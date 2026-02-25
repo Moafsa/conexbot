@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: conext-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_DB: conext_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d conext_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: conext-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  uzapi:
+    build:
+      context: ./docker/uzapi
+      dockerfile: Dockerfile
+    container_name: conext-uzapi
+    restart: unless-stopped
+    environment:
+      WUZAPI_ADMIN_TOKEN: admin_token_123
+      API_KEY: admin_token_123
+      WUZAPI_HTTP_PORT: 8080
+      # DB_HOST: postgres  <-- Removed to force SQLite
+      # DB_PORT: 5432
+      # DB_USER: admin
+      # DB_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      # DB_NAME: conext_db
+      TZ: America/Sao_Paulo
+    ports:
+      - "21465:8080"
+    volumes:
+      - wuzapi_data:/app/data
+      - wuzapi_sessions:/app/sessions
+
+  minio:
+    image: minio/minio
+    container_name: conext-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c " /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin; /usr/bin/mc mb ignore myminio/media; /usr/bin/mc start; /usr/bin/mc anonymous set public myminio/media; exit 0; "
+
+volumes:
+  pgdata:
+  redisdata:
+  wuzapi_data:
+  wuzapi_sessions:
+  miniodata:

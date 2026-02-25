@@ -1,0 +1,15 @@
+{
+    "secretKey": "12345",
+    "webhook": {
+        "url": "http://host.docker.internal:3000/api/webhooks/whatsapp",
+        "autoDownload": true,
+        "readMessage": true,
+        "allUnreadOnStart": true,
+        "listenAcks": true,
+        "onPresenceChanged": true,
+        "onParticipantsChanged": true
+    },
+    "log": {
+        "level": "silly"
+    }
+}
