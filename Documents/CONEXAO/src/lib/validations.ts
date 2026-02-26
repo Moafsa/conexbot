@@ -32,7 +32,10 @@ export const createBotSchema = z.object({
     enablePayments: z.boolean().optional().default(false),
     fallbackContact: z.string().regex(/^\d{10,15}$/, 'WhatsApp inválido (ex: 5511999999999)').optional(),
     webhookUrl: z.string().url('URL de webhook inválida').optional().or(z.literal('')),
-    webhookToken: z.string().optional()
+    webhookToken: z.string().optional(),
+    chatwootUrl: z.string().url('URL do Chatwoot inválida').optional().or(z.literal('')),
+    chatwootToken: z.string().optional(),
+    chatwootAccountId: z.string().optional()
 });
 
 export const updateBotSchema = createBotSchema.partial();

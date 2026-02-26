@@ -8,7 +8,7 @@ function logToFile(msg: string) {
     const timestamp = new Date().toISOString();
     const line = `[${timestamp}] ${msg}\n`;
     try {
-        fs.appendFileSync(path.join(process.cwd(), 'webhook-debug.log'), line);
+        fs.appendFileSync(path.join(process.cwd(), 'debug-today.log'), line);
     } catch (e) {
         console.error('Failed to log to file:', e);
     }

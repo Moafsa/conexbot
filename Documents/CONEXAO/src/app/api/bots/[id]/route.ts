@@ -74,9 +74,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         return NextResponse.json(updatedBot);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error updating bot:', error);
-        return NextResponse.json({ error: 'Falha ao atualizar agente' }, { status: 500 });
+        // Also log to our persistent log file
+        const fs = await import('fs');
+        const path = await import('path');
+        const logLine = `[${new Date().toISOString()}] [API PUT ERROR] ${error.message}\n${error.stack}\n`;
+        try {
+            fs.appendFileSync(path.join(process.cwd(), 'debug-today.log'), logLine);
+        } catch (e) { }
+
+        return NextResponse.json({ error: `Falha ao atualizar agente: ${error.message}` }, { status: 500 });
     }
 }
 

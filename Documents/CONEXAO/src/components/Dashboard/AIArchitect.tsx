@@ -173,11 +173,18 @@ export default function AIArchitect() {
           setBotData((prev: any) => ({ ...prev, creating: true }));
 
           const payload = {
+            ...botData,
             name: data.extractedData?.name || botData.name || "Novo Agente",
             businessType: data.extractedData?.businessType || botData.businessType || "Geral",
             voiceId: "brazil-1",
             knowledgeBase: data.extractedData?.knowledgeBase || botData.knowledgeBase,
             description: data.extractedData?.description || botData.description,
+            systemPrompt: data.extractedData?.systemPrompt || botData.systemPrompt,
+            webhookUrl: data.extractedData?.webhookUrl || botData.webhookUrl,
+            webhookToken: data.extractedData?.webhookToken || botData.webhookToken,
+            chatwootUrl: data.extractedData?.chatwootUrl || botData.chatwootUrl,
+            chatwootToken: data.extractedData?.chatwootToken || botData.chatwootToken,
+            chatwootAccountId: data.extractedData?.chatwootAccountId || botData.chatwootAccountId
           };
 
           if (editId) {
@@ -210,11 +217,30 @@ export default function AIArchitect() {
   };
 
   const handleManualSave = async (updatedData: any) => {
-    setBotData((prev: any) => ({ ...prev, ...updatedData }));
-    if (editId) {
-      await fetch(`/api/bots/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
+    try {
+      if (editId) {
+        const res = await fetch(`/api/bots/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedData)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          alert(`Erro ao salvar: ${errData.error || 'Erro desconhecido'}`);
+          return;
+        }
+
+        const savedBot = await res.json();
+        setBotData(savedBot);
+        alert('Configurações salvas com sucesso!');
+      } else {
+        setBotData((prev: any) => ({ ...prev, ...updatedData }));
+      }
+      setIsEditModalOpen(false);
+    } catch (e: any) {
+      alert(`Erro de conexão: ${e.message}`);
     }
-    setIsEditModalOpen(false);
   };
 
   return (

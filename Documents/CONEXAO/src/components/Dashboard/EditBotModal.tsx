@@ -16,7 +16,10 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         description: "",
         systemPrompt: "",
         webhookUrl: "",
-        webhookToken: ""
+        webhookToken: "",
+        chatwootUrl: "",
+        chatwootToken: "",
+        chatwootAccountId: ""
     });
     const [showPrompt, setShowPrompt] = useState(false);
 
@@ -28,7 +31,10 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 description: botData.description || "",
                 systemPrompt: botData.systemPrompt || "",
                 webhookUrl: botData.webhookUrl || "",
-                webhookToken: botData.webhookToken || ""
+                webhookToken: botData.webhookToken || "",
+                chatwootUrl: botData.chatwootUrl || "",
+                chatwootToken: botData.chatwootToken || "",
+                chatwootAccountId: botData.chatwootAccountId || ""
             });
         }
     }, [isOpen, botData]);
@@ -147,7 +153,48 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                             </div>
                         </div>
                         <p className="text-xs text-gray-500 mt-2">
-                            Se preenchido, o agente enviará e receberá mensagens por aqui (em vez do WhatsApp WuzAPI).
+                            Se preenchido, o agente enviará notificações para esta URL após processar mensagens.
+                        </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5">
+                        <h3 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">💬 Integração Chatwoot</h3>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-gray-400">URL do Chatwoot</label>
+                                <input
+                                    type="url"
+                                    value={formData.chatwootUrl}
+                                    onChange={(e) => setFormData({ ...formData, chatwootUrl: e.target.value })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="https://chatwoot.seu-dominio.com"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium text-gray-400">Token de Acesso (API Key)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.chatwootToken}
+                                        onChange={(e) => setFormData({ ...formData, chatwootToken: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Token da conta"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium text-gray-400">ID da Conta</label>
+                                    <input
+                                        type="text"
+                                        value={formData.chatwootAccountId}
+                                        onChange={(e) => setFormData({ ...formData, chatwootAccountId: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Ex: 1"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                            O bot usará estas credenciais para buscar informações do usuário e sincronizar conversas.
                         </p>
                     </div>
 

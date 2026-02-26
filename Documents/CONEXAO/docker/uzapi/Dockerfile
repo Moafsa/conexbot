@@ -13,6 +13,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /app/wuzapi .
+COPY --from=builder /app/migrations ./migrations
 # Create necessary directories
 RUN mkdir -p /app/data /app/files /app/sessions
 
