@@ -216,16 +216,26 @@ export const MessageProcessor = {
 
             // 6. CRM Extraction & Contact Management
             let existingContact = await prisma.contact.findUnique({
-                where: { phone_tenantId: { phone: senderPhone, tenantId: bot.tenantId } },
+                where: { phone_botId: { phone: senderPhone, botId: bot.id } },
+                include: { stage: true }
             });
 
             if (!existingContact) {
+                // If it's a new contact for this bot, attempt to find a default stage or first stage
+                const firstStage = await prisma.crmStage.findFirst({
+                    where: { botId: bot.id },
+                    orderBy: { order: 'asc' }
+                });
+
                 existingContact = await prisma.contact.create({
                     data: {
                         phone: senderPhone,
+                        botId: bot.id,
                         tenantId: bot.tenantId,
-                        funnelStage: 'LEAD',
+                        funnelStage: firstStage?.name || 'LEAD',
+                        stageId: firstStage?.id,
                     },
+                    include: { stage: true }
                 });
             }
 
@@ -256,6 +266,7 @@ export const MessageProcessor = {
                 messageText,
                 history,
                 ((existingContact as any).funnelStage) || 'LEAD',
+                bot.id,
                 aiClient as OpenAI,
                 aiModel
             );
@@ -266,13 +277,14 @@ export const MessageProcessor = {
                 where: { id: existingContact.id },
                 data: {
                     funnelStage: analysis.nextStage,
+                    stageId: analysis.nextStageId,
                     leadScore: analysis.leadScore,
                     sentiment: analysis.sentiment,
                     lastAiInsight: analysis.insight,
                     lastActive: new Date()
                 }
             });
-            (existingContact as any).funnelStage = analysis.nextStage;
+            existingContact.funnelStage = analysis.nextStage;
 
             // 8. RAG Context
             const vectorResults = await VectorService.searchSimilar(bot.id, messageText, 3);

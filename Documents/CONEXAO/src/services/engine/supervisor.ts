@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { FunnelStage } from '@prisma/client';
+import prisma from '@/lib/prisma';
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -12,55 +12,52 @@ export const SupervisorService = {
     async analyze(
         userMessage: string,
         history: { role: string, content: string }[],
-        currentStage: FunnelStage,
+        currentStage: string,
+        botId: string,
         aiClient?: OpenAI,
         aiModel?: string
     ): Promise<{
-        nextStage: FunnelStage;
+        nextStage: string;
+        nextStageId?: string;
         strategy: string;
         reasoning: string;
         leadScore: number;
         sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
         insight: string;
     }> {
+        // 1. Fetch dynamic stages for this bot
+        const dynamicStages = await prisma.crmStage.findMany({
+            where: { botId },
+            orderBy: { order: 'asc' }
+        });
 
-        const recentHistory = history.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n');
+        const stagesList = dynamicStages.length > 0
+            ? dynamicStages.map((s: any, i: number) => `${i + 1}. ${s.name}: ${s.description || 'Nenhuma descrição fornecida.'}`).join('\n        ')
+            : `1. LEAD: Cliente novo.\n        2. INTEREST: Interessado.\n        3. CUSTOMER: Cliente.`;
 
         const prompt = `
         VOCÊ É O SUPERVISOR DE VENDAS DA INTELIGÊNCIA ARTIFICIAL.
         
-        OBJETIVO: Analisar a conversa e decidir em qual etapa do FUNIL DE VENDAS o cliente está, além de qualificar o lead.
+        OBJETIVO: Analisar a conversa e decidir em qual etapa do CRM o cliente está, além de qualificar o lead.
         
-        ETAPAS DO FUNIL:
-        1. LEAD: Cliente novo, acabou de chegar.
-        2. AWARENESS: Cliente está conhecendo o produto/serviço.
-        3. INTEREST: Cliente demonstrou interesse, faz perguntas específicas.
-        4. CONSIDERATION: Cliente está avaliando preços, condições.
-        5. DECISION: Cliente quer comprar, pede link, pix ou contrato.
-        6. ACTION: Cliente já comprou (Pagamento confirmado).
-        7. SUPPORT: Cliente precisa de ajuda pós-venda.
-        8. CHURNED: Cliente, pediu para parar, xingou ou não quer mais.
+        ESTÁGIOS CONFIGURADOS PARA ESTE BOT:
+        ${stagesList}
+        
+        ESTADO ATUAL DO CLIENTE: ${currentStage}
 
-        ESTADO ATUAL: ${currentStage}
-
-        SUA TAREFA ADICIONAL:
-        1. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar. (0 = nenhum interesse, 100 = pronto para pagar).
-        2. SENTIMENTO: O cliente está sendo educado/positivo (POSITIVE), apenas funcional (NEUTRAL) ou agressivo/negativo (NEGATIVE)?
-        3. INSIGHT: Uma frase curta (estilo Slack alert) para o dono da empresa sobre este lead. Ex: "Cliente quente, interessado em prazos".
-
-        REGRAS DE TRANSIÇÃO (IMPORTANTE):
-        - Se o usuário disser "Oi", "Tudo bem", "Voltar" -> Volte para AWARENESS.
-        - Se o usuário perguntar preço -> Vá para CONSIDERATION.
-        - Se o usuário disser "não sei", "vou pensar", "tá caro", "será?" -> Vá para CONSIDERATION (OBJEÇÃO).
-        - Se o usuário disser "quero", "fechado", "ok" -> Vá para DECISION.
-        - Se o usuário pedir link, pix -> Vá para ACTION.
+        SUA TAREFA:
+        1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve mudar de coluna? 
+        2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar (100 = pronto).
+        3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
+        4. INSIGHT: Uma frase curta para o dono do bot.
+        5. ESTRATÉGIA: Como o bot deve agir agora?
 
         MENSAGEM ATUAL DO USUÁRIO:
         "${userMessage}"
 
         Retorne APENAS um JSON:
         {
-            "nextStage": "...",
+            "nextStage": "NOME_DO_ESTÁGIO_ESCOLHIDO",
             "strategy": "...",
             "reasoning": "...",
             "leadScore": 85,
@@ -81,10 +78,13 @@ export const SupervisorService = {
             });
 
             const result = JSON.parse(completion.choices[0].message.content || '{}');
+            const matchedStage = dynamicStages.find((s: any) => s.name.toLowerCase() === result.nextStage?.toLowerCase());
+
             return {
-                nextStage: result.nextStage as FunnelStage || currentStage,
+                nextStage: (matchedStage as any)?.name || result.nextStage || currentStage,
+                nextStageId: (matchedStage as any)?.id,
                 strategy: result.strategy || "Responda cordialmente.",
-                reasoning: result.reasoning || "Análise padrão.",
+                reasoning: result.reasoning || "Análise dinâmica.",
                 leadScore: result.leadScore || 0,
                 sentiment: result.sentiment || 'NEUTRAL',
                 insight: result.insight || "Nenhum insight novo."
@@ -104,27 +104,19 @@ export const SupervisorService = {
     },
 
     /**
-     * Returns a specific system prompt amendment based on the stage.
+     * Returns a specific system prompt amendment based on the stage name.
      */
-    getStagePrompt(stage: FunnelStage): string {
-        switch (stage) {
-            case 'LEAD':
-            case 'AWARENESS':
-                return "FOCO: QUALIFICAÇÃO (MANDATÓRIA). Não tente vender ainda. Seu objetivo é virar um 'Agente Qualificador'. Pergunte: 1. Qual a empresa dele? 2. Qual o cargo? 3. Qual o maior desafio hoje? Só avance depois de ter uma noção básica de quem é o cliente.";
-            case 'INTEREST':
-                return "FOCO: Apresentação de Solução. Conecte o problema do cliente ao beneficio do produto. Use 'Isso é perfeito para você porque...'";
-            case 'CONSIDERATION':
-                return "FOCO: QUEBRA DE OBJEÇÃO (CRÍTICO). O cliente está em dúvida. NÃO ACEITE UM 'NÃO' FÁCIL. Use gatilhos mentais: Escassez ('Vagas acabando'), Autoridade ('Maior evento do setor') ou Prova Social. Resgate o que ele disse antes para convencer.";
-            case 'DECISION':
-                return "FOCO: Fechamento (CLOSING). Seja direto. Envie link de pagamento ou PIX. Use gatilhos de escassez leve.";
-            case 'ACTION':
-                return "FOCO: Pós-venda e Onboarding. Parabenize pela compra. Explique os próximos passos.";
-            case 'SUPPORT':
-                return "FOCO: Resolução de Problemas. Seja extremamente calmo, empático e resolutivo. Não tente vender.";
-            case 'CHURNED':
-                return "FOCO: Despedida cordial. Deixe a porta aberta.";
-            default:
-                return "FOCO: Atendimento prestativo.";
+    getStagePrompt(stageName: string): string {
+        const name = (stageName || '').toUpperCase();
+        if (name === 'LEAD' || name === 'AWARENESS') {
+            return "FOCO: QUALIFICAÇÃO. Identifique as necessidades básicas e quem é o cliente.";
         }
+        if (name === 'INTEREST' || name === 'INTERESSADO') {
+            return "FOCO: Apresentação de Solução. Mostre como o produto resolve a dor dele.";
+        }
+        if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO') {
+            return "FOCO: FECHAMENTO. Seja direto e encoraje o pagamento/contratação.";
+        }
+        return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
     }
 };

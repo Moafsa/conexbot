@@ -2,11 +2,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         // params.id is the BOT ID
         const bot = await prisma.bot.findUnique({
-            where: { id: params.id },
+            where: { id: id },
             select: { tenantId: true }
         });
 

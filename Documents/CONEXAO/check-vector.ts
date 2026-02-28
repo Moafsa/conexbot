@@ -20,7 +20,7 @@ async function checkVector() {
             try {
                 await client.query("CREATE EXTENSION IF NOT EXISTS vector;");
                 console.log('🎉 pgvector extension ENABLED SAFELY!');
-            } catch (err) {
+            } catch (err: any) {
                 console.error('❌ Failed to enable pgvector via SQL:', err.message);
                 console.log('\n💡 DATA: If you are using Supabase/Neon, enable it in the Dashboard.');
                 console.log('💡 DOCKER: Ensure your image is `pgvector/pgvector:pg16` or similar.');

@@ -2,13 +2,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const body = await req.json();
         const { funnelStage, name, email, notes, tags } = body;
 
         const contact = await prisma.contact.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 funnelStage,
                 name,
@@ -24,10 +25,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const contact = await prisma.contact.findUnique({
-            where: { id: params.id },
+            where: { id },
             include: {
                 orders: true
             }

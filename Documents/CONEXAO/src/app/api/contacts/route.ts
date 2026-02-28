@@ -13,11 +13,16 @@ export async function GET(req: Request) {
 
         const tenantId = (session.user as any).id; // In this app, user ID is tenant ID
 
+        const { searchParams } = new URL(req.url);
+        const botId = searchParams.get('botId');
+
         const contacts = await prisma.contact.findMany({
             where: {
-                tenantId: tenantId
+                tenantId: tenantId,
+                botId: botId || undefined
             },
             include: {
+                stage: true,
                 orders: true // Include orders for value calculation
             },
             orderBy: {

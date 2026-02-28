@@ -103,7 +103,7 @@ function parseHtml(html: string): ScrapeResult {
         if ($(el).parents('nav, footer, header').length > 0) return;
 
         const text = $(el).text().trim().replace(/\s+/g, ' ');
-        const tag = (el as cheerio.Element).tagName?.toLowerCase() || '';
+        const tag = (el as any).tagName?.toLowerCase() || '';
 
         // Filter noise: simple text checks
         if (!text || text.length < 2) return;

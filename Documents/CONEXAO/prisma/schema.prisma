@@ -105,6 +105,23 @@ model Bot {
   orders            Order[]
   products          Product[]
   vectors           VectorStore[]
+  crmStages         CrmStage[]
+  contacts          Contact[]
+}
+
+model CrmStage {
+  id          String    @id @default(uuid())
+  name        String
+  color       String    @default("gray")
+  order       Int       @default(0)
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  botId       String
+  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contacts    Contact[]
+
+  @@unique([botId, name])
 }
 
 model BotMedia {
@@ -170,18 +187,22 @@ model Contact {
   needs         String?
   notes         String?
   tags          String[]
-  funnelStage   FunnelStage @default(LEAD)
+  funnelStage   String      @default("LEAD")
   lastActive    DateTime    @default(now())
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   tenantId      String
+  botId         String?
+  stageId       String?
   lastAiInsight String?
   leadScore     Int         @default(0)
   sentiment     String?
   tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bot           Bot?        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  stage         CrmStage?   @relation(fields: [stageId], references: [id], onDelete: SetNull)
   orders        Order[]
 
-  @@unique([phone, tenantId])
+  @@unique([phone, botId])
 }
 
 model Conversation {
