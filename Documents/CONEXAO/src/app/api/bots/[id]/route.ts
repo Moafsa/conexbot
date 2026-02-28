@@ -49,11 +49,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         const body = await req.json();
+        console.log('[API /bots/[id] PUT] Received Body:', JSON.stringify(body, null, 2));
+
         const parsed = updateBotSchema.safeParse(body);
 
         if (!parsed.success) {
+            console.error('[API /bots/[id] PUT] Validation Error:', parsed.error.issues);
             return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
         }
+
+        console.log('[API /bots/[id] PUT] Parsed Data:', JSON.stringify(parsed.data, null, 2));
 
         const updatedBot = await prisma.bot.update({
             where: { id },

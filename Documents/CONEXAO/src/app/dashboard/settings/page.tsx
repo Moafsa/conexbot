@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign } from "lucide-react";
+import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
@@ -17,6 +17,7 @@ export default function SettingsPage() {
     const [profile, setProfile] = useState({ name: "", email: "", whatsapp: "" });
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
     const [finance, setFinance] = useState({ asaasApiKey: "" });
+    const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "" });
     const [bots, setBots] = useState<any[]>([]);
     const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
 
@@ -42,6 +43,14 @@ export default function SettingsPage() {
                     const res = await fetch("/api/settings/finance");
                     const data = await res.json();
                     if (res.ok) setFinance({ asaasApiKey: data.asaasApiKey || "" });
+                } else if (activeTab === "ai") {
+                    const res = await fetch("/api/settings/ai");
+                    const data = await res.json();
+                    if (res.ok) setAiSettings({
+                        openaiApiKey: data.openaiApiKey || "",
+                        geminiApiKey: data.geminiApiKey || "",
+                        openrouterApiKey: data.openrouterApiKey || ""
+                    });
                 }
             } catch (err) {
                 console.error(err);
@@ -133,6 +142,24 @@ export default function SettingsPage() {
         }
     };
 
+    const handleSaveAiSettings = async () => {
+        setSaving(true);
+        setMessage(null);
+        try {
+            const res = await fetch("/api/settings/ai", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(aiSettings)
+            });
+            if (!res.ok) throw new Error("Erro ao salvar configurações de IA");
+            setMessage({ type: 'success', text: "Configurações de IA salvas!" });
+        } catch (err) {
+            setMessage({ type: 'error', text: "Erro ao salvar configurações." });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const TabButton = ({ id, label, icon: Icon }: any) => (
         <button
             onClick={() => setActiveTab(id)}
@@ -155,6 +182,7 @@ export default function SettingsPage() {
                 <div className="glass rounded-2xl p-4 h-fit space-y-2">
                     <TabButton id="profile" label="Perfil" icon={User} />
                     <TabButton id="whatsapp" label="Conexão WhatsApp" icon={Smartphone} />
+                    <TabButton id="ai" label="Inteligência Artificial" icon={Zap} />
                     <TabButton id="finance" label="Financeiro & Pagamentos" icon={DollarSign} />
                     <TabButton id="notifications" label="Notificações" icon={Bell} />
                     <TabButton id="security" label="Segurança" icon={Shield} />
@@ -287,6 +315,59 @@ export default function SettingsPage() {
                                             ))
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {activeTab === "ai" && (
+                                <div className="space-y-6 max-w-md animate-fade-in">
+                                    <h3 className="text-xl font-semibold">Provedores de IA</h3>
+                                    <p className="text-gray-400 text-sm">
+                                        Configure suas chaves de API para habilitar diferentes inteligências artificiais no seu bot.
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2">OpenAI API Key</label>
+                                            <input
+                                                type="password"
+                                                value={aiSettings.openaiApiKey}
+                                                onChange={e => setAiSettings({ ...aiSettings, openaiApiKey: e.target.value })}
+                                                placeholder="sk-..."
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2">Gemini API Key</label>
+                                            <input
+                                                type="password"
+                                                value={aiSettings.geminiApiKey}
+                                                onChange={e => setAiSettings({ ...aiSettings, geminiApiKey: e.target.value })}
+                                                placeholder="AIza..."
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2">OpenRouter API Key</label>
+                                            <input
+                                                type="password"
+                                                value={aiSettings.openrouterApiKey}
+                                                onChange={e => setAiSettings({ ...aiSettings, openrouterApiKey: e.target.value })}
+                                                placeholder="sk-or-..."
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={handleSaveAiSettings}
+                                        disabled={saving}
+                                        className="btn-primary flex items-center gap-2 mt-4"
+                                    >
+                                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                        Salvar Chaves
+                                    </button>
                                 </div>
                             )}
 

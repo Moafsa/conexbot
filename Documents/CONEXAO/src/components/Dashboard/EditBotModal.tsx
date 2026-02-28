@@ -9,6 +9,28 @@ interface EditBotModalProps {
     onSave: (updatedData: any) => void;
 }
 
+const MODELS_BY_PROVIDER: Record<string, { id: string, name: string }[]> = {
+    openai: [
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4o', name: 'GPT-4o (Completo)' },
+        { id: 'o1-mini', name: 'o1 Mini' },
+    ],
+    gemini: [
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Legacy)' },
+    ],
+    openrouter: [
+        { id: 'x-ai/grok-2', name: 'Grok 2 (xAI)' },
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+        { id: 'meta-llama/llama-3.1-405b', name: 'Llama 3.1 405B' },
+        { id: 'google/gemini-flash-1.5', name: 'Gemini 1.5 Flash (via OpenRouter)' },
+    ]
+};
+
+const getDefaultModel = (provider: string) => MODELS_BY_PROVIDER[provider]?.[0]?.id || "";
+const getAvailableModels = (provider: string) => MODELS_BY_PROVIDER[provider] || [];
+
 export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditBotModalProps) {
     const [formData, setFormData] = useState({
         name: "",
@@ -19,7 +41,9 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         webhookToken: "",
         chatwootUrl: "",
         chatwootToken: "",
-        chatwootAccountId: ""
+        chatwootAccountId: "",
+        aiProvider: "openai",
+        aiModel: "gpt-4o-mini"
     });
     const [showPrompt, setShowPrompt] = useState(false);
 
@@ -34,7 +58,9 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 webhookToken: botData.webhookToken || "",
                 chatwootUrl: botData.chatwootUrl || "",
                 chatwootToken: botData.chatwootToken || "",
-                chatwootAccountId: botData.chatwootAccountId || ""
+                chatwootAccountId: botData.chatwootAccountId || "",
+                aiProvider: botData.aiProvider || "openai",
+                aiModel: botData.aiModel || "gpt-4o-mini"
             });
         }
     }, [isOpen, botData]);
@@ -88,6 +114,41 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                 required
                             />
                         </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5 space-y-4">
+                        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">🤖 Inteligência Artificial</h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-gray-400">Provedor</label>
+                                <select
+                                    value={formData.aiProvider}
+                                    onChange={(e) => setFormData({ ...formData, aiProvider: e.target.value, aiModel: getDefaultModel(e.target.value) })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="openai">OpenAI</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openrouter">OpenRouter (Grok, Claude, etc)</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-gray-400">Modelo</label>
+                                <select
+                                    value={formData.aiModel}
+                                    onChange={(e) => setFormData({ ...formData, aiModel: e.target.value })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    {getAvailableModels(formData.aiProvider).map((model: { id: string, name: string }) => (
+                                        <option key={model.id} value={model.id}>{model.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                            Certifique-se de ter configurado a chave de API correspondente em Configurações `{'>'}` Inteligência Artificial.
+                        </p>
                     </div>
 
                     <div className="space-y-2">

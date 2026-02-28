@@ -12,7 +12,9 @@ export const SupervisorService = {
     async analyze(
         userMessage: string,
         history: { role: string, content: string }[],
-        currentStage: FunnelStage
+        currentStage: FunnelStage,
+        aiClient?: OpenAI,
+        aiModel?: string
     ): Promise<{
         nextStage: FunnelStage;
         strategy: string;
@@ -68,8 +70,11 @@ export const SupervisorService = {
         `;
 
         try {
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
+            const client = aiClient || openai;
+            const modelToUse = aiModel || 'gpt-4o-mini';
+
+            const completion = await client.chat.completions.create({
+                model: modelToUse,
                 messages: [{ role: "system", content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2

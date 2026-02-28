@@ -70,6 +70,8 @@ export async function POST(req: Request) {
                 websiteUrl: parsed.data.websiteUrl,
                 enablePayments: parsed.data.enablePayments || false,
                 fallbackContact: parsed.data.fallbackContact,
+                aiProvider: parsed.data.aiProvider || 'openai',
+                aiModel: parsed.data.aiModel || 'gpt-4o-mini',
                 tenantId,
             },
         });

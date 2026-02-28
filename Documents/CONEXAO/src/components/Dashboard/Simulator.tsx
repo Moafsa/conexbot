@@ -98,8 +98,8 @@ export function Simulator({ botId }: { botId: string }) {
                     >
                         <div
                             className={`max-w-[80%] rounded-lg p-3 text-sm ${msg.role === 'user'
-                                    ? 'bg-[#dcf8c6] text-gray-800 rounded-tr-none shadow-sm'
-                                    : 'bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-100'
+                                ? 'bg-[#dcf8c6] text-gray-800 rounded-tr-none shadow-sm'
+                                : 'bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-100'
                                 }`}
                         >
                             <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
@@ -129,7 +129,7 @@ export function Simulator({ botId }: { botId: string }) {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                         placeholder="Digite sua mensagem..."
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                        className="flex-1 px-4 py-2 bg-white text-gray-900 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
                         disabled={loading}
                     />
                     <button

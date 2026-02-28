@@ -25,9 +25,113 @@ function logToFile(msg: string) {
     }
 }
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// Helper to get AI client and config
+class GeminiWrapper {
+    constructor(private apiKey: string) { }
+    chat = {
+        completions: {
+            create: async (body: any) => {
+                const model = body.model;
+                let systemContent = "";
+                const contents = body.messages.map((m: any) => {
+                    if (m.role === 'system') {
+                        systemContent += m.content + "\n";
+                        return null;
+                    }
+
+                    let parts: any[] = [];
+                    if (Array.isArray(m.content)) {
+                        parts = m.content.map((c: any) => {
+                            if (c.type === 'image_url') {
+                                const [mimeInfo, base64] = c.image_url.url.split(';base64,');
+                                const mimeType = mimeInfo.replace('data:', '');
+                                return { inlineData: { mimeType, data: base64 } };
+                            }
+                            return { text: c.text };
+                        });
+                    } else {
+                        parts = [{ text: m.content }];
+                    }
+
+                    return {
+                        role: m.role === 'assistant' ? 'model' : 'user',
+                        parts
+                    };
+                }).filter(Boolean);
+
+                const reqBody: any = { contents };
+                if (systemContent) {
+                    reqBody.systemInstruction = { parts: [{ text: systemContent }] };
+                }
+
+                if (body.response_format?.type === "json_object") {
+                    reqBody.generationConfig = { responseMimeType: "application/json" };
+                }
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reqBody)
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Gemini API Error: ${res.status} - ${await res.text()}`);
+                }
+                const data = await res.json();
+
+                return {
+                    choices: [{
+                        message: {
+                            content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+                        }
+                    }]
+                };
+            }
+        }
+    }
+}
+
+async function getAiClient(bot: any) {
+    const provider = bot.aiProvider || 'openai';
+    let model = bot.aiModel || 'gpt-4o-mini';
+
+    // Priority: Bot/Tenant specific key > Environment key
+    const tenantOpenRouterKey = bot.tenant.openrouterApiKey;
+    const tenantGeminiKey = bot.tenant.geminiApiKey;
+    const tenantOpenAIKey = bot.tenant.openaiApiKey;
+
+    if (provider === 'openrouter') {
+        const apiKey = tenantOpenRouterKey || process.env.OPENROUTER_API_KEY;
+        if (!apiKey) throw new Error('OpenRouter API Key not configured');
+        return {
+            client: new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' }),
+            model,
+        };
+    }
+
+    if (provider === 'gemini') {
+        const apiKey = tenantGeminiKey || process.env.GEMINI_API_KEY;
+        if (!apiKey) throw new Error('Gemini API Key not configured');
+
+        // Force upgrade legacy gemini models
+        if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model === 'gemini-2.0-flash') {
+            model = 'gemini-2.5-flash';
+        }
+
+        return {
+            client: new GeminiWrapper(apiKey) as any,
+            model,
+        };
+    }
+
+    // Default: OpenAI
+    const apiKey = tenantOpenAIKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API Key not configured');
+    return {
+        client: new OpenAI({ apiKey }),
+        model,
+    };
+}
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
@@ -60,6 +164,10 @@ export const MessageProcessor = {
                 logToFile(`[Processor] LIMIT REACHED - Bypassing for now`);
             }
 
+            // 2.5 Prepare AI Client
+            const { client: aiClient, model: aiModel } = await getAiClient(bot);
+            logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} / Model: ${aiModel}`);
+
             // 3. Find or create conversation
             const conversation = await prisma.conversation.upsert({
                 where: {
@@ -78,7 +186,7 @@ export const MessageProcessor = {
             if (options.inputType === 'image' && options.mediaPath) {
                 const { VisionService } = await import('./vision');
                 try {
-                    const description = await VisionService.analyze(options.mediaPath, messageText);
+                    const description = await VisionService.analyze(options.mediaPath, messageText, aiClient as OpenAI, aiModel);
                     contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\nLegenda: "${messageText}"\nDescrição da IA: ${description}`;
                 } catch (e) {
                     console.error('Vision analysis failed:', e);
@@ -147,7 +255,9 @@ export const MessageProcessor = {
             const analysis = await SupervisorService.analyze(
                 messageText,
                 history,
-                ((existingContact as any).funnelStage) || 'LEAD'
+                ((existingContact as any).funnelStage) || 'LEAD',
+                aiClient as OpenAI,
+                aiModel
             );
 
             logToFile(`[Processor] SUPERVISOR: ${(existingContact as any).funnelStage} -> ${analysis.nextStage}`);
@@ -200,9 +310,9 @@ export const MessageProcessor = {
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
             const finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
 
-            // 10. Call OpenAI
+            // 10. Call AI Provider
             const messages = buildConversationMessages(finalSystemPrompt, history);
-            const completion = await openai.chat.completions.create({ model: 'gpt-4o-mini', messages, temperature: 0.7, max_tokens: 500 });
+            const completion = await aiClient.chat.completions.create({ model: aiModel, messages, temperature: 0.7, max_tokens: 500 });
             const aiResponse = completion.choices[0]?.message?.content?.trim() || 'Desculpe, não entendi.';
 
             // 11. Parse Media & Payments
@@ -253,7 +363,7 @@ export const MessageProcessor = {
                     bot: { id: bot.id, name: bot.name },
                     contact: { id: existingContact.id, phone: senderPhone, name: existingContact.name, email: existingContact.email, stage: (existingContact as any).funnelStage },
                     incoming: { text: messageText, type: options.inputType, channel: channel },
-                    response: { text: cleanResponse, media: mediaMatches.length > 0 ? (bot.media as any[]).filter(m => mediaMatches.some(match => match[1] === m.id)) : [] },
+                    response: { text: cleanResponse, media: mediaMatches.length > 0 ? (bot.media as any[]).filter(m => (mediaMatches as any[]).some(match => match[1] === m.id)) : [] },
                     timestamp: new Date().toISOString()
                 };
 
@@ -301,7 +411,7 @@ export const MessageProcessor = {
                     await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
                 }
 
-                for (const match of mediaMatches) {
+                for (const match of mediaMatches as any[]) {
                     const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
                     if (media) await UzapiService.sendMedia(bot.sessionName, senderPhone, media.type, media.url, media.description || media.filename);
                 }
@@ -312,7 +422,7 @@ export const MessageProcessor = {
                 await prisma.usageCounter.update({ where: { id: counter.id }, data: { messagesUsed: { increment: 1 } } });
             }
 
-            return { text: cleanResponse, media: mediaMatches.map(m => m[1]) };
+            return { text: cleanResponse, media: mediaMatches.map((m: any) => m[1]) };
 
         } catch (error: any) {
             logToFile(`[Processor] ERROR: ${error?.message || error}`);

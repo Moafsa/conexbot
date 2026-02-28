@@ -184,7 +184,9 @@ export default function AIArchitect() {
             webhookToken: data.extractedData?.webhookToken || botData.webhookToken,
             chatwootUrl: data.extractedData?.chatwootUrl || botData.chatwootUrl,
             chatwootToken: data.extractedData?.chatwootToken || botData.chatwootToken,
-            chatwootAccountId: data.extractedData?.chatwootAccountId || botData.chatwootAccountId
+            chatwootAccountId: data.extractedData?.chatwootAccountId || botData.chatwootAccountId,
+            aiProvider: data.extractedData?.aiProvider || botData.aiProvider || "openai",
+            aiModel: data.extractedData?.aiModel || botData.aiModel || "gpt-4o-mini"
           };
 
           if (editId) {

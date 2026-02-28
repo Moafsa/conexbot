@@ -54,14 +54,18 @@ model Tenant {
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
   notificationPreferences String?
-  asaasApiKey             String?
-  accounts                Account[]
-  bots                    Bot[]
-  contacts                Contact[]
-  payments                Payment[]
-  sessions                Session[]
-  subscription            Subscription?
-  usageCounter            UsageCounter?
+  botLimit               Int           @default(1)
+  asaasApiKey            String?
+  openaiApiKey           String?
+  geminiApiKey           String?
+  openrouterApiKey       String?
+  accounts               Account[]
+  bots                   Bot[]
+  contacts               Contact[]
+  payments               Payment[]
+  sessions               Session[]
+  subscription           Subscription?
+  usageCounter           UsageCounter?
 }
 
 model Bot {
@@ -84,6 +88,8 @@ model Bot {
   enablePayments    Boolean        @default(false)
   fallbackContact   String?
   systemPrompt      String?
+  aiProvider        String         @default("openai")
+  aiModel           String         @default("gpt-4o-mini")
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   tenantId          String

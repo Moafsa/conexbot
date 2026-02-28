@@ -10,7 +10,7 @@ export const VisionService = {
     /**
      * Analyze an image and return a description.
      */
-    async analyze(imagePath: string, caption?: string): Promise<string> {
+    async analyze(imagePath: string, caption?: string, aiClient?: OpenAI, aiModel?: string): Promise<string> {
         try {
             console.log(`[VisionService] Analyzing ${imagePath}...`);
 
@@ -35,8 +35,11 @@ export const VisionService = {
                 },
             ];
 
-            const response = await openai.chat.completions.create({
-                model: "gpt-4o-mini", // Supports vision
+            const client = aiClient || openai;
+            const modelToUse = aiModel || "gpt-4o-mini"; // Standard vision model
+
+            const response = await client.chat.completions.create({
+                model: modelToUse,
                 messages: messages,
                 max_tokens: 300,
             });

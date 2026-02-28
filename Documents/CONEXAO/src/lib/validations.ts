@@ -35,7 +35,9 @@ export const createBotSchema = z.object({
     webhookToken: z.string().optional(),
     chatwootUrl: z.string().url('URL do Chatwoot inválida').optional().or(z.literal('')),
     chatwootToken: z.string().optional(),
-    chatwootAccountId: z.string().optional()
+    chatwootAccountId: z.string().optional(),
+    aiProvider: z.string().optional().default('openai'),
+    aiModel: z.string().optional().default('gpt-4o-mini')
 });
 
 export const updateBotSchema = createBotSchema.partial();
