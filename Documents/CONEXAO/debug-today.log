@@ -1,0 +1,172 @@
+[2026-02-28T00:14:02.713Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_skr4a / "oi]" / simulator
+[2026-02-28T00:14:02.765Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:14:02.767Z] [Processor] Using Provider: gemini / Model: gemini-1.5-flash
+[2026-02-28T00:14:02.812Z] [Processor] Chatwoot lookup for SIM_skr4a
+[2026-02-28T00:14:02.813Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=4
+[2026-02-28T00:14:03.767Z] [Chatwoot] Found 15 contacts for 4. Returning first match.
+[2026-02-28T00:14:03.768Z] [Processor] Chatwoot contact found: 555496662391
+[2026-02-28T00:14:04.521Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:14:05.249Z] [Processor] ERROR: 404 status code (no body)
+[2026-02-28T00:21:14.153Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_lydheb / "Oi" / simulator
+[2026-02-28T00:21:14.235Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:21:14.237Z] [Processor] Using Provider: gemini / Model: gemini-1.5-flash
+[2026-02-28T00:21:14.322Z] [Processor] Chatwoot lookup for SIM_lydheb
+[2026-02-28T00:21:14.327Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:21:15.203Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:21:15.969Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:21:16.880Z] [Processor] ERROR: 404 status code (no body)
+[2026-02-28T00:31:11.836Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_yc7abi / "Op" / simulator
+[2026-02-28T00:31:11.879Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:31:11.881Z] [Processor] Using Provider: gemini / Model: gemini-1.5-flash
+[2026-02-28T00:31:11.909Z] [Processor] Chatwoot lookup for SIM_yc7abi
+[2026-02-28T00:31:11.910Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=7
+[2026-02-28T00:31:12.844Z] [Chatwoot] Found 15 contacts for 7. Returning first match.
+[2026-02-28T00:31:12.845Z] [Processor] Chatwoot contact found: Moacir Ferreira
+[2026-02-28T00:31:13.442Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:31:15.393Z] [Processor] ERROR: Gemini API Error: 404 - {
+  "error": {
+    "code": 404,
+    "message": "models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+    "status": "NOT_FOUND"
+  }
+}
+
+[2026-02-28T00:40:51.703Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_tjfino / "oi" / simulator
+[2026-02-28T00:40:51.757Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:40:51.757Z] [Processor] Using Provider: gemini / Model: gemini-1.5-flash
+[2026-02-28T00:40:51.789Z] [Processor] Chatwoot lookup for SIM_tjfino
+[2026-02-28T00:40:51.790Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:40:52.855Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:40:54.133Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:40:55.088Z] [Processor] ERROR: Gemini API Error: 404 - {
+  "error": {
+    "code": 404,
+    "message": "models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.",
+    "status": "NOT_FOUND"
+  }
+}
+
+[2026-02-28T00:48:44.292Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_TEST_123 / "oi, tudo bem?" / simulator
+[2026-02-28T00:48:44.348Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:48:44.349Z] [Processor] Using Provider: gemini / Model: gemini-2.0-flash
+[2026-02-28T00:48:44.380Z] [Processor] Chatwoot lookup for SIM_TEST_123
+[2026-02-28T00:48:44.381Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=123
+[2026-02-28T00:48:45.293Z] [Chatwoot] Found 1 contacts for 123. Returning first match.
+[2026-02-28T00:48:45.294Z] [Processor] Chatwoot contact found: Leo Brito Recanto da Lagoa
+[2026-02-28T00:48:46.038Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:48:47.201Z] [Processor] ERROR: Gemini API Error: 429 - {
+  "error": {
+    "code": 429,
+    "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.0-flash\nPlease retry in 37.435463269s.",
+    "status": "RESOURCE_EXHAUSTED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.Help",
+        "links": [
+          {
+            "description": "Learn more about Gemini API quotas",
+            "url": "https://ai.google.dev/gemini-api/docs/rate-limits"
+          }
+        ]
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+        "violations": [
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+            "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+            "quotaDimensions": {
+              "model": "gemini-2.0-flash",
+              "location": "global"
+            }
+          },
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+            "quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier",
+            "quotaDimensions": {
+              "model": "gemini-2.0-flash",
+              "location": "global"
+            }
+          },
+          {
+            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_input_token_count",
+            "quotaId": "GenerateContentInputTokensPerModelPerMinute-FreeTier",
+            "quotaDimensions": {
+              "model": "gemini-2.0-flash",
+              "location": "global"
+            }
+          }
+        ]
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.RetryInfo",
+        "retryDelay": "37s"
+      }
+    ]
+  }
+}
+
+[2026-02-28T00:50:18.598Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_TEST_123 / "oi, tudo bem?" / simulator
+[2026-02-28T00:50:18.656Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:50:18.657Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:50:18.681Z] [Processor] Chatwoot lookup for SIM_TEST_123
+[2026-02-28T00:50:18.682Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=123
+[2026-02-28T00:50:19.595Z] [Chatwoot] Found 1 contacts for 123. Returning first match.
+[2026-02-28T00:50:19.596Z] [Processor] Chatwoot contact found: Leo Brito Recanto da Lagoa
+[2026-02-28T00:50:20.035Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:56:38.070Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "op" / simulator
+[2026-02-28T00:56:38.138Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:56:38.139Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:56:38.188Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:56:38.189Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:56:39.236Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:56:39.782Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:56:52.113Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "me fale mais" / simulator
+[2026-02-28T00:56:52.146Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:56:52.147Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:56:52.168Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:56:52.170Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:56:53.034Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:56:53.509Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:57:13.705Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "automação" / simulator
+[2026-02-28T00:57:13.783Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:57:13.784Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:57:13.830Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:57:13.831Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:57:14.681Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:57:15.111Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:57:40.863Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "network" / simulator
+[2026-02-28T00:57:40.911Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:57:40.912Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:57:40.933Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:57:40.933Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:57:41.751Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:57:42.221Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:58:31.687Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "sim" / simulator
+[2026-02-28T00:58:31.741Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:58:31.742Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:58:31.795Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:58:31.796Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:58:32.623Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:58:33.173Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:58:55.983Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "Conext" / simulator
+[2026-02-28T00:58:56.104Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:58:56.107Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:58:56.178Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:58:56.180Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:58:57.001Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:58:57.526Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T00:59:24.774Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "CEO" / simulator
+[2026-02-28T00:59:24.832Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T00:59:24.833Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T00:59:24.856Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T00:59:24.856Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T00:59:25.701Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T00:59:26.249Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-02-28T01:30:53.526Z] [Processor] START: d0e0fed2-5168-4b49-9226-3926cc7a65ae / SIM_vwykya / "o duplo" / simulator
+[2026-02-28T01:30:54.487Z] [Processor] LIMIT REACHED - Bypassing for now
+[2026-02-28T01:30:54.497Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-02-28T01:30:54.618Z] [Processor] Chatwoot lookup for SIM_vwykya
+[2026-02-28T01:30:54.623Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
+[2026-02-28T01:30:56.096Z] [Chatwoot] No contact found in Chatwoot for 
+[2026-02-28T01:30:57.896Z] [Processor] SUPERVISOR: LEAD -> LEAD
