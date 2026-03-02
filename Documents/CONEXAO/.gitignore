@@ -31,7 +31,17 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-# .env*
+.env*
+
+# debug and logs
+*.log
+debug-today.log
+gemini-req.log
+
+# temporary media
+public/media/temp/*.mp3
+temp_audio_*
+temp_image_*
 
 # vercel
 .vercel
