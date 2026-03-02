@@ -176,7 +176,7 @@ export default function AIArchitect() {
             ...botData,
             name: data.extractedData?.name || botData.name || "Novo Agente",
             businessType: data.extractedData?.businessType || botData.businessType || "Geral",
-            voiceId: botData.voiceId || "brazil-1",
+            voiceId: botData.voiceId || "",
             knowledgeBase: data.extractedData?.knowledgeBase || botData.knowledgeBase,
             description: data.extractedData?.description || botData.description,
             systemPrompt: data.extractedData?.systemPrompt || botData.systemPrompt,
