@@ -218,3 +218,36 @@
 [2026-03-02T13:10:24.117Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "sim" / simulator
 [2026-03-02T13:10:24.184Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
 [2026-03-02T13:10:28.007Z] [Processor] SUPERVISOR: NEGOCIAÇÃO -> GANHO
+[2026-03-02T14:32:13.668Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_4t265n / "oi" / simulator
+[2026-03-02T14:32:14.014Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-03-02T14:32:14.847Z] [Processor] SUPERVISOR: NOVO -> NOVO
+[2026-03-02T14:33:07.780Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_4t265n / "me fale mais" / simulator
+[2026-03-02T14:33:07.834Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-03-02T14:33:08.337Z] [Processor] SUPERVISOR: NOVO -> NOVO
+[2026-03-02T14:33:26.522Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_4t265n / "interesante" / simulator
+[2026-03-02T14:33:26.570Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-03-02T14:33:27.156Z] [Processor] SUPERVISOR: NOVO -> NOVO
+[2026-03-02T15:00:21.682Z] --- Incoming Webhook ---
+[2026-03-02T15:00:21.686Z] Content-Type: application/x-www-form-urlencoded
+[2026-03-02T15:00:21.708Z] Form Data - Token: bot-d0fd70d8
+[2026-03-02T15:00:21.713Z] Raw JD: {"event":{"Info":{"Chat":"8766162493551@lid","Sender":"8766162493551@lid","IsFromMe":false,"IsGroup":false,"AddressingMode":"","SenderAlt":"555497092223@s.whatsapp.net","RecipientAlt":"","BroadcastListOwner":"","BroadcastRecipients":null,"ID":"ACB15445F36324B1ED0EE8E0C96A66E1","ServerID":0,"Type":"text","PushName":"Moacir Ferreira","Timestamp":"2026-03-02T12:01:00-03:00","Category":"","Multicast":false,"MediaType":"","Edit":"","MsgBotInfo":{"EditType":"","EditTargetID":"","EditSenderTimestampMS"
+[2026-03-02T15:00:21.714Z] Event Type detected: Message
+[2026-03-02T15:00:21.714Z] Processing message: From=8766162493551@lid, Me=false, Body=Opa
+[2026-03-02T15:00:21.715Z] Calling MessageProcessor for 8766162493551@lid / bot-d0fd70d8
+[2026-03-02T15:00:21.733Z] Message buffered for 8766162493551@lid
+[2026-03-02T15:00:24.736Z] [Processor] START: bot-d0fd70d8 / 8766162493551@lid / "Opa" / whatsapp
+[2026-03-02T15:00:24.964Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-03-02T15:00:25.445Z] [Processor] SUPERVISOR: NOVO -> NOVO
+[2026-03-02T15:00:29.141Z] --- Incoming Webhook ---
+[2026-03-02T15:00:29.146Z] Content-Type: application/x-www-form-urlencoded
+[2026-03-02T15:00:29.149Z] Form Data - Token: bot-d0fd70d8
+[2026-03-02T15:00:29.150Z] Raw JD: {"event":{"Chat":"8766162493551@lid","Sender":"8766162493551@lid","IsFromMe":false,"IsGroup":false,"AddressingMode":"","SenderAlt":"","RecipientAlt":"","BroadcastListOwner":"","BroadcastRecipients":null,"MessageIDs":["3EB0678648E22DDDC088"],"Timestamp":"2026-03-02T12:01:10-03:00","Type":"","MessageSender":""},"state":"Delivered","type":"ReadReceipt"}
+[2026-03-02T15:00:29.150Z] Event Type detected: ReadReceipt
+[2026-03-02T15:00:30.558Z] --- Incoming Webhook ---
+[2026-03-02T15:00:30.559Z] Content-Type: application/x-www-form-urlencoded
+[2026-03-02T15:00:30.561Z] Form Data - Token: bot-d0fd70d8
+[2026-03-02T15:00:30.562Z] Raw JD: {"event":{"Chat":"8766162493551@lid","Sender":"8766162493551:4@lid","IsFromMe":false,"IsGroup":false,"AddressingMode":"","SenderAlt":"","RecipientAlt":"","BroadcastListOwner":"","BroadcastRecipients":null,"MessageIDs":["3EB0678648E22DDDC088"],"Timestamp":"2026-03-02T12:01:11-03:00","Type":"","MessageSender":""},"state":"Delivered","type":"ReadReceipt"}
+[2026-03-02T15:00:30.562Z] Event Type detected: ReadReceipt
+[2026-03-02T16:30:41.912Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_ypyg4u / "ola" / simulator
+[2026-03-02T16:30:42.014Z] [Processor] Using Provider: gemini / Model: gemini-2.5-flash
+[2026-03-02T16:30:42.951Z] [Processor] SUPERVISOR: NOVO -> NOVO

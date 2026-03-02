@@ -83,7 +83,7 @@ export const SupervisorService = {
 
             const completion = await client.chat.completions.create({
                 model: modelToUse,
-                messages: [{ role: "system", content: prompt }],
+                messages: [{ role: "user", content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2
             });
