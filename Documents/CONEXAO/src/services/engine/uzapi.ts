@@ -154,8 +154,8 @@ export const UzapiService = {
             // Data is wrapped in envelope { "code": 200, "data": { ... } }
             const data = response.data || {};
 
-            if (data.LoggedIn) return 'CONNECTED';
-            if (data.Connected && !data.LoggedIn) return 'QRCODE';
+            if (data.LoggedIn || data.loggedIn) return 'CONNECTED';
+            if ((data.Connected || data.connected) && !(data.LoggedIn || data.loggedIn)) return 'QRCODE';
 
             return 'DISCONNECTED';
         } catch (e) {
@@ -187,6 +187,9 @@ export const UzapiService = {
 
             if (!res.ok) {
                 const text = await res.text();
+                if (res.status === 500 && text.toLowerCase().includes('already connected')) {
+                    return { success: true };
+                }
                 return { success: false, error: `UZAPI Error: ${res.status} - ${text}` };
             }
 
