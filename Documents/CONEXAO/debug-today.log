@@ -170,3 +170,51 @@
 [2026-02-28T01:30:54.623Z] [Chatwoot] Searching contact: https://services.conext.click/api/v1/accounts/1/contacts/search?q=
 [2026-02-28T01:30:56.096Z] [Chatwoot] No contact found in Chatwoot for 
 [2026-02-28T01:30:57.896Z] [Processor] SUPERVISOR: LEAD -> LEAD
+[2026-03-02T12:25:11.244Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_ejfa06 / "oi" / simulator
+[2026-03-02T12:25:11.301Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:25:20.297Z] [Processor] SUPERVISOR: NOVO -> EM ATENDIMENTO
+[2026-03-02T12:25:38.186Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_ejfa06 / "como funciona?" / simulator
+[2026-03-02T12:25:38.264Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:25:48.937Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> EM ATENDIMENTO
+[2026-03-02T12:30:35.983Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "opa" / simulator
+[2026-03-02T12:30:36.028Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:30:46.299Z] [Processor] SUPERVISOR: NOVO -> EM ATENDIMENTO
+[2026-03-02T12:31:09.913Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "como funciona?" / simulator
+[2026-03-02T12:31:10.065Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:31:20.001Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> EM ATENDIMENTO
+[2026-03-02T12:37:15.096Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "quando sera?" / simulator
+[2026-03-02T12:37:15.191Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:37:25.629Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> EM ATENDIMENTO
+[2026-03-02T12:37:55.261Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "sim" / simulator
+[2026-03-02T12:37:55.477Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:38:04.987Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> APRESENTAÇÃO
+[2026-03-02T12:38:29.636Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "Moacir Ferreira" / simulator
+[2026-03-02T12:38:29.675Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:38:39.223Z] [Processor] SUPERVISOR: APRESENTAÇÃO -> NEGOCIAÇÃO
+[2026-03-02T12:38:59.187Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "acompanhnte" / simulator
+[2026-03-02T12:38:59.243Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:39:09.140Z] [Processor] SUPERVISOR: NEGOCIAÇÃO -> GANHO
+[2026-03-02T12:39:31.206Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "Jonh Macgragor" / simulator
+[2026-03-02T12:39:31.256Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:39:41.414Z] [Processor] SUPERVISOR: GANHO -> Confirmados
+[2026-03-02T12:40:14.725Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_d200k7 / "Obrigado" / simulator
+[2026-03-02T12:40:14.900Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T12:40:28.853Z] [Processor] SUPERVISOR: Confirmados -> EM ATENDIMENTO
+[2026-03-02T13:07:43.617Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "ola" / simulator
+[2026-03-02T13:07:43.784Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:07:47.062Z] [Processor] SUPERVISOR: NOVO -> EM ATENDIMENTO
+[2026-03-02T13:09:22.456Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "como funciona" / simulator
+[2026-03-02T13:09:22.508Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:09:26.436Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> EM ATENDIMENTO
+[2026-03-02T13:09:38.709Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "quando sera" / simulator
+[2026-03-02T13:09:38.760Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:09:42.185Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> EM ATENDIMENTO
+[2026-03-02T13:09:56.161Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "sim" / simulator
+[2026-03-02T13:09:56.247Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:09:59.843Z] [Processor] SUPERVISOR: EM ATENDIMENTO -> APRESENTAÇÃO
+[2026-03-02T13:10:10.547Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "Moa Santos" / simulator
+[2026-03-02T13:10:10.589Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:10:14.728Z] [Processor] SUPERVISOR: APRESENTAÇÃO -> NEGOCIAÇÃO
+[2026-03-02T13:10:24.117Z] [Processor] START: d0fd70d8-a269-4a9f-9a1b-5ffa37543cc3 / SIM_u22sev / "sim" / simulator
+[2026-03-02T13:10:24.184Z] [Processor] Using Provider: openai / Model: gpt-4o-mini
+[2026-03-02T13:10:28.007Z] [Processor] SUPERVISOR: NEGOCIAÇÃO -> GANHO

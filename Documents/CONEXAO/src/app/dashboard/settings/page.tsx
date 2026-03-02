@@ -17,7 +17,7 @@ export default function SettingsPage() {
     const [profile, setProfile] = useState({ name: "", email: "", whatsapp: "" });
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
     const [finance, setFinance] = useState({ asaasApiKey: "" });
-    const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "" });
+    const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "" });
     const [bots, setBots] = useState<any[]>([]);
     const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
 
@@ -49,7 +49,8 @@ export default function SettingsPage() {
                     if (res.ok) setAiSettings({
                         openaiApiKey: data.openaiApiKey || "",
                         geminiApiKey: data.geminiApiKey || "",
-                        openrouterApiKey: data.openrouterApiKey || ""
+                        openrouterApiKey: data.openrouterApiKey || "",
+                        elevenLabsApiKey: data.elevenLabsApiKey || ""
                     });
                 }
             } catch (err) {
@@ -355,6 +356,16 @@ export default function SettingsPage() {
                                                 value={aiSettings.openrouterApiKey}
                                                 onChange={e => setAiSettings({ ...aiSettings, openrouterApiKey: e.target.value })}
                                                 placeholder="sk-or-..."
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2 mt-4">ElevenLabs API Key (Para Áudios)</label>
+                                            <input
+                                                type="password"
+                                                value={aiSettings.elevenLabsApiKey}
+                                                onChange={e => setAiSettings({ ...aiSettings, elevenLabsApiKey: e.target.value })}
+                                                placeholder="sk_..."
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
                                         </div>

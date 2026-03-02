@@ -129,7 +129,8 @@ export async function POST(req: Request) {
                         });
                         fs.writeFileSync(tempFile, Buffer.from(buffer));
 
-                        const transcription = await VoiceService.transcribe(tempFile);
+                        const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
+                        const transcription = await VoiceService.transcribe(tempFile, botDoc?.tenant?.openaiApiKey || undefined);
                         logToFile(`Transcription: ${transcription}`);
 
                         // Clean up

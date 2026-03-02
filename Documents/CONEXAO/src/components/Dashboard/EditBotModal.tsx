@@ -43,7 +43,8 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         chatwootToken: "",
         chatwootAccountId: "",
         aiProvider: "openai",
-        aiModel: "gpt-4o-mini"
+        aiModel: "gpt-4o-mini",
+        voiceId: ""
     });
     const [showPrompt, setShowPrompt] = useState(false);
 
@@ -60,7 +61,8 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 chatwootToken: botData.chatwootToken || "",
                 chatwootAccountId: botData.chatwootAccountId || "",
                 aiProvider: botData.aiProvider || "openai",
-                aiModel: botData.aiModel || "gpt-4o-mini"
+                aiModel: botData.aiModel || "gpt-4o-mini",
+                voiceId: botData.voiceId || ""
             });
         }
     }, [isOpen, botData]);
@@ -144,6 +146,18 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                         <option key={model.id} value={model.id}>{model.name}</option>
                                     ))}
                                 </select>
+                            </div>
+
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-xs font-medium text-gray-400">ID da Voz (ElevenLabs) - Opcional</label>
+                                <input
+                                    type="text"
+                                    value={formData.voiceId || ""}
+                                    onChange={(e) => setFormData({ ...formData, voiceId: e.target.value })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="Ex: 21m00Tcm4TlvDq8ikWAM"
+                                />
+                                <p className="text-[10px] text-gray-500">Se preenchido e a chave global da ElevenLabs estiver configurada, os áudios do bot usarão esta voz.</p>
                             </div>
                         </div>
                         <p className="text-[10px] text-gray-500">

@@ -24,6 +24,9 @@ export const SupervisorService = {
         leadScore: number;
         sentiment: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
         insight: string;
+        customerName: string | null;
+        customerEmail: string | null;
+        summary: string | null;
     }> {
         // 1. Fetch dynamic stages for this bot
         const dynamicStages = await prisma.crmStage.findMany({
@@ -35,34 +38,42 @@ export const SupervisorService = {
             ? dynamicStages.map((s: any, i: number) => `${i + 1}. ${s.name}: ${s.description || 'Nenhuma descrição fornecida.'}`).join('\n        ')
             : `1. LEAD: Cliente novo.\n        2. INTEREST: Interessado.\n        3. CUSTOMER: Cliente.`;
 
+        const historyString = history.map(h => `${h.role.toUpperCase()}: ${h.content}`).join('\n');
+
         const prompt = `
         VOCÊ É O SUPERVISOR DE VENDAS DA INTELIGÊNCIA ARTIFICIAL.
         
-        OBJETIVO: Analisar a conversa e decidir em qual etapa do CRM o cliente está, além de qualificar o lead.
+        OBJETIVO: Analisar a conversa e decidir em qual etapa do CRM o cliente está, qualificar o lead, e extrair dados importantes.
         
         ESTÁGIOS CONFIGURADOS PARA ESTE BOT:
         ${stagesList}
         
         ESTADO ATUAL DO CLIENTE: ${currentStage}
 
+        HISTÓRICO DA CONVERSA:
+        ${historyString}
+
         SUA TAREFA:
-        1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve mudar de coluna? 
+        1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil? Use os nomes exatos fornecidos na lista de estágios.
         2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar (100 = pronto).
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
         5. ESTRATÉGIA: Como o bot deve agir agora?
+        6. NOME: Se o usuário já informou o nome na conversa, extraia aqui. Se não, retorne null.
+        7. EMAIL: Se o usuário informou o email, extraia aqui. Se não, retorne null.
+        8. RESUMO: Um resumo conciso da interação de vendas até o momento.
 
-        MENSAGEM ATUAL DO USUÁRIO:
-        "${userMessage}"
-
-        Retorne APENAS um JSON:
+        Retorne APENAS um JSON estrito:
         {
             "nextStage": "NOME_DO_ESTÁGIO_ESCOLHIDO",
             "strategy": "...",
             "reasoning": "...",
             "leadScore": 85,
             "sentiment": "POSITIVE",
-            "insight": "..."
+            "insight": "...",
+            "customerName": "Nome do Cliente" ou null,
+            "customerEmail": "email@cliente.com" ou null,
+            "summary": "Resumo da qualificação..."
         }
         `;
 
@@ -87,7 +98,10 @@ export const SupervisorService = {
                 reasoning: result.reasoning || "Análise dinâmica.",
                 leadScore: result.leadScore || 0,
                 sentiment: result.sentiment || 'NEUTRAL',
-                insight: result.insight || "Nenhum insight novo."
+                insight: result.insight || "Nenhum insight novo.",
+                customerName: result.customerName || null,
+                customerEmail: result.customerEmail || null,
+                summary: result.summary || null
             };
 
         } catch (error) {
@@ -98,10 +112,14 @@ export const SupervisorService = {
                 reasoning: "Erro na análise.",
                 leadScore: 0,
                 sentiment: 'NEUTRAL',
-                insight: "Erro ao gerar insight."
+                insight: "Erro na IA ao gerar insight.",
+                customerName: null,
+                customerEmail: null,
+                summary: null
             };
         }
     },
+
 
     /**
      * Returns a specific system prompt amendment based on the stage name.

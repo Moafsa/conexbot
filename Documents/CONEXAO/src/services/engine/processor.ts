@@ -2,14 +2,13 @@ import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
 import { buildSystemPrompt, buildConversationMessages } from './prompts';
 import { UzapiService } from './uzapi';
-import { extractContactData, mergeContactData } from './contact-extractor';
 import { chunkKnowledge, retrieveRelevantChunks } from './knowledge-rag';
-import { findRelevantPrice } from '../payment/price-detector';
 import { AsaasService } from '../payment/asaas';
 import { SupervisorService } from './supervisor';
 import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
+import { getAiClient } from '@/lib/ai-provider';
 
 import fs from 'fs';
 import path from 'path';
@@ -23,114 +22,6 @@ function logToFile(msg: string) {
     } catch (e) {
         console.error('Failed to log to file:', e);
     }
-}
-
-// Helper to get AI client and config
-class GeminiWrapper {
-    constructor(private apiKey: string) { }
-    chat = {
-        completions: {
-            create: async (body: any) => {
-                const model = body.model;
-                let systemContent = "";
-                const contents = body.messages.map((m: any) => {
-                    if (m.role === 'system') {
-                        systemContent += m.content + "\n";
-                        return null;
-                    }
-
-                    let parts: any[] = [];
-                    if (Array.isArray(m.content)) {
-                        parts = m.content.map((c: any) => {
-                            if (c.type === 'image_url') {
-                                const [mimeInfo, base64] = c.image_url.url.split(';base64,');
-                                const mimeType = mimeInfo.replace('data:', '');
-                                return { inlineData: { mimeType, data: base64 } };
-                            }
-                            return { text: c.text };
-                        });
-                    } else {
-                        parts = [{ text: m.content }];
-                    }
-
-                    return {
-                        role: m.role === 'assistant' ? 'model' : 'user',
-                        parts
-                    };
-                }).filter(Boolean);
-
-                const reqBody: any = { contents };
-                if (systemContent) {
-                    reqBody.systemInstruction = { parts: [{ text: systemContent }] };
-                }
-
-                if (body.response_format?.type === "json_object") {
-                    reqBody.generationConfig = { responseMimeType: "application/json" };
-                }
-
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reqBody)
-                });
-
-                if (!res.ok) {
-                    throw new Error(`Gemini API Error: ${res.status} - ${await res.text()}`);
-                }
-                const data = await res.json();
-
-                return {
-                    choices: [{
-                        message: {
-                            content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
-                        }
-                    }]
-                };
-            }
-        }
-    }
-}
-
-async function getAiClient(bot: any) {
-    const provider = bot.aiProvider || 'openai';
-    let model = bot.aiModel || 'gpt-4o-mini';
-
-    // Priority: Bot/Tenant specific key > Environment key
-    const tenantOpenRouterKey = bot.tenant.openrouterApiKey;
-    const tenantGeminiKey = bot.tenant.geminiApiKey;
-    const tenantOpenAIKey = bot.tenant.openaiApiKey;
-
-    if (provider === 'openrouter') {
-        const apiKey = tenantOpenRouterKey || process.env.OPENROUTER_API_KEY;
-        if (!apiKey) throw new Error('OpenRouter API Key not configured');
-        return {
-            client: new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' }),
-            model,
-        };
-    }
-
-    if (provider === 'gemini') {
-        const apiKey = tenantGeminiKey || process.env.GEMINI_API_KEY;
-        if (!apiKey) throw new Error('Gemini API Key not configured');
-
-        // Force upgrade legacy gemini models
-        if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model === 'gemini-2.0-flash') {
-            model = 'gemini-2.5-flash';
-        }
-
-        return {
-            client: new GeminiWrapper(apiKey) as any,
-            model,
-        };
-    }
-
-    // Default: OpenAI
-    const apiKey = tenantOpenAIKey || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OpenAI API Key not configured');
-    return {
-        client: new OpenAI({ apiKey }),
-        model,
-    };
 }
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
@@ -165,7 +56,11 @@ export const MessageProcessor = {
             }
 
             // 2.5 Prepare AI Client
-            const { client: aiClient, model: aiModel } = await getAiClient(bot);
+            const { client: aiClient, model: aiModel } = await getAiClient({
+                provider: bot.aiProvider,
+                model: bot.aiModel,
+                tenant: bot.tenant
+            });
             logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} / Model: ${aiModel}`);
 
             // 3. Find or create conversation
@@ -216,8 +111,7 @@ export const MessageProcessor = {
 
             // 6. CRM Extraction & Contact Management
             let existingContact = await prisma.contact.findUnique({
-                where: { phone_botId: { phone: senderPhone, botId: bot.id } },
-                include: { stage: true }
+                where: { phone_botId: { phone: senderPhone, botId: bot.id } }
             });
 
             if (!existingContact) {
@@ -230,12 +124,11 @@ export const MessageProcessor = {
                 existingContact = await prisma.contact.create({
                     data: {
                         phone: senderPhone,
-                        botId: bot.id,
                         tenantId: bot.tenantId,
+                        botId: bot.id,
                         funnelStage: firstStage?.name || 'LEAD',
                         stageId: firstStage?.id,
-                    },
-                    include: { stage: true }
+                    } as any
                 });
             }
 
@@ -281,7 +174,10 @@ export const MessageProcessor = {
                     leadScore: analysis.leadScore,
                     sentiment: analysis.sentiment,
                     lastAiInsight: analysis.insight,
-                    lastActive: new Date()
+                    lastActive: new Date(),
+                    ...(analysis.customerName && { name: analysis.customerName }),
+                    ...(analysis.customerEmail && { email: analysis.customerEmail }),
+                    ...(analysis.summary && { notes: analysis.summary })
                 }
             });
             existingContact.funnelStage = analysis.nextStage;
@@ -411,7 +307,12 @@ export const MessageProcessor = {
                 if (options.inputType === 'audio') {
                     const { VoiceService } = await import('./voice');
                     try {
-                        const audioPath = await VoiceService.speak(cleanResponse);
+                        const audioPath = await VoiceService.speak(
+                            cleanResponse,
+                            bot.tenant?.openaiApiKey,
+                            bot.tenant?.elevenLabsApiKey,
+                            bot.voiceId
+                        );
                         const audioBuffer = fs.readFileSync(audioPath);
                         const dataUri = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
                         const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');

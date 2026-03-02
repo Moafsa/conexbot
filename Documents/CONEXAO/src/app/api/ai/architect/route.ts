@@ -1,24 +1,53 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/prisma';
+import { getAiClient } from '@/lib/ai-provider';
 import { scrapeWebsite } from '@/services/engine/scraper';
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
 
 // URL detection regex
 const URL_REGEX = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi;
 
 export async function POST(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userId = (session.user as any).id;
+
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: userId },
+            select: {
+                openaiApiKey: true,
+                geminiApiKey: true,
+                openrouterApiKey: true
+            }
+        });
+
+        if (!tenant) {
+            return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        }
+
         // Now accepting extractedTexts from frontend (OCR results)
         const { message, history, extractedTexts } = await req.json();
 
         console.log('[AI Architect] Received message:', message.substring(0, 100));
-        console.log('[AI Architect] Received extractedTexts count:', extractedTexts ? extractedTexts.length : 0);
-        if (extractedTexts && extractedTexts.length > 0) {
-            console.log('[AI Architect] First text preview:', extractedTexts[0].substring(0, 50));
+
+        // Use shared client logic
+        // We'll try to determine provider based on what keys the user has
+        let provider = 'openai';
+        if (!tenant.openaiApiKey) {
+            if (tenant.geminiApiKey) provider = 'gemini';
+            else if (tenant.openrouterApiKey) provider = 'openrouter';
         }
+
+        const { client, model } = await getAiClient({
+            provider,
+            model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini',
+            tenant
+        });
 
         // Detect URLs in message
         const urls = message.match(URL_REGEX);
@@ -103,8 +132,8 @@ FORMATO JSON:
             { role: "user", content: detailedUserMessage }
         ];
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+        const completion = await (client as any).chat.completions.create({
+            model: model,
             messages: messages as any,
             response_format: { type: "json_object" },
             temperature: 0.1,
@@ -143,6 +172,12 @@ FORMATO JSON:
             if (kbContent) {
                 parsedResponse.extractedData.knowledgeBase = kbContent.substring(0, 10000);
             }
+        }
+
+        // Inject current provider/model for reference if needed
+        if (parsedResponse.extractedData) {
+            parsedResponse.extractedData.aiProvider = provider;
+            parsedResponse.extractedData.aiModel = model;
         }
 
         return NextResponse.json(parsedResponse);

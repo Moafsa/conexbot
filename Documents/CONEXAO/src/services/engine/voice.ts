@@ -12,11 +12,12 @@ export const VoiceService = {
     /**
      * Transcribe audio file using OpenAI Whisper
      */
-    async transcribe(audioPath: string): Promise<string> {
+    async transcribe(audioPath: string, openaiApiKey?: string): Promise<string> {
         try {
             console.log(`[VoiceService] Transcribing ${audioPath}...`);
+            const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : openai;
 
-            const transcription = await openai.audio.transcriptions.create({
+            const transcription = await client.audio.transcriptions.create({
                 file: fs.createReadStream(audioPath),
                 model: 'whisper-1',
                 language: 'pt', // Force Portuguese for better accuracy
@@ -26,28 +27,57 @@ export const VoiceService = {
             return transcription.text;
         } catch (error) {
             console.error('[VoiceService] Transcription failed:', error);
-            // Return empty string or throw depending on strategy. 
-            // Returning empty string allows the bot to say "Please send text" gracefully?
-            // Actually, throwing is better so we can log it.
             throw error;
         }
     },
 
     /**
-     * Generate Audio (TTS) from text using OpenAI TTS
+     * Generate Audio (TTS) from text using OpenAI TTS or ElevenLabs
      * Returns path to saved file
      */
-    async speak(text: string): Promise<string> {
+    async speak(text: string, openaiApiKey?: string, elevenLabsApiKey?: string, voiceId?: string): Promise<string> {
         try {
             console.log(`[VoiceService] Generating audio for: "${text.substring(0, 50)}..."`);
+            let buffer: Buffer;
 
-            const mp3 = await openai.audio.speech.create({
-                model: "tts-1",
-                voice: "alloy", // 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
-                input: text,
-            });
+            if (elevenLabsApiKey && voiceId && voiceId.trim() !== "") {
+                console.log(`[VoiceService] Using ElevenLabs provider with Voice ID: ${voiceId}`);
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'audio/mpeg',
+                        'xi-api-key': elevenLabsApiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        model_id: "eleven_multilingual_v2",
+                        voice_settings: {
+                            stability: 0.5,
+                            similarity_boost: 0.75
+                        }
+                    })
+                });
 
-            const buffer = Buffer.from(await mp3.arrayBuffer());
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error('[VoiceService] ElevenLabs API Error:', errText);
+                    throw new Error(`ElevenLabs API returned ${response.status}: ${errText}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                buffer = Buffer.from(arrayBuffer);
+            } else {
+                console.log(`[VoiceService] Using OpenAI TTS fallback`);
+                const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : openai;
+                const mp3 = await client.audio.speech.create({
+                    model: "tts-1",
+                    voice: "alloy", // 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+                    input: text,
+                });
+
+                buffer = Buffer.from(await mp3.arrayBuffer());
+            }
 
             // Save to public dir so it can be served/sent
             const fileName = `tts-${uuidv4()}.mp3`;
@@ -61,11 +91,6 @@ export const VoiceService = {
             fs.writeFileSync(filePath, buffer);
 
             console.log(`[VoiceService] Audio saved to ${filePath}`);
-
-            // Return relative path or URL - we need absolute path for WuzAPI upload/send usually, 
-            // OR a public URL if we send by URL. 
-            // WuzAPI usually takes a URL or Base64. Let's return the local path for now, 
-            // the caller (UzapiService) might need to handle the conversion to URL.
             return filePath;
         } catch (error) {
             console.error('[VoiceService] TTS failed:', error);

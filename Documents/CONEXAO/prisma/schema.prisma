@@ -59,6 +59,7 @@ model Tenant {
   openaiApiKey           String?
   geminiApiKey           String?
   openrouterApiKey       String?
+  elevenLabsApiKey       String?
   accounts               Account[]
   bots                   Bot[]
   contacts               Contact[]

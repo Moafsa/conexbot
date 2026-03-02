@@ -8,6 +8,7 @@ const updateAiSettingsSchema = z.object({
     openaiApiKey: z.string().optional().nullable(),
     geminiApiKey: z.string().optional().nullable(),
     openrouterApiKey: z.string().optional().nullable(),
+    elevenLabsApiKey: z.string().optional().nullable(),
 });
 
 export async function GET() {
@@ -26,6 +27,7 @@ export async function GET() {
                 openaiApiKey: true,
                 geminiApiKey: true,
                 openrouterApiKey: true,
+                elevenLabsApiKey: true,
             } as any,
         });
 
@@ -53,6 +55,7 @@ export async function PUT(req: Request) {
                 openaiApiKey: data.openaiApiKey,
                 geminiApiKey: data.geminiApiKey,
                 openrouterApiKey: data.openrouterApiKey,
+                elevenLabsApiKey: data.elevenLabsApiKey,
             } as any,
         });
 

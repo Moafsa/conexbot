@@ -78,6 +78,19 @@ export async function POST(req: Request) {
 
         console.log('[API /bots POST] Bot created successfully:', { id: bot.id, name: bot.name });
 
+        // Initialize default CRM stages
+        await prisma.crmStage.createMany({
+            data: [
+                { botId: bot.id, name: 'NOVO', color: '#3b82f6', order: 0, description: 'Leads recentes' },
+                { botId: bot.id, name: 'EM ATENDIMENTO', color: '#f59e0b', order: 1, description: 'Leads em conversação' },
+                { botId: bot.id, name: 'APRESENTAÇÃO', color: '#8b5cf6', order: 2, description: 'Proposta enviada' },
+                { botId: bot.id, name: 'NEGOCIAÇÃO', color: '#ec4899', order: 3, description: 'Ajustes finos' },
+                { botId: bot.id, name: 'GANHO', color: '#10b981', order: 4, description: 'Venda concluída' },
+            ]
+        });
+
+        console.log('[API /bots POST] Default CRM stages created');
+
         // Increment bot usage counter
         await prisma.usageCounter.upsert({
             where: { tenantId },
