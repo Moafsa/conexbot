@@ -6,9 +6,23 @@ import { v4 as uuidv4 } from 'uuid';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 
-// Set ffmpeg path
-if (ffmpegStatic) {
-    ffmpeg.setFfmpegPath(ffmpegStatic);
+// Set ffmpeg path robustly
+let ffmpegPath = ffmpegStatic;
+if (ffmpegPath && ffmpegPath.startsWith('\\ROOT')) {
+    ffmpegPath = ffmpegPath.replace('\\ROOT', 'C:\\Users\\User');
+}
+
+// Fallback manual check if still failing or null
+if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+    const manualPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg.exe');
+    if (fs.existsSync(manualPath)) {
+        ffmpegPath = manualPath;
+    }
+}
+
+if (ffmpegPath) {
+    console.log(`[VoiceService] Setting FFmpeg path to: ${ffmpegPath}`);
+    ffmpeg.setFfmpegPath(ffmpegPath);
 }
 
 const openai = new OpenAI({
