@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { getAiClient } from '@/lib/ai-provider';
+import { safeChatCompletion } from '@/lib/ai-provider';
 import { scrapeWebsite } from '@/services/engine/scraper';
 
 // URL detection regex
@@ -35,19 +35,17 @@ export async function POST(req: Request) {
 
         console.log('[AI Architect] Received message:', message.substring(0, 100));
 
-        // Use shared client logic
-        // We'll try to determine provider based on what keys the user has
         let provider = 'openai';
         if (!tenant.openaiApiKey) {
             if (tenant.geminiApiKey) provider = 'gemini';
             else if (tenant.openrouterApiKey) provider = 'openrouter';
         }
 
-        const { client, model } = await getAiClient({
-            provider,
-            model: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini',
+        const dummyBot = {
+            aiProvider: provider,
+            aiModel: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
             tenant
-        });
+        };
 
         // Detect URLs in message
         const urls = message.match(URL_REGEX);
@@ -132,14 +130,13 @@ FORMATO JSON:
             { role: "user", content: detailedUserMessage }
         ];
 
-        const completion = await (client as any).chat.completions.create({
-            model: model,
+        const responseContent = await safeChatCompletion({
+            bot: dummyBot,
             messages: messages as any,
             response_format: { type: "json_object" },
             temperature: 0.1,
         });
 
-        const responseContent = completion.choices[0].message.content;
         const parsedResponse = JSON.parse(responseContent || '{}');
 
         // 🛑 SAFETY: Prevent premature 'done'
@@ -176,8 +173,8 @@ FORMATO JSON:
 
         // Inject current provider/model for reference if needed
         if (parsedResponse.extractedData) {
-            parsedResponse.extractedData.aiProvider = provider;
-            parsedResponse.extractedData.aiModel = model;
+            parsedResponse.extractedData.aiProvider = dummyBot.aiProvider;
+            parsedResponse.extractedData.aiModel = dummyBot.aiModel;
         }
 
         return NextResponse.json(parsedResponse);
