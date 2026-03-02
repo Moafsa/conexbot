@@ -218,6 +218,10 @@ export function CRMBoard({ botId }: { botId: string }) {
                     <CRMContactPanel
                         contactId={selectedContactId}
                         onClose={() => setSelectedContactId(null)}
+                        onDeleted={() => {
+                            setContacts(prev => prev.filter(c => c.id !== selectedContactId));
+                            setSelectedContactId(null);
+                        }}
                     />
                 </div>
             )}

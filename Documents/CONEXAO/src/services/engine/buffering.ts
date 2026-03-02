@@ -14,7 +14,7 @@ interface BufferedChat {
 // Key: `${sessionName}:${contactId}`
 const activeBuffers: Map<string, BufferedChat> = new Map();
 
-const BUFFER_DELAY_MS = 3000; // Wait 3 seconds for more messages
+const BUFFER_DELAY_MS = 1500; // Wait 1.5 seconds for more messages
 
 export const BufferingService = {
     /**

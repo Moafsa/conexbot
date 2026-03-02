@@ -8,7 +8,7 @@ import { SupervisorService } from './supervisor';
 import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
-import { getAiClient } from '@/lib/ai-provider';
+import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
 
 import fs from 'fs';
 import path from 'path';
@@ -28,8 +28,28 @@ const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
 
+const processingLocks = new Map<string, Promise<any>>();
+
 export const MessageProcessor = {
     async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+        // Concurrency Lock: prevent same phone processing parallelly
+        const existingLock = processingLocks.get(senderPhone);
+        if (existingLock) {
+            logToFile(`[Processor] WAITING for existing lock: ${senderPhone}`);
+            await existingLock;
+        }
+
+        const currentProcess = this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
+        processingLocks.set(senderPhone, currentProcess);
+
+        try {
+            return await currentProcess;
+        } finally {
+            processingLocks.delete(senderPhone);
+        }
+    },
+
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -55,13 +75,7 @@ export const MessageProcessor = {
                 logToFile(`[Processor] LIMIT REACHED - Bypassing for now`);
             }
 
-            // 2.5 Prepare AI Client
-            const { client: aiClient, model: aiModel } = await getAiClient({
-                provider: bot.aiProvider,
-                model: bot.aiModel,
-                tenant: bot.tenant
-            });
-            logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} / Model: ${aiModel}`);
+            logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} (with Fallback enabled)`);
 
             // 3. Find or create conversation
             const conversation = await prisma.conversation.upsert({
@@ -81,7 +95,7 @@ export const MessageProcessor = {
             if (options.inputType === 'image' && options.mediaPath) {
                 const { VisionService } = await import('./vision');
                 try {
-                    const description = await VisionService.analyze(options.mediaPath, messageText, aiClient as OpenAI, aiModel);
+                    const description = await VisionService.analyze(options.mediaPath, messageText, bot);
                     contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\nLegenda: "${messageText}"\nDescrição da IA: ${description}`;
                 } catch (e) {
                     console.error('Vision analysis failed:', e);
@@ -115,7 +129,6 @@ export const MessageProcessor = {
             });
 
             if (!existingContact) {
-                // If it's a new contact for this bot, attempt to find a default stage or first stage
                 const firstStage = await prisma.crmStage.findFirst({
                     where: { botId: bot.id },
                     orderBy: { order: 'asc' }
@@ -160,8 +173,7 @@ export const MessageProcessor = {
                 history,
                 ((existingContact as any).funnelStage) || 'LEAD',
                 bot.id,
-                aiClient as OpenAI,
-                aiModel
+                bot
             );
 
             logToFile(`[Processor] SUPERVISOR: ${(existingContact as any).funnelStage} -> ${analysis.nextStage}`);
@@ -218,10 +230,14 @@ export const MessageProcessor = {
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
             const finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
 
-            // 10. Call AI Provider
+            // 10. Call AI Provider with Fallback
             const messages = buildConversationMessages(finalSystemPrompt, history);
-            const completion = await aiClient.chat.completions.create({ model: aiModel, messages, temperature: 0.7, max_tokens: 500 });
-            const aiResponse = completion.choices[0]?.message?.content?.trim() || 'Desculpe, não entendi.';
+            const aiResponse = await safeChatCompletion({
+                bot,
+                messages,
+                temperature: 0.7,
+                max_tokens: 500
+            });
 
             // 11. Parse Media & Payments
             const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
@@ -286,15 +302,12 @@ export const MessageProcessor = {
                     if (webhookResponse.ok) {
                         try {
                             const result = await webhookResponse.json();
-                            // If the external processor returns a reply, we override ours
-                            // This satisfies the "GET" integration request (bot GETs response from n8n)
                             if (result && (result.text || result.response)) {
                                 const externalText = result.text || result.response;
                                 logToFile(`[Processor] EXTERNAL PROCESSOR OVERRIDE: "${externalText.substring(0, 50)}"`);
                                 cleanResponse = externalText;
                             }
                         } catch (jsonErr) {
-                            // Valid response but not JSON or no 'text' field, treat as notification
                         }
                     }
                 } catch (err: any) {

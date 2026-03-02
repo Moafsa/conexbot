@@ -2,7 +2,7 @@
 // CONFIGURATION
 const UZAPI_URL = 'http://127.0.0.1:21465';
 const ADMIN_TOKEN = process.env.WUZAPI_ADMIN_TOKEN || 'admin_token_123';
-const NEXT_APP_URL = 'http://host.docker.internal:3000'; // URL reachable from INSIDE Docker
+const NEXT_APP_URL = 'http://host.docker.internal:3004'; // URL reachable from INSIDE Docker
 
 async function fixWuzapi() {
     console.log('🔧 Starting WuzAPI Auto-Fixer...');

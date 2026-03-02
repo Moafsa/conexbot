@@ -71,7 +71,9 @@ export async function POST(req: Request) {
             const info = eventData.Info || eventData.info || {};
             const message = eventData.Message || eventData.message || {};
 
-            const senderPhone = info.Sender || info.sender || '';
+            const senderPhoneRaw = info.Sender || info.sender || '';
+            const senderAltRaw = info.SenderAlt || info.senderAlt || '';
+            const senderPhone = senderPhoneRaw.includes('@lid') && senderAltRaw ? senderAltRaw : senderPhoneRaw;
             const audioMessage = message.audioMessage || message.AudioMessage;
             const messageBody = message.conversation || message.Conversation ||
                 message.extendedTextMessage?.text || message.ExtendedTextMessage?.Text ||

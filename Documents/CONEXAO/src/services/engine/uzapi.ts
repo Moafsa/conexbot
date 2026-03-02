@@ -96,14 +96,14 @@ export const UzapiService = {
         caption?: string
     ): Promise<boolean> {
         try {
-            const endpoint = (type === 'pdf') ? '/chat/send/document'
-                : (type === 'audio') ? '/chat/send/voice'
-                    : (type === 'video') ? '/chat/send/video'
-                        : '/chat/send/image';
+            const endpoint = (type === 'pdf') ? 'chat/send/document'
+                : (type === 'audio') ? 'chat/send/audio'
+                    : (type === 'video') ? 'chat/send/video'
+                        : 'chat/send/image';
 
             const body: Record<string, string> = {
                 Phone: to,
-                Url: url,
+                [type === 'audio' ? 'Audio' : 'Url']: url,
             };
 
             if (caption) body.Caption = caption;

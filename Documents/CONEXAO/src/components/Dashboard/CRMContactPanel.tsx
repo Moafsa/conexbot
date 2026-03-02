@@ -5,15 +5,17 @@ import { useState, useEffect } from "react";
 import {
     X, MessageCircle, History, Info, Send,
     TrendingUp, Star, Phone, Mail, MapPin,
-    Calendar, CreditCard, ExternalLink, Bot
+    Calendar, CreditCard, ExternalLink, Bot, Trash2
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface CRMContactPanelProps {
     contactId: string;
     onClose: () => void;
+    onDeleted?: () => void;
 }
 
-export default function CRMContactPanel({ contactId, onClose }: CRMContactPanelProps) {
+export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMContactPanelProps) {
     const [activeTab, setActiveTab] = useState<'chat' | 'data' | 'auto'>('chat');
     const [contact, setContact] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
@@ -52,6 +54,23 @@ export default function CRMContactPanel({ contactId, onClose }: CRMContactPanelP
         setInput("");
     };
 
+    const handleDelete = async () => {
+        if (!confirm("Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.")) return;
+
+        try {
+            const res = await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast.success("Lead excluído com sucesso");
+                onDeleted?.();
+            } else {
+                toast.error("Erro ao excluir contato");
+            }
+        } catch (error) {
+            console.error("Error deleting contact", error);
+            toast.error("Erro de conexão ao excluir");
+        }
+    };
+
     if (loading) return (
         <div className="w-full h-full flex items-center justify-center bg-white border-l shadow-2xl animate-fade-in">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -77,9 +96,18 @@ export default function CRMContactPanel({ contactId, onClose }: CRMContactPanelP
                         </div>
                     </div>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                    <X size={20} className="text-gray-500" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleDelete}
+                        className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full transition-all group"
+                        title="Excluir Lead"
+                    >
+                        <Trash2 size={18} className="group-active:scale-90" />
+                    </button>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                        <X size={20} className="text-gray-500" />
+                    </button>
+                </div>
             </div>
 
             {/* Tabs */}

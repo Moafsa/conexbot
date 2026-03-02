@@ -25,6 +25,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        await prisma.contact.delete({
+            where: { id }
+        });
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('[API] Error deleting contact:', error);
+        return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
+    }
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -35,13 +48,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             }
         });
 
-        // Fetch recent messages for context
-        // We need conversation ID first
-        // This might be complex if we don't have conversation ID handy, 
-        // but we can find conversation by remoteId (phone) and tenant's bot.
-        // For now, just return contact details.
+        if (!contact) {
+            return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+        }
 
-        return NextResponse.json(contact);
+        // Fetch recent messages for context
+        // We find conversation by remoteId (phone) and botId
+        // Improvement: If contact has a botId, use it. Otherwise try to find any conversation with this phone.
+        const conversation = await prisma.conversation.findFirst({
+            where: {
+                remoteId: contact.phone,
+                ...(contact.botId ? { botId: contact.botId } : {})
+            },
+            include: {
+                messages: {
+                    orderBy: {
+                        createdAt: 'asc'
+                    },
+                    take: 100 // Limit to recent 100 messages for the panel
+                }
+            }
+        });
+
+        // Attach conversations format as expected by CRMContactPanel
+        const responseData = {
+            ...contact,
+            conversations: conversation ? [conversation] : []
+        };
+
+        return NextResponse.json(responseData);
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
     }

@@ -1,9 +1,5 @@
-import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+import { safeChatCompletion } from '@/lib/ai-provider';
 
 export const SupervisorService = {
     /**
@@ -14,8 +10,7 @@ export const SupervisorService = {
         history: { role: string, content: string }[],
         currentStage: string,
         botId: string,
-        aiClient?: OpenAI,
-        aiModel?: string
+        bot: any
     ): Promise<{
         nextStage: string;
         nextStageId?: string;
@@ -78,17 +73,14 @@ export const SupervisorService = {
         `;
 
         try {
-            const client = aiClient || openai;
-            const modelToUse = aiModel || 'gpt-4o-mini';
-
-            const completion = await client.chat.completions.create({
-                model: modelToUse,
+            const content = await safeChatCompletion({
+                bot,
                 messages: [{ role: "user", content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2
             });
 
-            const result = JSON.parse(completion.choices[0].message.content || '{}');
+            const result = JSON.parse(content || '{}');
             const matchedStage = dynamicStages.find((s: any) => s.name.toLowerCase() === result.nextStage?.toLowerCase());
 
             return {
@@ -119,7 +111,6 @@ export const SupervisorService = {
             };
         }
     },
-
 
     /**
      * Returns a specific system prompt amendment based on the stage name.
