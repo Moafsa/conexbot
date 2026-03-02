@@ -3,6 +3,13 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
+
+// Set ffmpeg path
+if (ffmpegStatic) {
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+}
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -90,11 +97,38 @@ export const VoiceService = {
             const filePath = path.join(publicDir, fileName);
             fs.writeFileSync(filePath, buffer);
 
-            console.log(`[VoiceService] Audio saved to ${filePath}`);
-            return filePath;
+            console.log(`[VoiceService] MP3 saved to ${filePath}. Converting to OGG/Opus...`);
+            const opusPath = await this.convertToOpus(filePath);
+
+            return opusPath;
         } catch (error) {
             console.error('[VoiceService] TTS failed:', error);
             throw error;
         }
+    },
+
+    /**
+     * Converts any audio file to OGG/Opus format for WhatsApp compatibility
+     */
+    async convertToOpus(inputPath: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const outputPath = inputPath.replace(/\.[^.]+$/, '.ogg');
+            console.log(`[VoiceService] Converting ${inputPath} to ${outputPath}...`);
+
+            ffmpeg(inputPath)
+                .toFormat('ogg')
+                .audioCodec('libopus')
+                .on('end', () => {
+                    console.log(`[VoiceService] Conversion finished: ${outputPath}`);
+                    // Optionally delete the original MP3 to save space
+                    try { fs.unlinkSync(inputPath); } catch (e) { }
+                    resolve(outputPath);
+                })
+                .on('error', (err) => {
+                    console.error('[VoiceService] Conversion error:', err);
+                    reject(err);
+                })
+                .save(outputPath);
+        });
     }
 };

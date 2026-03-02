@@ -327,6 +327,7 @@ export const MessageProcessor = {
                             bot.voiceId
                         );
                         const audioBuffer = fs.readFileSync(audioPath);
+                        // Ensure correct extension and mimetype for WuzAPI
                         const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
                         const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');
                         if (!sent) await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
