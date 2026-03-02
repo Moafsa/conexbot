@@ -25,9 +25,9 @@ export async function POST(req: Request) {
         if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
             const formData = await req.formData();
             const jsonDataStr = formData.get('jsonData') as string;
-            const token = formData.get('token') as string;
+            const token = (formData.get('token') || formData.get('instanceName')) as string;
 
-            logToFile(`Form Data - Token: ${token}`);
+            logToFile(`Form Data - Token/InstanceName: ${token}`);
             if (jsonDataStr) {
                 body = JSON.parse(jsonDataStr);
                 logToFile(`Raw JD: ${jsonDataStr.substring(0, 500)}`);
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
                 }
             }
 
-            sessionName = body.session || body.sessionName || body.token || '';
+            sessionName = body.session || body.sessionName || body.token || body.instanceName || '';
         }
 
         if (!body) {
