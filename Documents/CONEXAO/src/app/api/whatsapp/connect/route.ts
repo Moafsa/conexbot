@@ -37,8 +37,22 @@ export async function POST(req: Request) {
         } catch (e) { }
 
         // Ensure UZAPI can reach Next.js (host machine) from Docker container
-        // WARNING: If you change the Next.js port, update this line or set INTERNAL_WEBHOOK_URL env var
-        const baseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://host.docker.internal:3000';
+        let baseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL;
+
+        // Dynamic Port Resolution for Local Dev
+        if (!baseUrl) {
+            const hostHeader = req.headers.get('host') || 'localhost:3000';
+            if (hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1')) {
+                // If running locally, Docker needs 'host.docker.internal' to reach the host machine
+                const port = hostHeader.split(':')[1] || '3000';
+                baseUrl = `http://host.docker.internal:${port}`;
+            } else {
+                // Production fallback
+                const protocol = req.headers.get('x-forwarded-proto') || 'https';
+                baseUrl = `${protocol}://${hostHeader}`;
+            }
+        }
+
         const webhookUrl = `${baseUrl}/api/webhooks/whatsapp`;
 
         // Start UZAPI session
