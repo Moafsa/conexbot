@@ -119,10 +119,20 @@ export async function POST(req: Request) {
                         logToFile(`Downloading audio from: ${mediaUrl}`);
                         const tempFile = path.join(process.cwd(), 'temp_audio_' + Date.now() + '.ogg');
 
-                        // Fix for localhost fetch issues (Node 18+ prefers IPv6, WuzAPI might be IPv4)
-                        // Also fixing port: WuzAPI sends internal port (5555?) but Docker exposes it on 21465
-                        let fetchUrl = mediaUrl.replace('localhost', '127.0.0.1');
-                        fetchUrl = fetchUrl.replace(':5555', ':21465');
+                        // Replace localhost with actual UZAPI_URL for Docker environments
+                        let fetchUrl = mediaUrl;
+                        if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
+                            try {
+                                const urlObj = new URL(fetchUrl);
+                                const uzapiUrl = new URL(process.env.UZAPI_URL || 'http://host.docker.internal:21465');
+                                urlObj.protocol = uzapiUrl.protocol;
+                                urlObj.hostname = uzapiUrl.hostname;
+                                urlObj.port = uzapiUrl.port;
+                                fetchUrl = urlObj.toString();
+                            } catch (e) {
+                                fetchUrl = fetchUrl.replace('localhost', 'host.docker.internal').replace(':5555', ':21465');
+                            }
+                        }
 
                         // Use fetch to download (WuzAPI file_url is usually accessible)
                         const buffer = await fetch(fetchUrl).then(r => {
@@ -164,9 +174,20 @@ export async function POST(req: Request) {
                     if (mediaUrl) {
                         const tempFile = path.join(process.cwd(), 'temp_image_' + Date.now() + '.jpg');
 
-                        // Fix for localhost fetch issues
-                        let fetchUrl = mediaUrl.replace('localhost', '127.0.0.1');
-                        fetchUrl = fetchUrl.replace(':5555', ':21465');
+                        // Replace localhost with actual UZAPI_URL for Docker environments
+                        let fetchUrl = mediaUrl;
+                        if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
+                            try {
+                                const urlObj = new URL(fetchUrl);
+                                const uzapiUrl = new URL(process.env.UZAPI_URL || 'http://host.docker.internal:21465');
+                                urlObj.protocol = uzapiUrl.protocol;
+                                urlObj.hostname = uzapiUrl.hostname;
+                                urlObj.port = uzapiUrl.port;
+                                fetchUrl = urlObj.toString();
+                            } catch (e) {
+                                fetchUrl = fetchUrl.replace('localhost', 'host.docker.internal').replace(':5555', ':21465');
+                            }
+                        }
 
                         const buffer = await fetch(fetchUrl).then(r => {
                             if (!r.ok) throw new Error(`Fetch failed: ${r.statusText} (${fetchUrl})`);
