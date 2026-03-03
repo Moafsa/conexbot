@@ -242,7 +242,7 @@ export async function POST(req: Request) {
             }
         }
 
-        if (eventType === 'Connected') {
+        if (eventType === 'Connected' || eventType === 'onConnected') {
             logToFile(`Status Update: CONNECTED for ${sessionName}`);
             await prisma.bot.update({
                 where: { sessionName },
@@ -250,8 +250,9 @@ export async function POST(req: Request) {
             }).catch(e => logToFile(`Failed to update status CONNECTED: ${e.message}`));
         }
 
-        if (eventType === 'Disconnected') {
-            logToFile(`Status Update: DISCONNECTED for ${sessionName}`);
+        const disconnectEvents = ['Disconnected', 'onDisconnected', 'LoggedOut', 'Logout', 'Unauthorized'];
+        if (disconnectEvents.includes(eventType)) {
+            logToFile(`Status Update: DISCONNECTED (${eventType}) for ${sessionName}`);
             await prisma.bot.update({
                 where: { sessionName },
                 data: { connectionStatus: 'DISCONNECTED' }

@@ -164,9 +164,9 @@ export default function BotsPage() {
                             <h3 className="font-bold text-lg mb-1">{bot.name}</h3>
                             <p className="text-sm text-gray-400 mb-3">{bot.businessType}</p>
                             <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-                                <span className={`w-2 h-2 rounded-full ${bot.sessionName ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`}></span>
-                                <span className={bot.sessionName ? 'text-emerald-500' : 'text-yellow-500'}>
-                                    {bot.sessionName ? 'Conectado' : 'Aguardando Conexão'}
+                                <span className={`w-2 h-2 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`}></span>
+                                <span className={bot.connectionStatus === 'CONNECTED' ? 'text-emerald-500' : 'text-yellow-500'}>
+                                    {bot.connectionStatus === 'CONNECTED' ? 'Conectado' : (bot.connectionStatus || 'Aguardando Conexão')}
                                 </span>
                             </div>
 
