@@ -90,7 +90,7 @@ export const VoiceService = {
                 const arrayBuffer = await response.arrayBuffer();
                 buffer = Buffer.from(arrayBuffer);
             } else {
-                console.log(`[VoiceService] Using OpenAI TTS fallback`);
+                console.log(`[VoiceService] ElevenLabs skipped (missing API key or Voice ID). Using OpenAI TTS fallback.`);
                 const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : openai;
                 const mp3 = await client.audio.speech.create({
                     model: "tts-1",

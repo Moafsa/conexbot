@@ -323,15 +323,30 @@ export const MessageProcessor = {
                         const audioPath = await VoiceService.speak(
                             cleanResponse,
                             bot.tenant?.openaiApiKey,
-                            bot.tenant?.elevenLabsApiKey,
+                            (bot.tenant as any)?.elevenLabsApiKey,
                             bot.voiceId
                         );
+
+                        const hasElevenLabs = !!(bot.tenant as any)?.elevenLabsApiKey;
+                        const hasVoiceId = !!bot.voiceId;
+                        logToFile(`[Processor] TTS Config: elevenLabs=${hasElevenLabs}, voiceId=${hasVoiceId}`);
+                        if (!hasElevenLabs || !hasVoiceId) {
+                            logToFile(`[Processor] HINT: Configure Dashboard -> Settings -> AI (ElevenLabs API Key) and Edit Bot -> Voice ID for audio replies.`);
+                        }
+
                         const audioBuffer = fs.readFileSync(audioPath);
                         // Ensure correct extension and mimetype for WuzAPI
                         const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
                         const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');
-                        if (!sent) await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
-                    } catch (e) {
+
+                        if (sent) {
+                            logToFile(`[Processor] Audio reply sent successfully.`);
+                        } else {
+                            logToFile(`[Processor] sendMedia (audio) returned false; falling back to text.`);
+                            await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
+                        }
+                    } catch (e: any) {
+                        logToFile(`[Processor] TTS or send failed: ${e.message}; sending text fallback.`);
                         await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
                     }
                 } else {
