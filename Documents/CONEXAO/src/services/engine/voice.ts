@@ -12,9 +12,10 @@ if (ffmpegPath && ffmpegPath.startsWith('\\ROOT')) {
     ffmpegPath = ffmpegPath.replace('\\ROOT', 'C:\\Users\\User');
 }
 
-// Fallback manual check if still failing or null
+// Fallback manual check for Docker/Linux or Windows
 if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
-    const manualPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg.exe');
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const manualPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', `ffmpeg${ext}`);
     if (fs.existsSync(manualPath)) {
         ffmpegPath = manualPath;
     }
