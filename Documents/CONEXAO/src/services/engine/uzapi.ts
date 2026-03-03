@@ -109,15 +109,25 @@ export const UzapiService = {
             if (caption) body.Caption = caption;
             if (type === 'pdf') body.FileName = caption || 'document.pdf';
 
-            // TRANSFORM URL FOR DOCKER (If using local MinIO)
-            // If the URL is localhost/127.0.0.1 (host machine), WuzAPI (container) needs to access it via internal network name 'minio' 
-            // OR 'host.docker.internal' depending on setup. Since they are in same stack, 'minio' is best.
+            // TRANSFORM URL FOR DOCKER
+            // If the URL is localhost/127.0.0.1 (host machine), WuzAPI (container) needs to access it via internal network name
             let finalUrl = url;
-            if (url.includes('127.0.0.1:9000') || url.includes('localhost:9000')) {
-                finalUrl = url.replace('127.0.0.1:9000', 'minio:9000').replace('localhost:9000', 'minio:9000');
-                console.log(`[UZAPI] Transformed URL for Docker: ${url} -> ${finalUrl}`);
+            if (url.startsWith('http')) {
+                const internalHost = process.env.INTERNAL_WEBHOOK_URL
+                    ? new URL(process.env.INTERNAL_WEBHOOK_URL).hostname
+                    : 'host.docker.internal';
+
+                if (url.includes('127.0.0.1') || url.includes('localhost')) {
+                    finalUrl = url.replace('127.0.0.1', internalHost).replace('localhost', internalHost);
+                    console.log(`[UZAPI] Transformed Media URL for Docker: ${url} -> ${finalUrl}`);
+                }
             }
-            body.Url = finalUrl;
+
+            if (type === 'audio') {
+                body.Audio = finalUrl;
+            } else {
+                body.Url = finalUrl;
+            }
 
             const res = await fetch(`${UZAPI_URL}/${endpoint}`, {
                 method: 'POST',
