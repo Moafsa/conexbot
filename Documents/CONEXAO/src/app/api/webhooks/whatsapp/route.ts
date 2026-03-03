@@ -113,11 +113,17 @@ export async function POST(req: Request) {
 
                     // WuzAPI Fix: file_url is often at the root when using S3/local storage
                     const mediaUrl = (body as any).file_url || audioMessage.url;
-                    logToFile(`Audio Candidates - file_url: ${(body as any).file_url}, audioMessage.url: ${audioMessage.url}`);
+                    const base64Data = (body as any).base64 || (body as any).data || (audioMessage as any).base64;
+                    logToFile(`Audio Candidates - file_url: ${(body as any).file_url}, audioMessage.url: ${audioMessage.url}, hasBase64: ${!!base64Data}`);
 
-                    if (mediaUrl) {
+                    const tempFile = path.join(process.cwd(), 'temp_audio_' + Date.now() + '.ogg');
+
+                    if (base64Data) {
+                        logToFile(`Processing audio from base64 data...`);
+                        const buffer = Buffer.from(base64Data.split(',').pop()!, 'base64');
+                        fs.writeFileSync(tempFile, buffer);
+                    } else if (mediaUrl) {
                         logToFile(`Downloading audio from: ${mediaUrl}`);
-                        const tempFile = path.join(process.cwd(), 'temp_audio_' + Date.now() + '.ogg');
 
                         // Replace localhost with actual UZAPI_URL for Docker environments
                         let fetchUrl = mediaUrl;
@@ -140,7 +146,9 @@ export async function POST(req: Request) {
                             return r.arrayBuffer();
                         });
                         fs.writeFileSync(tempFile, Buffer.from(buffer));
+                    }
 
+                    if (fs.existsSync(tempFile)) {
                         const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
                         const transcription = await VoiceService.transcribe(tempFile, botDoc?.tenant?.openaiApiKey || undefined);
                         logToFile(`Transcription: ${transcription}`);
@@ -154,7 +162,7 @@ export async function POST(req: Request) {
                             });
                         }
                     } else {
-                        logToFile('Audio URL missing');
+                        logToFile('Audio content missing (no URL and no base64)');
                     }
                 } catch (e: any) {
                     logToFile(`Transcription Error: ${e.message}`);
@@ -169,11 +177,16 @@ export async function POST(req: Request) {
                     // Download Image
                     // WuzAPI Fix: file_url is often at the root when using S3/local storage
                     const mediaUrl = (body as any).file_url || imageMessage.url;
-                    logToFile(`Image Candidates - file_url: ${(body as any).file_url}, imageMessage.url: ${imageMessage.url}`);
+                    const base64Data = (body as any).base64 || (body as any).data || (imageMessage as any).base64;
+                    logToFile(`Image Candidates - file_url: ${(body as any).file_url}, imageMessage.url: ${imageMessage.url}, hasBase64: ${!!base64Data}`);
 
-                    if (mediaUrl) {
-                        const tempFile = path.join(process.cwd(), 'temp_image_' + Date.now() + '.jpg');
+                    const tempFile = path.join(process.cwd(), 'temp_image_' + Date.now() + '.jpg');
 
+                    if (base64Data) {
+                        logToFile(`Processing image from base64 data...`);
+                        const buffer = Buffer.from(base64Data.split(',').pop()!, 'base64');
+                        fs.writeFileSync(tempFile, buffer);
+                    } else if (mediaUrl) {
                         // Replace localhost with actual UZAPI_URL for Docker environments
                         let fetchUrl = mediaUrl;
                         if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
@@ -194,7 +207,10 @@ export async function POST(req: Request) {
                             return r.arrayBuffer();
                         });
                         fs.writeFileSync(tempFile, Buffer.from(buffer));
-                        logToFile(`Image downloaded to ${tempFile}`);
+                    }
+
+                    if (fs.existsSync(tempFile)) {
+                        logToFile(`Image content ready at ${tempFile}`);
 
                         // Process with Vision
                         // We pass the caption as the "text" and the image path in options
@@ -204,12 +220,11 @@ export async function POST(req: Request) {
                         }).catch(err => {
                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
                         });
-
                     } else {
-                        logToFile('Image URL missing');
+                        logToFile('Image content missing');
                     }
                 } catch (e: any) {
-                    logToFile(`Image Download/Process Error: ${e.message}`);
+                    logToFile(`Image Process Error: ${e.message}`);
                 }
             } else {
                 // Text Message Handling with Smart Buffering

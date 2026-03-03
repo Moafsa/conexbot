@@ -46,6 +46,7 @@ function run() {
         webhook: {
             url: 'http://host.docker.internal:3000/api/webhooks/whatsapp',
             autoDownload: true,
+            base64: true,
             readMessage: true,
             allUnreadOnStart: true,
             listenAcks: true,
