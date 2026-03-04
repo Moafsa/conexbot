@@ -4,6 +4,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createBotSchema } from '@/lib/validations';
 import { checkBotLimit } from '@/services/plan-limits';
+import { UzapiService } from '@/services/engine/uzapi';
 
 export async function POST(req: Request) {
     try {
@@ -152,7 +153,32 @@ export async function GET() {
 
         console.log('[API /bots GET] Found', bots.length, 'bots:', bots.map(b => ({ id: b.id, name: b.name, createdAt: b.createdAt })));
 
-        return NextResponse.json(bots);
+        // Enrich with live connection status from WuzAPI so UI shows real state
+        const botsWithLiveStatus = await Promise.all(
+            bots.map(async (bot) => {
+                if (!bot.sessionName) return { ...bot, connectionStatus: bot.connectionStatus || 'DISCONNECTED' };
+
+                try {
+                    const liveStatus = await UzapiService.getSessionStatus(bot.sessionName);
+
+                    // If DB is out of sync, update it in background
+                    if (liveStatus !== bot.connectionStatus) {
+                        console.log(`[API /bots GET] Syncing status for ${bot.sessionName}: ${bot.connectionStatus} -> ${liveStatus}`);
+                        prisma.bot.update({
+                            where: { id: bot.id },
+                            data: { connectionStatus: liveStatus }
+                        }).catch(e => console.error(`Failed to sync status for ${bot.sessionName}:`, e));
+                    }
+
+                    return { ...bot, connectionStatus: liveStatus };
+                } catch (e) {
+                    console.error(`[API /bots GET] Error fetching live status for ${bot.sessionName}:`, e);
+                    return bot;
+                }
+            })
+        );
+
+        return NextResponse.json(botsWithLiveStatus);
     } catch (error) {
         console.error('Error fetching bots:', error);
         return NextResponse.json({ error: 'Falha ao buscar agentes' }, { status: 500 });
