@@ -14,6 +14,7 @@ export const SupervisorService = {
     ): Promise<{
         nextStage: string;
         nextStageId?: string;
+        assignedBotId?: string | null;
         strategy: string;
         reasoning: string;
         leadScore: number;
@@ -23,25 +24,38 @@ export const SupervisorService = {
         customerEmail: string | null;
         summary: string | null;
     }> {
-        // 1. Fetch dynamic stages for this bot
+        // 1. Fetch dynamic stages and available bots for this tenant
         const dynamicStages = await prisma.crmStage.findMany({
             where: { botId },
             orderBy: { order: 'asc' }
+        });
+
+        const availableBots = await prisma.bot.findMany({
+            where: { tenantId: bot.tenantId, status: 'active' },
+            select: { id: true, name: true, businessType: true }
         });
 
         const stagesList = dynamicStages.length > 0
             ? dynamicStages.map((s: any, i: number) => `${i + 1}. ${s.name}: ${s.description || 'Nenhuma descrição fornecida.'}`).join('\n        ')
             : `1. LEAD: Cliente novo.\n        2. INTEREST: Interessado.\n        3. CUSTOMER: Cliente.`;
 
+        const botsList = availableBots
+            .filter(b => b.id !== botId)
+            .map(b => `- ID: ${b.id} | NOME: ${b.name} | PERFIL: ${b.businessType}`)
+            .join('\n        ');
+
         const historyString = history.map(h => `${h.role.toUpperCase()}: ${h.content}`).join('\n');
 
         const prompt = `
         VOCÊ É O SUPERVISOR DE VENDAS DA INTELIGÊNCIA ARTIFICIAL.
         
-        OBJETIVO: Analisar a conversa e decidir em qual etapa do CRM o cliente está, qualificar o lead, e extrair dados importantes.
+        OBJETIVO: Analisar a conversa e decidir em qual etapa do CRM o cliente está, qualificar o lead, extrair dados e DELEGAR para um especialista se necessário.
         
         ESTÁGIOS CONFIGURADOS PARA ESTE BOT:
         ${stagesList}
+
+        AGENTES ESPECIALISTAS DISPONÍVEIS (SE NECESSÁRIO DELEGAR):
+        ${botsList || "Nenhum outro agente disponível."}
         
         ESTADO ATUAL DO CLIENTE: ${currentStage}
 
@@ -49,26 +63,26 @@ export const SupervisorService = {
         ${historyString}
 
         SUA TAREFA:
-        1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil? Use os nomes exatos fornecidos na lista de estágios.
-        2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar (100 = pronto).
+        1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil?
+        2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar.
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
         5. ESTRATÉGIA: Como o bot deve agir agora?
-        6. NOME: Se o usuário já informou o nome na conversa, extraia aqui. Se não, retorne null.
-        7. EMAIL: Se o usuário informou o email, extraia aqui. Se não, retorne null.
-        8. RESUMO: Um resumo conciso da interação de vendas até o momento.
+        6. DELEGAÇÃO: Se você perceber que o cliente precisa de um "Closer" (fechamento), "Consultor" (suporte técnico) ou outro especialista da lista acima, retorne o "assignedBotId" correspondente. Caso contrário, retorne null.
+        7. NOME/EMAIL/RESUMO: Extraia dados do cliente se disponíveis.
 
         Retorne APENAS um JSON estrito:
         {
             "nextStage": "NOME_DO_ESTÁGIO_ESCOLHIDO",
+            "assignedBotId": "ID_DO_BOT_ESPECIALISTA" ou null,
             "strategy": "...",
             "reasoning": "...",
-            "leadScore": 85,
-            "sentiment": "POSITIVE",
+            "leadScore": 1-100,
+            "sentiment": "...",
             "insight": "...",
-            "customerName": "Nome do Cliente" ou null,
-            "customerEmail": "email@cliente.com" ou null,
-            "summary": "Resumo da qualificação..."
+            "customerName": "...",
+            "customerEmail": "...",
+            "summary": "..."
         }
         `;
 
@@ -86,6 +100,7 @@ export const SupervisorService = {
             return {
                 nextStage: (matchedStage as any)?.name || result.nextStage || currentStage,
                 nextStageId: (matchedStage as any)?.id,
+                assignedBotId: result.assignedBotId || null,
                 strategy: result.strategy || "Responda cordialmente.",
                 reasoning: result.reasoning || "Análise dinâmica.",
                 leadScore: result.leadScore || 0,

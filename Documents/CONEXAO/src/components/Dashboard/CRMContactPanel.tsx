@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import {
     X, MessageCircle, History, Info, Send,
     TrendingUp, Star, Phone, Mail, MapPin,
-    Calendar, CreditCard, ExternalLink, Bot, Trash2
+    Calendar, CreditCard, ExternalLink, Bot, Trash2,
+    Package, CheckCircle2, Clock, AlertCircle, DollarSign
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,11 +17,14 @@ interface CRMContactPanelProps {
 }
 
 export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMContactPanelProps) {
-    const [activeTab, setActiveTab] = useState<'chat' | 'data' | 'auto'>('chat');
+    const [activeTab, setActiveTab] = useState<'chat' | 'data' | 'auto' | 'finance'>('chat');
     const [contact, setContact] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
+    const [bots, setBots] = useState<any[]>([]);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         fetchContactData();
@@ -33,12 +37,15 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
             if (res.ok) {
                 const data = await res.json();
                 setContact(data);
-                // Assuming messages are linked via conversations -> messages
-                // For now, let's look for the first conversation
+                setOrders(data.orders || []);
                 if (data.conversations?.[0]) {
                     setMessages(data.conversations[0].messages || []);
                 }
             }
+
+            // Fetch bots for delegation
+            const botsRes = await fetch('/api/bots');
+            if (botsRes.ok) setBots(await botsRes.json());
         } catch (error) {
             console.error("Error fetching contact detail", error);
         } finally {
@@ -46,10 +53,29 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
         }
     }
 
+    const handleDelegate = async (botId: string) => {
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/contacts/${contactId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignedBotId: botId === 'none' ? null : botId })
+            });
+            if (res.ok) {
+                toast.success("Agente especialista delegado");
+                fetchContactData();
+            } else {
+                toast.error("Falha ao delegar");
+            }
+        } catch (e) {
+            toast.error("Erro de conexão");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleSend = async () => {
         if (!input.trim()) return;
-        // Implementation for manual intervention (Slack-like)
-        // This would send a message to Uzapi via the bot's session
         console.log("Sending manual message:", input);
         setInput("");
     };
@@ -66,7 +92,6 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                 toast.error("Erro ao excluir contato");
             }
         } catch (error) {
-            console.error("Error deleting contact", error);
             toast.error("Erro de conexão ao excluir");
         }
     };
@@ -111,10 +136,11 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-100">
-                <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageCircle size={18} />} label="Chat" />
-                <TabButton active={activeTab === 'data'} onClick={() => setActiveTab('data')} icon={<Info size={18} />} label="Dados CRM" />
-                <TabButton active={activeTab === 'auto'} onClick={() => setActiveTab('auto')} icon={<Bot size={18} />} label="IA Insights" />
+            <div className="flex border-b border-gray-100 bg-gray-50/20 overflow-x-auto no-scrollbar">
+                <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={<MessageCircle size={16} />} label="Chat" />
+                <TabButton active={activeTab === 'data'} onClick={() => setActiveTab('data')} icon={<Info size={16} />} label="Dados" />
+                <TabButton active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={16} />} label="Financeiro" />
+                <TabButton active={activeTab === 'auto'} onClick={() => setActiveTab('auto')} icon={<Bot size={16} />} label="IA" />
             </div>
 
             {/* Content Area */}
@@ -133,7 +159,7 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                                     <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
                                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
                                             ? 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
-                                            : 'bg-indigo-600 text-white rounded-tr-none'
+                                            : 'bg-indigo-600 text-white rounded-tr-none shadow-lg'
                                             }`}>
                                             {msg.content}
                                             <p className={`text-[9px] mt-1 ${msg.role === 'user' ? 'text-gray-400' : 'text-indigo-200'}`}>
@@ -145,71 +171,112 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                             )}
                         </div>
 
-                        {/* Input - Manual Intervention */}
                         <div className="p-4 bg-white border-t border-gray-100">
                             <div className="relative">
                                 <input
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                    placeholder="Responder como o Bot (Intervenção Humana)..."
+                                    placeholder="Responder como o Bot..."
                                     className="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                 />
-                                <button
-                                    onClick={handleSend}
-                                    className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors"
-                                >
+                                <button onClick={handleSend} className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors">
                                     <Send size={16} />
                                 </button>
                             </div>
-                            <p className="text-[10px] text-gray-400 mt-2 text-center">
-                                Sua resposta será enviada via WhatsApp através do bot.
-                            </p>
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'data' && (
                     <div className="p-6 space-y-8 animate-fade-in">
-                        {/* Contact Stats */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm transition-all hover:shadow-md group">
-                                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Pedidos</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-black mb-1 group-hover:text-indigo-500">Pedidos</p>
                                 <div className="flex items-center gap-2">
                                     <CreditCard size={18} className="text-indigo-500" />
-                                    <span className="text-lg font-bold text-gray-800">{contact?._count?.orders || 0}</span>
+                                    <span className="text-lg font-black text-gray-800">{orders.length}</span>
                                 </div>
                             </div>
                             <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm transition-all hover:shadow-md group">
-                                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Lead Score</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-black mb-1 group-hover:text-indigo-500">Lead Score</p>
                                 <div className="flex items-center gap-2">
                                     <TrendingUp size={18} className={`${(contact?.leadScore || 0) > 70 ? 'text-green-500' : 'text-yellow-500'}`} />
-                                    <span className="text-lg font-bold text-gray-800">{contact?.leadScore || 0}/100</span>
+                                    <span className="text-lg font-black text-gray-800">{contact?.leadScore || 0}%</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Fields */}
                         <div className="space-y-4">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Informações Base</h3>
+                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Informações Base</h3>
                             <InfoRow label="Email" value={contact?.email || 'Não informado'} icon={<Mail size={14} />} />
                             <InfoRow label="Telefone" value={contact?.phone} icon={<Phone size={14} />} />
-                            <InfoRow label="Insight IA" value={contact?.lastAiInsight || 'Sem análise recente'} icon={<Bot size={14} />} />
-                            <InfoRow label="Desde" value={new Date(contact?.createdAt).toLocaleDateString('pt-BR')} icon={<Calendar size={14} />} />
+                            <InfoRow label="Insight IA" value={contact?.lastAiInsight ? 'Gerado' : 'Aguardando'} icon={<Bot size={14} />} />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'finance' && (
+                    <div className="p-6 space-y-6 animate-fade-in">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Histórico de Cobranças</h3>
+                            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">ASAAS INTEGRADO</span>
                         </div>
 
-                        {/* Tags */}
-                        <div className="space-y-3">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Tags Inteligentes</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {contact?.tags?.length > 0 ? contact.tags.map((tag: string) => (
-                                    <span key={tag} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium hover:bg-indigo-100 transition-colors cursor-default">
-                                        #{tag}
-                                    </span>
-                                )) : (
-                                    <span className="text-xs text-gray-400 italic">Nenhuma tag detectada.</span>
-                                )}
-                            </div>
+                        <div className="space-y-4">
+                            {orders.length === 0 ? (
+                                <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-gray-100 opacity-40">
+                                    <Package size={48} className="mx-auto mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-widest">Nenhuma compra detectada</p>
+                                </div>
+                            ) : (
+                                orders.map((order: any) => (
+                                    <div key={order.id} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-indigo-100 transition-all group">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-all">
+                                                    <Package size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-gray-800">Cód: {order.id.slice(-6)}</p>
+                                                    <p className="text-[10px] text-gray-400 uppercase font-bold">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-indigo-600">R$ {order.totalAmount?.toFixed(2) || '0.00'}</p>
+                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${order.status === 'RECEIVED' || order.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
+                                                    order.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                                    }`}>
+                                                    {order.status}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Itens do Pedido */}
+                                        <div className="mb-3 space-y-1">
+                                            {order.items?.map((item: any) => (
+                                                <div key={item.id} className="text-[10px] flex justify-between italic text-gray-500">
+                                                    <span>• {item.product?.name || 'Produto'} x{item.quantity}</span>
+                                                    <span>R$ {item.unitPrice.toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 pt-3 border-t border-gray-50">
+                                            {order.status === 'RECEIVED' ? <CheckCircle2 size={12} className="text-green-500" /> : <Clock size={12} className="text-amber-500" />}
+                                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+                                                {order.status === 'RECEIVED' ? 'Pagamento Confirmado' : 'Aguardando Compensação'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-indigo-600/5 rounded-2xl border border-indigo-500/10">
+                            <p className="text-[10px] text-indigo-600 leading-tight">
+                                💡 <strong>Dica Asaas:</strong> O bot identifica pagamentos automaticamente via webhook. Quando o status muda para <strong>RECEIVED</strong>, o lead é movido no funil.
+                            </p>
                         </div>
                     </div>
                 )}
@@ -222,16 +289,44 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                                 <Star size={20} fill="currentColor" className="text-yellow-400 animate-pulse" />
                                 Insight Estratégico
                             </h3>
-                            <p className="text-sm opacity-90 leading-relaxed font-medium bg-white/10 p-4 rounded-2xl border border-white/10">
-                                {contact?.lastAiInsight || "A IA ainda não gerou um insight específico para este lead. Aguarde a próxima interação."}
+                            <p className="text-sm opacity-90 leading-relaxed font-medium bg-white/10 p-4 rounded-2xl border border-white/10 italic">
+                                "{contact?.lastAiInsight || "Aguardando próxima interação para análise..."}"
                             </p>
                             <div className="mt-6 flex gap-3">
-                                <button className="flex-1 py-3 bg-white text-indigo-700 rounded-2xl text-[11px] font-black uppercase tracking-tighter hover:bg-indigo-50 transition-all active:scale-95 shadow-lg">
+                                <button className="flex-1 py-3 bg-white text-indigo-700 rounded-2xl text-[11px] font-black uppercase tracking-tighter hover:bg-indigo-50 transition-all shadow-lg">
                                     Ação Recomendada
                                 </button>
-                                <button className="p-3 bg-white/10 border border-white/20 rounded-2xl hover:bg-white/20 transition-all active:scale-95">
+                                <button className="p-3 bg-white/10 border border-white/20 rounded-2xl hover:bg-white/20 transition-all">
                                     <ExternalLink size={16} />
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Agente Especialista Delegado</h3>
+                            <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                        <Bot size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Responsável Atual</p>
+                                        <p className="text-sm font-black text-gray-800">
+                                            {bots.find(b => b.id === contact?.assignedBotId)?.name || "Agente Padrão (IA)"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <select
+                                    className="w-full bg-gray-50 border-none rounded-xl p-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none"
+                                    value={contact?.assignedBotId || 'none'}
+                                    disabled={saving}
+                                    onChange={(e) => handleDelegate(e.target.value)}
+                                >
+                                    <option value="none">Transferir para Agente Padrão</option>
+                                    {bots.filter(b => b.id !== contact?.botId).map(b => (
+                                        <option key={b.id} value={b.id}>Delegar para: {b.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
@@ -251,9 +346,7 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                                                 'Interação Neutra'}
                                     </p>
                                     <p className="text-xs text-gray-500 mt-0.5 leading-snug">
-                                        {contact?.sentiment === 'POSITIVE' ? 'O cliente demonstra satisfação e progresso no funil.' :
-                                            contact?.sentiment === 'NEGATIVE' ? 'Atenção: O feedback recente foi crítico ou impaciente.' :
-                                                'A comunicação está focada em dúvidas pontuais e técnicas.'}
+                                        Análise baseada no contexto das conversas via {contact?.bot?.aiProvider || 'IA'}.
                                     </p>
                                 </div>
                             </div>
@@ -265,19 +358,6 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
     );
 }
 
-function TabButton({ active, onClick, icon, label }: any) {
-    return (
-        <button
-            onClick={onClick}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-all relative ${active ? 'text-indigo-600 bg-white' : 'text-gray-400 hover:text-gray-600 bg-gray-50/50'
-                }`}
-        >
-            {icon}
-            {label}
-            {active && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 mx-4"></div>}
-        </button>
-    );
-}
 
 function InfoRow({ label, value, icon }: any) {
     return (
@@ -286,9 +366,24 @@ function InfoRow({ label, value, icon }: any) {
                 <div className="p-1.5 bg-gray-50 text-gray-400 rounded-lg group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-colors">
                     {icon}
                 </div>
-                <span className="text-xs text-gray-500">{label}</span>
+                <span className="text-xs text-gray-500 font-bold">{label}</span>
             </div>
             <span className="text-xs font-medium text-gray-800">{value}</span>
         </div>
+    );
+}
+
+function TabButton({ active, onClick, icon, label }: any) {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${active
+                ? 'border-indigo-600 text-indigo-600 bg-indigo-50/30'
+                : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                }`}
+        >
+            {icon}
+            {label}
+        </button>
     );
 }

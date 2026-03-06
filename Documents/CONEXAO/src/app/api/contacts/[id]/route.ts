@@ -8,19 +8,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         const body = await req.json();
         const { funnelStage, name, email, notes, tags } = body;
 
+        console.log(`[API] Updating contact ${id}:`, body);
+
         const contact = await prisma.contact.update({
             where: { id },
             data: {
-                funnelStage,
-                name,
-                email,
-                notes,
-                tags
+                funnelStage: body.funnelStage,
+                stageId: body.stageId,
+                name: body.name,
+                email: body.email,
+                notes: body.notes,
+                tags: body.tags
             }
         });
 
+        console.log(`[API] Contact ${id} updated successfully`);
         return NextResponse.json(contact);
     } catch (error) {
+        console.error('[API] Error updating contact:', error);
         return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
     }
 }
@@ -44,7 +49,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const contact = await prisma.contact.findUnique({
             where: { id },
             include: {
-                orders: true
+                orders: {
+                    include: {
+                        items: {
+                            include: {
+                                product: true
+                            }
+                        }
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                }
             }
         });
 

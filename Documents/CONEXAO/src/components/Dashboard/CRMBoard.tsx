@@ -92,7 +92,7 @@ export function CRMBoard({ botId }: { botId: string }) {
             toast.error("Erro ao mover contato");
             fetchContacts();
         }
-    }
+    };
 
     const handleDragStart = (e: React.DragEvent, id: string) => {
         setDraggedContact(id);

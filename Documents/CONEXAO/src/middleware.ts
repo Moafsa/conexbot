@@ -42,8 +42,14 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
     }
 
-    // Admin-only routes
-    if (pathname.startsWith('/admin') && token.role !== 'admin') {
+    // Aggressive Superadmin Redirection
+    if (token.role === 'SUPERADMIN') {
+        if (!pathname.startsWith('/admin') && !isPublic) {
+            console.log(`[Middleware] Superadmin detected on client route ${pathname}, redirecting to /admin/dashboard`);
+            return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+        }
+    } else if (pathname.startsWith('/admin')) {
+        // Prevent regular users from accessing admin routes
         return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 

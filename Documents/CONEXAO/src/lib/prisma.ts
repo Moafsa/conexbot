@@ -12,7 +12,7 @@ const globalForPrisma = globalThis as unknown as {
     prisma_v2: PrismaClientSingleton | undefined;
 };
 
-const prisma = globalForPrisma.prisma_v2 ?? prismaClientSingleton();
+export const prisma = globalForPrisma.prisma_v2 ?? prismaClientSingleton();
 
 export default prisma;
 

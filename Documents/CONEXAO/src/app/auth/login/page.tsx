@@ -32,8 +32,22 @@ function LoginContent() {
     if (result?.error) {
       setError("Email ou senha incorretos.");
     } else {
-      router.push(callbackUrl);
-      router.refresh();
+      // Force session fetch to determine destination
+      try {
+        const sessionRes = await fetch('/api/auth/session');
+        const session = await sessionRes.json();
+
+        console.log("Login successful, role detected:", session?.user?.role);
+
+        if (session?.user?.role === 'SUPERADMIN') {
+          window.location.assign('/admin/dashboard');
+        } else {
+          window.location.assign(callbackUrl);
+        }
+      } catch (err) {
+        console.error("Session check failed", err);
+        window.location.assign(callbackUrl);
+      }
     }
   };
 

@@ -1,7 +1,12 @@
-const ASAAS_BASE = 'https://api.asaas.com/v3';
+const ASAAS_PROD = 'https://api.asaas.com/v3';
+const ASAAS_SANDBOX = 'https://sandbox.asaas.com/api/v3';
 
-function getHeaders(): Record<string, string> {
-    const key = process.env.ASAAS_API_KEY;
+function getAsaasBase() {
+    return process.env.ASAAS_MODE === 'production' ? ASAAS_PROD : ASAAS_SANDBOX;
+}
+
+function getHeaders(customKey?: string): Record<string, string> {
+    const key = customKey || process.env.ASAAS_API_KEY;
     if (!key) throw new Error('ASAAS_API_KEY not configured');
     return {
         'Content-Type': 'application/json',
@@ -22,7 +27,7 @@ export const AsaasService = {
             return { id: `cus_mock_${Date.now()}`, ...data };
         }
 
-        const res = await fetch(`${ASAAS_BASE}/customers`, {
+        const res = await fetch(`${getAsaasBase()}/customers`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({
@@ -52,7 +57,7 @@ export const AsaasService = {
             };
         }
 
-        const res = await fetch(`${ASAAS_BASE}/subscriptions`, {
+        const res = await fetch(`${getAsaasBase()}/subscriptions`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({
@@ -90,7 +95,7 @@ export const AsaasService = {
     }): Promise<{ success: boolean; url?: string; error?: string }> {
         try {
             // Create or get customer first
-            const customerRes = await fetch(`${ASAAS_BASE}/customers`, {
+            const customerRes = await fetch(`${getAsaasBase()}/customers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -110,7 +115,7 @@ export const AsaasService = {
             } else {
                 // Try to find existing customer by email
                 const searchRes = await fetch(
-                    `${ASAAS_BASE}/customers?email=${encodeURIComponent(params.customerEmail)}`,
+                    `${getAsaasBase()}/customers?email=${encodeURIComponent(params.customerEmail)}`,
                     {
                         headers: { 'access_token': params.apiKey },
                     }
@@ -131,7 +136,7 @@ export const AsaasService = {
             const dueDate = new Date();
             dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
 
-            const paymentRes = await fetch(`${ASAAS_BASE}/payments`, {
+            const paymentRes = await fetch(`${getAsaasBase()}/payments`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

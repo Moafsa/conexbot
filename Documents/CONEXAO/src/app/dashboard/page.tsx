@@ -50,7 +50,7 @@ export default function DashboardPage() {
     const stats = [
         {
             label: "Mensagens (24h)",
-            value: analytics?.messages.last24h || 0,
+            value: analytics?.messages?.last24h || 0,
             icon: MessageSquare,
             color: "from-blue-500 to-cyan-400",
         },
@@ -62,7 +62,7 @@ export default function DashboardPage() {
         },
         {
             label: "Agentes Ativos",
-            value: analytics?.bots.active || 0,
+            value: analytics?.bots?.active || 0,
             icon: Bot,
             color: "from-indigo-500 to-blue-400",
         },
@@ -163,6 +163,17 @@ export default function DashboardPage() {
                                             <WifiOff className="w-3 h-3" /> {bot.connectionStatus === 'QRCODE' ? 'Escanear QR' : 'Conectar'}
                                         </Link>
                                     )}
+                                    <button
+                                        onClick={async () => {
+                                            if (confirm('Deseja duplicar este agente?')) {
+                                                const res = await fetch(`/api/bots/${bot.id}/duplicate`, { method: 'POST' });
+                                                if (res.ok) window.location.reload();
+                                            }
+                                        }}
+                                        className="text-indigo-400 hover:text-indigo-300 text-xs"
+                                    >
+                                        Duplicar
+                                    </button>
                                     <Link
                                         href={`/dashboard/create-bot?edit=${bot.id}`}
                                         className="text-gray-400 hover:text-white text-xs"

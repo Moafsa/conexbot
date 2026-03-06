@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap } from "lucide-react";
+import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
@@ -18,6 +18,8 @@ export default function SettingsPage() {
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
     const [finance, setFinance] = useState({ asaasApiKey: "" });
     const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "" });
+    const [smtpConfigs, setSmtpConfigs] = useState<any[]>([]);
+    const [newSmtp, setNewSmtp] = useState({ host: "", port: 587, user: "", pass: "", fromEmail: "" });
     const [bots, setBots] = useState<any[]>([]);
     const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
 
@@ -46,12 +48,18 @@ export default function SettingsPage() {
                 } else if (activeTab === "ai") {
                     const res = await fetch("/api/settings/ai");
                     const data = await res.json();
-                    if (res.ok) setAiSettings({
-                        openaiApiKey: data.openaiApiKey || "",
-                        geminiApiKey: data.geminiApiKey || "",
-                        openrouterApiKey: data.openrouterApiKey || "",
-                        elevenLabsApiKey: data.elevenLabsApiKey || ""
-                    });
+                    if (res.ok) {
+                        setAiSettings({
+                            openaiApiKey: data.openaiApiKey || "",
+                            geminiApiKey: data.geminiApiKey || "",
+                            openrouterApiKey: data.openrouterApiKey || "",
+                            elevenLabsApiKey: data.elevenLabsApiKey || ""
+                        });
+                    }
+                } else if (activeTab === "smtp") {
+                    const res = await fetch("/api/settings/smtp");
+                    const data = await res.json();
+                    if (res.ok) setSmtpConfigs(Array.isArray(data) ? data : []);
                 }
             } catch (err) {
                 console.error(err);
@@ -143,6 +151,37 @@ export default function SettingsPage() {
         }
     };
 
+    const handleAddSmtp = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch("/api/settings/smtp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newSmtp)
+            });
+            if (res.ok) {
+                const added = await res.json();
+                setSmtpConfigs([...smtpConfigs, added]);
+                setNewSmtp({ host: "", port: 587, user: "", pass: "", fromEmail: "" });
+                setMessage({ type: 'success', text: "SMTP adicionado!" });
+            }
+        } catch (err) {
+            setMessage({ type: 'error', text: "Erro ao adicionar SMTP." });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteSmtp = async (id: string) => {
+        try {
+            const res = await fetch(`/api/settings/smtp/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                setSmtpConfigs(smtpConfigs.filter(s => s.id !== id));
+                setMessage({ type: 'success', text: "SMTP removido!" });
+            }
+        } catch (err) { }
+    };
+
     const handleSaveAiSettings = async () => {
         setSaving(true);
         setMessage(null);
@@ -185,6 +224,7 @@ export default function SettingsPage() {
                     <TabButton id="whatsapp" label="Conexão WhatsApp" icon={Smartphone} />
                     <TabButton id="ai" label="Inteligência Artificial" icon={Zap} />
                     <TabButton id="finance" label="Financeiro & Pagamentos" icon={DollarSign} />
+                    <TabButton id="smtp" label="Servidores E-mail (SMTP)" icon={Mail} />
                     <TabButton id="notifications" label="Notificações" icon={Bell} />
                     <TabButton id="security" label="Segurança" icon={Shield} />
                 </div>
@@ -261,9 +301,16 @@ export default function SettingsPage() {
                                             placeholder="$aact_..."
                                             className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                         />
-                                        <p className="mt-2 text-xs text-gray-500">
-                                            Você pode encontrar essa chave no painel do Asaas em Minha Conta `{'>'}` Integrações.
-                                        </p>
+                                        <div className="mt-4 p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl space-y-2">
+                                            <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">📋 Como obter sua chave Asaas:</p>
+                                            <ol className="text-[11px] text-gray-400 list-decimal ml-4 space-y-1">
+                                                <li>Acesse seu painel no <a href="https://www.asaas.com" target="_blank" className="underline text-blue-300">Asaas</a> (ou Sandbox para testes).</li>
+                                                <li>Vá em <strong>Minha Conta</strong> {'>'} <strong>Integrações</strong>.</li>
+                                                <li>Clique em <strong>Gerar nova chave API</strong>.</li>
+                                                <li>Copie a chave gerada e cole no campo acima.</li>
+                                                <li><em>Importante:</em> Certifique-se de que sua conta esteja verificada para processar pagamentos reais.</li>
+                                            </ol>
+                                        </div>
                                     </div>
 
                                     <button
@@ -336,6 +383,9 @@ export default function SettingsPage() {
                                                 placeholder="sk-..."
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
+                                            <p className="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                                Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank" className="underline">platform.openai.com</a>. É necessário ter saldo (credits) para o bot funcionar.
+                                            </p>
                                         </div>
 
                                         <div>
@@ -347,6 +397,9 @@ export default function SettingsPage() {
                                                 placeholder="AIza..."
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
+                                            <p className="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                                Crie gratuitamente no <a href="https://aistudio.google.com/app/apikey" target="_blank" className="underline">Google AI Studio</a>. Ideal para leitura de imagens.
+                                            </p>
                                         </div>
 
                                         <div>
@@ -358,6 +411,9 @@ export default function SettingsPage() {
                                                 placeholder="sk-or-..."
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
+                                            <p className="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                                Acesse <a href="https://openrouter.ai/keys" target="_blank" className="underline">openrouter.ai</a> para usar modelos de baixo custo.
+                                            </p>
                                         </div>
                                         <div>
                                             <label className="block text-sm text-gray-400 mb-2 mt-4">ElevenLabs API Key (Para Áudios)</label>
@@ -368,6 +424,11 @@ export default function SettingsPage() {
                                                 placeholder="sk_..."
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
+                                            <div className="mt-2 p-3 bg-purple-500/5 border border-purple-500/10 rounded-lg">
+                                                <p className="text-[10px] text-gray-400">
+                                                    Para vozes personalizadas, pegue a chave em <a href="https://elevenlabs.io" target="_blank" className="underline">elevenlabs.io</a>. Depois, insira o <strong>Voice ID</strong> desejado nas configurações individuais de cada bot.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -435,6 +496,41 @@ export default function SettingsPage() {
                                         {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                                         Salvar Preferências
                                     </button>
+                                </div>
+                            )}
+
+                            {activeTab === "smtp" && (
+                                <div className="space-y-6 animate-fade-in">
+                                    <h3 className="text-xl font-semibold">Servidores E-mail (SMTP)</h3>
+                                    <p className="text-gray-400 text-sm">
+                                        Configure servidores SMTP para disparos de e-mail manuais ou automáticos.
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        {smtpConfigs.map(s => (
+                                            <div key={s.id} className="p-4 rounded-xl border border-white/5 bg-white/5 flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-white font-medium">{s.host}:{s.port}</p>
+                                                    <p className="text-xs text-gray-500">{s.fromEmail}</p>
+                                                </div>
+                                                <button onClick={() => handleDeleteSmtp(s.id)} className="text-xs text-red-400 hover:text-red-300">Excluir</button>
+                                            </div>
+                                        ))}
+
+                                        <div className="p-6 rounded-xl border border-white/10 bg-black/20 space-y-4">
+                                            <h4 className="text-sm font-medium text-white mb-2">Adicionar Novo Servidor</h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <input placeholder="Host (ex: smtp.gmail.com)" value={newSmtp.host} onChange={e => setNewSmtp({ ...newSmtp, host: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                                                <input placeholder="Porta (ex: 587)" type="number" value={newSmtp.port} onChange={e => setNewSmtp({ ...newSmtp, port: parseInt(e.target.value) })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                                                <input placeholder="Usuário/E-mail" value={newSmtp.user} onChange={e => setNewSmtp({ ...newSmtp, user: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                                                <input placeholder="Senha" type="password" value={newSmtp.pass} onChange={e => setNewSmtp({ ...newSmtp, pass: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm" />
+                                                <input placeholder="E-mail de Remetente" value={newSmtp.fromEmail} onChange={e => setNewSmtp({ ...newSmtp, fromEmail: e.target.value })} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm sm:col-span-2" />
+                                            </div>
+                                            <button onClick={handleAddSmtp} disabled={saving} className="btn-primary w-full text-sm py-2">
+                                                {saving ? <Loader2 className="animate-spin h-4 w-4" /> : "Adicionar SMTP"}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

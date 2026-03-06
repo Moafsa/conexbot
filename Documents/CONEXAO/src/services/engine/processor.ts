@@ -183,6 +183,7 @@ export const MessageProcessor = {
                 data: {
                     funnelStage: analysis.nextStage,
                     stageId: analysis.nextStageId,
+                    assignedBotId: analysis.assignedBotId,
                     leadScore: analysis.leadScore,
                     sentiment: analysis.sentiment,
                     lastAiInsight: analysis.insight,
@@ -190,9 +191,10 @@ export const MessageProcessor = {
                     ...(analysis.customerName && { name: analysis.customerName }),
                     ...(analysis.customerEmail && { email: analysis.customerEmail }),
                     ...(analysis.summary && { notes: analysis.summary })
-                }
+                } as any
             });
             existingContact.funnelStage = analysis.nextStage;
+            (existingContact as any).assignedBotId = analysis.assignedBotId || (existingContact as any).assignedBotId;
 
             // 8. RAG Context
             const vectorResults = await VectorService.searchSimilar(bot.id, messageText, 3);
@@ -210,14 +212,31 @@ export const MessageProcessor = {
 
             // 9. Prompt Building
             const mediaList = bot.media.map((m: any) => ({ id: m.id, type: m.type, description: m.description }));
+
+            // Check if contact has an assigned specialist bot
+            let activeBot = bot;
+            if ((existingContact as any).assignedBotId) {
+                const assignedBot = await prisma.bot.findUnique({
+                    where: { id: (existingContact as any).assignedBotId },
+                    include: { media: true, products: { where: { active: true } } }
+                });
+                if (assignedBot) {
+                    logToFile(`[Processor] DELEGATED to specialist bot: ${assignedBot.name}`);
+                    activeBot = assignedBot;
+                }
+            }
+
+            const { mapBotToSkill } = await import('./skills');
+            const specialistSkill = mapBotToSkill(activeBot);
+
             const baseSystemPrompt = buildSystemPrompt({
-                name: bot.name,
-                businessType: bot.businessType,
-                address: bot.address,
-                hours: bot.hours,
-                paymentMethods: bot.paymentMethods,
-                systemPrompt: bot.systemPrompt,
-                websiteUrl: bot.websiteUrl || undefined,
+                name: activeBot.name,
+                businessType: activeBot.businessType,
+                address: activeBot.address,
+                hours: activeBot.hours,
+                paymentMethods: activeBot.paymentMethods,
+                systemPrompt: activeBot.systemPrompt,
+                websiteUrl: activeBot.websiteUrl || undefined,
                 relevantKnowledge: combinedContext || undefined,
                 mediaList: mediaList.length > 0 ? mediaList : undefined,
                 contactInfo: {
@@ -225,6 +244,12 @@ export const MessageProcessor = {
                     email: existingContact.email,
                     company: (existingContact as any).company,
                 },
+                crmContext: {
+                    insight: existingContact.lastAiInsight,
+                    sentiment: existingContact.sentiment,
+                    assignedRole: activeBot.name,
+                    specialistSkill: specialistSkill
+                }
             });
 
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;

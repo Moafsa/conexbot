@@ -1,7 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
-  engineType      = "binary"
 }
 
 datasource db {
@@ -43,30 +42,39 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
 model Tenant {
-  id                      String        @id @default(uuid())
+  id                      String         @id @default(uuid())
   name                    String?
-  email                   String        @unique
+  email                   String         @unique
   password                String?
-  whatsapp                String?       @unique
+  whatsapp                String?        @unique
   cpfCnpj                 String?
-  role                    String        @default("user")
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  role                    UserRole       @default(USER)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
   notificationPreferences String?
-  botLimit               Int           @default(1)
-  asaasApiKey            String?
-  openaiApiKey           String?
-  geminiApiKey           String?
-  openrouterApiKey       String?
-  elevenLabsApiKey       String?
-  accounts               Account[]
-  bots                   Bot[]
-  contacts               Contact[]
-  payments               Payment[]
-  sessions               Session[]
-  subscription           Subscription?
-  usageCounter           UsageCounter?
+  botLimit                Int            @default(1)
+  asaasApiKey             String?
+  openaiApiKey            String?
+  geminiApiKey            String?
+  openrouterApiKey        String?
+  elevenLabsApiKey        String?
+  accounts                Account[]
+  bots                    Bot[]
+  contacts                Contact[]
+  payments                Payment[]
+  sessions                Session[]
+  subscription            Subscription?
+  usageCounter            UsageCounter?
+  smtpConfigs             SmtpConfig[]
+  botMaterials            BotMaterial[]
+  followupRules           FollowupRule[]
 }
 
 model Bot {
@@ -108,6 +116,52 @@ model Bot {
   vectors           VectorStore[]
   crmStages         CrmStage[]
   contacts          Contact[]
+  assignedContacts  Contact[]      @relation("AssignedBot")
+  smtpConfigs       SmtpConfig[]
+  materials         BotMaterial[]
+  followupRules     FollowupRule[]
+}
+
+model SmtpConfig {
+  id        String   @id @default(uuid())
+  host      String
+  port      Int
+  user      String
+  pass      String
+  fromEmail String
+  active    Boolean  @default(true)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  botId     String?
+  bot       Bot?     @relation(fields: [botId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model FollowupRule {
+  id          String   @id @default(uuid())
+  name        String
+  triggerDays Int      @default(1)
+  triggerType String   @default("AFTER_LAST_MESSAGE") // SALES, POST_SALE, EVENT_REMINDER
+  message     String
+  active      Boolean  @default(true)
+  botId       String
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model BotMaterial {
+  id            String   @id @default(uuid())
+  name          String
+  type          String // PDF, DOCX, TXT, IMAGE
+  contentUrl    String
+  extractedText String?
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
 }
 
 model CrmStage {
@@ -179,7 +233,7 @@ model OrderItem {
 }
 
 model Contact {
-  id            String      @id @default(uuid())
+  id            String    @id @default(uuid())
   phone         String
   name          String?
   email         String?
@@ -188,19 +242,22 @@ model Contact {
   needs         String?
   notes         String?
   tags          String[]
-  funnelStage   String      @default("LEAD")
-  lastActive    DateTime    @default(now())
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  funnelStage   String    @default("LEAD")
+  lastActive    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   tenantId      String
   botId         String?
   stageId       String?
+  eventDate     DateTime?
+  assignedBotId String?
   lastAiInsight String?
-  leadScore     Int         @default(0)
+  leadScore     Int       @default(0)
   sentiment     String?
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bot           Bot?        @relation(fields: [botId], references: [id], onDelete: Cascade)
-  stage         CrmStage?   @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bot           Bot?      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  assignedBot   Bot?      @relation("AssignedBot", fields: [assignedBotId], references: [id], onDelete: SetNull)
+  stage         CrmStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
   orders        Order[]
 
   @@unique([phone, botId])
@@ -229,28 +286,64 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
+model Plan {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  price         Float
+  interval      PlanInterval   @default(MONTHLY)
+  botLimit      Int            @default(1)
+  messageLimit  Int            @default(500)
+  active        Boolean        @default(true)
+  externalId    String? // ID do plano no Asaas
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+}
+
 model Subscription {
-  id         String   @id @default(uuid())
-  plan       String
-  status     String
-  gateway    String
-  externalId String?
-  tenantId   String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id         String             @id @default(uuid())
+  status     SubscriptionStatus
+  gateway    String             @default("ASAAS")
+  externalId String?            @unique
+  tenantId   String             @unique
+  planId     String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan       Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 model Payment {
-  id         String   @id @default(uuid())
+  id         String        @id @default(uuid())
   amount     Float
-  status     String
-  gateway    String
-  externalId String?
+  status     PaymentStatus
+  gateway    String        @default("ASAAS")
+  externalId String?       @unique
   invoiceUrl String?
   tenantId   String
-  createdAt  DateTime @default(now())
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  CONFIRMED
+  OVERDUE
+  REFUNDED
 }
 
 model UsageCounter {
@@ -285,4 +378,21 @@ enum FunnelStage {
   CUSTOMER
   SUPPORT
   CHURNED
+}
+model GlobalConfig {
+  id                 String   @id @default("system")
+  systemName         String   @default("ConextBot")
+  maintenanceMode    Boolean  @default(false)
+  
+  // Google Auth (Configurável via SuperAdmin)
+  googleClientId     String?
+  googleClientSecret String?
+  
+  // Fallback Keys
+  openaiApiKey       String?
+  geminiApiKey       String?
+  asaasApiKey        String?
+  elevenLabsApiKey   String?
+  
+  updatedAt          DateTime @updatedAt
 }

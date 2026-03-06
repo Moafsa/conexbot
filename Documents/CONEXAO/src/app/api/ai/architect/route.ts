@@ -31,7 +31,20 @@ export async function POST(req: Request) {
         }
 
         // Now accepting extractedTexts from frontend (OCR results)
-        const { message, history, extractedTexts } = await req.json();
+        const { message, history, extractedTexts, botId } = await req.json();
+
+        let botContext = "";
+        if (botId) {
+            const existingBot = await prisma.bot.findUnique({ where: { id: botId } });
+            if (existingBot) {
+                botContext = `\n\nESTADO ATUAL DO BOT (EDIÇÃO):
+- Nome: ${existingBot.name}
+- Tipo: ${existingBot.businessType}
+- Descrição: ${existingBot.description}
+- Personalidade Atual: ${existingBot.systemPrompt?.substring(0, 500)}...
+`;
+            }
+        }
 
         console.log('[AI Architect] Received message:', message.substring(0, 100));
 
@@ -125,7 +138,7 @@ FORMATO JSON:
         }
 
         const messages = [
-            { role: "system", content: systemPrompt },
+            { role: "system", content: systemPrompt + (botContext ? `\n\n${botContext}` : "") },
             ...history.map((msg: any) => ({ role: msg.role === 'ai' ? 'assistant' : 'user', content: msg.content })),
             { role: "user", content: detailedUserMessage }
         ];

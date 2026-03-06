@@ -16,7 +16,11 @@ export async function GET(req: Request) {
 
         console.log(`[Cron] Found ${bots.length} active bots.`);
 
-        // 2. Process each bot
+        // 2. Process Daily AI Followups (Rules based)
+        console.log('[Cron] Processing rule-based followups...');
+        await FollowUpService.processDailyFollowups();
+
+        // 3. Process stalled conversations (legacy/fallback)
         const results = [];
         for (const bot of bots) {
             try {

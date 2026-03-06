@@ -158,7 +158,12 @@ export default function AIArchitect() {
       const res = await fetch('/api/ai/architect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage, history: [...messages, userMsg], extractedTexts: currentExtractedTexts })
+        body: JSON.stringify({
+          message: userMessage,
+          history: [...messages, userMsg],
+          extractedTexts: currentExtractedTexts,
+          botId: editId
+        })
       });
 
       const data = await res.json();

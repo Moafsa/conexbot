@@ -23,6 +23,12 @@ export interface BotContext {
     contactInfo?: ContactInfo | null;
     fallbackContact?: string | null;
     enablePayments?: boolean;
+    crmContext?: {
+        insight?: string | null;
+        sentiment?: string | null;
+        assignedRole?: string | null;
+        specialistSkill?: string | null;
+    };
 }
 
 export function buildSystemPrompt(bot: BotContext): string {
@@ -142,7 +148,8 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 - Quando cliente pergunta preço → Responda e IMEDIATAMENTE ofereça: "Quer que eu reserve?"
 - Quando cliente hesita → Use prova social: "Esse é nosso mais pedido"
 - Quando cliente diz "vou pensar" → "Entendo! Mas esse valor é só pra hoje, viu? 😉"
-- Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação`);
+- Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação
+- **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, esclarecer dúvidas e aumentar o ticket médio se houver oportunidade (upsell).`);
 
     // Conversation flow (CONDITIONAL)
     if (isConsultative) {
@@ -185,6 +192,22 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             `- Empresa: ${ci.company || 'não informado ainda'}`,
         ];
         sections.push(`═══ PERFIL DO CLIENTE ═══\n\n${contactLines.join('\n')}\n\nSe algum dado já está preenchido, NÃO peça novamente.`);
+    }
+
+    // CRM Context (Recent insights)
+    if (bot.crmContext && (bot.crmContext.insight || bot.crmContext.sentiment)) {
+        const crmIn = bot.crmContext;
+        const insightsLines = [];
+        if (crmIn.sentiment) insightsLines.push(`- Sentimento atual: ${crmIn.sentiment}`);
+        if (crmIn.insight) insightsLines.push(`- Insight da IA: ${crmIn.insight}`);
+        if (crmIn.assignedRole) insightsLines.push(`- Seu papel atual delegado: ${crmIn.assignedRole}`);
+
+        sections.push(`═══ CONTEXTO DO CRM (USE PARA ATENDER MELHOR) ═══\n\n${insightsLines.join('\n')}\n\nUse essas informações para ajustar seu tom e focar no que o cliente realmente precisa.`);
+    }
+
+    // Specialist Skill Injection
+    if (bot.crmContext?.specialistSkill) {
+        sections.push(bot.crmContext.specialistSkill);
     }
 
     // Media list

@@ -9,7 +9,7 @@ import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutD
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(true);
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
