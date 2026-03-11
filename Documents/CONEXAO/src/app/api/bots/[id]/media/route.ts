@@ -146,6 +146,45 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 }
 
 /**
+ * Simple URL validation to prevent common SSRF attacks
+ */
+function validateUrl(url: string) {
+    try {
+        const parsed = new URL(url);
+        
+        // Prevent local/internal addresses
+        const blacklist = [
+            'localhost',
+            '127.0.0.1',
+            '0.0.0.0',
+            '::1',
+            '169.254.169.254', // AWS Metadata
+            'metadata.google.internal',
+        ];
+
+        if (blacklist.some(domain => parsed.hostname.includes(domain))) {
+            return false;
+        }
+
+        // Prevent private IP ranges (basic check)
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (ipPattern.test(parsed.hostname)) {
+            const parts = parsed.hostname.split('.').map(Number);
+            // 10.0.0.0/8
+            if (parts[0] === 10) return false;
+            // 172.16.0.0/12
+            if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+            // 192.168.0.0/16
+            if (parts[0] === 192 && parts[1] === 168) return false;
+        }
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
  * Internal logic for processing media
  */
 async function handleMediaRequest(req: Request, botId: string) {
@@ -183,6 +222,10 @@ async function handleMediaRequest(req: Request, botId: string) {
             url = body.url;
             description = body.description || null;
             if (!url) throw new Error('URL não fornecida');
+
+            if (!validateUrl(url)) {
+                throw new Error('URL não permitida por motivos de segurança');
+            }
 
             console.log(`[API Media] Downloading from URL: ${url}`);
             const res = await fetch(url);

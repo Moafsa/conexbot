@@ -6,11 +6,11 @@ export const registerSchema = z.object({
     name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
     email: z.string().email('Email inválido'),
     password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
-    whatsapp: z.string().optional(),
-    cpfCnpj: z.string().optional(),
-    planId: z.string().optional(),
-    interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).optional(),
-    trial: z.string().optional(), // Comes as string boolean from URL
+    whatsapp: z.string().nullable().optional(),
+    cpfCnpj: z.string().nullable().optional(),
+    planId: z.string().nullable().optional(),
+    interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).nullable().optional(),
+    trial: z.string().nullable().optional(), // Comes as string boolean from URL
 });
 
 export const loginSchema = z.object({

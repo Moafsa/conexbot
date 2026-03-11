@@ -2,7 +2,7 @@
 // No import needed for global fetch in Node 18+ / Next.js
 
 const UZAPI_URL = process.env.UZAPI_URL || 'http://127.0.0.1:21465';
-const ADMIN_TOKEN = process.env.WUZAPI_ADMIN_TOKEN || 'admin_token_123';
+const ADMIN_TOKEN = process.env.WUZAPI_ADMIN_TOKEN || '';
 
 async function check() {
     console.log(`Checking WuzAPI at ${UZAPI_URL} with token ${ADMIN_TOKEN}...`);
