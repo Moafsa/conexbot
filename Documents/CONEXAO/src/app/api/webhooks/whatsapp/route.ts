@@ -82,19 +82,64 @@ export async function POST(req: Request) {
                 (message.documentMessage ? '[DOCUMENT]' : '');
             const fromMe = info.FromMe || info.fromMe || false;
 
+            const cleanPhone = senderPhone.replace('@c.us', '').replace('@s.whatsapp.net', '').split(':')[0].split('.')[0];
             logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}`);
 
-            if (!messageBody || senderPhone.includes('@g.us')) {
-                logToFile(`Skipping: empty body or group. Body: ${messageBody ? 'EXISTS' : 'EMPTY'}, Group: ${senderPhone.includes('@g.us')}`);
-                return NextResponse.json({ status: 'skipped' });
+            const isGroup = senderPhone.includes('@g.us');
+            const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
+
+            if (!messageBody) {
+                logToFile(`Skipping: empty body.`);
+                return NextResponse.json({ status: 'skipped_empty' });
+            }
+
+            // Group Filtering Logic
+            if (isGroup) {
+                if (!botDoc) {
+                    logToFile(`Skipping group message: Bot not found for session ${sessionName}`);
+                    return NextResponse.json({ status: 'skipped_no_bot' });
+                }
+
+                const mode = (botDoc as any).groupResponseMode || 'ALL';
+                const allowedGroups = (botDoc as any).allowedGroups || [];
+
+                if (mode === 'NONE') {
+                    logToFile(`Skipping group message: Bot configured to ignore all groups.`);
+                    return NextResponse.json({ status: 'skipped_group_none' });
+                }
+
+                if (mode === 'SPECIFIC') {
+                    const isAllowed = allowedGroups.includes(senderPhone) || allowedGroups.includes(cleanPhone);
+                    if (!isAllowed) {
+                        logToFile(`Skipping group message: Group ${senderPhone} not in allowed list.`);
+                        return NextResponse.json({ status: 'skipped_group_not_allowed' });
+                    }
+                }
+                
+                logToFile(`Proceeding with group message: Mode=${mode}`);
             }
 
             if (fromMe) {
-                logToFile(`Skipping: own message`);
+                logToFile(`Skipping: own message (Human Takeover Detection)`);
+                
+                // Active Human Takeover: If I send a message, pause the bot for the configured time
+                if (botDoc) {
+                    const pauseMinutes = (botDoc as any).humanTakeoverPause || 30;
+                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
+                    
+                    // Find or create conversation to apply pause
+                    await prisma.conversation.upsert({
+                        where: { botId_remoteId: { botId: botDoc.id, remoteId: cleanPhone } },
+                        update: { pausedUntil } as any,
+                        create: { botId: botDoc.id, remoteId: cleanPhone, channel: 'whatsapp', pausedUntil } as any
+                    });
+                    
+                    logToFile(`[Webhook] Human Takeover! Pausing bot ${botDoc.name} for ${pauseMinutes}m`);
+                }
+
                 return NextResponse.json({ status: 'skipped_own' });
             }
 
-            const cleanPhone = senderPhone.replace('@c.us', '').replace('@s.whatsapp.net', '').split(':')[0].split('.')[0];
             logToFile(`Calling MessageProcessor for ${cleanPhone} / ${sessionName}`);
 
             if (audioMessage) {
@@ -149,16 +194,20 @@ export async function POST(req: Request) {
                     }
 
                     if (fs.existsSync(tempFile)) {
-                        const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
-                        const transcription = await VoiceService.transcribe(tempFile, botDoc?.tenant?.openaiApiKey || undefined);
+                        const transcription = await VoiceService.transcribe(
+                            tempFile, 
+                            botDoc?.tenant?.openaiApiKey || undefined,
+                            botDoc?.tenant?.geminiApiKey || undefined
+                        );
                         logToFile(`Transcription: ${transcription}`);
 
                         // Clean up
                         fs.unlinkSync(tempFile);
 
                         if (transcription) {
-                            MessageProcessor.process(sessionName, cleanPhone, transcription, 'whatsapp', 'sessionName', { inputType: 'audio' }).catch(err => {
-                                logToFile(`PROCESSOR ERROR (Audio): ${err?.message || err}`);
+                            const { BufferingService } = await import('@/services/engine/buffering');
+                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
+                                logToFile(`BUFFER ERROR (Audio): ${err?.message || err}`);
                             });
                         }
                     } else {
@@ -212,13 +261,17 @@ export async function POST(req: Request) {
                     if (fs.existsSync(tempFile)) {
                         logToFile(`Image content ready at ${tempFile}`);
 
-                        // Process with Vision
-                        // We pass the caption as the "text" and the image path in options
-                        MessageProcessor.process(sessionName, cleanPhone, caption, 'whatsapp', 'sessionName', {
-                            inputType: 'image',
-                            mediaPath: tempFile
-                        }).catch(err => {
-                            logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
+                        // Process with Vision first, then buffer
+                        const { VisionService } = await import('@/services/engine/vision');
+                        const description = await VisionService.analyze(tempFile, caption, botDoc);
+                        logToFile(`Image analyzed: ${description.substring(0, 100)}...`);
+
+                        // Clean up temp file
+                        fs.unlinkSync(tempFile);
+
+                        const { BufferingService } = await import('@/services/engine/buffering');
+                        BufferingService.add(sessionName, cleanPhone, description, 'whatsapp', 'image').catch(err => {
+                            logToFile(`BUFFER ERROR (Image): ${err?.message || err}`);
                         });
                     } else {
                         logToFile('Image content missing');

@@ -1,10 +1,6 @@
 import prisma from '@/lib/prisma';
 
-const PLAN_LIMITS: Record<string, { messages: number; bots: number }> = {
-    starter: { messages: 500, bots: 1 },
-    pro: { messages: 999999, bots: 3 },
-    enterprise: { messages: 999999, bots: 999 },
-};
+// Limits are now managed via Database (Plan model) and UsageCounter record.
 
 export async function checkBotLimit(tenantId: string): Promise<{ allowed: boolean; reason?: string }> {
     // Development mode bypass
@@ -34,6 +30,10 @@ export async function checkMessageLimit(tenantId: string): Promise<{ allowed: bo
         return { allowed: true, remaining: 50 }; // Free trial: 50 messages
     }
 
+    if (counter.messagesLimit === 0) {
+        return { allowed: true, remaining: 999999 }; // 0 = Unlimited
+    }
+
     const remaining = counter.messagesLimit - counter.messagesUsed;
     return {
         allowed: remaining > 0,
@@ -41,6 +41,3 @@ export async function checkMessageLimit(tenantId: string): Promise<{ allowed: bo
     };
 }
 
-export function getPlanLimits(plan: string) {
-    return PLAN_LIMITS[plan] || PLAN_LIMITS.starter;
-}

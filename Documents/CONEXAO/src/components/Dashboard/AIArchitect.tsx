@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Upload, X, File, Image as ImageIcon, Check, Loader2, Edit, BookOpen } from "lucide-react";
+import { Upload, X, File, Image as ImageIcon, Check, Loader2, Edit, BookOpen, Mic, Square } from "lucide-react";
 import EditBotModal from "./EditBotModal";
 import FactsReview from "./FactsReview";
+import { toast } from "sonner";
 
 type Message = {
   role: "user" | "ai";
@@ -42,8 +43,30 @@ export default function AIArchitect() {
   const router = useRouter();
   const [botData, setBotData] = useState<any>({});
 
+  const [globalKeysMissing, setGlobalKeysMissing] = useState(false);
+
+  // Audio Recording States
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcriptionLoading, setTranscriptionLoading] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   // Initialize
   useEffect(() => {
+    // Check for global keys
+    fetch('/api/admin/config')
+      .then(res => {
+        if (res.status === 401 || res.status === 403) return { skipCheck: true };
+        return res.json();
+      })
+      .then(data => {
+        if (data.skipCheck) return;
+        if (!data.openaiApiKey && !data.geminiApiKey && !data.openrouterApiKey) {
+          setGlobalKeysMissing(true);
+        }
+      })
+      .catch(() => {});
+
     if (editId) {
       fetch(`/api/bots/${editId}`)
         .then(res => res.json())
@@ -128,6 +151,63 @@ export default function AIArchitect() {
 
   const removeFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await handleAudioUpload(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.info("Gravando áudio...");
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      toast.error("Erro ao acessar microfone.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioUpload = async (blob: Blob) => {
+    setTranscriptionLoading(true);
+    const formData = new FormData();
+    formData.append('file', blob, 'audio.webm');
+
+    try {
+      const res = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.text) {
+        setInput(data.text);
+        toast.success("Áudio transcrito!");
+      } else {
+        toast.error(data.error || "Erro na transcrição.");
+      }
+    } catch (err) {
+      toast.error("Falha ao transcrever áudio.");
+    } finally {
+      setTranscriptionLoading(false);
+    }
   };
 
   const handleSend = async (overrideInput?: string) => {
@@ -261,6 +341,26 @@ export default function AIArchitect() {
 
       <EditBotModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} botData={botData} onSave={handleManualSave} />
 
+      {globalKeysMissing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-gray-900 border border-white/10 p-8 rounded-3xl max-w-md text-center shadow-2xl">
+            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Upload size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">Configuração Necessária</h3>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+              Para começar a criar seus agentes, você precisa configurar uma chave de API da <strong>OpenAI</strong> ou <strong>Gemini</strong> nas Configurações Globais do sistema.
+            </p>
+            <button 
+              onClick={() => router.push('/dashboard/settings')}
+              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20 active:scale-95"
+            >
+              Configurar Agora
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-6 space-y-6 pt-12">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} `}>
@@ -316,8 +416,25 @@ export default function AIArchitect() {
       <div className="p-4 bg-black/20 border-t border-white/5 flex gap-2">
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf" multiple className="hidden" />
         <button onClick={() => fileInputRef.current?.click()} className="p-3 bg-white/5 rounded-xl"><Upload size={20} /></button>
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder="Diga algo..." className="flex-1 bg-black/40 rounded-xl px-4 outline-none" />
-        <button onClick={() => handleSend()} disabled={uploadedFiles.some(f => f.processing)} className="p-3 bg-indigo-600 rounded-xl">➤</button>
+        
+        <button 
+          onClick={isRecording ? stopRecording : startRecording} 
+          className={`p-3 rounded-xl transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+          title={isRecording ? "Parar Gravação" : "Gravar Áudio"}
+          disabled={transcriptionLoading}
+        >
+          {transcriptionLoading ? <Loader2 className="animate-spin" size={20} /> : isRecording ? <Square size={20} /> : <Mic size={20} />}
+        </button>
+
+        <input 
+          value={input} 
+          onChange={(e) => setInput(e.target.value)} 
+          onKeyDown={(e) => e.key === "Enter" && handleSend()} 
+          placeholder={transcriptionLoading ? "Transcrevendo..." : "Diga algo..."} 
+          className="flex-1 bg-black/40 rounded-xl px-4 outline-none" 
+          disabled={transcriptionLoading}
+        />
+        <button onClick={() => handleSend()} disabled={uploadedFiles.some(f => f.processing) || transcriptionLoading} className="p-3 bg-indigo-600 rounded-xl">➤</button>
       </div>
 
       {isFactsReviewOpen && editId && (

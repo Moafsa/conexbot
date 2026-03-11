@@ -31,22 +31,62 @@ const openai = new OpenAI({
 });
 
 export const VoiceService = {
-    /**
-     * Transcribe audio file using OpenAI Whisper
-     */
-    async transcribe(audioPath: string, openaiApiKey?: string): Promise<string> {
+    async transcribe(audioPath: string, openaiApiKey?: string, geminiApiKey?: string): Promise<string> {
         try {
             console.log(`[VoiceService] Transcribing ${audioPath}...`);
-            const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : openai;
+            
+            // 1. Try OpenAI Whisper (if key available)
+            const activeOpenaiKey = openaiApiKey || process.env.OPENAI_API_KEY;
+            if (activeOpenaiKey) {
+                try {
+                    const client = new OpenAI({ apiKey: activeOpenaiKey });
+                    const transcription = await client.audio.transcriptions.create({
+                        file: fs.createReadStream(audioPath),
+                        model: 'whisper-1',
+                        language: 'pt',
+                    });
+                    console.log(`[VoiceService] OpenAI Transcription result: "${transcription.text}"`);
+                    return transcription.text;
+                } catch (err) {
+                    console.warn(`[VoiceService] OpenAI transcription failed, attempting fallbacks...`);
+                }
+            }
 
-            const transcription = await client.audio.transcriptions.create({
-                file: fs.createReadStream(audioPath),
-                model: 'whisper-1',
-                language: 'pt', // Force Portuguese for better accuracy
-            });
+            // 2. Try Gemini 1.5 Flash (Multimodal)
+            const activeGeminiKey = geminiApiKey || process.env.GEMINI_API_KEY;
+            if (activeGeminiKey) {
+                try {
+                    const audioBuffer = fs.readFileSync(audioPath);
+                    const base64Audio = audioBuffer.toString('base64');
+                    
+                    const reqBody = {
+                        contents: [{
+                            parts: [
+                                { inlineData: { mimeType: "audio/ogg", data: base64Audio } }, // Most internal files are converted to ogg
+                                { text: "Transcreva o áudio acima exatamente como foi dito, sem comentários adicionais. Se não houver fala ou apenas ruído, retorne vazio." }
+                            ]
+                        }],
+                        generationConfig: { temperature: 0.0 }
+                    };
 
-            console.log(`[VoiceService] Transcription result: "${transcription.text}"`);
-            return transcription.text;
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeGeminiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(reqBody)
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        console.log(`[VoiceService] Gemini Transcription result: "${text.trim()}"`);
+                        return text.trim();
+                    }
+                } catch (err) {
+                    console.error('[VoiceService] Gemini transcription failed:', err);
+                }
+            }
+
+            throw new Error('No API keys configured for transcription or all providers failed.');
         } catch (error) {
             console.error('[VoiceService] Transcription failed:', error);
             throw error;

@@ -90,9 +90,12 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string
  * Extract text from images using Tesseract OCR
  */
 export async function extractTextFromImage(buffer: Buffer): Promise<{ text: string; success: boolean; error?: string }> {
-    const worker = await createWorker('por'); // Portuguese language
-
+    let worker;
     try {
+        console.log('[OCR] Creating Tesseract worker...');
+        worker = await createWorker('por'); // Portuguese language
+
+        console.log('[OCR] Starting image recognition...');
         const { data } = await worker.recognize(buffer);
         await worker.terminate();
 
@@ -102,7 +105,11 @@ export async function extractTextFromImage(buffer: Buffer): Promise<{ text: stri
         };
     } catch (error) {
         console.error('[OCR] Image extraction error:', error);
-        await worker.terminate();
+        if (worker) {
+            try {
+                await (worker as any).terminate();
+            } catch (e) { }
+        }
 
         return {
             success: false,

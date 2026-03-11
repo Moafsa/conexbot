@@ -25,9 +25,12 @@ export async function GET() {
             prisma.order.count({ where: { bot: { tenantId }, status: 'PENDING' } }),
             prisma.order.aggregate({
                 where: { bot: { tenantId }, status: 'PAID' },
-                _sum: { totalAmount: true }
+                _sum: { totalAmount: true, commissionAmount: true }
             }),
-            prisma.subscription.findUnique({ where: { tenantId } }),
+            prisma.subscription.findUnique({ 
+                where: { tenantId },
+                include: { plan: true }
+            }),
             prisma.tenant.findUnique({ where: { id: tenantId }, select: { asaasApiKey: true } })
         ]);
 
@@ -70,9 +73,17 @@ export async function GET() {
             amount: day._sum.totalAmount || 0
         }));
 
+        // 4. Invoices/Payments of the Tenant (SaaS Subscription Payments)
+        const invoices = await prisma.payment.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: 'desc' },
+            take: 12
+        });
+
         return NextResponse.json({
             summary: {
                 totalRevenue: totalRevenue._sum.totalAmount || 0,
+                totalCommission: totalRevenue._sum.commissionAmount || 0,
                 paidOrders,
                 pendingOrders,
                 averageTicket: paidOrders > 0 ? (totalRevenue._sum.totalAmount || 0) / paidOrders : 0
@@ -86,7 +97,8 @@ export async function GET() {
                 plan: subscription.plan,
                 status: subscription.status
             } : null,
-            chartData: dailyChartData
+            chartData: dailyChartData,
+            invoices: invoices
         });
 
     } catch (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Building2, Phone, Mail, MoreHorizontal, Download, Plus, Settings2, Trash2 } from "lucide-react";
+import { User, Building2, Phone, Mail, MoreHorizontal, Download, Plus, Settings2, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface Bot {
@@ -44,6 +44,7 @@ export function CRM() {
     const [draggedStage, setDraggedStage] = useState<string | null>(null);
     const [draggedContact, setDraggedContact] = useState<string | null>(null);
     const [selectedContactPanel, setSelectedContactPanel] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
 
 
     useEffect(() => {
@@ -53,9 +54,17 @@ export function CRM() {
     useEffect(() => {
         if (selectedBotId) {
             fetchStages();
-            fetchContacts();
         }
     }, [selectedBotId]);
+
+    useEffect(() => {
+        if (selectedBotId) {
+            const timeout = setTimeout(() => {
+                fetchContacts(search);
+            }, 400);
+            return () => clearTimeout(timeout);
+        }
+    }, [selectedBotId, search]);
 
     async function fetchBots() {
         try {
@@ -90,13 +99,11 @@ export function CRM() {
         }
     }
 
-    async function fetchContacts() {
+    async function fetchContacts(searchQuery = "") {
         if (!selectedBotId) return;
         setLoading(true);
         try {
-            // Updated API call to use bot-specific contacts if available, 
-            // fallback to general contacts filtered by botId logic in backend
-            const res = await fetch(`/api/contacts?botId=${selectedBotId}`);
+            const res = await fetch(`/api/contacts?botId=${selectedBotId}&search=${encodeURIComponent(searchQuery)}`);
             if (res.ok) {
                 const data = await res.json();
                 // Filter manually for safety if API doesn't support botId param yet
@@ -272,7 +279,18 @@ export function CRM() {
                             </select>
                         </div>
                     </div>
+
                     <div className="flex gap-2">
+                        <div className="flex items-center gap-2 bg-white/50 border border-gray-200 rounded-lg px-3 py-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-indigo-500/30 transition-shadow">
+                            <Search size={16} className="text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar nome ou mensagem..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="bg-transparent border-none outline-none text-sm text-gray-700 placeholder-gray-400 w-full"
+                            />
+                        </div>
                         <button
                             onClick={() => handleExport()}
                             className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium transition"

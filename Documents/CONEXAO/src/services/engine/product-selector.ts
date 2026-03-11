@@ -5,8 +5,10 @@ export const ProductSelector = {
     findProduct(userMessage: string, products: Product[]): Product | null {
         if (!products || products.length === 0) return null;
 
-        const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
         const msg = normalize(userMessage);
+
+        console.log(`[ProductSelector] Normalizing: "${userMessage}" -> "${msg}"`);
 
         // 1. Direct Name Match (Fuzzy)
         let bestMatch: Product | null = null;

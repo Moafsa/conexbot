@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { UzapiService } from "@/services/engine/uzapi";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -25,7 +26,19 @@ export async function GET() {
 
     if (!tenant) return NextResponse.json([], { status: 404 });
 
-    // In a real scenario, we would also check the UZAPI status for each sessionName
-    // For now, we return the bots and their basic db status
-    return NextResponse.json(tenant.bots);
+    // Check real status via Uzapi for each bot
+    const botsWithStatus = await Promise.all(
+        tenant.bots.map(async (bot) => {
+            let realStatus = 'DISCONNECTED';
+            if (bot.sessionName) {
+                realStatus = await UzapiService.getSessionStatus(bot.sessionName);
+            }
+            return {
+                ...bot,
+                connectionStatus: realStatus
+            };
+        })
+    );
+
+    return NextResponse.json(botsWithStatus);
 }

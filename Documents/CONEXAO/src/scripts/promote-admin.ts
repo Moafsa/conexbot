@@ -17,7 +17,7 @@ async function main() {
         });
 
         console.log(`✅ Usuário ${user.email} promovido a SUPERADMIN com sucesso!`);
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ Erro ao promover usuário:', error.message);
     } finally {
         await prisma.$disconnect();

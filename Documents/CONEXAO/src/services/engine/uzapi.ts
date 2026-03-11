@@ -5,7 +5,8 @@ export const UzapiService = {
     // Helper: Ensure user exists in WuzAPI
     async ensureUser(sessionName: string, webhookUrl: string): Promise<boolean> {
         try {
-            console.log(`[UZAPI] Checking user ${sessionName} at ${UZAPI_URL}`);
+            console.log(`[UZAPI] ensureUser: ${sessionName} (Webhook: ${webhookUrl})`);
+            console.log(`[UZAPI] ADMIN_TOKEN used: ${ADMIN_TOKEN}`);
 
             // First, try to list users to see if it exists
             const listRes = await fetch(`${UZAPI_URL}/admin/users`, {
@@ -14,22 +15,19 @@ export const UzapiService = {
 
             if (listRes.ok) {
                 const result = await listRes.json();
-                console.log('[UZAPI] List Result:', JSON.stringify(result)); // DEBUG
-                // WuzAPI returns [...] or { "instances": [...] }
                 const users = Array.isArray(result) ? result : (result.instances || []);
                 const exists = users.find((u: any) => u.name === sessionName || u.token === sessionName);
                 if (exists) {
-                    console.log(`[UZAPI] User ${sessionName} already exists.`);
+                    console.log(`[UZAPI] User ${sessionName} already exists in list.`);
                     return true;
                 }
             } else {
-                console.warn(`[UZAPI] Failed to list users: ${listRes.status} ${listRes.statusText}`);
                 const text = await listRes.text();
-                console.warn(`[UZAPI] List error body: ${text}`);
+                console.warn(`[UZAPI] List Failed: ${listRes.status} - ${text}`);
             }
 
             // Create user
-            console.log(`[UZAPI] Creating user for session: ${sessionName}`);
+            console.log(`[UZAPI] Creating user: ${sessionName}`);
             const createRes = await fetch(`${UZAPI_URL}/admin/users`, {
                 method: 'POST',
                 headers: {
@@ -45,19 +43,21 @@ export const UzapiService = {
                 })
             });
 
-            if (!createRes.ok) {
-                if (createRes.status === 409) {
-                    console.log(`[UZAPI] User ${sessionName} already exists (409 Conflict). Proceeding.`);
-                    return true;
-                }
-                const errorText = await createRes.text();
-                console.error('[UZAPI] Create user failed:', errorText);
-                return false;
+            if (createRes.ok) {
+                console.log(`[UZAPI] User ${sessionName} created successfully.`);
+                return true;
             }
-            return true;
-        } catch (error) {
-            console.error('[UZAPI] ensureUser error:', error);
-            // If fetch fails completely (e.g. connection refused), it often means UZAPI is not running or URL is wrong
+
+            if (createRes.status === 409) {
+                console.log(`[UZAPI] User ${sessionName} already exists (409).`);
+                return true;
+            }
+
+            const errorText = await createRes.text();
+            console.error(`[UZAPI] Create user FAILED: ${createRes.status} - ${errorText}`);
+            return false;
+        } catch (error: any) {
+            console.error('[UZAPI] ensureUser exception:', error.message);
             return false;
         }
     },
@@ -158,18 +158,46 @@ export const UzapiService = {
                 },
             });
 
-            if (!res.ok) return 'DISCONNECTED';
+            if (!res.ok) {
+                // FALLBACK: Check admin/users if session/status fails (common when session is dormant or No Session)
+                try {
+                    const adminRes = await fetch(`${UZAPI_URL}/admin/users`, {
+                        headers: { 'Authorization': ADMIN_TOKEN }
+                    });
+                    if (adminRes.ok) {
+                        const data = await adminRes.json();
+                        const instances = data.instances || [];
+                        const inst = instances.find((i: any) => i.name === sessionName || i.token === sessionName);
+                        if (inst && inst.connected) {
+                            return 'CONNECTED';
+                        }
+                    }
+                } catch (e: any) {
+                    console.error('[UZAPI] Fallback status check failed:', e.message);
+                }
+                return 'DISCONNECTED';
+            }
 
-            const response = await res.json();
-            // Data is wrapped in envelope { "code": 200, "data": { ... } }
-            const data = response.data || {};
+            const resText = await res.text();
+            
+            let data: any = {};
+            try {
+                const response = JSON.parse(resText);
+                data = response.data || {};
+            } catch (jsonErr) {
+                return 'DISCONNECTED';
+            }
 
-            if (data.LoggedIn || data.loggedIn) return 'CONNECTED';
-            if ((data.Connected || data.connected) && !(data.LoggedIn || data.loggedIn)) return 'QRCODE';
+            // More robust checking across different WuzAPI versions
+            const isLoggedIn = !!(data.LoggedIn || data.loggedIn || data.authenticated || data.Authenticated || data.state === 'CONNECTED');
+            const isConnecting = !!(data.Connected || data.connected || data.state === 'CONNECTING' || data.state === 'STARTING' || data.state === 'QRCODE' || data.QRCode);
 
+            if (isLoggedIn) return 'CONNECTED';
+            if (isConnecting) return 'QRCODE';
+            
             return 'DISCONNECTED';
-        } catch (e) {
-            console.error('[UZAPI] getSessionStatus error:', e);
+        } catch (e: any) {
+            console.error('[UZAPI] getSessionStatus exception:', e.message);
             return 'DISCONNECTED';
         }
     },
@@ -197,8 +225,12 @@ export const UzapiService = {
 
             if (!res.ok) {
                 const text = await res.text();
-                if (res.status === 500 && text.toLowerCase().includes('already connected')) {
-                    return { success: true };
+                // If WuzAPI is unstable or says "already connected", we should verify the real state
+                if (res.status === 500 || text.toLowerCase().includes('already')) {
+                    const currentStatus = await this.getSessionStatus(sessionName);
+                    if (currentStatus === 'CONNECTED' || currentStatus === 'QRCODE') {
+                        return { success: true };
+                    }
                 }
                 return { success: false, error: `UZAPI Error: ${res.status} - ${text}` };
             }
@@ -219,7 +251,10 @@ export const UzapiService = {
                 },
             });
 
-            if (!res.ok) return null;
+            if (!res.ok) {
+                // Return null so the calling code can retry or handle fallback
+                return null;
+            }
 
             const response = await res.json();
             // Data is wrapped in envelope { "code": 200, "data": { "QRCode": "..." } }

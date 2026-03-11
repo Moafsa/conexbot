@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-export default function Hero() {
+export default function Hero({ branding }: { branding?: any }) {
+    const systemName = branding?.systemName || "Conext Bot";
+    const firstName = systemName.split(' ')[0];
+    const lastName = systemName.split(' ').slice(1).join(' ');
     return (
         <section className="relative min-h-[90vh] flex flex-col items-center justify-center text-center px-4 overflow-hidden">
 
@@ -12,16 +15,15 @@ export default function Hero() {
             </div>
 
             {/* Headline */}
-            <h1 className="text-5xl md:text-7xl font-bold mb-8 tracking-tighter leading-[1.1]">
-                Crie seu <span className="text-gradient">Agente de Vendas</span> <br />
-                Humano via Áudio.
-            </h1>
+                <h1 className="text-5xl md:text-7xl font-black mb-6 tracking-tight animate-fade-in-up">
+                    Seu WhatsApp <br />
+                    com <span className="bg-gradient-to-r from-emerald-400 to-indigo-500 bg-clip-text text-transparent">{firstName} {lastName}</span>
+                </h1>
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-                O <strong>Conext Bot</strong> é o "Arquiteto" que constrói automações para você.
-                Descreva seu negócio, escolha uma voz ultra-realista e deixe nossa IA
-                gerenciar vendas, agendamentos e suporte.
+                Pare de perder leads por demora no atendimento. O <strong>Conext Bot</strong> usa IA de ponta para 
+                automatizar vendas, suporte e pagamentos via áudio e texto, com o tom de voz da sua marca.
             </p>
 
             {/* CTAs */}

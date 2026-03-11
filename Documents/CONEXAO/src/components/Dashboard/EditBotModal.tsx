@@ -1,6 +1,9 @@
 
 import { useState, useEffect } from "react";
-import { X, Save, RefreshCw, Book, Bell, DollarSign, Zap, Globe, MessageSquare, Trash2, Plus, Upload } from "lucide-react";
+import { 
+    Bot, Plus, Settings, MessageSquare, Database, Sparkles, 
+    Save, X, Trash2, Bell, Play, Pause, DollarSign, HelpCircle, Percent, AlertCircle, ExternalLink, Book, Zap, Upload, Globe, RefreshCw, Users 
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface EditBotModalProps {
@@ -48,6 +51,12 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         aiModel: "gpt-4o-mini",
         voiceId: "",
         enablePayments: false,
+        messageBuffer: 1500,
+        asaasApiKey: "",
+        userSplitType: "PERCENTAGE",
+        userSplitValue: 0,
+        groupResponseMode: "ALL",
+        allowedGroups: [] as string[],
     });
 
     const [materials, setMaterials] = useState<any[]>([]);
@@ -70,6 +79,12 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 aiModel: botData.aiModel || "gpt-4o-mini",
                 voiceId: botData.voiceId || "",
                 enablePayments: botData.enablePayments || false,
+                messageBuffer: botData.messageBuffer ?? 1500,
+                asaasApiKey: botData.asaasApiKey || "",
+                userSplitType: botData.userSplitType || "PERCENTAGE",
+                userSplitValue: botData.userSplitValue || 0,
+                groupResponseMode: botData.groupResponseMode || "ALL",
+                allowedGroups: botData.allowedGroups || [],
             });
             fetchExtraData();
         }
@@ -191,6 +206,44 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                             placeholder="Descreva o que seu bot faz, preços, prazos..."
                                         />
                                     </div>
+                                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-6 space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                                    <Users size={18} className="text-indigo-400" /> Resposta em Grupos
+                                                </h4>
+                                                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-1">Defina como o bot se comporta em grupos</p>
+                                            </div>
+                                            <select
+                                                value={formData.groupResponseMode}
+                                                onChange={e => setFormData({ ...formData, groupResponseMode: e.target.value })}
+                                                className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                            >
+                                                <option value="ALL">Responder Tudo</option>
+                                                <option value="NONE">Ignorar Grupos</option>
+                                                <option value="SPECIFIC">Grupos Específicos</option>
+                                            </select>
+                                        </div>
+
+                                        {formData.groupResponseMode === 'SPECIFIC' && (
+                                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                                                    IDs dos Grupos Permitidos (JIDs)
+                                                    <span className="text-[9px] text-indigo-400">Separe por vírgula</span>
+                                                </label>
+                                                <textarea
+                                                    value={formData.allowedGroups.join(', ')}
+                                                    onChange={e => setFormData({ ...formData, allowedGroups: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                                    className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-white text-xs focus:ring-1 focus:ring-indigo-500 outline-none min-h-[60px]"
+                                                    placeholder="Ex: 123456789@g.us, 987654321@g.us"
+                                                />
+                                                <p className="text-[9px] text-gray-600 italic">
+                                                    * O bot responderá apenas nos grupos listados acima, além das conversas privadas.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4">
                                         <label className="text-xs font-black text-indigo-400 uppercase tracking-widest flex justify-between items-center mb-2">
                                             System Prompt (Cérebro)
@@ -209,9 +262,17 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                 <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-300">
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between">
-                                                Provedor LLM
-                                                <a href="#" className="text-indigo-400 hover:underline">Obter Chave →</a>
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    Provedor LLM
+                                                    <div className="group relative">
+                                                        <HelpCircle size={14} className="text-gray-600 hover:text-indigo-400 cursor-help" />
+                                                        <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-gray-900 border border-white/10 rounded-lg text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                                                            A OpenAI é recomendada para melhor inteligência. O Gemini é mais rápido e econômico.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <a href="https://platform.openai.com/api-keys" target="_blank" className="text-indigo-400 hover:underline flex items-center gap-1">Chaves <ExternalLink size={10} /></a>
                                             </label>
                                             <select
                                                 value={formData.aiProvider}
@@ -238,15 +299,47 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between">
-                                            ID da Voz (ElevenLabs)
-                                            <a href="https://elevenlabs.io/app/voice-lab" className="text-indigo-400 hover:underline">Vozes →</a>
+                                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                ID da Voz (ElevenLabs)
+                                                <div className="group relative">
+                                                    <HelpCircle size={14} className="text-gray-600 hover:text-indigo-400 cursor-help" />
+                                                    <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-gray-900 border border-white/10 rounded-lg text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                                                        Copie o ID da voz no Voice Lab da ElevenLabs para que seu bot possa falar.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <a href="https://elevenlabs.io/app/voice-lab" target="_blank" className="text-indigo-400 hover:underline flex items-center gap-1">Vozes <ExternalLink size={10} /></a>
                                         </label>
                                         <input
                                             value={formData.voiceId}
                                             onChange={e => setFormData({ ...formData, voiceId: e.target.value })}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                             placeholder="Ex: 21m00Tcm4TlvDq8ikWAM"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                Buffer de Mensagens (ms)
+                                                <div className="group relative">
+                                                    <HelpCircle size={14} className="text-gray-600 hover:text-indigo-400 cursor-help" />
+                                                    <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 border border-white/10 rounded-lg text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                                                        Tempo que o bot espera para agrupar mensagens antes de responder. 
+                                                        Isso permite que se o usuário enviar várias mensagens de 
+                                                        texto, áudio ou imagem seguidas, o bot responda tudo de uma vez.
+                                                        Valor sugerido: 1500ms. Use 0 para desativar.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.messageBuffer}
+                                            onChange={e => setFormData({ ...formData, messageBuffer: parseInt(e.target.value) || 0 })}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            placeholder="Ex: 1500"
                                         />
                                     </div>
 
@@ -423,8 +516,14 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                         <div>
                                             <h4 className="text-lg font-bold text-white flex items-center gap-2">
                                                 <DollarSign size={20} className="text-emerald-400" /> Cobrança Automatizada
+                                                <div className="group relative">
+                                                    <HelpCircle size={16} className="text-gray-600 hover:text-indigo-400 cursor-help" />
+                                                    <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 border border-white/10 rounded-lg text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                                                        O bot identificará intenção de compra e enviará o link do Asaas automaticamente.
+                                                    </div>
+                                                </div>
                                             </h4>
-                                            <p className="text-xs text-gray-500 max-w-sm">Habilite para que o bot gere links de pagamento Asaas automaticamente durante o chat.</p>
+                                            <p className="text-xs text-gray-500 max-w-sm">Requer Chave de API Asaas configurada no painel principal.</p>
                                         </div>
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input
@@ -436,6 +535,90 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                             <div className="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-600"></div>
                                         </label>
                                     </div>
+                                    
+                                    <div className={`space-y-2 transition-all ${formData.enablePayments ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                Chave Asaas Exclusiva do Bot
+                                                <div className="group relative">
+                                                    <HelpCircle size={14} className="text-gray-600 hover:text-indigo-400 cursor-help" />
+                                                    <div className="absolute left-0 bottom-full mb-2 w-56 p-2 bg-gray-900 border border-white/10 rounded-lg text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl">
+                                                        Se deixada em branco, usará a chave configurada nas definições gerais. Útil para afiliados.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <input
+                                            value={formData.asaasApiKey}
+                                            onChange={e => setFormData({ ...formData, asaasApiKey: e.target.value })}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            placeholder="Ex: $a6b7..."
+                                        />
+                                        <div className="mt-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                                            <p className="text-[10px] text-blue-300 leading-tight">
+                                                🔗 <strong>Configuração de Webhook no Asaas:</strong><br/>
+                                                Para receber confirmações de pagamento, configure esta URL no seu painel Asaas:
+                                                <code className="block mt-1 bg-black/40 p-1.5 rounded select-all font-mono">
+                                                    {window.location.origin}/api/webhooks/asaas
+                                                </code>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {formData.asaasApiKey && (
+                                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl space-y-4 animate-in fade-in duration-500">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                                    <Percent size={16} className="text-indigo-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-white">Comissão de Afiliado (Split)</h4>
+                                                    <p className="text-[10px] text-gray-400">Receba uma parte de cada venda realizada por este agente.</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-gray-500 uppercase">Tipo</label>
+                                                    <select
+                                                        value={formData.userSplitType}
+                                                        onChange={e => setFormData({ ...formData, userSplitType: e.target.value as any })}
+                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                                    >
+                                                        <option value="PERCENTAGE">Porcentagem (%)</option>
+                                                        <option value="FIXED">Valor Fixo (R$)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-gray-500 uppercase">
+                                                        {formData.userSplitType === 'PERCENTAGE' ? 'Porcentagem (Máx 10%)' : 'Valor Fixo'}
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={formData.userSplitValue}
+                                                        onChange={e => {
+                                                            let val = parseFloat(e.target.value) || 0;
+                                                            if (formData.userSplitType === 'PERCENTAGE' && val > 10) val = 10;
+                                                            setFormData({ ...formData, userSplitValue: val });
+                                                        }}
+                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[9px] text-indigo-300 leading-tight">
+                                                * O valor será creditado na carteira Asaas configurada em suas Definições de Perfil.
+                                            </p>
+                                            {!(botData.tenant as any)?.asaasWalletId && (
+                                                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2">
+                                                    <AlertCircle size={14} className="text-amber-400 mt-0.5" />
+                                                    <p className="text-[10px] text-amber-300 leading-tight">
+                                                        ⚠️ <strong>Wallet ID Ausente:</strong> Você configurou um split mas não informou seu Wallet ID no perfil. O split falhará.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className={`p-6 border-2 border-dashed rounded-3xl transition-all ${formData.enablePayments ? 'border-white/10 bg-white/5 opacity-100' : 'border-white/5 opacity-30 pointer-events-none'}`}>
                                         <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Configurações de Produto</h4>

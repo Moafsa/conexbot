@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { v4 as uuidv4 } from 'uuid';
 import { createBotSchema } from '@/lib/validations';
 import { checkBotLimit } from '@/services/plan-limits';
 import { UzapiService } from '@/services/engine/uzapi';
@@ -44,10 +45,12 @@ export async function POST(req: Request) {
                 select: { asaasApiKey: true },
             });
 
-            if (!tenant?.asaasApiKey) {
+            const hasAnyAsaasKey = !!(parsed.data.asaasApiKey || tenant?.asaasApiKey);
+
+            if (!hasAnyAsaasKey) {
                 console.warn('[API /bots POST] Asaas key missing for payment-enabled bot');
                 return NextResponse.json(
-                    { error: 'Configure a chave API do Asaas em Configurações antes de habilitar pagamentos' },
+                    { error: 'Configure a chave API do Asaas aqui ou em Configurações Gerais para habilitar pagamentos' },
                     { status: 400 }
                 );
             }
@@ -70,10 +73,14 @@ export async function POST(req: Request) {
                 systemPrompt: parsed.data.systemPrompt,
                 websiteUrl: parsed.data.websiteUrl,
                 enablePayments: parsed.data.enablePayments || false,
+                asaasApiKey: parsed.data.asaasApiKey || null,
                 fallbackContact: parsed.data.fallbackContact,
                 aiProvider: parsed.data.aiProvider || 'openai',
                 aiModel: parsed.data.aiModel || 'gpt-4o-mini',
                 tenantId,
+                connectToken: uuidv4(),
+                groupResponseMode: parsed.data.groupResponseMode,
+                allowedGroups: parsed.data.allowedGroups,
             },
         });
 
@@ -156,6 +163,16 @@ export async function GET() {
         // Enrich with live connection status from WuzAPI so UI shows real state
         const botsWithLiveStatus = await Promise.all(
             bots.map(async (bot) => {
+                // Auto-fix missing tokens
+                if (!bot.connectToken) {
+                    const newToken = uuidv4();
+                    await prisma.bot.update({
+                        where: { id: bot.id },
+                        data: { connectToken: newToken }
+                    }).catch(e => console.error(`Failed to auto-fix token for ${bot.id}:`, e));
+                    bot.connectToken = newToken;
+                }
+
                 if (!bot.sessionName) return { ...bot, connectionStatus: bot.connectionStatus || 'DISCONNECTED' };
 
                 try {

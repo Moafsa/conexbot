@@ -1,22 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function SettingsPage() {
+function SettingsContent() {
     const { data: session, update: updateSession } = useSession();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState("profile");
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // Data states
-    const [profile, setProfile] = useState({ name: "", email: "", whatsapp: "" });
+    const [profile, setProfile] = useState({ name: "", email: "", whatsapp: "", cpfCnpj: "" });
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
-    const [finance, setFinance] = useState({ asaasApiKey: "" });
+    const [finance, setFinance] = useState({ asaasApiKey: "", asaasWalletId: "" });
     const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "" });
     const [smtpConfigs, setSmtpConfigs] = useState<any[]>([]);
     const [newSmtp, setNewSmtp] = useState({ host: "", port: 587, user: "", pass: "", fromEmail: "" });
@@ -32,7 +33,7 @@ export default function SettingsPage() {
                 if (activeTab === "profile") {
                     const res = await fetch("/api/settings/profile");
                     const data = await res.json();
-                    if (res.ok) setProfile({ name: data.name || "", email: data.email || "", whatsapp: data.whatsapp || "" });
+                    if (res.ok) setProfile({ name: data.name || "", email: data.email || "", whatsapp: data.whatsapp || "", cpfCnpj: data.cpfCnpj || "" });
                 } else if (activeTab === "notifications") {
                     const res = await fetch("/api/settings/notifications");
                     const data = await res.json();
@@ -44,7 +45,7 @@ export default function SettingsPage() {
                 } else if (activeTab === "finance") {
                     const res = await fetch("/api/settings/finance");
                     const data = await res.json();
-                    if (res.ok) setFinance({ asaasApiKey: data.asaasApiKey || "" });
+                    if (res.ok) setFinance({ asaasApiKey: data.asaasApiKey || "", asaasWalletId: data.asaasWalletId || "" });
                 } else if (activeTab === "ai") {
                     const res = await fetch("/api/settings/ai");
                     const data = await res.json();
@@ -83,6 +84,13 @@ export default function SettingsPage() {
             if (!res.ok) throw new Error("Erro ao salvar perfil");
             await updateSession({ name: profile.name });
             setMessage({ type: 'success', text: "Perfil atualizado com sucesso!" });
+            
+            const callbackUrl = searchParams.get('callbackUrl');
+            if (callbackUrl) {
+                setTimeout(() => {
+                    router.push(callbackUrl);
+                }, 1500);
+            }
         } catch (err) {
             setMessage({ type: 'error', text: "Erro ao atualizar perfil." });
         } finally {
@@ -247,6 +255,17 @@ export default function SettingsPage() {
                             {activeTab === "profile" && (
                                 <div className="space-y-6 max-w-md animate-fade-in">
                                     <h3 className="text-xl font-semibold">Informações do Perfil</h3>
+                                    
+                                    {searchParams.get('error') === 'missing_cpf' && (
+                                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3 text-yellow-500 text-sm">
+                                            <AlertCircle className="shrink-0 w-5 h-5 mt-0.5" />
+                                            <div>
+                                                <p className="font-bold">CPF/CNPJ Obrigatório</p>
+                                                <p>Para prosseguir com a assinatura, você precisa informar o seu CPF ou CNPJ válido no perfil.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div>
                                         <label className="block text-sm text-gray-400 mb-2">Nome Completo</label>
                                         <input
@@ -263,6 +282,16 @@ export default function SettingsPage() {
                                             value={profile.email}
                                             onChange={e => setProfile({ ...profile, email: e.target.value })}
                                             className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2">CPF ou CNPJ</label>
+                                        <input
+                                            type="text"
+                                            value={profile.cpfCnpj}
+                                            onChange={e => setProfile({ ...profile, cpfCnpj: e.target.value })}
+                                            placeholder="Ex: 000.000.000-00 ou 00.000.000/0000-00"
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono"
                                         />
                                     </div>
                                     <div>
@@ -301,7 +330,23 @@ export default function SettingsPage() {
                                             placeholder="$aact_..."
                                             className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                         />
-                                        <div className="mt-4 p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl space-y-2">
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2">Asaas Wallet ID</label>
+                                        <input
+                                            type="text"
+                                            value={finance.asaasWalletId}
+                                            onChange={e => setFinance({ ...finance, asaasWalletId: e.target.value })}
+                                            placeholder="Ex: 50a..."
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                        />
+                                        <p className="mt-2 text-[10px] text-gray-500 leading-relaxed">
+                                            Seu Wallet ID é necessário para receber as comissões de afiliados (splits). Você encontra no menu "Minha Conta" {'->'} "Integrações" do Asaas.
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-4 p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl space-y-2">
                                             <p className="text-xs font-bold text-blue-400 uppercase tracking-widest">📋 Como obter sua chave Asaas:</p>
                                             <ol className="text-[11px] text-gray-400 list-decimal ml-4 space-y-1">
                                                 <li>Acesse seu painel no <a href="https://www.asaas.com" target="_blank" className="underline text-blue-300">Asaas</a> (ou Sandbox para testes).</li>
@@ -311,17 +356,16 @@ export default function SettingsPage() {
                                                 <li><em>Importante:</em> Certifique-se de que sua conta esteja verificada para processar pagamentos reais.</li>
                                             </ol>
                                         </div>
-                                    </div>
 
-                                    <button
-                                        onClick={handleSaveFinance}
-                                        disabled={saving}
-                                        className="btn-primary flex items-center gap-2 mt-4"
-                                    >
-                                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                                        Salvar Chave
-                                    </button>
-                                </div>
+                                        <button
+                                            onClick={handleSaveFinance}
+                                            disabled={saving}
+                                            className="btn-primary flex items-center gap-2 mt-4"
+                                        >
+                                            {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                            Salvar Chave
+                                        </button>
+                                    </div>
                             )}
 
                             {activeTab === "whatsapp" && (
@@ -346,11 +390,15 @@ export default function SettingsPage() {
                                                         </p>
                                                     </div>
                                                     <div className="flex items-center gap-3">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${bot.sessionName
-                                                            ? "bg-green-500/20 text-green-300 border-green-500/30"
-                                                            : "bg-red-500/20 text-red-300 border-red-500/30"
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${bot.connectionStatus === "CONNECTED"
+                                                                ? "bg-green-500/20 text-green-300 border-green-500/30"
+                                                                : bot.connectionStatus === "QRCODE"
+                                                                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30 animate-pulse"
+                                                                    : "bg-red-500/20 text-red-300 border-red-500/30"
                                                             }`}>
-                                                            {bot.sessionName ? "Conectado" : "Desconectado"}
+                                                            {bot.connectionStatus === "CONNECTED" ? "Conectado" :
+                                                                bot.connectionStatus === "QRCODE" ? "Aguardando QR Code" :
+                                                                    "Desconectado"}
                                                         </span>
                                                         <button
                                                             onClick={() => router.push(`/dashboard/bots/${bot.id}`)}
@@ -583,5 +631,13 @@ export default function SettingsPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><Loader2 className="animate-spin text-white/30" size={32} /></div>}>
+            <SettingsContent />
+        </Suspense>
     );
 }

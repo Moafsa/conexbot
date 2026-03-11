@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, User, Bot, Loader2 } from "lucide-react";
+import { Send, User, Bot, Loader2, Mic, Square } from "lucide-react";
+import { toast } from "sonner";
 
 interface Message {
     id: string;
@@ -17,6 +18,12 @@ export function Simulator({ botId }: { botId: string }) {
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [sessionId] = useState(() => `SIM_${Math.random().toString(36).substring(7)}`);
+    
+    // Audio States
+    const [isRecording, setIsRecording] = useState(false);
+    const [transcriptionLoading, setTranscriptionLoading] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -25,6 +32,62 @@ export function Simulator({ botId }: { botId: string }) {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await handleAudioUpload(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            toast.error("Erro ao acessar microfone.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const handleAudioUpload = async (blob: Blob) => {
+        setTranscriptionLoading(true);
+        const formData = new FormData();
+        formData.append('file', blob, 'audio.webm');
+
+        try {
+            const res = await fetch('/api/ai/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.text) {
+                setInput(data.text);
+                toast.success("Áudio transcrito!");
+            } else {
+                toast.error(data.error || "Erro na transcrição.");
+            }
+        } catch (err) {
+            toast.error("Falha ao transcrever áudio.");
+        } finally {
+            setTranscriptionLoading(false);
+        }
+    };
 
     const handleSend = async () => {
         if (!input.trim() || loading) return;
@@ -123,18 +186,25 @@ export function Simulator({ botId }: { botId: string }) {
             {/* Input Area */}
             <div className="p-4 border-t border-gray-100 bg-white">
                 <div className="flex gap-2">
+                    <button 
+                        onClick={isRecording ? stopRecording : startRecording} 
+                        className={`p-2 rounded-full transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        disabled={transcriptionLoading}
+                    >
+                        {transcriptionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Digite sua mensagem..."
+                        placeholder={transcriptionLoading ? "Transcrevendo..." : "Digite sua mensagem..."}
                         className="flex-1 px-4 py-2 bg-white text-gray-900 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
-                        disabled={loading}
+                        disabled={loading || transcriptionLoading}
                     />
                     <button
                         onClick={handleSend}
-                        disabled={loading || !input.trim()}
+                        disabled={loading || !input.trim() || transcriptionLoading}
                         className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >
                         <Send className="w-4 h-4" />

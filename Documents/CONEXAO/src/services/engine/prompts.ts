@@ -237,11 +237,13 @@ O sistema vai enviar o link automaticamente.`);
     if (bot.enablePayments) {
         sections.push(`═══ PAGAMENTOS HABILITADOS ═══
 
-Quando o cliente CONFIRMAR a compra (diz "sim", "quero", "fecha", "beleza"):
-1. Confirme o pedido
-2. Diga: "Vou gerar seu link de pagamento! 💳"
+Quando o cliente MOSTRAR INTENÇÃO DE COMPRA de um produto ou plano:
+1. OBRIGATÓRIO: Antes de fechar a compra, você PRECISA pedir o Nome Completo, E-mail e CPF (ou CNPJ) do cliente. Diga algo como: "Para gerar sua fatura, preciso do seu Nome Completo, E-mail e CPF. Pode me passar?"
+2. SÓ DEPOIS que o cliente informar esses 3 dados, use a função/tool "gerar_fatura" informando os parâmetros extraídos da conversa.
+3. IMPORTANTE: NUNCA tente gerar a fatura sem ter o CPF e o E-mail. Sempre pergunte primeiro se estiver faltando.
 
-O sistema vai buscar o valor nos materiais e gerar o link automaticamente.`);
+- **Promoções e Ofertas**: Se um produto no catálogo tiver um "Preço de Oferta" (salePrice), informe este valor como o preço atual, destacando o desconto em relação ao preço original.
+- **Cupons de Desconto**: Se o cliente mencionar um cupom ou você quiser oferecer um, use o parâmetro "cupom_desconto" na ferramenta "gerar_fatura".`);
     }
 
     // Response examples (CONDITIONAL)
@@ -272,9 +274,9 @@ Mantenha SEMPRE esse estilo: direto, humano, focado em fechar a venda.`);
 
 export function buildConversationMessages(
     systemPromptText: string,
-    history: { role: string; content: string }[]
-): { role: 'system' | 'user' | 'assistant'; content: string }[] {
-    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+    history: { role: string; content: string; tool_calls?: any; tool_call_id?: string }[]
+): { role: 'system' | 'user' | 'assistant' | 'tool'; content: string; tool_calls?: any; tool_call_id?: string }[] {
+    const messages: { role: 'system' | 'user' | 'assistant' | 'tool'; content: string; tool_calls?: any; tool_call_id?: string }[] = [
         { role: 'system', content: systemPromptText },
     ];
 
@@ -283,8 +285,10 @@ export function buildConversationMessages(
 
     for (const msg of recentHistory) {
         messages.push({
-            role: msg.role === 'user' ? 'user' : 'assistant',
+            role: msg.role as any,
             content: msg.content,
+            tool_calls: msg.tool_calls,
+            tool_call_id: msg.tool_call_id
         });
     }
 

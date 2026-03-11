@@ -15,7 +15,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, whatsapp } = parsed.data;
+        const { name, email, password, whatsapp, cpfCnpj, planId, trial } = parsed.data;
 
         const existing = await prisma.tenant.findUnique({
             where: { email },
@@ -30,12 +30,47 @@ export async function POST(req: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
+        // Fetch plan details if selected
+        let plan = null;
+        if (planId) {
+            try {
+                // Try finding by UUID
+                plan = await prisma.plan.findUnique({
+                    where: { id: planId }
+                });
+            } catch (e) {
+                // Ignore parse errors from invalid UUID formats
+            }
+
+            if (!plan) {
+                // Fallback to name
+                plan = await prisma.plan.findFirst({
+                    where: { name: { equals: planId, mode: 'insensitive' } }
+                });
+            }
+        }
+
         const tenant = await prisma.tenant.create({
             data: {
                 name,
                 email,
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
+                cpfCnpj: cpfCnpj || null,
+                subscription: (trial === 'true' && plan) ? {
+                    create: {
+                        planId: plan.id,
+                        status: 'TRIALING',
+                        gateway: 'SYSTEM'
+                    }
+                } : undefined,
+                usageCounter: {
+                    create: {
+                        messagesLimit: plan?.messageLimit || 500,
+                        botsLimit: plan?.botLimit || 1,
+                        periodEnd: new Date(Date.now() + (trial === 'true' && plan ? plan.trialDays : 30) * 24 * 60 * 60 * 1000)
+                    }
+                }
             },
         });
 

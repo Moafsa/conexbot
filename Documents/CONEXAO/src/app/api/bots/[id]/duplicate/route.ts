@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 hours: originalBot.hours,
                 paymentMethods: originalBot.paymentMethods,
                 knowledgeBase: originalBot.knowledgeBase,
-                status: 'active',
+                status: 'ACTIVE',
 
                 // Duplicate Media
                 media: {

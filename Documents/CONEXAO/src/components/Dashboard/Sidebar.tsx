@@ -2,14 +2,22 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield } from "lucide-react";
 
-export default function Sidebar() {
+export default function Sidebar({ branding }: { branding?: any }) {
     const pathname = usePathname();
+    const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(true);
+
+    const logo = branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png";
+    const systemName = branding?.systemName || "Conext Bot";
+    const firstName = systemName.split(' ')[0];
+    const lastName = systemName.split(' ').slice(1).join(' ');
+
+    const isAdmin = (session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'SUPERADMIN';
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
@@ -19,14 +27,23 @@ export default function Sidebar() {
         { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
     ];
 
+    if (isAdmin) {
+        menuItems.push({ icon: Shield, label: "Administração", href: "/admin" });
+    }
+
     return (
-        <aside className={`h-screen bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? 'w-20' : 'w-64'}`}>
+        <aside className={`h-full bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? 'w-20' : 'w-64'}`}>
             {/* Brand */}
-            <div className="h-20 flex items-center justify-center border-b border-white/5 relative">
-                <h1 className={`font-bold text-xl tracking-tighter transition-opacity text-white ${collapsed ? 'opacity-0 hidden' : 'opacity-100'}`}>
-                    Conext<span className="text-[#00a884]">Bot</span>
-                </h1>
-                {collapsed && <span className="text-2xl font-bold text-[#00a884]">CB</span>}
+            <div className="h-24 flex items-center justify-center border-b border-white/5 relative px-4 text-center">
+                {!collapsed && (
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <img src={logo} className="h-12 w-auto shrink-0 object-contain" alt="Logo" />
+                        <h1 className="font-bold text-xl tracking-tighter text-white truncate">
+                            {firstName}<span className="text-[#00a884]">{lastName}</span>
+                        </h1>
+                    </div>
+                )}
+                {collapsed && <img src={logo} className="h-12 w-auto object-contain" alt="Logo" />}
 
                 <button
                     onClick={() => setCollapsed(!collapsed)}

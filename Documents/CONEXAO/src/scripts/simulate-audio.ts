@@ -1,5 +1,5 @@
 
-import fetch from 'node-fetch';
+// No import needed for global fetch in Node 18+ / Next.js
 
 async function run() {
     const payload = {

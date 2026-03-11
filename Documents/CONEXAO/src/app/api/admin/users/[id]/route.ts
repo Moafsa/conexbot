@@ -5,16 +5,16 @@ import { authOptions } from '@/lib/auth';
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== 'SUPERADMIN') {
+    if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
         return new NextResponse('Unauthorized', { status: 401 });
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         const user = await prisma.tenant.findUnique({
             where: { id }
         });
@@ -33,17 +33,17 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== 'SUPERADMIN') {
+    if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
         return new NextResponse('Unauthorized', { status: 401 });
     }
 
     try {
         const body = await request.json();
-        const { id } = params;
+        const { id } = await params;
 
         // Sanitize body: remove sensitive or unnecessary fields
         const { confirmPassword, ...updateData } = body;
@@ -70,16 +70,16 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getServerSession(authOptions);
 
-    if (!session || session.user.role !== 'SUPERADMIN') {
+    if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
         return new NextResponse('Unauthorized', { status: 401 });
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
 
         await prisma.tenant.delete({
             where: { id }

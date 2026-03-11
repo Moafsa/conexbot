@@ -7,6 +7,10 @@ export const registerSchema = z.object({
     email: z.string().email('Email inválido'),
     password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
     whatsapp: z.string().optional(),
+    cpfCnpj: z.string().optional(),
+    planId: z.string().optional(),
+    interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).optional(),
+    trial: z.string().optional(), // Comes as string boolean from URL
 });
 
 export const loginSchema = z.object({
@@ -37,7 +41,16 @@ export const createBotSchema = z.object({
     chatwootToken: z.string().optional(),
     chatwootAccountId: z.string().optional(),
     aiProvider: z.string().optional().default('openai'),
-    aiModel: z.string().optional().default('gpt-4o-mini')
+    aiModel: z.string().optional().default('gpt-4o-mini'),
+    messageBuffer: z.number().min(0).max(10000).optional().default(1500),
+    asaasApiKey: z.string().optional().or(z.literal('')),
+    userSplitType: z.enum(['FIXED', 'PERCENTAGE']).optional().default('PERCENTAGE'),
+    userSplitValue: z.number().min(0).max(10).optional().default(0), // Limit to 10 by default, UI will enforce
+    schedulingProvider: z.enum(['INTERNAL', 'GOOGLE']).optional(),
+    appointmentDuration: z.number().int().min(1).optional(),
+    workingHours: z.any().optional(),
+    groupResponseMode: z.enum(['ALL', 'NONE', 'SPECIFIC']).optional().default('ALL'),
+    allowedGroups: z.array(z.string()).optional().default([]),
 });
 
 export const updateBotSchema = createBotSchema.partial();
@@ -45,7 +58,8 @@ export const updateBotSchema = createBotSchema.partial();
 // ─── Checkout ────────────────────────────────────────────────────
 
 export const checkoutSchema = z.object({
-    plan: z.enum(['starter', 'pro', 'enterprise']),
+    plan: z.string(), // Plan ID or name (Enterprise/Starter etc)
+    interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).optional().default('MONTHLY'),
     gateway: z.enum(['asaas', 'mercadopago']),
 });
 

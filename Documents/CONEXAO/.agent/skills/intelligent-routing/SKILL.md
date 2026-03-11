@@ -113,6 +113,7 @@ function analyzeRequest(userMessage) {
 | **Performance** | slow, lag, optimize, cache, performance    | `performance-optimizer` |
 | **SEO**         | seo, meta, analytics, sitemap, robots      | `seo-specialist`        |
 | **Game**        | unity, godot, phaser, game, multiplayer    | `game-developer`        |
+| **SaaS**        | micro-saas, mvp, launch, pricing, indie    | `micro-saas-launcher`   |
 
 ### Multi-Domain Tasks (Auto-invoke Orchestrator)
 

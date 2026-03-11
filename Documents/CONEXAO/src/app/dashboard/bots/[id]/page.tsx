@@ -11,12 +11,19 @@ import {
     Users,
     Zap,
     FileText,
-    RefreshCw
+    RefreshCw,
+    LogOut,
+    Calendar,
+    ShieldAlert,
+    Ticket
 } from "lucide-react";
 import { ProductManager } from "@/components/Dashboard/ProductManager";
 import { MediaManager } from "@/components/Dashboard/MediaManager";
 import { Simulator } from "@/components/Dashboard/Simulator";
 import { CRMBoard } from "@/components/Dashboard/CRMBoard";
+import { AgendaManager } from "@/components/Dashboard/AgendaManager";
+import { SecuritySettings } from "@/components/Dashboard/SecuritySettings";
+import { CouponManager } from "@/components/Dashboard/CouponManager";
 
 export default function BotDetailsPage() {
     const params = useParams();
@@ -42,6 +49,30 @@ export default function BotDetailsPage() {
             }
         } catch (error) {
             console.error("Error fetching bot", error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handleDisconnect() {
+        if (!confirm("Deseja desconectar o WhatsApp deste agente?")) return;
+        try {
+            setLoading(true);
+            const res = await fetch('/api/whatsapp/disconnect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ botId })
+            });
+
+            if (res.ok) {
+                alert("WhatsApp desconectado com sucesso!");
+                fetchBot();
+            } else {
+                alert("Erro ao desconectar.");
+            }
+        } catch (error) {
+            console.error("Error disconnecting bot", error);
+            alert("Erro ao desconectar.");
         } finally {
             setLoading(false);
         }
@@ -88,6 +119,15 @@ export default function BotDetailsPage() {
                         <RefreshCw className="w-4 h-4" />
                         Conexão
                     </button>
+                    {bot.connectionStatus === 'CONNECTED' && (
+                        <button
+                            onClick={handleDisconnect}
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-red-500/20"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Desconectar
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -106,6 +146,12 @@ export default function BotDetailsPage() {
                     label="Catálogo"
                 />
                 <TabButton
+                    active={activeTab === "coupons"}
+                    onClick={() => setActiveTab("coupons")}
+                    icon={<Ticket className="w-4 h-4" />}
+                    label="Cupons"
+                />
+                <TabButton
                     active={activeTab === "media"}
                     onClick={() => setActiveTab("media")}
                     icon={<FileText className="w-4 h-4" />}
@@ -122,6 +168,18 @@ export default function BotDetailsPage() {
                     onClick={() => setActiveTab("crm")}
                     icon={<Users className="w-4 h-4" />}
                     label="CRM (Clientes)"
+                />
+                <TabButton
+                    active={activeTab === "agenda"}
+                    onClick={() => setActiveTab("agenda")}
+                    icon={<Calendar className="w-4 h-4" />}
+                    label="Agenda"
+                />
+                <TabButton
+                    active={activeTab === "security"}
+                    onClick={() => setActiveTab("security")}
+                    icon={<ShieldAlert className="w-4 h-4" />}
+                    label="Segurança"
                 />
             </div>
 
@@ -147,6 +205,10 @@ export default function BotDetailsPage() {
 
                 {activeTab === "products" && (
                     <ProductManager botId={botId} />
+                )}
+
+                {activeTab === "coupons" && (
+                    <CouponManager botId={botId} />
                 )}
 
                 {activeTab === "media" && (
@@ -176,6 +238,14 @@ export default function BotDetailsPage() {
 
                 {activeTab === "crm" && (
                     <CRMBoard botId={botId} />
+                )}
+
+                {activeTab === "agenda" && (
+                    <AgendaManager botId={botId} />
+                )}
+
+                {activeTab === "security" && (
+                    <SecuritySettings bot={bot} onUpdate={fetchBot} />
                 )}
             </div>
         </div>

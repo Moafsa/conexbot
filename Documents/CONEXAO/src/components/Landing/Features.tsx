@@ -1,34 +1,36 @@
+import { Cpu, AudioLines, Zap, Brain, Users, CreditCard } from "lucide-react";
+
 export default function Features() {
     const features = [
         {
-            title: "Arquiteto IA",
-            desc: "Não gaste horas configurando fluxos. Apenas diga 'Sou uma Pizzaria' e nós criamos o bot de delivery completo para você.",
-            icon: "🧠"
+            title: "Arquiteto de Automação",
+            desc: "Sem fluxogramas complexos. Diga seu nicho e nossa IA gera toda a estrutura de atendimento e vendas em segundos.",
+            icon: <Cpu className="w-8 h-8 text-indigo-500" />
         },
         {
-            title: "Voz Ultra-Realista",
-            desc: "Integração nativa com ElevenLabs. Seu bot fala com entonação, pausas e emoção humana, não como um robô.",
-            icon: "🎙️"
+            title: "Vozes que Vendem",
+            desc: "Integração premium ElevenLabs. Seus clientes recebem áudios com entonação humana, construindo confiança e autoridade.",
+            icon: <AudioLines className="w-8 h-8 text-purple-500" />
         },
         {
-            title: "Omnichannel",
-            desc: "Conecte-se onde seu cliente está: WhatsApp (Uzapi), Instagram, Telegram e Webchat. Tudo centralizado.",
-            icon: "🔗"
+            title: "WhatsApp Ininterrupto",
+            desc: "Conexão via Uzapi estável e rápida. Responda centenas de clientes simultaneamente sem perder o timing da venda.",
+            icon: <Zap className="w-8 h-8 text-blue-500" />
         },
         {
-            title: "Foco em Vendas",
-            desc: "Nossos agentes são treinados para fechar negócios. Eles são objetivos, persuazivos e buscam o 'sim' do cliente.",
-            icon: "💰"
+            title: "Cérebro do Negócio",
+            desc: "O bot aprende lendo seu site e manuais. Ele sabe seus preços, horários e diferenciais melhor que qualquer manual.",
+            icon: <Brain className="w-8 h-8 text-pink-500" />
         },
         {
-            title: "Base de Conhecimento",
-            desc: "O bot 'lê' seu site automaticamente para aprender sobre seus produtos, preços e políticas.",
-            icon: "📚"
+            title: "CRM Inteligente",
+            desc: "Organização automática de leads. Saiba exatamente quem está pronto para comprar e quem precisa de acompanhamento.",
+            icon: <Users className="w-8 h-8 text-green-500" />
         },
         {
-            title: "Pagamentos In-Chat",
-            desc: "Integração com Mercado Pago e Asaas. Receba via PIX sem o cliente sair da conversa.",
-            icon: "💳"
+            title: "Checkout no Chat",
+            desc: "Venda e receba via PIX (Asaas/Mercado Pago) direto no WhatsApp. Reduza a fricção e aumente sua conversão.",
+            icon: <CreditCard className="w-8 h-8 text-yellow-500" />
         }
     ];
 

@@ -1,16 +1,12 @@
 
-import OpenAI from 'openai';
 import fs from 'fs';
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+import { getAiClient } from '@/lib/ai-provider';
 
 export const VisionService = {
     /**
      * Analyze an image and return a description.
      */
-    async analyze(imagePath: string, caption?: string, aiClient?: OpenAI, aiModel?: string): Promise<string> {
+    async analyze(imagePath: string, caption?: string, bot?: any): Promise<string> {
         try {
             console.log(`[VisionService] Analyzing ${imagePath}...`);
 
@@ -28,29 +24,39 @@ export const VisionService = {
                             type: "image_url",
                             image_url: {
                                 "url": dataUri,
-                                "detail": "low" // 'low' is cheaper and usually sufficient for context
+                                "detail": "low"
                             },
                         },
                     ],
                 },
             ];
 
-            const client = aiClient || openai;
-            const modelToUse = aiModel || "gpt-4o-mini"; // Standard vision model
+            // Use the bot's preferred provider or fallback to Gemini for vision (usually cheaper/better for vision)
+            const provider = bot?.aiProvider || 'gemini';
+            const model = provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash';
+
+            const { client, model: modelToUse } = await getAiClient({
+                provider,
+                model,
+                tenant: bot?.tenant || {}
+            });
+
+            console.log(`[VisionService] Using provider ${provider} with model ${modelToUse}`);
 
             const response = await client.chat.completions.create({
                 model: modelToUse,
                 messages: messages,
-                max_tokens: 300,
+                max_tokens: 500,
             });
 
             const description = response.choices[0]?.message?.content || "Não consegui analisar a imagem.";
-            console.log(`[VisionService] Analysis: "${description.substring(0, 50)}..."`);
+            console.log(`[VisionService] Analysis length: ${description.length} chars`);
 
             return description;
         } catch (error) {
             console.error('[VisionService] Analysis failed:', error);
-            throw error;
+            // Fallback for missing keys or errors
+            return "Ocorreu um erro ao tentar analisar a imagem do usuário.";
         }
     }
 };

@@ -17,9 +17,9 @@ export default function AdminProfilePage() {
 
     useEffect(() => {
         const fetchUserData = async () => {
-            if (session?.user?.id) {
+            if ((session?.user as any)?.id) {
                 try {
-                    const res = await fetch(`/api/admin/users/${session.user.id}`);
+                    const res = await fetch(`/api/admin/users/${(session?.user as any).id}`);
                     if (res.ok) {
                         const userData = await res.json();
                         setFormData(prev => ({
@@ -47,7 +47,7 @@ export default function AdminProfilePage() {
         setMessage({ type: '', text: '' });
 
         try {
-            const res = await fetch(`/api/admin/users/${session?.user?.id}`, {
+            const res = await fetch(`/api/admin/users/${(session?.user as any)?.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

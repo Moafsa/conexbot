@@ -27,10 +27,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 name: body.name,
                 description: body.description,
                 price: body.price !== undefined ? parseFloat(body.price) : undefined,
+                salePrice: body.salePrice !== undefined ? (body.salePrice ? parseFloat(body.salePrice) : null) : undefined,
                 stock: body.stock !== undefined ? parseInt(body.stock) : undefined,
                 sku: body.sku,
                 imageUrl: body.imageUrl,
-                active: body.active
+                active: body.active,
+                type: body.type,
+                billingPeriod: body.billingPeriod,
+                iterations: body.iterations !== undefined ? (body.iterations ? parseInt(body.iterations.toString()) : null) : undefined
             }
         });
 

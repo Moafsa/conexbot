@@ -1,5 +1,5 @@
-
 import { MessageProcessor } from './processor';
+import prisma from '@/lib/prisma';
 
 interface BufferedChat {
     messages: string[];
@@ -7,37 +7,36 @@ interface BufferedChat {
     sessionName: string;
     contactId: string; // phone
     channel: 'whatsapp' | 'simulator';
-    inputType: 'text' | 'audio';
 }
 
 // In-memory storage for active buffers
 // Key: `${sessionName}:${contactId}`
 const activeBuffers: Map<string, BufferedChat> = new Map();
 
-const BUFFER_DELAY_MS = 1500; // Wait 1.5 seconds for more messages
-
 export const BufferingService = {
     /**
      * Add a message to the buffer.
      * If a timer exists, clear it and restart (debounce).
      */
-    add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' = 'text') {
+    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
         const key = `${sessionName}:${contactId}`;
 
-        // Audio messages should probably skip buffering or be handled carefully.
-        // If we buffer audio, we can't concatenate files easily without processing.
-        // Recommendation: Auto-process audio immediately, OR treat audio as a "trigger" to flush text?
-        // For now, let's PROCESS AUDIO IMMEDIATELY and only buffer TEXT.
-        if (inputType === 'audio') {
-            // If there's pending text, maybe flush it first? 
-            // Or just process audio parallel. 
-            // Let's flush existing text buffer if any.
-            if (activeBuffers.has(key)) {
-                this.flush(key);
-            }
-            // Process audio directly
-            MessageProcessor.process(sessionName, contactId, text, channel, 'sessionName', { inputType: 'audio' })
-                .catch(err => console.error('[Buffering] Audio process error:', err));
+        // Get bot configuration for buffer delay
+        const bot = await prisma.bot.findUnique({
+            where: { sessionName },
+            select: { messageBuffer: true }
+        });
+
+        const delay = bot?.messageBuffer ?? 1500;
+
+        console.log(`[Buffering] [${key}] Added message. Active buffers before: ${activeBuffers.size}. Delay: ${delay}`);
+
+        if (delay === 0) {
+            // Process immediately if buffer is disabled
+            console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately.`);
+            MessageProcessor.process(sessionName, contactId, text, channel, 'sessionName', { 
+                inputType: inputType as any 
+            }).catch(err => console.error('[Buffering] Immediate process error:', err));
             return;
         }
 
@@ -49,14 +48,21 @@ export const BufferingService = {
                 timer: null,
                 sessionName,
                 contactId,
-                channel,
-                inputType
+                channel
             };
             activeBuffers.set(key, buffer);
         }
 
         // Add message part
-        buffer.messages.push(text);
+        // For audio and image, we prefix the content to make it clear to the IA
+        let content = text;
+        if (inputType === 'audio') {
+            content = `[ÁUDIO TRANSCRITO]: "${text}"`;
+        } else if (inputType === 'image') {
+            content = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${text}`;
+        }
+
+        buffer.messages.push(content);
 
         // Clear existing timer
         if (buffer.timer) {
@@ -65,10 +71,11 @@ export const BufferingService = {
 
         // Set new timer
         buffer.timer = setTimeout(() => {
+            console.log(`[Buffering] [${key}] 🔥 Timer triggered. Flushing...`);
             this.flush(key);
-        }, BUFFER_DELAY_MS);
+        }, delay);
 
-        console.log(`[Buffering] Added "${text}" to buffer for ${contactId}. Waiting ${BUFFER_DELAY_MS}ms...`);
+        console.log(`[Buffering] [${key}] Timer set for ${delay}ms. Messages so far: ${buffer.messages.length}`);
     },
 
     /**
@@ -84,12 +91,11 @@ export const BufferingService = {
         if (buffer.messages.length === 0) return;
 
         // Combine messages
-        // If multiple lines, join with newline or space. Newline is safer for semantic meaning.
         const combinedText = buffer.messages.join('\n');
 
         console.log(`[Buffering] Flushing ${buffer.messages.length} messages for ${buffer.contactId}: "${combinedText.substring(0, 50)}..."`);
 
-        // Process
+        // Process combined text as a single message
         MessageProcessor.process(
             buffer.sessionName,
             buffer.contactId,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
     Users, DollarSign, MessageCircle, MoreHorizontal,
-    TrendingUp, Phone, Mail, User, Settings2
+    TrendingUp, Phone, Mail, User, Settings2, Search
 } from "lucide-react";
 import CRMContactPanel from "./CRMContactPanel";
 import { toast } from "sonner";
@@ -35,13 +35,24 @@ export function CRMBoard({ botId }: { botId: string }) {
     const [loading, setLoading] = useState(true);
     const [draggedContact, setDraggedContact] = useState<string | null>(null);
     const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
 
+    // Hook para fetch inicial de stages
     useEffect(() => {
         if (botId) {
             fetchStages();
-            fetchContacts();
         }
     }, [botId]);
+
+    // Hook com Debounce para busca de contacts
+    useEffect(() => {
+        if (botId) {
+            const timeout = setTimeout(() => {
+                fetchContacts(search);
+            }, 400);
+            return () => clearTimeout(timeout);
+        }
+    }, [botId, search]);
 
     async function fetchStages() {
         try {
@@ -55,10 +66,10 @@ export function CRMBoard({ botId }: { botId: string }) {
         }
     }
 
-    async function fetchContacts() {
+    async function fetchContacts(searchQuery = "") {
         setLoading(true);
         try {
-            const res = await fetch(`/api/contacts?botId=${botId}`);
+            const res = await fetch(`/api/contacts?botId=${botId}&search=${encodeURIComponent(searchQuery)}`, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 // Filter by botId for safety
@@ -132,9 +143,23 @@ export function CRMBoard({ botId }: { botId: string }) {
     }
 
     return (
-        <div className="relative flex h-[calc(100vh-200px)] min-h-[600px] overflow-hidden">
-            <div className={`flex-1 overflow-x-auto pb-4 transition-all duration-300 ${selectedContactId ? 'pr-[450px]' : ''}`}>
-                <div className="flex gap-6 h-full p-2">
+        <div className="flex flex-col h-full bg-white/30 rounded-3xl border border-white/50 p-4 shadow-sm gap-4">
+            
+            {/* 🔴 SEARCH BAR HEADER */}
+            <div className="flex bg-white/50 border border-gray-100 p-2 rounded-2xl md:w-1/3 min-w-[300px] items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/30 transition-shadow">
+                <Search className="w-5 h-5 text-gray-400 ml-2" />
+                <input 
+                    type="text" 
+                    placeholder="Buscar nome, telefone, LLID ou mensagem..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="flex-1 bg-transparent border-none outline-none px-2 text-sm text-gray-700 placeholder-gray-400 font-medium"
+                />
+            </div>
+
+            <div className="relative flex h-[calc(100vh-250px)] min-h-[500px] overflow-hidden">
+                <div className={`flex-1 overflow-x-auto pb-4 transition-all duration-300 ${selectedContactId ? 'pr-[450px]' : ''}`}>
+                    <div className="flex gap-6 h-full p-2">
                     {stages.map(stage => {
                         const stageContacts = contacts.filter(c => c.stageId === stage.id);
 
@@ -225,6 +250,7 @@ export function CRMBoard({ botId }: { botId: string }) {
                     />
                 </div>
             )}
+        </div>
         </div>
     );
 }

@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma';
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user || (session.user as any).role !== 'admin') {
+        if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
             return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
         }
 
@@ -14,7 +14,7 @@ export async function GET() {
             prisma.tenant.count(),
             prisma.bot.count(),
             prisma.message.count(),
-            prisma.subscription.count({ where: { status: 'active' } }),
+            prisma.subscription.count({ where: { status: 'ACTIVE' } }),
             prisma.tenant.findMany({
                 take: 20,
                 orderBy: { createdAt: 'desc' },

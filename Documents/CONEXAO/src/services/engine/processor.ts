@@ -2,6 +2,36 @@ import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
 import { buildSystemPrompt, buildConversationMessages } from './prompts';
 import { UzapiService } from './uzapi';
+import { logToFile } from './logger';
+import { NotificationService } from '../notification/service';
+
+function detectAiMessage(text: string): boolean {
+    if (!text) return false;
+    
+    // Heuristic 1: Length (Bots often send long, structured texts)
+    if (text.length > 800) return true;
+
+    // Heuristic 2: Known Bot Phrases (Common in AI customer service)
+    const botPatterns = [
+        "Como posso te ajudar hoje?",
+        "Eu sou uma inteligência artificial",
+        "Sinto muito, não entendi",
+        "Pode reformular sua pergunta?",
+        "Estou aqui para auxiliar",
+        "Escolha uma das opções abaixo",
+        "Protocolo de atendimento:",
+        "{\"action\":",
+        "{\"type\":"
+    ];
+    
+    if (botPatterns.some(pattern => text.toLowerCase().includes(pattern.toLowerCase()))) return true;
+
+    // Heuristic 3: Excessive repetition or robotic structure
+    const lines = text.split('\n');
+    if (lines.length > 5 && lines.every(l => l.trim().startsWith('-') || l.trim().startsWith('•'))) return true;
+
+    return false;
+}
 import { chunkKnowledge, retrieveRelevantChunks } from './knowledge-rag';
 import { AsaasService } from '../payment/asaas';
 import { SupervisorService } from './supervisor';
@@ -9,20 +39,11 @@ import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
+import { format } from 'date-fns';
 
 import fs from 'fs';
 import path from 'path';
 
-// Helper for file logging
-function logToFile(msg: string) {
-    const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] ${msg}\n`;
-    try {
-        fs.appendFileSync(path.join(process.cwd(), 'debug-today.log'), line);
-    } catch (e) {
-        console.error('Failed to log to file:', e);
-    }
-}
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
@@ -32,6 +53,7 @@ const processingLocks = new Map<string, Promise<any>>();
 
 export const MessageProcessor = {
     async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+        console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
         // Concurrency Lock: prevent same phone processing parallelly
         const existingLock = processingLocks.get(senderPhone);
         if (existingLock) {
@@ -58,7 +80,7 @@ export const MessageProcessor = {
             const bot = await prisma.bot.findUnique({
                 where: whereClause as any,
                 include: {
-                    tenant: { include: { subscription: true, usageCounter: true } },
+                    tenant: { include: { subscription: { include: { plan: true } }, usageCounter: true } },
                     media: true,
                     products: { where: { active: true } }
                 },
@@ -70,9 +92,25 @@ export const MessageProcessor = {
             }
 
             // 2. Usage limits check
-            const counter = bot.tenant.usageCounter;
-            if (counter && counter.messagesUsed >= counter.messagesLimit) {
-                logToFile(`[Processor] LIMIT REACHED - Bypassing for now`);
+            let counter = bot.tenant.usageCounter;
+            
+            // Auto-sync limits if there is an active/trialing subscription that has a plan
+            const sub = bot.tenant.subscription;
+            if (counter && sub && (sub.status === 'ACTIVE' || sub.status === 'TRIALING' || sub.plan?.price === 0) && sub.plan) {
+                if (counter.messagesLimit !== sub.plan.messageLimit) {
+                    await prisma.usageCounter.update({
+                        where: { id: counter.id },
+                        data: { messagesLimit: sub.plan.messageLimit, botsLimit: sub.plan.botLimit }
+                    });
+                    counter.messagesLimit = sub.plan.messageLimit;
+                    counter.botsLimit = sub.plan.botLimit;
+                    logToFile(`[Processor] Limits auto-synced for tenant ${bot.tenantId} to ${sub.plan.messageLimit} msgs`);
+                }
+            }
+
+            if (channel !== 'simulator' && counter && counter.messagesLimit > 0 && counter.messagesUsed >= counter.messagesLimit) {
+                logToFile(`[Processor] LIMIT REACHED for tenant ${bot.tenantId}`);
+                return { text: "⚠️ Desculpe, o limite de mensagens do plano deste atendente foi atingido. Por favor, entre em contato com o administrador." };
             }
 
             logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} (with Fallback enabled)`);
@@ -90,7 +128,13 @@ export const MessageProcessor = {
                 },
             });
 
-            // 3.5. specialized input processing
+            // 3.1. Check if conversation is PAUSED
+            if ((conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
+                logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()}`);
+                return null;
+            }
+
+            // 3.5. Specialized input processing
             let contentToSave = messageText;
             if (options.inputType === 'image' && options.mediaPath) {
                 const { VisionService } = await import('./vision');
@@ -106,7 +150,7 @@ export const MessageProcessor = {
             }
 
             // 4. Save user message
-            await prisma.message.create({
+            const savedMessage = await prisma.message.create({
                 data: {
                     conversationId: conversation.id,
                     content: contentToSave,
@@ -115,11 +159,11 @@ export const MessageProcessor = {
             });
 
             // 5. Get conversation history
-            const rawHistory = await prisma.message.findMany({
+            const rawHistory = await (prisma.message as any).findMany({
                 where: { conversationId: conversation.id },
                 orderBy: { createdAt: 'desc' },
                 take: 20,
-                select: { role: true, content: true },
+                select: { role: true, content: true, tool_calls: true, tool_call_id: true },
             });
             const history = rawHistory.reverse();
 
@@ -143,6 +187,39 @@ export const MessageProcessor = {
                         stageId: firstStage?.id,
                     } as any
                 });
+            }
+
+            // 6.0. Check if contact is BLOCKED
+            if ((existingContact as any).isBlocked) {
+                logToFile(`[Processor] Contact BLOCKED: ${senderPhone}`);
+                return null;
+            }
+
+            // 6.0.5 AI Detection
+            if (bot.enableAiDetection && detectAiMessage(messageText)) {
+                logToFile(`[Processor] AI DETECTED from ${senderPhone}`);
+                
+                const action = bot.aiDetectionAction || "PAUSE";
+                const title = `🤖 Possível Bot Detectado`;
+                const logMessage = `O contato *${senderPhone}* parece ser uma IA. Ação tomada: *${action}*.`;
+
+                if (action === "PAUSE") {
+                    const pausedUntil = new Date(Date.now() + 24 * 60 * 60000); // 24h pause
+                    await prisma.conversation.update({
+                        where: { id: conversation.id },
+                        data: { pausedUntil } as any
+                    });
+                } else if (action === "BLOCK") {
+                    await prisma.contact.update({
+                        where: { id: existingContact.id },
+                        data: { isBlocked: true } as any
+                    });
+                }
+
+                // Notify using triple-channel service
+                await NotificationService.alertTenant(bot.tenantId, title, logMessage, 'AI_DETECTED');
+                
+                if (action !== "NOTIFY") return null; // Stop processing if not just notifying
             }
 
             // 6.1. Chatwoot Integration: Fetch enriched data
@@ -170,7 +247,7 @@ export const MessageProcessor = {
             // 7. SUPERVISOR ANALYSIS
             const analysis = await SupervisorService.analyze(
                 messageText,
-                history,
+                history as any,
                 ((existingContact as any).funnelStage) || 'LEAD',
                 bot.id,
                 bot
@@ -255,52 +332,306 @@ export const MessageProcessor = {
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
             const finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
 
-            // 10. Call AI Provider with Fallback
-            const messages = buildConversationMessages(finalSystemPrompt, history);
-            const aiResponse = await safeChatCompletion({
-                bot,
-                messages,
-                temperature: 0.7,
-                max_tokens: 500
-            });
+            // 10. Call AI Provider with Tool Calling support
+            const { SchedulingService } = await import('../scheduling/service');
+            const schedulingTools: any[] = [
+                {
+                    type: 'function',
+                    function: {
+                        name: 'consultar_horarios',
+                        description: 'Consulta horários disponíveis para agendamento em uma data específica.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                data: { type: 'string', description: 'Data no formato YYYY-MM-DD' }
+                            },
+                            required: ['data']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'marcar_compromisso',
+                        description: 'Agenda um compromisso para o cliente.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                data_hora: { type: 'string', description: 'Data e hora no formato ISO (ex: 2024-03-10T14:00:00Z)' }
+                            },
+                            required: ['data_hora']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'chamar_humano',
+                        description: 'Chama um atendente humano para assumir a conversa quando o bot não sabe responder ou o cliente solicita explicitamente.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                motivo: { type: 'string', description: 'O motivo pelo qual o humano está sendo chamado.' }
+                            },
+                            required: ['motivo']
+                        }
+                    }
+                }
+            ];
 
-            // 11. Parse Media & Payments
-            const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
-            let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
+            if (bot.enablePayments) {
+                schedulingTools.push({
+                    type: 'function',
+                    function: {
+                        name: 'gerar_fatura',
+                        description: 'Gera um link de pagamento ou assinatura (fatura) usando a integração Asaas do Atendente. SÓ CHAME ESTA FUNÇÃO se você JÁ souber qual o produto e tiver coletado o Nome Completo, E-mail e CPF do cliente.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                produto_nome: { type: 'string', description: 'O nome do produto ou plano do catálogo que o cliente quer comprar.' },
+                                cliente_nome: { type: 'string', description: 'Nome completo do cliente.' },
+                                cliente_email: { type: 'string', description: 'E-mail do cliente.' },
+                                cliente_cpf: { type: 'string', description: 'CPF ou CNPJ do cliente.' }
+                            },
+                            required: ['produto_nome', 'cliente_nome', 'cliente_email', 'cliente_cpf']
+                        }
+                    }
+                });
+            }
 
-            if (bot.enablePayments && SALE_KEYWORDS.test(messageText)) {
-                const { ProductSelector } = await import('./product-selector');
-                const matchedProduct = ProductSelector.findProduct(messageText, bot.products);
-                if (matchedProduct && matchedProduct.stock > 0 && bot.tenant.asaasApiKey) {
-                    try {
-                        const payment = await AsaasService.createPaymentLink({
-                            apiKey: bot.tenant.asaasApiKey,
-                            customerName: existingContact.name || 'Cliente WhatsApp',
-                            customerEmail: existingContact.email || `${senderPhone}@whatsapp.com`,
-                            customerPhone: senderPhone,
-                            amount: Math.round(matchedProduct.price * 100),
-                            description: `Pedido: ${matchedProduct.name}`
-                        });
-                        if (payment.success && payment.url) {
-                            await prisma.order.create({
-                                data: {
+            // 10. Call AI Provider with Tool Calling support (Loop for recursive tools)
+            let aiResult: any;
+            let toolIteration = 0;
+            const maxToolIterations = 5;
+
+            while (toolIteration < maxToolIterations) {
+                const messages = buildConversationMessages(finalSystemPrompt, history as any);
+                aiResult = await safeChatCompletion({
+                    bot,
+                    messages: messages as any[],
+                    tools: schedulingTools,
+                    temperature: 0.7,
+                    max_tokens: 500
+                }) as any;
+
+                if (aiResult.toolCalls && aiResult.toolCalls.length > 0) {
+                    logToFile(`[Processor] AI requested ${aiResult.toolCalls.length} tool calls (Iteration: ${toolIteration + 1})`);
+                    
+                    // 1. Save assistant message with tool_calls to DB
+                    await (prisma.message as any).create({
+                        data: {
+                            conversationId: conversation.id,
+                            role: 'assistant',
+                            content: aiResult.content || "",
+                            tool_calls: aiResult.toolCalls as any
+                        }
+                    });
+                    // Add to session history for next AI calls in this loop
+                    history.push({ 
+                        role: 'assistant', 
+                        content: aiResult.content || "", 
+                        tool_calls: aiResult.toolCalls 
+                    } as any);
+
+                    // 2. Execute each tool
+                    for (const toolCall of aiResult.toolCalls) {
+                        const { name, arguments: argsString } = toolCall.function;
+                        logToFile(`[Processor] Executing Tool: ${name} with args: ${argsString}`);
+                        const args = JSON.parse(argsString);
+                        
+                        let toolResult = "";
+                        if (name === 'consultar_horarios') {
+                            try {
+                                const date = new Date(args.data);
+                                const slots = await (await import('../scheduling/service')).SchedulingService.getAvailableSlots(bot.id, date);
+                                const libres = slots.filter(s => s.available).map(s => format(s.start, 'HH:mm')).join(', ');
+                                toolResult = libres ? `Horários disponíveis em ${args.data}: ${libres}` : `Não há horários disponíveis em ${args.data}.`;
+                            } catch (e: any) { toolResult = `Erro ao consultar: ${e.message}`; }
+                        } else if (name === 'marcar_compromisso') {
+                            try {
+                                const startTime = new Date(args.data_hora);
+                                const appt = await (await import('../scheduling/service')).SchedulingService.createAppointment({
                                     botId: bot.id,
                                     contactId: existingContact.id,
-                                    totalAmount: matchedProduct.price,
-                                    status: 'PENDING',
-                                    items: { create: { productId: matchedProduct.id, quantity: 1, unitPrice: matchedProduct.price } }
+                                    tenantId: bot.tenantId,
+                                    startTime
+                                });
+                                toolResult = `Agendamento confirmado para ${format(startTime, 'dd/MM/yyyy HH:mm')}. ID: ${appt.id}`;
+                                const scheduledStage = await prisma.crmStage.findFirst({
+                                    where: { botId: bot.id, name: { contains: 'AGENDA', mode: 'insensitive' } }
+                                });
+                                if (scheduledStage) {
+                                    await prisma.contact.update({
+                                        where: { id: existingContact.id },
+                                        data: { stageId: scheduledStage.id, funnelStage: scheduledStage.name }
+                                    });
                                 }
-                            });
-                            cleanResponse += `\n\n💳 *Aqui está seu link de pagamento:* ${payment.url}`;
+                            } catch (e: any) { toolResult = `Erro ao agendar: ${e.message}`; }
+                        } else if (name === 'chamar_humano') {
+                            try {
+                                logToFile(`[Processor] Handoff requested: ${args.motivo}`);
+                                const humanStage = await prisma.crmStage.findFirst({
+                                    where: { botId: bot.id, name: { contains: 'HUMAN', mode: 'insensitive' } }
+                                });
+                                await prisma.contact.update({
+                                    where: { id: existingContact.id },
+                                    data: { 
+                                        funnelStage: humanStage?.name || 'ATENDIMENTO HUMANO',
+                                        stageId: humanStage?.id || undefined
+                                    }
+                                });
+                                const pauseMinutes = (bot as any).handoffPause || 1440;
+                                const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
+                                await prisma.conversation.update({
+                                    where: { id: conversation.id },
+                                    data: { pausedUntil } as any
+                                });
+                                const title = `🚨 Atendimento Humano Solicitado`;
+                                const message = `O cliente *${existingContact.name || senderPhone}* solicitou um humano.\n\n*Motivo:* ${args.motivo}\n*Bot:* ${bot.name}`;
+                                const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
+                                if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
+                                if (channels.includes('WHATSAPP') && bot.tenant.whatsapp) await NotificationService.sendWhatsApp(bot.tenant.whatsapp, message);
+                                if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
+                                toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
+                            } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
+                        } else if (name === 'gerar_fatura') {
+                            try {
+                                const asaasKey = bot.asaasApiKey || bot.tenant.asaasApiKey;
+                                if (!asaasKey) {
+                                    toolResult = "A loja não tem a integração com Módulo de Pagamentos configurada. Peça desculpas ao cliente.";
+                                } else {
+                                    const { ProductSelector } = await import('./product-selector');
+                                    const matchedProduct = ProductSelector.findProduct(args.produto_nome, bot.products);
+                                    if (!matchedProduct) {
+                                        toolResult = `Erro: Produto "${args.produto_nome}" não encontrado no catálogo. Pergunte ao cliente qual produto ele quer exatamente.`;
+                                    } else if (matchedProduct.stock <= 0) {
+                                        toolResult = `Erro: Produto "${args.produto_nome}" encontra-se esgotado/sem estoque. Iforme o cliente.`;
+                                    } else {
+                                        // Determine base price (favor salePrice)
+                                        let finalPrice = matchedProduct.salePrice || matchedProduct.price;
+                                        let appliedCouponId: string | null = null;
+                                        let discountDetail = "";
+
+                                        // Apply Coupon if provided
+                                        if (args.cupom_desconto) {
+                                            const coupon = await prisma.coupon.findUnique({
+                                                where: { botId_code: { botId: bot.id, code: args.cupom_desconto.toUpperCase() } }
+                                            });
+
+                                            if (coupon && coupon.active) {
+                                                // Check expiration
+                                                const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
+                                                const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
+
+                                                if (!isExpired && !isLimitReached) {
+                                                    appliedCouponId = coupon.id;
+                                                    const originalValue = finalPrice;
+                                                    if (coupon.type === 'PERCENTAGE') {
+                                                        finalPrice = finalPrice * (1 - coupon.value / 100);
+                                                        discountDetail = ` (Cupom ${coupon.code}: -${coupon.value}%)`;
+                                                    } else {
+                                                        finalPrice = Math.max(0, finalPrice - coupon.value);
+                                                        discountDetail = ` (Cupom ${coupon.code}: -R$ ${coupon.value.toFixed(2)})`;
+                                                    }
+                                                    
+                                                    // Increment usage count
+                                                    await prisma.coupon.update({
+                                                        where: { id: coupon.id },
+                                                        data: { usedCount: { increment: 1 } }
+                                                    });
+                                                } else {
+                                                    discountDetail = " (Cupom inválido ou expirado)";
+                                                }
+                                            } else {
+                                                discountDetail = " (Cupom não encontrado)";
+                                            }
+                                        }
+
+                                        const globalConfig = (await prisma.globalConfig.findUnique({ where: { id: 'system' } })) as any;
+                                        const platformWalletId = globalConfig?.asaasWalletId;
+                                        
+                                        let commissionAmount = 0;
+                                        if ((bot as any).userSplitValue > 0) {
+                                            if ((bot as any).userSplitType === 'PERCENTAGE') commissionAmount = (finalPrice * (bot as any).userSplitValue) / 100;
+                                            else commissionAmount = (bot as any).userSplitValue;
+                                        }
+
+                                        const splits = (commissionAmount > 0 && platformWalletId && platformWalletId !== bot.asaasWalletId) 
+                                            ? [{ walletId: platformWalletId, fixedValue: commissionAmount }] 
+                                            : undefined;
+                                        
+                                        let payment: any;
+                                        const chargeDescription = `Pedido: ${matchedProduct.name}${discountDetail}`;
+                                        
+                                        if ((matchedProduct as any).type === 'RECURRING') {
+                                            payment = await (await import('../payment/asaas')).AsaasService.createSubscriptionForBot({
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: senderPhone, customerCpfCnpj: args.cliente_cpf, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
+                                            });
+                                        } else {
+                                            payment = await (await import('../payment/asaas')).AsaasService.createPaymentLink({
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: senderPhone, customerCpfCnpj: args.cliente_cpf, amount: Math.round(finalPrice * 100), description: chargeDescription, splits
+                                            });
+                                        }
+                                        if (payment.success && payment.url) {
+                                            if (existingContact) {
+                                                await prisma.contact.update({
+                                                    where: { id: (existingContact as any).id },
+                                                    data: { leadScore: { increment: 10 }, name: existingContact.name || args.cliente_nome, email: existingContact.email || args.cliente_email }
+                                                });
+                                            }
+                                            await prisma.order.create({
+                                                data: { 
+                                                    botId: bot.id, 
+                                                    contactId: (existingContact as any).id, 
+                                                    totalAmount: finalPrice, 
+                                                    commissionAmount: commissionAmount, 
+                                                    status: 'PENDING', 
+                                                    externalId: payment.id, 
+                                                    couponId: appliedCouponId,
+                                                    items: { create: { productId: (matchedProduct as any).id, quantity: 1, unitPrice: finalPrice } } 
+                                                } as any
+                                            });
+                                            toolResult = `Fatura gerada com sucesso!${discountDetail} Link de pagamento: ${payment.url}. Use apenas este link e envie para o cliente para ele continuar o pagamento.`;
+                                        } else {
+                                            toolResult = `Erro ao gerar fatura no sistema do Asaas: ${payment.error}. Avise o cliente gentilmente de que houve uma falha técnica.`;
+                                        }
+                                    }
+                                }
+                            } catch (e: any) { toolResult = `Erro interno ao faturar: ${e.message}`; }
                         }
-                    } catch (err) { console.error('Payment Error:', err); }
+
+                        logToFile(`[Processor] Tool Result [${name}]: ${toolResult.substring(0, 100)}...`);
+
+                        // 3. Save tool result to DB and in-memory history
+                        await (prisma.message as any).create({
+                            data: {
+                                conversationId: conversation.id,
+                                role: 'tool',
+                                content: toolResult,
+                                tool_call_id: toolCall.id
+                            }
+                        });
+                        history.push({ role: 'tool', content: toolResult, tool_call_id: toolCall.id } as any);
+                    }
+                    toolIteration++;
+                } else {
+                    // No more tool calls, AI just answered textually
+                    break;
                 }
             }
 
-            // 12. Save Assistant Response
-            await prisma.message.create({
-                data: { conversationId: conversation.id, content: cleanResponse, role: 'assistant' },
-            });
+            const aiResponse = typeof aiResult === 'string' ? aiResult : aiResult.content;
+
+            // 11. Parse Media
+            const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
+            let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
+
+            // 12. Save Assistant Final Response (only if not a tool call already handled)
+            if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
+                await prisma.message.create({
+                    data: { conversationId: conversation.id, content: cleanResponse, role: 'assistant' },
+                });
+            }
 
             VectorService.addDocument(bot.id, `User: ${messageText}`, { type: 'chat_history', conversationId: conversation.id }).catch(e => console.error('Vector save error:', e));
 
@@ -384,9 +715,74 @@ export const MessageProcessor = {
                 }
             }
 
-            // 15. Increment usage
-            if (counter) {
-                await prisma.usageCounter.update({ where: { id: counter.id }, data: { messagesUsed: { increment: 1 } } });
+            // 15. Subscription Autonomy (Cancellation & Status)
+            const CANCELLATION_KEYWORDS = /(cancelar|encerrar|parar|desistir).*(assinatura|plano|serviço|mensalidade)/i;
+            const STATUS_KEYWORDS = /(status|fatura|vencimento|pagamento|como está).*(assinatura|plano|minha conta|meu pagamento)/i;
+
+            if (CANCELLATION_KEYWORDS.test(messageText)) {
+                const sub = await prisma.order.findFirst({
+                    where: { contactId: (existingContact as any).id, status: 'PAID' },
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                if (sub && (sub as any).externalId) {
+                    return {
+                        text: "Entendo que deseja cancelar sua assinatura. Para sua segurança, você pode cancelar diretamente pelo link da última fatura recebida ou solicitar ao suporte técnico. Deseja que eu envie o contato do suporte?"
+                    };
+                }
+            }
+
+            if (STATUS_KEYWORDS.test(messageText)) {
+                const lastOrder = await prisma.order.findFirst({
+                    where: { contactId: (existingContact as any).id },
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                if (lastOrder) {
+                    const statusMap: Record<string, string> = {
+                        'PENDING': 'pendente',
+                        'PAID': 'pago',
+                        'CANCELED': 'cancelado'
+                    };
+                    return {
+                        text: `Sua última fatura (${lastOrder.id.slice(0, 8)}) está com status: *${statusMap[lastOrder.status] || lastOrder.status}*.`
+                    };
+                }
+            }
+
+            // 16. Increment usage & Check thresholds (Session-based: count once per 24h per contact)
+            if (channel !== 'simulator' && counter) {
+                // Check if this contact has a message in the last 24h (excluding the one we just saved)
+                const lastSessionMessage = await prisma.message.findFirst({
+                    where: {
+                        conversation: { 
+                            botId: bot.id,
+                            remoteId: senderPhone
+                        },
+                        role: 'user',
+                        id: { not: savedMessage.id }
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                const isNewSession = !lastSessionMessage || 
+                    (new Date().getTime() - new Date(lastSessionMessage.createdAt).getTime()) > 24 * 60 * 60 * 1000;
+
+                if (isNewSession) {
+                    const newUsed = counter.messagesUsed + 1;
+                    await prisma.usageCounter.update({ where: { id: counter.id }, data: { messagesUsed: newUsed } });
+                    logToFile(`[Processor] New Session (Atendimento) for ${senderPhone}. Usage incremented: ${newUsed}`);
+
+                    // Threshold alerts only on new session increments
+                    if (counter.messagesLimit > 0 && newUsed >= counter.messagesLimit * 0.9 && !counter.warned90) {
+                        NotificationService.notifyLimit(bot.tenantId, 'warning', newUsed, counter.messagesLimit).catch(e => console.error('Notify Error:', e));
+                    }
+                    if (counter.messagesLimit > 0 && newUsed >= counter.messagesLimit && !counter.warned100) {
+                        NotificationService.notifyLimit(bot.tenantId, 'critical', newUsed, counter.messagesLimit).catch(e => console.error('Notify Error:', e));
+                    }
+                } else {
+                    logToFile(`[Processor] Existing session for ${senderPhone} (within 24h). No usage incremented.`);
+                }
             }
 
             return { text: cleanResponse, media: mediaMatches.map((m: any) => m[1]) };

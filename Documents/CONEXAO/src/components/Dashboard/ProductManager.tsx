@@ -7,10 +7,16 @@ interface Product {
     id: string;
     name: string;
     price: number;
+    salePrice?: number | null;
     description?: string;
+    imageUrl?: string;
+    videoUrl?: string;
     stock: number;
     sku?: string;
     active: boolean;
+    type: 'SINGLE' | 'RECURRING';
+    billingPeriod?: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
+    iterations?: number | null;
 }
 
 export function ProductManager({ botId }: { botId: string }) {
@@ -18,14 +24,20 @@ export function ProductManager({ botId }: { botId: string }) {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
+ 
     // Form State
     const [formData, setFormData] = useState({
         name: "",
         price: "",
+        salePrice: "",
         description: "",
         stock: "0",
         sku: "",
+        imageUrl: "",
+        videoUrl: "",
+        type: "SINGLE",
+        billingPeriod: "MONTHLY",
+        iterations: "",
     });
 
     useEffect(() => {
@@ -58,7 +70,9 @@ export function ProductManager({ botId }: { botId: string }) {
                 ...formData,
                 botId,
                 price: parseFloat(formData.price),
+                salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
                 stock: parseInt(formData.stock),
+                iterations: formData.iterations ? parseInt(formData.iterations) : null,
             };
 
             const res = await fetch(url, {
@@ -70,7 +84,7 @@ export function ProductManager({ botId }: { botId: string }) {
             if (res.ok) {
                 setIsModalOpen(false);
                 setEditingProduct(null);
-                setFormData({ name: "", price: "", description: "", stock: "0", sku: "" });
+                setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "" });
                 fetchProducts();
             }
         } catch (error) {
@@ -93,9 +107,15 @@ export function ProductManager({ botId }: { botId: string }) {
         setFormData({
             name: product.name,
             price: product.price.toString(),
+            salePrice: product.salePrice?.toString() || "",
             description: product.description || "",
             stock: product.stock.toString(),
             sku: product.sku || "",
+            imageUrl: product.imageUrl || "",
+            videoUrl: product.videoUrl || "",
+            type: product.type,
+            billingPeriod: product.billingPeriod || "MONTHLY",
+            iterations: product.iterations?.toString() || "",
         });
         setIsModalOpen(true);
     }
@@ -110,7 +130,7 @@ export function ProductManager({ botId }: { botId: string }) {
                 <button
                     onClick={() => {
                         setEditingProduct(null);
-                        setFormData({ name: "", price: "", description: "", stock: "0", sku: "" });
+                        setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "" });
                         setIsModalOpen(true);
                     }}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
@@ -138,6 +158,7 @@ export function ProductManager({ botId }: { botId: string }) {
                         <thead>
                             <tr className="border-b border-gray-200">
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Nome</th>
+                                <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Tipo</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Preço</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Estoque</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-right">Ações</th>
@@ -146,8 +167,23 @@ export function ProductManager({ botId }: { botId: string }) {
                         <tbody>
                             {products.map((p) => (
                                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-3 px-4 font-medium text-gray-800">{p.name}</td>
-                                    <td className="py-3 px-4 text-gray-600">R$ {p.price.toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-gray-600">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${p.type === 'RECURRING' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {p.type === 'RECURRING' ? 'Assinatura' : 'Único'}
+                                        </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-gray-600">
+                                        <div className="flex flex-col">
+                                            {p.salePrice ? (
+                                                <>
+                                                    <span className="text-xs text-red-500 line-through">R$ {p.price.toFixed(2)}</span>
+                                                    <span className="font-bold text-green-600">R$ {p.salePrice.toFixed(2)}</span>
+                                                </>
+                                            ) : (
+                                                <span>R$ {p.price.toFixed(2)}</span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="py-3 px-4 text-gray-600">
                                         <span className={`px-2 py-1 rounded-full text-xs ${p.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                             {p.stock} un
@@ -191,34 +227,75 @@ export function ProductManager({ botId }: { botId: string }) {
                                     required
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                     placeholder="Ex: X-Salada Especial"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço (R$)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cobrança</label>
+                                    <select
+                                        value={formData.type}
+                                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                    >
+                                        <option value="SINGLE">Cobrança Única</option>
+                                        <option value="RECURRING">Assinatura</option>
+                                    </select>
+                                </div>
+                                {formData.type === 'RECURRING' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Ciclo</label>
+                                        <select
+                                            value={formData.billingPeriod}
+                                            onChange={(e) => setFormData({ ...formData, billingPeriod: e.target.value })}
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                                        >
+                                            <option value="WEEKLY">Semanal</option>
+                                            <option value="MONTHLY">Mensal</option>
+                                            <option value="QUARTERLY">Trimestral</option>
+                                            <option value="YEARLY">Anual</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço Original (R$)</label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         required
                                         value={formData.price}
                                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                         placeholder="0.00"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Estoque</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Preço de Oferta (R$)</label>
                                     <input
                                         type="number"
-                                        required
-                                        value={formData.stock}
-                                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                        step="0.01"
+                                        value={formData.salePrice}
+                                        onChange={(e) => setFormData({ ...formData, salePrice: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 border-green-200 bg-green-50/30 focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                        placeholder="Opcional"
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Estoque / Qtd</label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={formData.stock}
+                                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                />
                             </div>
 
                             <div>
@@ -226,22 +303,45 @@ export function ProductManager({ botId }: { botId: string }) {
                                 <textarea
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none h-24 resize-none"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none h-24 resize-none text-sm"
                                     placeholder="Detalhes do produto, ingredientes, etc..."
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">URL da Imagem (Foto)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.imageUrl}
+                                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
+                                        placeholder="https://..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">URL do Vídeo (Opcional)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.videoUrl}
+                                        onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
+                                        placeholder="https://..."
+                                    />
+                                </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition text-sm"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium text-sm"
                                 >
                                     Salvar Produto
                                 </button>

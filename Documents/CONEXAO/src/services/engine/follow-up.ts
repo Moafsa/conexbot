@@ -241,12 +241,12 @@ export const FollowUpService = {
                 Responda APENAS com o texto da mensagem a ser enviada.
             `;
 
-            const aiResponse = await safeChatCompletion({
+            const result = await safeChatCompletion({
                 bot,
                 messages: [{ role: 'system', content: prompt }]
-            });
+            }) as any;
 
-            return aiResponse;
+            return typeof result === 'string' ? result : result.content;
         } catch (error) {
             console.error(`[FollowUp] Error generating AI message:`, error);
             return null;

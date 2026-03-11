@@ -12,8 +12,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing botId or message' }, { status: 400 });
         }
 
-        // Use a fixed "simulator" phone number or the sessionId provided
-        const simulatorPhone = sessionId || 'SIMULATOR_USER';
+        // Use a valid numeric phone format for the simulator to prevent Asaas errors
+        const simulatorPhone = (sessionId && /^\d{10,15}$/.test(sessionId)) ? sessionId : '11999999999';
 
         // Process message
         // Channel = 'simulator'

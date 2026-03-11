@@ -6,7 +6,7 @@ export class GeminiWrapper {
     chat = {
         completions: {
             create: async (body: any) => {
-                const model = body.model || 'gemini-1.5-flash';
+                const model = body.model || 'gemini-1.5-flash-latest';
                 let systemContent = "";
                 const contents = body.messages.map((m: any) => {
                     if (m.role === 'system') {
@@ -14,18 +14,31 @@ export class GeminiWrapper {
                         return null;
                     }
 
+                    // Convert messages with tool_calls or role tool to something Gemini understands (plain text)
+                    let content = m.content;
+                    if (!content && m.tool_calls) {
+                        content = `[AI ACTION: ${m.tool_calls.map((tc: any) => tc.function.name).join(', ')}]`;
+                    }
+                    if (m.role === 'tool') {
+                        content = `[TOOL RESULT: ${m.content}]`;
+                    }
+
+                    if (!content || (typeof content === 'string' && content.trim() === "")) {
+                        return null; // Ignore empty parts to avoid 400
+                    }
+
                     let parts: any[] = [];
-                    if (Array.isArray(m.content)) {
-                        parts = m.content.map((c: any) => {
+                    if (Array.isArray(content)) {
+                        parts = content.map((c: any) => {
                             if (c.type === 'image_url') {
                                 const [mimeInfo, base64] = c.image_url.url.split(';base64,');
                                 const mimeType = mimeInfo.replace('data:', '');
                                 return { inlineData: { mimeType, data: base64 } };
                             }
-                            return { text: c.text };
+                            return { text: c.text || "[Empty Part]" };
                         });
                     } else {
-                        parts = [{ text: m.content }];
+                        parts = [{ text: String(content) }];
                     }
 
                     return {
@@ -102,12 +115,12 @@ export async function getAiClient(options: {
         // Force upgrade legacy gemini models and fix invalid ones
         if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model.includes('gemini-2.0') || model.includes('2.5')) {
             if (!model.includes('flash') && !model.includes('pro')) {
-                model = 'gemini-1.5-flash';
+                model = 'gemini-1.5-flash-latest';
             } else if (model.includes('2.5')) {
                 model = 'gemini-2.0-flash'; // 2.5 doesn't exist yet, use 2.0
             }
         } else {
-            model = 'gemini-1.5-flash';
+            model = 'gemini-1.5-flash-latest';
         }
 
         return {
@@ -126,16 +139,18 @@ export async function getAiClient(options: {
 }
 
 /**
- * Enhanced AI completion with automatic fallback between providers.
+ * Enhanced AI completion with automatic fallback between providers and Tool Calling support.
  */
 export async function safeChatCompletion(options: {
     messages: any[],
     temperature?: number,
     response_format?: { type: "json_object" | "text" },
     max_tokens?: number,
+    tools?: any[],
+    tool_choice?: any,
     bot: any
 }) {
-    const { bot, messages, temperature, response_format, max_tokens } = options;
+    const { bot, messages, temperature, response_format, max_tokens, tools, tool_choice } = options;
     const providersToTry = [];
 
     // Order of preference based on configuration
@@ -163,25 +178,43 @@ export async function safeChatCompletion(options: {
             });
 
             console.log(`[SafeAI] Attempting ${provider} with model ${model}`);
-            const completion = await client.chat.completions.create({
+            
+            // Gemini Wrapper doesn't support tools yet in this implementation, 
+            // but we can pass them to OpenAI clients (OpenAI itself and OpenRouter)
+            const completionOptions: any = {
                 model,
                 messages,
                 temperature: temperature ?? 0.7,
                 response_format,
-                max_tokens
-            });
+                max_tokens,
+            };
+
+            // Only send tools if the provider is NOT gemini (for now, unless we update GeminiWrapper)
+            if (provider !== 'gemini' && tools && tools.length > 0) {
+                completionOptions.tools = tools;
+                completionOptions.tool_choice = tool_choice;
+            }
+
+            const completion = await client.chat.completions.create(completionOptions);
+            console.log(`[SafeAI] [${provider}] Raw Completion Choices:`, JSON.stringify(completion.choices, null, 2));
 
             const content = completion.choices[0]?.message?.content;
-            if (content) return content;
+            const toolCalls = completion.choices[0]?.message?.tool_calls;
+
+            if (content || toolCalls) {
+                return {
+                    content,
+                    toolCalls,
+                    provider
+                };
+            }
 
         } catch (err: any) {
             console.error(`[SafeAI] Provider ${provider} failed:`, err.message);
             lastError = err;
-            // If it's a quota error or internal error, continue to next provider
             if (err.message.includes('429') || err.message.includes('Quota') || err.message.includes('500')) {
                 continue;
             }
-            // For other errors, maybe stop? For now, let's try everything
         }
     }
 

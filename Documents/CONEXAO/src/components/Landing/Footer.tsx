@@ -6,9 +6,9 @@ export default function Footer() {
                     <p>&copy; {new Date().getFullYear()} Conext Bot. Powered by Conext.click.</p>
                 </div>
                 <div className="flex gap-6">
-                    <a href="#" className="hover:text-white transition-colors">Termos</a>
-                    <a href="#" className="hover:text-white transition-colors">Privacidade</a>
-                    <a href="#" className="hover:text-white transition-colors">Suporte</a>
+                    <a href="/terms" className="hover:text-white transition-colors">Termos</a>
+                    <a href="/privacy" className="hover:text-white transition-colors">Privacidade</a>
+                    <a href="/support" className="hover:text-white transition-colors">Suporte</a>
                 </div>
             </div>
         </footer>

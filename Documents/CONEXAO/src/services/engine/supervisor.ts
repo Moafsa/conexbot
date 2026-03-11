@@ -31,7 +31,10 @@ export const SupervisorService = {
         });
 
         const availableBots = await prisma.bot.findMany({
-            where: { tenantId: bot.tenantId, status: 'active' },
+            where: { 
+                masterId: botId, 
+                status: 'active'
+            },
             select: { id: true, name: true, businessType: true }
         });
 
@@ -87,12 +90,14 @@ export const SupervisorService = {
         `;
 
         try {
-            const content = await safeChatCompletion({
+            const aiResult = await safeChatCompletion({
                 bot,
                 messages: [{ role: "user", content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2
-            });
+            }) as any;
+
+            const content = typeof aiResult === 'string' ? aiResult : aiResult.content;
 
             const result = JSON.parse(content || '{}');
             const matchedStage = dynamicStages.find((s: any) => s.name.toLowerCase() === result.nextStage?.toLowerCase());

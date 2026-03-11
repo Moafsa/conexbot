@@ -16,6 +16,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
         const bot = await prisma.bot.findFirst({
             where: { id, tenantId },
+            include: {
+                _count: {
+                    select: {
+                        conversations: true,
+                        products: true
+                    }
+                }
+            }
         });
 
         if (!bot) {

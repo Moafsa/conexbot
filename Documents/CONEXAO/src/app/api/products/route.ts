@@ -37,8 +37,7 @@ export async function POST(req: Request) {
         if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { botId, name, price, description, sku, stock, imageUrl } = body;
-
+        const { botId, name, price, salePrice, description, sku, stock, imageUrl, type, billingPeriod, iterations } = body;
         if (!botId || !name || price === undefined) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
@@ -55,10 +54,14 @@ export async function POST(req: Request) {
                 botId,
                 name,
                 price: parseFloat(price),
+                salePrice: salePrice ? parseFloat(salePrice) : null,
                 description,
                 sku,
                 stock: parseInt(stock || '0'),
-                imageUrl
+                imageUrl,
+                type: type || 'SINGLE',
+                billingPeriod: billingPeriod as any,
+                iterations: iterations ? parseInt(iterations.toString()) : null
             }
         });
 

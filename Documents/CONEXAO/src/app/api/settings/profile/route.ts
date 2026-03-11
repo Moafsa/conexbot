@@ -7,7 +7,8 @@ import { z } from "zod";
 const updateProfileSchema = z.object({
     name: z.string().min(2),
     email: z.string().email(),
-    whatsapp: z.string().optional(),
+    whatsapp: z.string().nullable().optional(),
+    cpfCnpj: z.string().nullable().optional(),
 });
 
 export async function GET() {
@@ -23,6 +24,7 @@ export async function GET() {
                 name: true,
                 email: true,
                 whatsapp: true,
+                cpfCnpj: true,
             },
         });
 
@@ -49,13 +51,14 @@ export async function PUT(req: Request) {
                 name: data.name,
                 email: data.email,
                 whatsapp: data.whatsapp,
+                cpfCnpj: data.cpfCnpj,
             },
         });
 
         return NextResponse.json(tenant);
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.errors }, { status: 400 });
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

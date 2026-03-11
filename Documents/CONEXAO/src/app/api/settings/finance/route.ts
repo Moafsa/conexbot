@@ -7,6 +7,7 @@ import { z } from "zod";
 
 const updateFinanceSchema = z.object({
     asaasApiKey: z.string().optional(),
+    asaasWalletId: z.string().optional(),
 });
 
 export async function GET() {
@@ -20,6 +21,7 @@ export async function GET() {
             where: { email: session.user.email },
             select: {
                 asaasApiKey: true,
+                asaasWalletId: true,
             },
         });
 
@@ -44,13 +46,14 @@ export async function PUT(req: Request) {
             where: { email: session.user.email },
             data: {
                 asaasApiKey: data.asaasApiKey,
+                asaasWalletId: data.asaasWalletId,
             },
         });
 
         return NextResponse.json({ success: true });
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: error.errors }, { status: 400 });
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         console.error("API /settings/finance error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

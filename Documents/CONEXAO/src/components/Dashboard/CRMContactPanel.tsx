@@ -6,7 +6,7 @@ import {
     X, MessageCircle, History, Info, Send,
     TrendingUp, Star, Phone, Mail, MapPin,
     Calendar, CreditCard, ExternalLink, Bot, Trash2,
-    Package, CheckCircle2, Clock, AlertCircle, DollarSign
+    Package, CheckCircle2, Clock, AlertCircle, DollarSign, ShieldAlert, ShieldCheck
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,6 +80,28 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
         setInput("");
     };
 
+    const handleToggleBlock = async () => {
+        const newStatus = !contact.isBlocked;
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/contacts/${contactId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isBlocked: newStatus })
+            });
+            if (res.ok) {
+                toast.success(newStatus ? "Contato bloqueado" : "Contato desbloqueado");
+                setContact({ ...contact, isBlocked: newStatus });
+            } else {
+                toast.error("Erro ao alterar status de bloqueio");
+            }
+        } catch (error) {
+            toast.error("Erro de conexão");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleDelete = async () => {
         if (!confirm("Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.")) return;
 
@@ -122,6 +144,13 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleToggleBlock}
+                        className={`p-2 rounded-full transition-all group ${contact?.isBlocked ? 'text-red-600 bg-red-50' : 'text-gray-400 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                        title={contact?.isBlocked ? "Desbloquear Contato" : "Bloquear Contato"}
+                    >
+                        {contact?.isBlocked ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
+                    </button>
                     <button
                         onClick={handleDelete}
                         className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full transition-all group"
@@ -323,7 +352,8 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                                     onChange={(e) => handleDelegate(e.target.value)}
                                 >
                                     <option value="none">Transferir para Agente Padrão</option>
-                                    {bots.filter(b => b.id !== contact?.botId).map(b => (
+                                    {/* Only show agents that belong to the SAME MASTER bot as this contact's primary bot */}
+                                    {bots.filter(b => b.masterId === contact?.botId).map(b => (
                                         <option key={b.id} value={b.id}>Delegar para: {b.name}</option>
                                     ))}
                                 </select>

@@ -2,15 +2,9 @@
 import fs from 'fs';
 import path from 'path';
 
-function logToFile(msg: string) {
-    const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] [Chatwoot] ${msg}\n`;
-    try {
-        fs.appendFileSync(path.join(process.cwd(), 'debug-today.log'), line);
-    } catch (e) {
-        console.error('Failed to log to file:', e);
-    }
-}
+import { logToFile as centralLog } from './logger';
+
+const logToFile = (msg: string) => centralLog(msg, 'Chatwoot');
 
 export const ChatwootService = {
     async getContactByPhone(bot: any, phone: string) {

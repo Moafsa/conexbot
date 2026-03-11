@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { Bot, MessageSquare, TrendingUp, Zap, Plus, Wifi, WifiOff } from "lucide-react";
+import OnboardingGuide from "@/components/Dashboard/OnboardingGuide";
 
 interface Analytics {
     bots: { total: number; active: number };
@@ -11,6 +12,15 @@ interface Analytics {
     messages: { total: number; received: number; sent: number; last24h: number };
     subscription: { plan: string; status: string } | null;
     usage: { messagesUsed: number; messagesLimit: number; botsUsed: number; botsLimit: number } | null;
+    onboarding: { 
+        hasAiKeys: boolean; 
+        hasBots: boolean; 
+        hasConnections: boolean;
+        hasElevenLabs: boolean;
+        hasAsaas: boolean;
+        hasVoiceConfig: boolean;
+        hasAdvancedConfig: boolean;
+    };
 }
 
 interface BotItem {
@@ -68,7 +78,7 @@ export default function DashboardPage() {
         },
         {
             label: "Total de Mensagens",
-            value: analytics?.messages.total || 0,
+            value: analytics?.messages?.total || 0,
             icon: Zap,
             color: "from-amber-500 to-orange-400",
         },
@@ -77,7 +87,7 @@ export default function DashboardPage() {
     return (
         <>
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-white">
                         Olá, {session?.user?.name || "👋"}
@@ -91,10 +101,10 @@ export default function DashboardPage() {
                             : ""}
                     </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 w-full sm:w-auto">
                     <Link
                         href="/dashboard/create-bot"
-                        className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                        className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm"
                     >
                         <Plus className="w-4 h-4" /> Novo Agente
                     </Link>
@@ -106,6 +116,13 @@ export default function DashboardPage() {
                     </button>
                 </div>
             </div>
+            
+            {/* Onboarding Guide */}
+            {analytics && analytics.onboarding && (
+                <OnboardingGuide 
+                    onboarding={analytics.onboarding}
+                />
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -142,41 +159,41 @@ export default function DashboardPage() {
                 ) : (
                     <div className="space-y-3">
                         {bots.map((bot) => (
-                            <div key={bot.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                            <div key={bot.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-3 h-3 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-green-400 animate-pulse' : bot.connectionStatus === 'QRCODE' ? 'bg-yellow-400' : 'bg-gray-500'}`} />
-                                    <div>
-                                        <p className="text-white font-medium">{bot.name}</p>
-                                        <p className="text-gray-400 text-sm">{bot.businessType} • {bot._count?.conversations || 0} conversas</p>
+                                    <div className={`shrink-0 w-3 h-3 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-green-400 animate-pulse' : bot.connectionStatus === 'QRCODE' ? 'bg-yellow-400' : 'bg-gray-500'}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-white font-medium truncate">{bot.name}</p>
+                                        <p className="text-gray-400 text-sm truncate">{bot.businessType} • {bot._count?.conversations || 0} conversas</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
                                     {bot.connectionStatus === 'CONNECTED' ? (
-                                        <span className="flex items-center gap-1 text-green-400 text-xs">
-                                            <Wifi className="w-3 h-3" /> Conectado
+                                        <span className="shrink-0 flex items-center gap-1 text-green-400 text-xs">
+                                            <Wifi className="w-3 h-3" /> <span className="hidden xs:inline">Conectado</span>
                                         </span>
                                     ) : (
                                         <Link
                                             href={`/dashboard/connect?botId=${bot.id}`}
-                                            className={`flex items-center gap-1 text-xs hover:text-opacity-80 ${bot.connectionStatus === 'QRCODE' ? 'text-yellow-400' : 'text-amber-400'}`}
+                                            className={`shrink-0 flex items-center gap-1 text-xs hover:text-opacity-80 ${bot.connectionStatus === 'QRCODE' ? 'text-yellow-400' : 'text-amber-400'}`}
                                         >
-                                            <WifiOff className="w-3 h-3" /> {bot.connectionStatus === 'QRCODE' ? 'Escanear QR' : 'Conectar'}
+                                            <WifiOff className="w-3 h-3" /> {bot.connectionStatus === 'QRCODE' ? 'QR' : 'Conectar'}
                                         </Link>
                                     )}
                                     <button
                                         onClick={async () => {
                                             if (confirm('Deseja duplicar este agente?')) {
-                                                const res = await fetch(`/api/bots/${bot.id}/duplicate`, { method: 'POST' });
+                                                const res = await fetch(`/api/bots/${bot.id}/clone`, { method: 'POST' });
                                                 if (res.ok) window.location.reload();
                                             }
                                         }}
-                                        className="text-indigo-400 hover:text-indigo-300 text-xs"
+                                        className="shrink-0 text-indigo-400 hover:text-indigo-300 text-xs"
                                     >
                                         Duplicar
                                     </button>
                                     <Link
                                         href={`/dashboard/create-bot?edit=${bot.id}`}
-                                        className="text-gray-400 hover:text-white text-xs"
+                                        className="shrink-0 text-gray-400 hover:text-white text-xs"
                                     >
                                         Editar
                                     </Link>

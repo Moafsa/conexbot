@@ -30,7 +30,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
         }
 
-        // Now accepting extractedTexts from frontend (OCR results)
         const { message, history, extractedTexts, botId } = await req.json();
 
         let botContext = "";
@@ -48,16 +47,28 @@ export async function POST(req: Request) {
 
         console.log('[AI Architect] Received message:', message.substring(0, 100));
 
+        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+
+        const effectiveTenant = {
+            openaiApiKey: tenant.openaiApiKey || globalConfig?.openaiApiKey,
+            geminiApiKey: tenant.geminiApiKey || globalConfig?.geminiApiKey,
+            openrouterApiKey: tenant.openrouterApiKey
+        };
+
+        if (!effectiveTenant.openaiApiKey && !effectiveTenant.geminiApiKey && !effectiveTenant.openrouterApiKey) {
+            return NextResponse.json({ error: 'AI Config is missing. Please contact administrator.' }, { status: 400 });
+        }
+
         let provider = 'openai';
-        if (!tenant.openaiApiKey) {
-            if (tenant.geminiApiKey) provider = 'gemini';
-            else if (tenant.openrouterApiKey) provider = 'openrouter';
+        if (!effectiveTenant.openaiApiKey) {
+            if (effectiveTenant.geminiApiKey) provider = 'gemini';
+            else if (effectiveTenant.openrouterApiKey) provider = 'openrouter';
         }
 
         const dummyBot = {
             aiProvider: provider,
             aiModel: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
-            tenant
+            tenant: effectiveTenant
         };
 
         // Detect URLs in message
@@ -139,17 +150,18 @@ FORMATO JSON:
 
         const messages = [
             { role: "system", content: systemPrompt + (botContext ? `\n\n${botContext}` : "") },
-            ...history.map((msg: any) => ({ role: msg.role === 'ai' ? 'assistant' : 'user', content: msg.content })),
+            ...(history as any[]).map((msg: any) => ({ role: msg.role === 'ai' ? 'assistant' : 'user', content: msg.content })),
             { role: "user", content: detailedUserMessage }
         ];
 
-        const responseContent = await safeChatCompletion({
+        const aiResult = await safeChatCompletion({
             bot: dummyBot,
             messages: messages as any,
             response_format: { type: "json_object" },
             temperature: 0.1,
-        });
+        }) as any;
 
+        const responseContent = typeof aiResult === 'string' ? aiResult : aiResult.content;
         const parsedResponse = JSON.parse(responseContent || '{}');
 
         // 🛑 SAFETY: Prevent premature 'done'

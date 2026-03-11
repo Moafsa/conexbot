@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
         // 1. Get all active bots
         const bots = await prisma.bot.findMany({
-            where: { status: 'active' },
+            where: { status: 'ACTIVE' },
             select: { id: true, name: true }
         });
 

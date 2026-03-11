@@ -61,8 +61,8 @@ export async function PUT(req: Request) {
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        if (error && error.name === 'ZodError') {
-            return NextResponse.json({ error: error.errors }, { status: 400 });
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: error.issues }, { status: 400 });
         }
         console.error("API /settings/ai PUT error:", error);
         return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });

@@ -42,12 +42,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-enum UserRole {
-  USER
-  ADMIN
-  SUPERADMIN
-}
-
 model Tenant {
   id                      String         @id @default(uuid())
   name                    String?
@@ -55,71 +49,113 @@ model Tenant {
   password                String?
   whatsapp                String?        @unique
   cpfCnpj                 String?
-  role                    UserRole       @default(USER)
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   notificationPreferences String?
-  botLimit                Int            @default(1)
   asaasApiKey             String?
-  openaiApiKey            String?
+  botLimit                Int            @default(1)
   geminiApiKey            String?
+  openaiApiKey            String?
   openrouterApiKey        String?
   elevenLabsApiKey        String?
+  role                    UserRole       @default(USER)
+  asaasWalletId           String?
   accounts                Account[]
+  appointments            Appointment[]
   bots                    Bot[]
+  botMaterials            BotMaterial[]
   contacts                Contact[]
+  followupRules           FollowupRule[]
   payments                Payment[]
   sessions                Session[]
+  smtpConfigs             SmtpConfig[]
   subscription            Subscription?
   usageCounter            UsageCounter?
-  smtpConfigs             SmtpConfig[]
-  botMaterials            BotMaterial[]
-  followupRules           FollowupRule[]
 }
 
 model Bot {
-  id                String         @id @default(uuid())
-  name              String
-  businessType      String
-  voiceId           String?
-  modules           String[]
-  status            String         @default("active")
-  sessionName       String?        @unique
-  address           String?
-  hours             String?
-  paymentMethods    String[]
-  knowledgeBase     String?
-  description       String?
-  productsServices  String?
-  websiteUrl        String?
-  scrapedContent    String?
-  lastScrapedAt     DateTime?
-  enablePayments    Boolean        @default(false)
-  fallbackContact   String?
-  systemPrompt      String?
-  aiProvider        String         @default("openai")
-  aiModel           String         @default("gpt-4o-mini")
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  tenantId          String
-  connectionStatus  String         @default("DISCONNECTED")
-  webhookToken      String?
-  webhookUrl        String?
-  chatwootAccountId String?
-  chatwootToken     String?
-  chatwootUrl       String?
-  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  media             BotMedia[]
-  conversations     Conversation[]
-  orders            Order[]
-  products          Product[]
-  vectors           VectorStore[]
-  crmStages         CrmStage[]
-  contacts          Contact[]
-  assignedContacts  Contact[]      @relation("AssignedBot")
-  smtpConfigs       SmtpConfig[]
-  materials         BotMaterial[]
-  followupRules     FollowupRule[]
+  id                  String             @id @default(uuid())
+  name                String
+  businessType        String
+  voiceId             String?
+  modules             String[]
+  status              String             @default("active")
+  sessionName         String?            @unique
+  address             String?
+  hours               String?
+  paymentMethods      String[]
+  knowledgeBase       String?
+  description         String?
+  productsServices    String?
+  websiteUrl          String?
+  scrapedContent      String?
+  lastScrapedAt       DateTime?
+  enablePayments      Boolean            @default(false)
+  fallbackContact     String?
+  systemPrompt        String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  tenantId            String
+  aiModel             String             @default("gpt-4o-mini")
+  aiProvider          String             @default("openai")
+  chatwootAccountId   String?
+  chatwootToken       String?
+  chatwootUrl         String?
+  connectionStatus    String             @default("DISCONNECTED")
+  webhookToken        String?
+  webhookUrl          String?
+  messageBuffer       Int                @default(1500)
+  appointmentDuration Int                @default(30)
+  asaasApiKey         String?
+  googleCalendarId    String?            @default("primary")
+  googleRefreshToken  String?
+  schedulingProvider  SchedulingProvider @default(INTERNAL)
+  userSplitType       SplitType          @default(PERCENTAGE)
+  userSplitValue      Float              @default(0)
+  workingHours        Json?
+  aiDetectionAction   String             @default("PAUSE")
+  enableAiDetection   Boolean            @default(false)
+  handoffPause        Int                @default(1440)
+  humanTakeoverPause  Int                @default(30)
+  notifyChannels      String             @default("INTERNAL,WHATSAPP,EMAIL")
+  connectToken        String?            @unique
+  allowedGroups       String[]           @default([])
+  groupResponseMode   String             @default("ALL")
+  appointments        Appointment[]
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  materials           BotMaterial[]
+  media               BotMedia[]
+  assignedContacts    Contact[]          @relation("AssignedBot")
+  contacts            Contact[]
+  conversations       Conversation[]
+  crmStages           CrmStage[]
+  followupRules       FollowupRule[]
+  orders              Order[]
+  products            Product[]
+  smtpConfigs         SmtpConfig[]
+  vectors             VectorStore[]
+  coupons             Coupon[]
+
+  // Hierarchy for Agent Isolation
+  masterId            String?
+  master              Bot?               @relation("BotAgents", fields: [masterId], references: [id])
+  agents              Bot[]              @relation("BotAgents")
+}
+
+model Appointment {
+  id            String            @id @default(uuid())
+  startTime     DateTime
+  endTime       DateTime
+  status        AppointmentStatus @default(PENDING)
+  googleEventId String?           @unique
+  botId         String
+  contactId     String?
+  tenantId      String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  bot           Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contact       Contact?          @relation(fields: [contactId], references: [id])
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model SmtpConfig {
@@ -131,37 +167,37 @@ model SmtpConfig {
   fromEmail String
   active    Boolean  @default(true)
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   botId     String?
-  bot       Bot?     @relation(fields: [botId], references: [id])
   createdAt DateTime @default(now())
+  bot       Bot?     @relation(fields: [botId], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model FollowupRule {
   id          String   @id @default(uuid())
   name        String
   triggerDays Int      @default(1)
-  triggerType String   @default("AFTER_LAST_MESSAGE") // SALES, POST_SALE, EVENT_REMINDER
+  triggerType String   @default("AFTER_LAST_MESSAGE")
   message     String
   active      Boolean  @default(true)
   botId       String
-  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model BotMaterial {
   id            String   @id @default(uuid())
   name          String
-  type          String // PDF, DOCX, TXT, IMAGE
+  type          String
   contentUrl    String
   extractedText String?
   botId         String
-  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   tenantId      String
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model CrmStage {
@@ -173,8 +209,8 @@ model CrmStage {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   botId       String
-  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
   contacts    Contact[]
+  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, name])
 }
@@ -193,33 +229,69 @@ model BotMedia {
 }
 
 model Product {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  price         Float
+  salePrice     Float?
+  currency      String         @default("BRL")
+  sku           String?
+  stock         Int            @default(0)
+  imageUrl      String?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  botId         String
+  videoUrl      String?
+  billingPeriod BillingPeriod?
+  iterations    Int?
+  type          ProductType    @default(SINGLE)
+  orderItems    OrderItem[]
+  bot           Bot            @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
   id          String      @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  currency    String      @default("BRL")
-  sku         String?
-  stock       Int         @default(0)
-  imageUrl    String?
+  code        String
+  type        CouponType  @default(PERCENTAGE)
+  value       Float
   active      Boolean     @default(true)
+  botId       String
+  tenantId    String
+  expiresAt   DateTime?
+  usageLimit  Int?
+  usedCount   Int         @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  botId       String
-  orderItems  OrderItem[]
   bot         Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@unique([botId, code])
+  @@index([botId])
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
 }
 
 model Order {
-  id          String      @id @default(uuid())
-  status      String      @default("PENDING")
-  totalAmount Float
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  botId       String
-  contactId   String
-  bot         Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
-  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  items       OrderItem[]
+  id               String      @id @default(uuid())
+  status           String      @default("PENDING")
+  totalAmount      Float
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  botId            String
+  contactId        String
+  commissionAmount Float?      @default(0)
+  externalId       String?     @unique
+  couponId         String?
+  bot              Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contact          Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  coupon           Coupon?     @relation(fields: [couponId], references: [id])
+  items            OrderItem[]
+
+  @@index([couponId])
 }
 
 model OrderItem {
@@ -233,7 +305,7 @@ model OrderItem {
 }
 
 model Contact {
-  id            String    @id @default(uuid())
+  id            String        @id @default(uuid())
   phone         String
   name          String?
   email         String?
@@ -242,22 +314,23 @@ model Contact {
   needs         String?
   notes         String?
   tags          String[]
-  funnelStage   String    @default("LEAD")
-  lastActive    DateTime  @default(now())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  lastActive    DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   tenantId      String
   botId         String?
+  lastAiInsight String?
+  leadScore     Int           @default(0)
+  sentiment     String?
   stageId       String?
+  funnelStage   String        @default("LEAD")
   eventDate     DateTime?
   assignedBotId String?
-  lastAiInsight String?
-  leadScore     Int       @default(0)
-  sentiment     String?
-  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bot           Bot?      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  assignedBot   Bot?      @relation("AssignedBot", fields: [assignedBotId], references: [id], onDelete: SetNull)
-  stage         CrmStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  appointments  Appointment[]
+  assignedBot   Bot?          @relation("AssignedBot", fields: [assignedBotId], references: [id])
+  bot           Bot?          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  stage         CrmStage?     @relation(fields: [stageId], references: [id])
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders        Order[]
 
   @@unique([phone, botId])
@@ -283,67 +356,56 @@ model Message {
   role           String
   createdAt      DateTime     @default(now())
   conversationId String
+  tool_call_id   String?
+  tool_calls     Json?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model Plan {
-  id            String         @id @default(uuid())
-  name          String
-  description   String?
-  price         Float
-  interval      PlanInterval   @default(MONTHLY)
-  botLimit      Int            @default(1)
-  messageLimit  Int            @default(500)
-  active        Boolean        @default(true)
-  externalId    String? // ID do plano no Asaas
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subscriptions Subscription[]
-}
-
-enum PlanInterval {
-  MONTHLY
-  YEARLY
+  id                 String         @id @default(uuid())
+  name               String
+  description        String?
+  price              Float
+  interval           PlanInterval   @default(MONTHLY)
+  botLimit           Int            @default(1)
+  messageLimit       Int            @default(500)
+  active             Boolean        @default(true)
+  externalId         String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  platformSplitType  SplitType      @default(PERCENTAGE)
+  platformSplitValue Float          @default(0)
+  priceQuarterly     Float?
+  priceSemiannual    Float?
+  priceYearly        Float?
+  trialDays          Int            @default(0)
+  features           Json?          @default("[]")
+  subscriptions      Subscription[]
 }
 
 model Subscription {
   id         String             @id @default(uuid())
-  status     SubscriptionStatus
   gateway    String             @default("ASAAS")
   externalId String?            @unique
   tenantId   String             @unique
-  planId     String?
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
+  planId     String?
+  status     SubscriptionStatus
+  plan       Plan?              @relation(fields: [planId], references: [id])
   tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan       Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  INACTIVE
-  PAST_DUE
-  CANCELED
 }
 
 model Payment {
   id         String        @id @default(uuid())
   amount     Float
-  status     PaymentStatus
   gateway    String        @default("ASAAS")
   externalId String?       @unique
   invoiceUrl String?
   tenantId   String
   createdAt  DateTime      @default(now())
+  status     PaymentStatus
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-}
-
-enum PaymentStatus {
-  PENDING
-  RECEIVED
-  CONFIRMED
-  OVERDUE
-  REFUNDED
 }
 
 model UsageCounter {
@@ -355,6 +417,8 @@ model UsageCounter {
   periodStart   DateTime @default(now())
   periodEnd     DateTime
   tenantId      String   @unique
+  warned100     Boolean  @default(false)
+  warned90      Boolean  @default(false)
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
@@ -368,6 +432,94 @@ model VectorStore {
   bot       Bot                    @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
+model GlobalConfig {
+  id                     String   @id @default("system")
+  systemName             String   @default("ConextBot")
+  maintenanceMode        Boolean  @default(false)
+  googleClientId         String?
+  googleClientSecret     String?
+  openaiApiKey           String?
+  geminiApiKey           String?
+  asaasApiKey            String?
+  elevenLabsApiKey       String?
+  updatedAt              DateTime @updatedAt
+  supportEmail           String?
+  supportWhatsapp        String?
+  asaasWalletId          String?
+  smtpFrom               String?
+  smtpHost               String?
+  smtpPass               String?
+  smtpPort               Int?
+  smtpUser               String?
+  systemBotId            String?
+  logoColoredUrl         String?
+  logoWhiteUrl           String?
+  mercadoPagoAccessToken String?
+  stripePublishableKey   String?
+  stripeSecretKey        String?
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum SchedulingProvider {
+  INTERNAL
+  GOOGLE
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELED
+}
+
+enum ProductType {
+  SINGLE
+  RECURRING
+}
+
+enum BillingPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  SEMIANNUAL
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+  QUARTERLY
+  SEMIANNUAL
+}
+
+enum SplitType {
+  FIXED
+  PERCENTAGE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELED
+  PENDING
+  TRIALING
+  FREE
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  CONFIRMED
+  OVERDUE
+  REFUNDED
+  PAID
+}
+
 enum FunnelStage {
   LEAD
   AWARENESS
@@ -378,21 +530,4 @@ enum FunnelStage {
   CUSTOMER
   SUPPORT
   CHURNED
-}
-model GlobalConfig {
-  id                 String   @id @default("system")
-  systemName         String   @default("ConextBot")
-  maintenanceMode    Boolean  @default(false)
-  
-  // Google Auth (Configurável via SuperAdmin)
-  googleClientId     String?
-  googleClientSecret String?
-  
-  // Fallback Keys
-  openaiApiKey       String?
-  geminiApiKey       String?
-  asaasApiKey        String?
-  elevenLabsApiKey   String?
-  
-  updatedAt          DateTime @updatedAt
 }

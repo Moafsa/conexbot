@@ -71,9 +71,11 @@ function ConnectPageContent() {
                         clearInterval(interval);
                         // Redirect back to dashboard after a few seconds
                         setTimeout(() => router.push('/dashboard'), 3000);
-                    } else if (data.status === 'QRCODE' && data.qrCodeUrl) {
-                        setQrCodeData(data.qrCodeUrl);
-                        setStep('qrcode');
+                    } else if (data.status === 'QRCODE' || data.status === 'GENERATING_QR' || data.status === 'DISCONNECTED') {
+                        if (data.qrCodeUrl) {
+                            setQrCodeData(data.qrCodeUrl);
+                            setStep('qrcode');
+                        }
                     }
                 }
             } catch (e) {
@@ -96,8 +98,8 @@ function ConnectPageContent() {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-            <div className="max-w-md w-full glass rounded-3xl p-8 border border-white/10 relative">
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 sm:p-6 overflow-y-auto py-10">
+            <div className="max-w-md w-full glass rounded-3xl p-8 border border-white/10 relative my-auto">
                 <Link href="/dashboard" className="absolute top-6 left-6 text-gray-400 hover:text-white transition-colors">
                     <ArrowLeft size={24} />
                 </Link>
@@ -125,19 +127,19 @@ function ConnectPageContent() {
                     </button>
                 </div>
 
-                <div className="flex flex-col items-center justify-center min-h-[300px] bg-white rounded-xl p-4 mb-6 relative overflow-hidden">
+                <div className="flex flex-col items-center justify-center min-h-[300px] bg-white rounded-xl p-4 mb-6 relative overflow-hidden w-full">
                     {activeTab === 'whatsapp' ? (
                         <>
-                            {step === 'generating' && (
-                                <div className="flex flex-col items-center gap-4 text-black">
+                            {(step === 'generating' || (step === 'qrcode' && !qrCodeData)) && (
+                                <div className="flex flex-col items-center gap-4 text-black w-full my-10">
                                     <RefreshCw size={40} className="animate-spin text-gray-400" />
-                                    <p className="font-medium animate-pulse">Gerando QRCode Seguro...</p>
+                                    <p className="font-medium animate-pulse text-center">Gerando QRCode Seguro...</p>
                                 </div>
                             )}
 
                             {step === 'qrcode' && qrCodeData && (
-                                <div className="text-center animate-fade-in">
-                                    <div className="w-64 h-64 bg-white p-2 mx-auto mb-4 rounded-lg flex items-center justify-center overflow-hidden">
+                                <div className="text-center animate-fade-in w-full">
+                                    <div className="w-48 h-48 sm:w-64 sm:h-64 bg-white p-2 mx-auto mb-4 rounded-lg flex items-center justify-center overflow-hidden">
                                         <img
                                             src={qrCodeData}
                                             alt="WhatsApp QR Code"

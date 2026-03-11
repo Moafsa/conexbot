@@ -7,15 +7,9 @@ import prisma from './prisma';
 export const authOptions: NextAuthOptions = {
     providers: [
         GoogleProvider({
-            async clientId() {
-                const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-                return config?.googleClientId || process.env.GOOGLE_CLIENT_ID || '';
-            },
-            async clientSecret() {
-                const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-                return config?.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET || '';
-            },
-        } as any),
+            clientId: process.env.GOOGLE_CLIENT_ID || '',
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET || ''
+        }),
         CredentialsProvider({
             name: 'credentials',
             credentials: {
@@ -67,6 +61,13 @@ export const authOptions: NextAuthOptions = {
                             email: user.email!,
                             name: user.name,
                             role: 'USER',
+                            usageCounter: {
+                                create: {
+                                    messagesLimit: 500,
+                                    botsLimit: 1,
+                                    periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                                }
+                            }
                         }
                     });
                 }
@@ -74,20 +75,21 @@ export const authOptions: NextAuthOptions = {
             return true;
         },
         async jwt({ token, user, account }) {
-            if (user) {
-                token.id = user.id;
-                token.role = (user as any).role;
-            }
-
-            if (token.id && !user) {
+            // Se tiver o email no token ou user, pega o ID e role real do banco
+            const userEmail = user?.email || token?.email;
+            if (userEmail) {
                 const dbUser = await prisma.tenant.findUnique({
-                    where: { id: token.id as string },
+                    where: { email: userEmail as string },
                     select: { id: true, role: true }
                 });
                 if (dbUser) {
                     token.id = dbUser.id;
                     token.role = dbUser.role;
                 }
+            } else if (user) {
+                // Fallback para login de Credentials caso email não venha
+                token.id = user.id;
+                token.role = (user as any).role;
             }
 
             return token;

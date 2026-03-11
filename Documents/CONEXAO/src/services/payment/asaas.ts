@@ -1,3 +1,5 @@
+import prisma from '@/lib/prisma';
+
 const ASAAS_PROD = 'https://api.asaas.com/v3';
 const ASAAS_SANDBOX = 'https://sandbox.asaas.com/api/v3';
 
@@ -5,84 +7,191 @@ function getAsaasBase() {
     return process.env.ASAAS_MODE === 'production' ? ASAAS_PROD : ASAAS_SANDBOX;
 }
 
-function getHeaders(customKey?: string): Record<string, string> {
-    const key = customKey || process.env.ASAAS_API_KEY;
+async function getHeaders(customKey?: string): Promise<Record<string, string>> {
+    let key = customKey;
+    
+    if (!key) {
+        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+        key = globalConfig?.asaasApiKey || process.env.ASAAS_API_KEY;
+    }
+
     if (!key) throw new Error('ASAAS_API_KEY not configured');
+    
     return {
         'Content-Type': 'application/json',
         'access_token': key,
     };
 }
 
-const PLAN_VALUES: Record<string, number> = {
-    starter: 97,
-    pro: 197,
-    enterprise: 497,
+async function asaasFetch(path: string, options: RequestInit, customKey?: string) {
+    console.log(`[Asaas] Fetching ${path} (Method: ${options.method || 'GET'})`);
+    // 1. Try Production First
+    let res = await fetch(`${ASAAS_PROD}${path}`, {
+        ...options,
+        headers: await getHeaders(customKey)
+    });
+
+    // 2. If 401 Unauthorized, maybe it's a Sandbox key. Try Sandbox.
+    if (res.status === 401) {
+        console.log(`[Asaas] Production key failed (401). Trying Sandbox fallback for ${path}...`);
+        res = await fetch(`${ASAAS_SANDBOX}${path}`, {
+            ...options,
+            headers: await getHeaders(customKey)
+        });
+    }
+
+    return res;
+}
+
+const PLAN_INTERVAL_MAP: Record<string, string> = {
+    'MONTHLY': 'MONTHLY',
+    'QUARTERLY': 'QUARTERLY',
+    'SEMIANNUAL': 'SEMIANNUALLY',
+    'YEARLY': 'YEARLY',
 };
 
 export const AsaasService = {
     async createCustomer(data: { name: string; email: string; cpfCnpj: string }) {
-        if (!process.env.ASAAS_API_KEY) {
-            console.warn('ASAAS_API_KEY missing, returning mock customer');
-            return { id: `cus_mock_${Date.now()}`, ...data };
-        }
-
-        const res = await fetch(`${getAsaasBase()}/customers`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
+        try {
+            const body: any = {
                 name: data.name,
                 email: data.email,
-                cpfCnpj: data.cpfCnpj,
-            }),
-        });
+            };
+            if (data.cpfCnpj && data.cpfCnpj !== '00000000000' && data.cpfCnpj.trim() !== '') {
+                body.cpfCnpj = data.cpfCnpj;
+            }
 
-        if (!res.ok) {
-            const error = await res.json();
-            console.error('Asaas createCustomer error:', error);
-            throw new Error(error.errors?.[0]?.description || 'Failed to create customer');
+            const res = await asaasFetch('/customers', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                console.error('Asaas createCustomer error:', JSON.stringify(error, null, 2));
+                throw new Error(error.errors?.[0]?.description || 'Failed to create customer');
+            }
+
+            return await res.json();
+        } catch (error: any) {
+            if (error.message === 'ASAAS_API_KEY not configured') {
+                console.warn('ASAAS_API_KEY missing, returning mock customer');
+                return { id: `cus_mock_${Date.now()}`, ...data };
+            }
+            throw error;
         }
-
-        return res.json();
     },
 
-    async createSubscription(customerId: string, plan: string) {
-        const value = PLAN_VALUES[plan] || 97;
+    async createSubscription(customerId: string, planId: string, value: number, interval: string = 'MONTHLY') {
+        try {
+            const nextDueDate = new Date();
+            // Optional: add 1 day to give them a day, or keep it today.
+            
+            const res = await asaasFetch('/subscriptions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    customer: customerId,
+                    billingType: 'UNDEFINED', // Allows PIX, boleto, credit card
+                    value,
+                    nextDueDate: nextDueDate.toISOString().split('T')[0],
+                    cycle: PLAN_INTERVAL_MAP[interval] || 'MONTHLY',
+                    description: `Conext Bot - Assinatura`,
+                    externalReference: customerId,
+                }),
+            });
 
-        if (!process.env.ASAAS_API_KEY) {
+            if (!res.ok) {
+                const error = await res.json();
+                console.error('Asaas createSubscription error:', error);
+                throw new Error(error.errors?.[0]?.description || 'Failed to create subscription');
+            }
+
+            const subscription = await res.json();
+
+            // Asaas subscriptions don't return invoiceUrl. We need to fetch the first payment generated by this subscription.
+            const paymentRes = await asaasFetch(`/payments?subscription=${subscription.id}`, {
+                method: 'GET'
+            });
+
+            let finalInvoiceUrl = '';
+            let paymentId = '';
+            let amount = value;
+            if (paymentRes.ok) {
+                const payments = await paymentRes.json();
+                if (payments.data && payments.data.length > 0) {
+                    finalInvoiceUrl = payments.data[0].invoiceUrl || payments.data[0].bankSlipUrl || '';
+                    paymentId = payments.data[0].id;
+                    amount = payments.data[0].value;
+                }
+            }
+
             return {
-                id: `sub_mock_${Date.now()}`,
-                status: 'PENDING',
-                invoiceUrl: `/billing/success?gateway=asaas&status=pending`,
+                id: subscription.id,
+                status: subscription.status,
+                invoiceUrl: finalInvoiceUrl || `/billing/success?gateway=asaas&id=${subscription.id}`,
+                paymentId,
+                amount
             };
+        } catch (error: any) {
+             if (error.message === 'ASAAS_API_KEY not configured') {
+                return {
+                    id: `sub_mock_${Date.now()}`,
+                    status: 'PENDING',
+                    invoiceUrl: `/billing/success?gateway=asaas&status=pending`,
+                };
+            }
+            throw error;
         }
+    },
 
-        const res = await fetch(`${getAsaasBase()}/subscriptions`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
-                customer: customerId,
-                billingType: 'UNDEFINED', // Allows PIX, boleto, credit card
-                value,
-                cycle: 'MONTHLY',
-                description: `Conext Bot - Plano ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
-                externalReference: customerId,
-            }),
-        });
-
-        if (!res.ok) {
-            const error = await res.json();
-            console.error('Asaas createSubscription error:', error);
-            throw new Error(error.errors?.[0]?.description || 'Failed to create subscription');
+    async cancelSubscription(subscriptionId: string) {
+        try {
+            const res = await asaasFetch(`/subscriptions/${subscriptionId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                console.error(`[Asaas] Error canceling subscription ${subscriptionId}`);
+            }
+            return res.ok;
+        } catch (error) {
+            console.error(`[Asaas] Exception canceling subscription ${subscriptionId}:`, error);
+            return false;
         }
+    },
 
-        const subscription = await res.json();
+    async cancelPayment(paymentId: string) {
+        try {
+            const res = await asaasFetch(`/payments/${paymentId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                console.error(`[Asaas] Error canceling payment ${paymentId}`);
+            }
+            return res.ok;
+        } catch (error) {
+            console.error(`[Asaas] Exception canceling payment ${paymentId}:`, error);
+            return false;
+        }
+    },
 
-        return {
-            id: subscription.id,
-            status: subscription.status,
-            invoiceUrl: subscription.invoiceUrl || `/billing/success?gateway=asaas&id=${subscription.id}`,
-        };
+    async receivePaymentInCash(paymentId: string) {
+        try {
+            const res = await asaasFetch(`/payments/${paymentId}/receiveInCash`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    paymentDate: new Date().toISOString().split('T')[0],
+                    notifyCustomer: false
+                })
+            });
+            if (!res.ok) {
+                console.error(`[Asaas] Error receiving payment in cash ${paymentId}`);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error(`[Asaas] Exception receiving payment in cash ${paymentId}:`, error);
+            return false;
+        }
     },
 
     async createPaymentLink(params: {
@@ -90,23 +199,30 @@ export const AsaasService = {
         customerName: string;
         customerEmail: string;
         customerPhone: string;
+        customerCpfCnpj?: string;
         amount: number; // in cents (e.g., 5000 = R$ 50.00)
         description: string;
-    }): Promise<{ success: boolean; url?: string; error?: string }> {
+        splits?: Array<{
+            walletId: string;
+            fixedValue?: number;
+            percentualValue?: number;
+        }>;
+    }): Promise<{ success: boolean; id?: string; url?: string; error?: string }> {
         try {
             // Create or get customer first
-            const customerRes = await fetch(`${getAsaasBase()}/customers`, {
+            const customerBody: any = {
+                name: params.customerName,
+                email: params.customerEmail,
+                mobilePhone: params.customerPhone,
+            };
+            if (params.customerCpfCnpj && params.customerCpfCnpj.trim() !== '') {
+                customerBody.cpfCnpj = params.customerCpfCnpj;
+            }
+
+            const customerRes = await asaasFetch('/customers', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'access_token': params.apiKey,
-                },
-                body: JSON.stringify({
-                    name: params.customerName,
-                    email: params.customerEmail,
-                    mobilePhone: params.customerPhone,
-                }),
-            });
+                body: JSON.stringify(customerBody),
+            }, params.apiKey);
 
             let customerId: string;
             if (customerRes.ok) {
@@ -114,11 +230,10 @@ export const AsaasService = {
                 customerId = customer.id;
             } else {
                 // Try to find existing customer by email
-                const searchRes = await fetch(
-                    `${getAsaasBase()}/customers?email=${encodeURIComponent(params.customerEmail)}`,
-                    {
-                        headers: { 'access_token': params.apiKey },
-                    }
+                const searchRes = await asaasFetch(
+                    `/customers?email=${encodeURIComponent(params.customerEmail)}`,
+                    { method: 'GET' },
+                    params.apiKey
                 );
 
                 if (!searchRes.ok) {
@@ -136,20 +251,17 @@ export const AsaasService = {
             const dueDate = new Date();
             dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
 
-            const paymentRes = await fetch(`${getAsaasBase()}/payments`, {
+            const paymentRes = await asaasFetch('/payments', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'access_token': params.apiKey,
-                },
                 body: JSON.stringify({
                     customer: customerId,
                     billingType: 'UNDEFINED',
                     value: params.amount / 100, // Convert cents to reais
                     dueDate: dueDate.toISOString().split('T')[0],
                     description: params.description,
+                    split: params.splits,
                 }),
-            });
+            }, params.apiKey);
 
             if (!paymentRes.ok) {
                 // MOCK MODE FOR DEV
@@ -172,6 +284,7 @@ export const AsaasService = {
             const payment = await paymentRes.json();
             return {
                 success: true,
+                id: payment.id,
                 url: payment.invoiceUrl || payment.bankSlipUrl,
             };
         } catch (error) {
@@ -182,4 +295,92 @@ export const AsaasService = {
             };
         }
     },
+
+    async createSubscriptionForBot(params: {
+        apiKey: string;
+        customerName: string;
+        customerEmail: string;
+        customerPhone: string;
+        customerCpfCnpj?: string;
+        value: number;
+        description: string;
+        cycle: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+        splits?: Array<{
+            walletId: string;
+            fixedValue?: number;
+            percentualValue?: number;
+        }>;
+    }): Promise<{ success: boolean; id?: string; url?: string; error?: string }> {
+        try {
+            // 1. Create/Find Customer
+            const customerBody: any = {
+                name: params.customerName,
+                email: params.customerEmail,
+                mobilePhone: params.customerPhone,
+            };
+            if (params.customerCpfCnpj && params.customerCpfCnpj.trim() !== '') {
+                customerBody.cpfCnpj = params.customerCpfCnpj;
+            }
+
+            const customerRes = await asaasFetch('/customers', {
+                method: 'POST',
+                body: JSON.stringify(customerBody),
+            }, params.apiKey);
+
+            let customerId: string;
+            if (customerRes.ok) {
+                const customer = await customerRes.json();
+                customerId = customer.id;
+            } else {
+                const searchRes = await asaasFetch(`/customers?email=${encodeURIComponent(params.customerEmail)}`, { method: 'GET' }, params.apiKey);
+                const searchData = await searchRes.json();
+                customerId = searchData.data?.[0]?.id;
+            }
+
+            if (!customerId) return { success: false, error: 'Customer creation/lookup failed' };
+
+            // 2. Create Subscription
+            const nextDueDate = new Date();
+            // Start billing today
+            
+            const subRes = await asaasFetch('/subscriptions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    customer: customerId,
+                    billingType: 'UNDEFINED',
+                    value: params.value,
+                    nextDueDate: nextDueDate.toISOString().split('T')[0],
+                    cycle: PLAN_INTERVAL_MAP[params.cycle] || params.cycle,
+                    description: params.description,
+                    split: params.splits,
+                }),
+            }, params.apiKey);
+
+            if (!subRes.ok) {
+                const error = await subRes.json();
+                return { success: false, error: error.errors?.[0]?.description || 'Subscription creation failed' };
+            }
+
+            const subscription = await subRes.json();
+            
+            // For Subscriptions in Asaas, the master object doesn't have the invoice link. We must fetch its first payment.
+            const paymentRes = await asaasFetch(`/payments?subscription=${subscription.id}`, { method: 'GET' }, params.apiKey);
+            let finalUrl = subscription.invoiceUrl || subscription.bankSlipUrl;
+            if (paymentRes.ok) {
+                const payments = await paymentRes.json();
+                if (payments.data && payments.data.length > 0) {
+                    finalUrl = payments.data[0].invoiceUrl || payments.data[0].bankSlipUrl || finalUrl;
+                }
+            }
+
+            return {
+                success: true,
+                id: subscription.id,
+                url: finalUrl,
+            };
+        } catch (error) {
+            console.error('[Asaas] createSubscriptionForBot error:', error);
+            return { success: false, error: 'System error' };
+        }
+    }
 };

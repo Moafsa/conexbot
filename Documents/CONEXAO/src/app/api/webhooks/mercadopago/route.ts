@@ -44,19 +44,23 @@ export async function POST(req: Request) {
 
                 if (tenant) {
                     // Determine plan from amount
-                    const plan = payment.transaction_amount >= 197 ? 'pro' : 'starter';
-                    const limits = PLAN_LIMITS[plan];
+                    const planName = payment.transaction_amount >= 197 ? 'pro' : 'starter';
+                    const dbPlan = await prisma.plan.findFirst({ 
+                        where: { name: { contains: planName, mode: 'insensitive' } } 
+                    });
+                    
+                    const limits = PLAN_LIMITS[planName];
                     const nextMonth = new Date();
                     nextMonth.setMonth(nextMonth.getMonth() + 1);
 
                     // Create/update subscription
                     await prisma.subscription.upsert({
                         where: { tenantId: tenant.id },
-                        update: { status: 'active', plan, gateway: 'mercadopago', externalId: String(paymentId) },
+                        update: { status: 'ACTIVE', planId: dbPlan?.id, gateway: 'mercadopago', externalId: String(paymentId) },
                         create: {
                             tenantId: tenant.id,
-                            plan,
-                            status: 'active',
+                            planId: dbPlan?.id,
+                            status: 'ACTIVE',
                             gateway: 'mercadopago',
                             externalId: String(paymentId),
                         },
@@ -67,7 +71,7 @@ export async function POST(req: Request) {
                         data: {
                             tenantId: tenant.id,
                             amount: payment.transaction_amount,
-                            status: 'paid',
+                            status: 'PAID',
                             gateway: 'mercadopago',
                             externalId: String(paymentId),
                         },

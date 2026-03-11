@@ -1,0 +1,27 @@
+
+enum ProductType {
+  SINGLE
+  RECURRING
+}
+
+enum BillingPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  status           String      @default("PENDING")
+  totalAmount      Float
+  commissionAmount Float?      @default(0)
+  externalId       String?     @unique
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  botId            String
+  contactId        String
+  bot              Bot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  contact          Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  items            OrderItem[]
+}
