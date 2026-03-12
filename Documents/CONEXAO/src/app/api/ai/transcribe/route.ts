@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         const userId = (session.user as any).id;
         const tenant = await prisma.tenant.findUnique({
             where: { id: userId },
-            select: { openaiApiKey: true }
+            select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
         });
 
         const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });

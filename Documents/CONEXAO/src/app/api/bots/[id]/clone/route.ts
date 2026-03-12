@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { v4 as uuidv4 } from 'uuid';
+// crypto is native in Node 18.x+, providing randomUUID()
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -53,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 chatwootUrl: originalBot.chatwootUrl,
                 chatwootToken: originalBot.chatwootToken,
                 chatwootAccountId: originalBot.chatwootAccountId,
-                connectToken: uuidv4(),
+                connectToken: crypto.randomUUID(),
                 // Relations
                 materials: {
                     create: (originalBot as any).materials.map((m: any) => ({

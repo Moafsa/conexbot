@@ -2,7 +2,7 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+// crypto is native in modern Node.js
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 
@@ -142,7 +142,7 @@ export const VoiceService = {
             }
 
             // Save to public dir so it can be served/sent
-            const fileName = `tts-${uuidv4()}.mp3`;
+            const fileName = `tts-${crypto.randomUUID()}.mp3`;
             const publicDir = path.join(process.cwd(), 'public', 'media', 'temp');
 
             if (!fs.existsSync(publicDir)) {

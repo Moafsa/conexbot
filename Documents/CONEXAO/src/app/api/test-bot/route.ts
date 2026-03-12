@@ -79,7 +79,7 @@ export async function POST(req: Request) {
         // Call OpenAI
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
-            messages,
+            messages: messages as any,
             temperature: 0.8,
             max_tokens: 500,
         });

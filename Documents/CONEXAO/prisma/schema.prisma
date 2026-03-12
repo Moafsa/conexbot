@@ -71,6 +71,7 @@ model Tenant {
   smtpConfigs             SmtpConfig[]
   subscription            Subscription?
   usageCounter            UsageCounter?
+  notifications           Notification[]
 }
 
 model Bot {
@@ -442,6 +443,7 @@ model GlobalConfig {
   geminiApiKey           String?
   asaasApiKey            String?
   elevenLabsApiKey       String?
+  openrouterApiKey       String?
   updatedAt              DateTime @updatedAt
   supportEmail           String?
   supportWhatsapp        String?
@@ -518,6 +520,17 @@ enum PaymentStatus {
   OVERDUE
   REFUNDED
   PAID
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // INFO, WARNING, SUCCESS, ERROR, HUMAN_REQUESTED, AI_DETECTED
+  title     String
+  content   String
+  read      Boolean  @default(false)
+  tenantId  String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 enum FunnelStage {

@@ -4,7 +4,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import prisma from '@/lib/prisma';
 import { NextRequest } from 'next/server';
 
-async function handler(req: NextRequest, ctx: { params: { nextauth: string[] } }) {
+async function handler(req: NextRequest, ctx: { params: Promise<{ nextauth: string[] }> }) {
     let config = null;
     try {
         config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });

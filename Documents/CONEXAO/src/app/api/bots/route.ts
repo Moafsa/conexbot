@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { v4 as uuidv4 } from 'uuid';
+// crypto is native in Node 19+ and latest versions of Node 18, so we can use randomUUID directly
 import { createBotSchema } from '@/lib/validations';
 import { checkBotLimit } from '@/services/plan-limits';
 import { UzapiService } from '@/services/engine/uzapi';
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
                 aiProvider: parsed.data.aiProvider || 'openai',
                 aiModel: parsed.data.aiModel || 'gpt-4o-mini',
                 tenantId,
-                connectToken: uuidv4(),
+                connectToken: crypto.randomUUID(),
                 groupResponseMode: parsed.data.groupResponseMode,
                 allowedGroups: parsed.data.allowedGroups,
             },
@@ -165,7 +165,7 @@ export async function GET() {
             bots.map(async (bot) => {
                 // Auto-fix missing tokens
                 if (!bot.connectToken) {
-                    const newToken = uuidv4();
+                    const newToken = crypto.randomUUID();
                     await prisma.bot.update({
                         where: { id: bot.id },
                         data: { connectToken: newToken }
