@@ -110,7 +110,7 @@ function LoginContent() {
                 onChange={(e) => setPassword(e.target.value)}
               />
               <div className="mt-2 flex justify-end">
-                <Link href="/auth/forgot-password" size="sm" className="text-xs text-gray-500 hover:text-indigo-400 transition-colors">
+                <Link href="/auth/forgot-password" className="text-xs text-gray-500 hover:text-indigo-400 transition-colors">
                   Esqueci minha senha
                 </Link>
               </div>

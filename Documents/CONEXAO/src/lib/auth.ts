@@ -56,6 +56,11 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 if (!existingTenant) {
+                    // Fetch default plan from DB
+                    const starterPlan = await prisma.plan.findFirst({
+                        where: { name: { contains: 'Starter', mode: 'insensitive' } }
+                    });
+
                     await prisma.tenant.create({
                         data: {
                             email: user.email!,
@@ -63,8 +68,8 @@ export const authOptions: NextAuthOptions = {
                             role: 'USER',
                             usageCounter: {
                                 create: {
-                                    messagesLimit: 500,
-                                    botsLimit: 1,
+                                    messagesLimit: starterPlan?.messageLimit || 5000,
+                                    botsLimit: starterPlan?.botLimit || 1,
                                     periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
                                 }
                             }

@@ -371,7 +371,7 @@ model Plan {
   price              Float
   interval           PlanInterval   @default(MONTHLY)
   botLimit           Int            @default(1)
-  messageLimit       Int            @default(500)
+  messageLimit       Int            @default(5000)
   active             Boolean        @default(true)
   externalId         String?
   createdAt          DateTime       @default(now())
@@ -414,7 +414,7 @@ model Payment {
 model UsageCounter {
   id            String   @id @default(uuid())
   messagesUsed  Int      @default(0)
-  messagesLimit Int      @default(500)
+  messagesLimit Int      @default(5000)
   botsUsed      Int      @default(0)
   botsLimit     Int      @default(1)
   periodStart   DateTime @default(now())

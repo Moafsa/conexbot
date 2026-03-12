@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-const PLAN_LIMITS: Record<string, { messages: number; bots: number }> = {
-    starter: { messages: 500, bots: 1 },
-    pro: { messages: 999999, bots: 3 },
-    enterprise: { messages: 999999, bots: 999 },
-};
 
 export async function POST(req: Request) {
     try {
@@ -49,9 +44,11 @@ export async function POST(req: Request) {
                         where: { name: { contains: planName, mode: 'insensitive' } } 
                     });
                     
-                    const limits = PLAN_LIMITS[planName];
                     const nextMonth = new Date();
                     nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+                    const messagesLimit = dbPlan?.messageLimit || 5000;
+                    const botsLimit = dbPlan?.botLimit || 1;
 
                     // Create/update subscription
                     await prisma.subscription.upsert({
@@ -82,17 +79,17 @@ export async function POST(req: Request) {
                         where: { tenantId: tenant.id },
                         update: {
                             messagesUsed: 0,
-                            messagesLimit: limits.messages,
-                            botsLimit: limits.bots,
+                            messagesLimit: messagesLimit,
+                            botsLimit: botsLimit,
                             periodStart: new Date(),
                             periodEnd: nextMonth,
                         },
                         create: {
                             tenantId: tenant.id,
                             messagesUsed: 0,
-                            messagesLimit: limits.messages,
+                            messagesLimit: messagesLimit,
                             botsUsed: 0,
-                            botsLimit: limits.bots,
+                            botsLimit: botsLimit,
                             periodStart: new Date(),
                             periodEnd: nextMonth,
                         },

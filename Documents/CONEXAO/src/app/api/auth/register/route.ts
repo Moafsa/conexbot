@@ -66,7 +66,7 @@ export async function POST(req: Request) {
                 } : undefined,
                 usageCounter: {
                     create: {
-                        messagesLimit: plan?.messageLimit || 500,
+                        messagesLimit: plan?.messageLimit || 5000,
                         botsLimit: plan?.botLimit || 1,
                         periodEnd: new Date(Date.now() + (trial === 'true' && plan ? plan.trialDays : 30) * 24 * 60 * 60 * 1000)
                     }

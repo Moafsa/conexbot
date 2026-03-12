@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-const PLAN_LIMITS: Record<string, { messages: number; bots: number }> = {
-    starter: { messages: 500, bots: 1 },
-    pro: { messages: 999999, bots: 3 },
-    enterprise: { messages: 999999, bots: 999 },
-};
 
 export async function POST(req: Request) {
     try {
@@ -74,7 +69,7 @@ export async function POST(req: Request) {
                     const nextMonth = new Date();
                     nextMonth.setMonth(nextMonth.getMonth() + 1);
 
-                    const messagesLimit = subscription.plan?.messageLimit || 500;
+                    const messagesLimit = subscription.plan?.messageLimit || 5000;
                     const botsLimit = subscription.plan?.botLimit || 1;
 
                     await prisma.usageCounter.upsert({
