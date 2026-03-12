@@ -60,6 +60,8 @@ model Tenant {
   elevenLabsApiKey        String?
   role                    UserRole       @default(USER)
   asaasWalletId           String?
+  resetToken              String?        @unique
+  resetTokenExpires       DateTime?
   accounts                Account[]
   appointments            Appointment[]
   bots                    Bot[]
