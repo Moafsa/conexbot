@@ -23,6 +23,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 RUN apk add --no-cache libc6-compat ffmpeg
+# Install prisma CLI globaly to have it available for DB management in production
+RUN npm install -g prisma@7.5.0
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -31,12 +33,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Prisma - Copy whole prisma folder and node_modules/prisma for CLI access
+# Prisma - Copy prisma folder and config for the CLI
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Client is already in standalone/node_modules/.prisma
 
 USER nextjs
 EXPOSE 3000
