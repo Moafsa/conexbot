@@ -1,8 +1,3 @@
-try {
-  require("dotenv/config");
-} catch (e) {
-  // dotenv not found, skipping (normal in production)
-}
 import { defineConfig } from "prisma/config";
 
 export default defineConfig({
