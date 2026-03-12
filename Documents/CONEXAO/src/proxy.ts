@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
+const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
+
+
 const publicRoutes = [
     '/',
     '/auth/login',
@@ -40,7 +43,7 @@ export async function proxy(request: NextRequest) {
 
     if (!token) {
         console.log(`[Middleware] No token found for ${pathname}, redirecting to login`);
-        const loginUrl = new URL('/auth/login', request.url);
+        const loginUrl = new URL('/auth/login', baseUrl());
         loginUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(loginUrl);
     }
@@ -50,11 +53,11 @@ export async function proxy(request: NextRequest) {
         console.log(`[Middleware] Superadmin check for ${pathname}`);
         if (!pathname.startsWith('/admin') && !pathname.startsWith('/api') && !isPublic) {
             console.log(`[Middleware] Superadmin redirecting ${pathname} to /admin/dashboard`);
-            return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+            return NextResponse.redirect(new URL('/admin/dashboard', baseUrl()));
         }
     } else if (pathname.startsWith('/admin')) {
         // Prevent regular users from accessing admin routes
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+        return NextResponse.redirect(new URL('/dashboard', baseUrl()));
     }
 
     return NextResponse.next();

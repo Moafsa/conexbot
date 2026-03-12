@@ -5,15 +5,18 @@ import prisma from '@/lib/prisma';
 import { AsaasService } from '@/services/payment/asaas';
 import { MercadoPagoService } from '@/services/payment/mercadopago';
 
+const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
+
+
 export async function GET(req: Request) {
-    const safeUrl = req.url.replace('0.0.0.0', 'localhost');
+    const safeUrl = baseUrl();
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
             return NextResponse.redirect(new URL('/auth/login', safeUrl));
         }
 
-        const { searchParams } = new URL(safeUrl);
+        const { searchParams } = new URL(req.url);
         const planId = searchParams.get('planId');
         const interval = searchParams.get('interval') || 'MONTHLY';
         const gateway = searchParams.get('gateway') || 'asaas';
@@ -185,6 +188,6 @@ export async function GET(req: Request) {
 
     } catch (error) {
         console.error('Checkout Portal Error:', error);
-        return NextResponse.redirect(new URL('/dashboard/finance?error=checkout_failed', req.url.replace('0.0.0.0', 'localhost')));
+        return NextResponse.redirect(new URL('/dashboard/finance?error=checkout_failed', safeUrl));
     }
 }
