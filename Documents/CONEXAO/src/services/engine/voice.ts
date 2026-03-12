@@ -4,27 +4,21 @@ import fs from 'fs';
 import path from 'path';
 // crypto is native in modern Node.js
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
-
 // Set ffmpeg path robustly
-let ffmpegPath = ffmpegStatic;
-if (ffmpegPath && ffmpegPath.startsWith('\\ROOT')) {
-    ffmpegPath = ffmpegPath.replace('\\ROOT', 'C:\\Users\\User');
-}
-
-// Fallback manual check for Docker/Linux or Windows
-if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
-    const ext = process.platform === 'win32' ? '.exe' : '';
-    const manualPath = path.join(process.cwd(), 'node_modules', 'ffmpeg-static', `ffmpeg${ext}`);
-    if (fs.existsSync(manualPath)) {
-        ffmpegPath = manualPath;
+if (process.platform === 'win32') {
+    // On Windows, try common paths
+    const commonPaths = [
+        'C:\\ffmpeg\\bin\\ffmpeg.exe',
+        'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe'
+    ];
+    for (const p of commonPaths) {
+        if (fs.existsSync(p)) {
+            ffmpeg.setFfmpegPath(p);
+            break;
+        }
     }
 }
-
-if (ffmpegPath) {
-    console.log(`[VoiceService] Setting FFmpeg path to: ${ffmpegPath}`);
-    ffmpeg.setFfmpegPath(ffmpegPath);
-}
+// On Linux/Docker, we rely on 'apk add ffmpeg' providing it in PATH
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
