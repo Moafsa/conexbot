@@ -28,6 +28,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             }
         });
 
+        // Instant release: Update subscription status to ACTIVE if it exists
+        await prisma.subscription.updateMany({
+            where: { tenantId: payment.tenantId },
+            data: { status: 'ACTIVE' }
+        });
+
+
         return NextResponse.json({ success: true, message: 'Fatura quitada com sucesso' });
     } catch (error: any) {
         console.error('[Admin Payment Pay API] Catch Error:', error);
