@@ -34,6 +34,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             data: { status: 'ACTIVE' }
         });
 
+        // Reset usage counter credits to renew access cycle
+        await prisma.usageCounter.updateMany({
+            where: { tenantId: payment.tenantId },
+            data: { 
+                messagesUsed: 0,
+                periodStart: new Date(),
+                periodEnd: new Date(new Date().setMonth(new Date().getMonth() + 1))
+            }
+        });
+
+
 
         return NextResponse.json({ success: true, message: 'Fatura quitada com sucesso' });
     } catch (error: any) {
