@@ -34,14 +34,14 @@ export default function AdminPage() {
 
     useEffect(() => {
         fetch("/api/admin/stats")
-            .then(r => r.json())
+            .then(r => r.ok ? r.json() : { recentTenants: [], totalTenants: 0, totalBots: 0, totalMessages: 0, activeSubscriptions: 0 })
             .then(setData)
-            .catch(console.error)
+            .catch(() => setData({ recentTenants: [], totalTenants: 0, totalBots: 0, totalMessages: 0, activeSubscriptions: 0 }))
             .finally(() => setLoading(false));
 
         fetch("/api/admin/config")
-            .then(r => r.json())
-            .then(setGlobalConfig)
+            .then(r => r.ok ? r.json() : null)
+            .then(c => c && !("error" in c) ? setGlobalConfig((prev) => ({ ...prev, ...c })) : null)
             .catch(console.error);
     }, []);
 
@@ -188,7 +188,7 @@ export default function AdminPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {data?.recentTenants.map(tenant => (
+                                {(data?.recentTenants ?? []).map(tenant => (
                                     <tr key={tenant.id} className="border-b border-white/5 hover:bg-white/5">
                                         <td className="py-3 px-4">
                                             <div className="font-medium text-white">{tenant.name || "-"}</div>

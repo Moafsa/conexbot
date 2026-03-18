@@ -89,7 +89,6 @@ export async function POST(req: Request) {
                 });
                 result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0);
 
-
                 // Save subscription record
                 await prisma.subscription.upsert({
                     where: { tenantId },

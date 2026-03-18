@@ -145,16 +145,7 @@ EXEMPLO CORRETO:
 ✅ Cliente: "moafsa@gmail.com"
 ✅ Você: "E-mail moafsa@gmail.com confirmado! ✅ Agora me conta: qual ingresso te interessa?"
 
-REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.
-
-═══ REAÇÕES COM EMOJI (WHATSAPP) ═══
-Você pode reagir às mensagens do cliente usando o comando [REAGIR: <emoji>].
-Exemplos de uso:
-- Se o cliente agradece: "[REAGIR: 🙏] De nada! Precisando é só chamar."
-- Se o cliente envia um comprovante: "[REAGIR: ✅] Comprovante recebido! Vou validar aqui."
-- Se o cliente diz algo engraçado: "[REAGIR: 😂]"
-- Se o cliente fecha uma compra: "[REAGIR: 🚀]"
-Use com moderação para manter a conversa humanizada. NUNCA use mais de uma reação por mensagem.`);
+REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.`);
 
     // Sales triggers
     sections.push(`═══ GATILHOS DE VENDA ═══

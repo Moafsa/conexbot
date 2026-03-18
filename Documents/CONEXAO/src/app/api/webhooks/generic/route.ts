@@ -22,8 +22,7 @@ export async function POST(req: Request) {
         let body: any;
         try {
             body = await req.json();
-        } catch (error) {
-            logToFile(`[Generic Webhook] JSON Parse Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+        } catch {
             return NextResponse.json({ status: 'error', message: 'Invalid JSON' }, { status: 400 });
         }
 

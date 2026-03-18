@@ -111,7 +111,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         }
 
         // 1. Delete from Storage if it's an internal file
-        const s3Endpoint = process.env.S3_ENDPOINT || 'http://127.0.0.1:9000';
+        const s3Endpoint =
+            process.env.S3_ENDPOINT ||
+            process.env.MINIO_ENDPOINT ||
+            'http://127.0.0.1:9000';
         if (media.url.includes(s3Endpoint) || media.url.includes('localhost:9000')) {
             try {
                 const { StorageService } = await import('@/lib/storage');

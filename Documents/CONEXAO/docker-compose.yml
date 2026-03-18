@@ -33,14 +33,12 @@ services:
     command: redis-server --appendonly yes
 
   uzapi:
-    build:
-      context: ./docker/uzapi
-      dockerfile: Dockerfile
+    image: asternic/wuzapi:latest
     container_name: conext-uzapi
     restart: unless-stopped
     environment:
-      WUZAPI_ADMIN_TOKEN: admin_token_123
-      API_KEY: admin_token_123
+      WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
+      API_KEY: ${UZAPI_SECRET_KEY:-admin_token_123}
       WUZAPI_HTTP_PORT: 8080
       # DB_HOST: postgres  <-- Removed to force SQLite
       # DB_PORT: 5432
@@ -58,8 +56,8 @@ services:
     image: minio/minio
     container_name: conext-minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9002:9000"
+      - "9003:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -73,7 +71,15 @@ services:
     depends_on:
       - minio
     entrypoint: >
-      /bin/sh -c " /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin; /usr/bin/mc mb ignore myminio/media; /usr/bin/mc start; /usr/bin/mc anonymous set public myminio/media; exit 0; "
+      /bin/sh -c "
+      until /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin >/dev/null 2>&1; do
+        echo 'Waiting for MinIO...';
+        sleep 2;
+      done;
+      /usr/bin/mc mb --ignore-existing myminio/media;
+      /usr/bin/mc anonymous set public myminio/media;
+      exit 0;
+      "
 
 volumes:
   pgdata:

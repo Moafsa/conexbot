@@ -15,14 +15,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+# Build limpo: evita cache corrompido que pode quebrar rotas (ex.: /admin) em produção
+RUN rm -rf .next && NODE_ENV=production npm run build
 
 # 3. Production runner
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache libc6-compat ffmpeg
+# ffmpeg necessário para TTS: conversão MP3→OGG/Opus (mensagens de voz no WhatsApp)
+RUN apk add --no-cache libc6-compat ffmpeg && ffmpeg -version
 # Install prisma CLI globaly to have it available for DB management in production
 RUN npm install -g prisma@7.5.0
 

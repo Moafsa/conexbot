@@ -46,14 +46,13 @@ import path from 'path';
 
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
-const REACTION_TAG_REGEX = /\[REAGIR:\s*(.+?)\]/i;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
 
 const processingLocks = new Map<string, Promise<any>>();
 
 export const MessageProcessor = {
-    async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, messageId?: string, remoteJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
         // Concurrency Lock: prevent same phone processing parallelly
         const existingLock = processingLocks.get(senderPhone);
@@ -72,7 +71,7 @@ export const MessageProcessor = {
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, messageId?: string, remoteJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -121,23 +120,6 @@ export const MessageProcessor = {
                 return { text: "⚠️ Desculpe, o limite de mensagens do plano deste atendente foi atingido. Por favor, entre em contato com o administrador." };
             }
 
-            // 2.5 Mark as read and show presence
-            if (channel === 'whatsapp' && searchBy === 'sessionName') {
-                const remoteJid = options.remoteJid || `${senderPhone}@s.whatsapp.net`;
-                
-                // Mark as read
-                if (options.messageId) {
-                    UzapiService.markRead(identifier, remoteJid, remoteJid, [options.messageId]).catch(e => 
-                        console.error('[Processor] markRead error:', e)
-                    );
-                }
-
-                // Show "composing" (typing) status
-                UzapiService.chatPresence(identifier, remoteJid, 'composing').catch(e => 
-                    console.error('[Processor] chatPresence error:', e)
-                );
-            }
-
             logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} (with Fallback enabled)`);
 
             // 3. Find or create conversation
@@ -153,10 +135,11 @@ export const MessageProcessor = {
                 },
             });
 
-            // 3.1. Check if conversation is PAUSED
+            // 3.1. Check if conversation is PAUSED (handoff para humano)
+            // No simulador: ignora pausa para permitir continuar testando
             if (channel !== 'simulator' && (conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
                 logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()}`);
-                return null;
+                return { text: "Esta conversa está pausada para atendimento humano. Um atendente irá retornar em breve. 😊", media: [] };
             }
 
             // 3.5. Specialized input processing
@@ -587,11 +570,11 @@ export const MessageProcessor = {
                                         
                                         let payment: any;
                                         const chargeDescription = `Pedido: ${matchedProduct.name}${discountDetail}`;
-                                        
+                                        // Asaas rejeita 11999999999 (simulador) como "invalid_mobilePhone". Usar número válido em testes.
                                         const phoneForAsaas = (channel === 'simulator' && senderPhone === '11999999999')
                                             ? '11987654321'
                                             : senderPhone;
-
+                                        
                                         if ((matchedProduct as any).type === 'RECURRING') {
                                             payment = await (await import('../payment/asaas')).AsaasService.createSubscriptionForBot({
                                                 apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: args.cliente_cpf, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
@@ -623,6 +606,7 @@ export const MessageProcessor = {
                                             toolResult = `Fatura gerada com sucesso!${discountDetail} Link de pagamento: ${payment.url}. Use apenas este link e envie para o cliente para ele continuar o pagamento.`;
                                         } else {
                                             const err = (payment.error || '').toLowerCase();
+                                            // Erros de validação: pedir correção ao cliente, NÃO chamar humano
                                             if (err.includes('celular') || err.includes('mobilephone') || err.includes('telefone') || err.includes('cpf') || err.includes('cnpj') || err.includes('inválido') || err.includes('invalid')) {
                                                 toolResult = `ERRO de validação: ${payment.error}. Peça ao cliente que informe os dados corretos (não use chamar_humano).`;
                                             } else {
@@ -659,22 +643,6 @@ export const MessageProcessor = {
             // 11. Parse Media
             const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
             let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
-
-            // 11.5. Detect and handle Reactions
-            let reactionEmoji = '';
-            const reactionMatch = cleanResponse.match(REACTION_TAG_REGEX);
-            if (reactionMatch) {
-                reactionEmoji = reactionMatch[1].trim();
-                cleanResponse = cleanResponse.replace(REACTION_TAG_REGEX, '').trim();
-                logToFile(`[Processor] Reaction detected: ${reactionEmoji}`);
-
-                if (channel === 'whatsapp' && bot.sessionName && options.messageId) {
-                    const remoteJid = options.remoteJid || `${senderPhone}@s.whatsapp.net`;
-                    UzapiService.react(bot.sessionName, remoteJid, remoteJid, options.messageId, reactionEmoji).catch(e => 
-                        console.error('[Processor] react error:', e)
-                    );
-                }
-            }
 
             // 12. Save Assistant Final Response (only if not a tool call already handled)
             if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {

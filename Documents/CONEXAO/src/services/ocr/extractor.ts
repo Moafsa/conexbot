@@ -64,6 +64,7 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string
             // @ts-ignore
             const strings = content.items.map((item: any) => item.str);
             fullText += strings.join(' ') + '\n';
+            fullText += strings.join(' ') + '\n';
         }
 
         console.log('[OCR] Extracted text length:', fullText.trim().length);

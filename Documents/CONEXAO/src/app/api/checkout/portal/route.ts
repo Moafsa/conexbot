@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 import { AsaasService } from '@/services/payment/asaas';
 import { MercadoPagoService } from '@/services/payment/mercadopago';
 
-const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
 
 
 export async function GET(req: Request) {
@@ -90,7 +90,6 @@ export async function GET(req: Request) {
                 });
                 
                 const result = await AsaasService.createSubscription(customer.id, plan.id, value, interval, plan.trialDays || 0);
-
 
                 await prisma.subscription.upsert({
                     where: { tenantId },

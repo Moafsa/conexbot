@@ -7,8 +7,7 @@ interface BufferedChat {
     sessionName: string;
     contactId: string; // phone
     channel: 'whatsapp' | 'simulator';
-    messageId?: string;
-    remoteJid?: string;
+    hadAudio: boolean; // se alguma mensagem veio de áudio, responder com TTS
 }
 
 // In-memory storage for active buffers
@@ -20,7 +19,7 @@ export const BufferingService = {
      * Add a message to the buffer.
      * If a timer exists, clear it and restart (debounce).
      */
-    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text', options: { messageId?: string, remoteJid?: string } = {}) {
+    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
         const key = `${sessionName}:${contactId}`;
 
         // Get bot configuration for buffer delay
@@ -35,16 +34,14 @@ export const BufferingService = {
 
         if (delay === 0) {
             // Process immediately if buffer is disabled
-            console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately.`);
-            
-            let formattedText = text;
+            let contentToProcess = text;
             if (inputType === 'audio') {
-                formattedText = `[ÁUDIO TRANSCRITO]: "${text}"`;
+                contentToProcess = `[ÁUDIO TRANSCRITO]: "${text}"`;
             } else if (inputType === 'image') {
-                formattedText = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${text}`;
+                contentToProcess = text ? `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${text}` : '[IMAGEM ENVIADA PELO USUÁRIO]: O usuário enviou uma imagem.';
             }
-
-            MessageProcessor.process(sessionName, contactId, formattedText, channel, 'sessionName', { 
+            console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately (${contentToProcess.length} chars).`);
+            MessageProcessor.process(sessionName, contactId, contentToProcess, channel, 'sessionName', { 
                 inputType: inputType as any 
             }).catch(err => console.error('[Buffering] Immediate process error:', err));
             return;
@@ -59,14 +56,9 @@ export const BufferingService = {
                 sessionName,
                 contactId,
                 channel,
-                messageId: options.messageId,
-                remoteJid: options.remoteJid
+                hadAudio: false
             };
             activeBuffers.set(key, buffer);
-        } else {
-            // Update last message ID to mark the whole thread as read
-            if (options.messageId) buffer.messageId = options.messageId;
-            if (options.remoteJid) buffer.remoteJid = options.remoteJid;
         }
 
         // Add message part
@@ -74,6 +66,7 @@ export const BufferingService = {
         let content = text;
         if (inputType === 'audio') {
             content = `[ÁUDIO TRANSCRITO]: "${text}"`;
+            buffer.hadAudio = true;
         } else if (inputType === 'image') {
             content = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${text}`;
         }
@@ -111,14 +104,15 @@ export const BufferingService = {
 
         console.log(`[Buffering] Flushing ${buffer.messages.length} messages for ${buffer.contactId}: "${combinedText.substring(0, 50)}..."`);
 
-        // Process combined text as a single message
+        // Se houve áudio no buffer, passar inputType: 'audio' para o processor enviar resposta em TTS
+        const flushInputType = buffer.hadAudio ? 'audio' : 'text';
         MessageProcessor.process(
             buffer.sessionName,
             buffer.contactId,
             combinedText,
             buffer.channel,
             'sessionName',
-            { inputType: 'text', messageId: buffer.messageId, remoteJid: buffer.remoteJid }
+            { inputType: flushInputType as any }
         ).catch(err => console.error('[Buffering] Process error:', err));
     }
 };

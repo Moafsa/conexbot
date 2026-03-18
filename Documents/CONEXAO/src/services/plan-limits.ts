@@ -38,7 +38,6 @@ export async function checkMessageLimit(tenantId: string): Promise<{ allowed: bo
 
     const counter = await prisma.usageCounter.findUnique({ where: { tenantId } });
 
-
     if (!counter) {
         return { allowed: true, remaining: 50 }; // Free trial: 50 messages
     }

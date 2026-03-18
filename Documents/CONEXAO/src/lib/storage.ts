@@ -2,11 +2,16 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 
-const S3_ENDPOINT = process.env.S3_ENDPOINT || "http://127.0.0.1:9000";
+const S3_ENDPOINT = process.env.S3_ENDPOINT || process.env.MINIO_ENDPOINT || "http://127.0.0.1:9000";
 const S3_REGION = process.env.S3_REGION || "us-east-1";
-const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || "minioadmin";
-const S3_SECRET_KEY = process.env.S3_SECRET_KEY || "minioadmin";
-const S3_BUCKET = process.env.S3_BUCKET || "media";
+const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || process.env.MINIO_ACCESS_KEY || "minioadmin";
+const S3_SECRET_KEY = process.env.S3_SECRET_KEY || process.env.MINIO_SECRET_KEY || "minioadmin";
+const S3_BUCKET = process.env.S3_BUCKET || process.env.MINIO_BUCKET || "media";
+const S3_PUBLIC_URL =
+    process.env.S3_PUBLIC_URL ||
+    process.env.MINIO_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_S3_PUBLIC_URL ||
+    "";
 
 // Initialize S3 Client
 const s3Client = new S3Client({
@@ -42,9 +47,8 @@ export const StorageService = {
 
             await parallelUploads3.done();
 
-            // Construct Public URL
-            // If running locally, we return the localhost URL
-            return `${S3_ENDPOINT}/${S3_BUCKET}/${filename}`;
+            const baseUrl = (S3_PUBLIC_URL || S3_ENDPOINT).replace(/\/+$/, "");
+            return `${baseUrl}/${S3_BUCKET}/${filename}`;
         } catch (error) {
             console.error("Storage Upload Error:", error);
             throw error;

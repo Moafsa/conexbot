@@ -40,7 +40,6 @@ export async function POST(req: Request) {
 
         console.log('[Connect] Step 1: Session name generated', sessionName);
 
-        // Ensure UZAPI can reach Next.js (host machine) from Docker container
         // Webhook URL: priorizar URL pública (Traefik) para WuzAPI alcançar o app
         let baseUrl =
             process.env.INTERNAL_WEBHOOK_URL ||

@@ -329,7 +329,7 @@ model Contact {
   funnelStage   String        @default("LEAD")
   eventDate     DateTime?
   assignedBotId String?
-  isBlocked     Boolean       @default(false)
+  isBlocked     Boolean      @default(false)
   appointments  Appointment[]
   assignedBot   Bot?          @relation("AssignedBot", fields: [assignedBotId], references: [id])
   bot           Bot?          @relation(fields: [botId], references: [id], onDelete: Cascade)
@@ -341,16 +341,16 @@ model Contact {
 }
 
 model Conversation {
-  id        String    @id @default(uuid())
-  channel   String
-  remoteId  String
-  status    String    @default("open")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  channel     String
+  remoteId    String
+  status      String    @default("open")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   botId       String
   pausedUntil DateTime?
   bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  messages  Message[]
+  messages    Message[]
 
   @@unique([botId, remoteId])
 }

@@ -78,8 +78,8 @@ export async function PUT(req: Request) {
             smtpPass: body.smtpPass || null,
             smtpFrom: body.smtpFrom || null,
             systemBotId: body.systemBotId || null,
-            // logoColoredUrl: body.logoColoredUrl || null,
-            // logoWhiteUrl: body.logoWhiteUrl || null
+            logoColoredUrl: body.logoColoredUrl || null,
+            logoWhiteUrl: body.logoWhiteUrl || null
         };
 
         console.log(`[AdminConfig] [${timestamp}] Attempting upsert...`);

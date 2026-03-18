@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { MessageProcessor } from '@/services/engine/processor';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import prisma from '@/lib/prisma';
+
+const TEMP_DIR = os.tmpdir();
 
 function logToFile(msg: string) {
     const timestamp = new Date().toISOString();
@@ -13,7 +16,8 @@ function logToFile(msg: string) {
         console.error('Failed to log to file:', e);
     }
     // stdout para docker logs (áudio/debug)
-    if (msg.includes('Audio') || msg.includes('downloadAudio') || msg.includes('Transcription') || msg.includes('file_url')) {
+    if (msg.includes('Audio') || msg.includes('downloadAudio') || msg.includes('Transcription') || msg.includes('file_url') ||
+        msg.includes('Image') || msg.includes('downloadImage') || msg.includes('Vision') || msg.includes('imageMessage')) {
         console.error(`[Webhook] ${msg}`);
     }
 }
@@ -30,10 +34,12 @@ export async function POST(req: Request) {
             const formData = await req.formData();
             const jsonDataStr = formData.get('jsonData') as string;
             const token = (formData.get('token') || formData.get('instanceName')) as string;
+            const fileUrlFromForm = (formData.get('file_url') || formData.get('fileUrl') || formData.get('file-url')) as string;
 
-            logToFile(`Form Data - Token/InstanceName: ${token}`);
+            logToFile(`Form Data - Token/InstanceName: ${token}, file_url: ${fileUrlFromForm || 'none'}, tempDir: ${TEMP_DIR}`);
             if (jsonDataStr) {
                 body = JSON.parse(jsonDataStr);
+                if (fileUrlFromForm) body.file_url = fileUrlFromForm;
                 logToFile(`Raw JD: ${jsonDataStr.substring(0, 500)}`);
             }
             if (token) {
@@ -78,15 +84,15 @@ export async function POST(req: Request) {
             const senderPhoneRaw = info.Sender || info.sender || '';
             const senderAltRaw = info.SenderAlt || info.senderAlt || '';
             const senderPhone = senderPhoneRaw.includes('@lid') && senderAltRaw ? senderAltRaw : senderPhoneRaw;
-            const audioMessage = message.audioMessage || message.AudioMessage;
+            // WuzAPI: audio pode vir em audioMessage OU em Info.Type=media + Info.MediaType=ptt
+            const isAudioPtt = (info.Type === 'media' && info.MediaType === 'ptt') && !message.conversation && !message.extendedTextMessage?.text;
+            const audioMessage = message.audioMessage || message.AudioMessage || (isAudioPtt ? { url: '' } : null);
             const messageBody = message.conversation || message.Conversation ||
                 message.extendedTextMessage?.text || message.ExtendedTextMessage?.Text ||
                 (audioMessage ? '[AUDIO]' : '') ||
                 (message.imageMessage || message.ImageMessage ? '[IMAGE]' : '') ||
                 (message.documentMessage ? '[DOCUMENT]' : '');
             const fromMe = info.FromMe || info.fromMe || false;
-            const messageId = info.ID || info.id || '';
-            const remoteJid = senderPhone;
 
             const cleanPhone = senderPhone.replace('@c.us', '').replace('@s.whatsapp.net', '').split(':')[0].split('.')[0];
             logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}`);
@@ -150,6 +156,7 @@ export async function POST(req: Request) {
 
             if (audioMessage) {
                 logToFile(`Audio detected! file_url: ${(body as any).file_url || 'none'}, audioMessage: ${!!audioMessage}`);
+                // Transcribe Logic
                 try {
                     const { VoiceService } = await import('@/services/engine/voice');
                     const { UzapiService } = await import('@/services/engine/uzapi');
@@ -158,7 +165,7 @@ export async function POST(req: Request) {
                     const base64Data = (body as any).base64 || (body as any).data || (audioMessage as any).base64;
                     logToFile(`Audio Candidates - file_url: ${(body as any).file_url}, hasBase64: ${!!base64Data}`);
 
-                    const tempFile = path.join('/tmp', 'temp_audio_' + Date.now() + '.ogg');
+                    const tempFile = path.join(TEMP_DIR, 'conexbot_audio_' + Date.now() + '.ogg');
                     let gotBuffer = false;
 
                     if (base64Data) {
@@ -210,12 +217,15 @@ export async function POST(req: Request) {
 
                     if (gotBuffer && fs.existsSync(tempFile)) {
                         const transcription = await VoiceService.transcribe(
-                            tempFile,
+                            tempFile, 
                             botDoc?.tenant?.openaiApiKey || undefined,
                             botDoc?.tenant?.geminiApiKey || undefined
                         );
                         logToFile(`Transcription: ${transcription}`);
+
+                        // Clean up
                         fs.unlinkSync(tempFile);
+
                         if (transcription) {
                             const { BufferingService } = await import('@/services/engine/buffering');
                             BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
@@ -231,72 +241,127 @@ export async function POST(req: Request) {
             } else if (message.imageMessage || message.ImageMessage || (message.documentMessage && message.documentMessage.mimetype?.startsWith('image/'))) {
                 // Image Handling (including Documents that are images)
                 const imageMessage = message.imageMessage || message.ImageMessage || message.documentMessage;
-                const caption = imageMessage.caption || '';
-                logToFile(`Image/Document detected! Caption: ${caption}, Mimetype: ${imageMessage.mimetype}`);
+                const caption = imageMessage.caption || imageMessage.Caption || '';
+                logToFile(`Image/Document detected! Caption: ${caption}, Mimetype: ${imageMessage.mimetype || imageMessage.Mimetype}`);
 
                 try {
-                    // Download Image
-                    // WuzAPI Fix: file_url is often at the root when using S3/local storage, but can be "none"
-                    const rawFileUrl = (body as any).file_url;
-                    const mediaUrl = (rawFileUrl && rawFileUrl !== 'none') ? rawFileUrl : imageMessage.url;
-                    const base64Data = (body as any).base64 || (body as any).data || (imageMessage as any).base64 || (imageMessage as any).jpegThumbnail || (imageMessage as any).JPEGThumbnail;
-                    logToFile(`Image Candidates - file_url: ${rawFileUrl}, mediaUrl: ${mediaUrl}, hasBase64: ${!!base64Data}`);
+                    let mediaUrl = (body as any).file_url || imageMessage.url || imageMessage.URL || imageMessage.Url;
+                    if (mediaUrl === 'none' || mediaUrl === 'null' || !mediaUrl || String(mediaUrl).trim() === '') mediaUrl = undefined;
+                    const base64Data = (body as any).base64 || (body as any).data || (imageMessage as any).base64;
+                    const hasJpegThumb = !!((imageMessage as any).JPEGThumbnail || (imageMessage as any).jpegThumbnail);
+                    logToFile(`Image Candidates - file_url: ${(body as any).file_url}, mediaUrl(valid): ${!!mediaUrl}, hasBase64: ${!!base64Data}, hasJPEGThumbnail: ${hasJpegThumb}`);
 
-                    const tempFile = path.join(process.cwd(), 'temp_image_' + Date.now() + '.jpg');
+                    const tempFile = path.join(TEMP_DIR, 'conexbot_image_' + Date.now() + '.jpg');
+                    let gotBuffer = false;
+                    const info = eventData.Info || eventData.info || {};
+                    const messageId = info.ID || info.Id || '';
 
-                    if (base64Data) {
-                        logToFile(`Processing image from base64 data...`);
-                        const buffer = Buffer.from(base64Data.split(',').pop()!, 'base64');
-                        fs.writeFileSync(tempFile, buffer);
-                    } else if (mediaUrl) {
-                        // Replace localhost with actual UZAPI_URL for Docker environments
-                        let fetchUrl = mediaUrl;
-                        if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
-                            try {
-                                const urlObj = new URL(fetchUrl);
-                                const uzapiUrl = new URL(process.env.UZAPI_URL || 'http://host.docker.internal:21465');
-                                urlObj.protocol = uzapiUrl.protocol;
-                                urlObj.hostname = uzapiUrl.hostname;
-                                urlObj.port = uzapiUrl.port;
-                                fetchUrl = urlObj.toString();
-                            } catch (e) {
-                                fetchUrl = fetchUrl.replace('localhost', 'host.docker.internal').replace(':5555', ':21465');
+                    // 1. JPEGThumbnail (já no payload - JPEG válido, sem download)
+                    if (!gotBuffer && ((imageMessage as any).JPEGThumbnail || (imageMessage as any).jpegThumbnail)) {
+                        const thumb = (imageMessage as any).JPEGThumbnail || (imageMessage as any).jpegThumbnail;
+                        try {
+                            const thumbBuf = Buffer.from(thumb.includes(',') ? thumb.split(',')[1] : thumb, 'base64');
+                            if (thumbBuf.length > 100) {
+                                fs.writeFileSync(tempFile, thumbBuf);
+                                gotBuffer = true;
+                                logToFile(`Using JPEGThumbnail from payload (${thumbBuf.length} bytes)`);
                             }
+                        } catch (e) {
+                            logToFile(`JPEGThumbnail decode failed: ${(e as Error).message}`);
                         }
-
-                        const buffer = await fetch(fetchUrl).then(r => {
-                            if (!r.ok) throw new Error(`Fetch failed: ${r.statusText} (${fetchUrl})`);
-                            return r.arrayBuffer();
-                        });
-                        fs.writeFileSync(tempFile, Buffer.from(buffer));
                     }
 
-                    if (fs.existsSync(tempFile)) {
-                        logToFile(`Image content ready at ${tempFile}`);
+                    if (!gotBuffer && base64Data) {
+                        logToFile(`Processing image from base64 data...`);
+                        const buffer = Buffer.from((base64Data.split(',').pop() || base64Data), 'base64');
+                        fs.writeFileSync(tempFile, buffer);
+                        gotBuffer = true;
+                    }
+                    if (!gotBuffer && mediaUrl) {
+                        let fetchUrl = mediaUrl;
+                        if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
+                            const uzapiBase = process.env.UZAPI_URL || 'http://uzapi:8080';
+                            const uzapiUrl = new URL(uzapiBase);
+                            try {
+                                const urlObj = new URL(fetchUrl);
+                                urlObj.protocol = uzapiUrl.protocol;
+                                urlObj.hostname = uzapiUrl.hostname;
+                                urlObj.port = uzapiUrl.port || (uzapiUrl.protocol === 'https:' ? '443' : '80');
+                                fetchUrl = urlObj.toString();
+                            } catch {
+                                fetchUrl = fetchUrl.replace(/localhost|127\.0\.0\.1/g, uzapiUrl.hostname).replace(/:5555/g, ':' + (uzapiUrl.port || '8080'));
+                            }
+                            logToFile(`Image fetch URL rewritten: ${mediaUrl} -> ${fetchUrl}`);
+                        }
+                        try {
+                            const buffer = await fetch(fetchUrl).then(r => {
+                                if (!r.ok) throw new Error(`Fetch failed: ${r.status} ${r.statusText}`);
+                                return r.arrayBuffer();
+                            });
+                            fs.writeFileSync(tempFile, Buffer.from(buffer));
+                            gotBuffer = true;
+                        } catch (e: unknown) {
+                            logToFile(`Fetch image file_url failed: ${(e as Error).message}`);
+                        }
+                    }
 
-                        // Process with Vision first, then buffer
+                    // 4. Tentar file_url do WuzAPI (files/user_X/ID.jpeg)
+                    if (!gotBuffer && messageId && sessionName) {
+                        const uzapiBase = process.env.UZAPI_URL || 'http://uzapi:8080';
+                        const fileUrls = [
+                            `${uzapiBase}/files/${sessionName}/${messageId}.jpeg`,
+                            `${uzapiBase}/files/${sessionName}/${messageId}.jpg`,
+                        ];
+                        for (const fileUrl of fileUrls) {
+                            try {
+                                const r = await fetch(fileUrl);
+                                if (r.ok) {
+                                    const buf = Buffer.from(await r.arrayBuffer());
+                                    if (buf.length > 100) {
+                                        fs.writeFileSync(tempFile, buf);
+                                        gotBuffer = true;
+                                        logToFile(`Fetched from WuzAPI files: ${fileUrl} (${buf.length} bytes)`);
+                                        break;
+                                    }
+                                }
+                            } catch { }
+                        }
+                    }
+
+                    // 5. WuzAPI /chat/downloadimage
+                    if (!gotBuffer && ((imageMessage as any).URL || (imageMessage as any).Url)) {
+                        logToFile(`No file_url - using UzapiService.downloadImage session=${sessionName}`);
+                        const { UzapiService } = await import('@/services/engine/uzapi');
+                        const buffer = await UzapiService.downloadImage(sessionName, imageMessage as any);
+                        logToFile(`downloadImage result: ${buffer ? buffer.length + ' bytes' : 'null'}`);
+                        if (buffer && buffer.length > 0) {
+                            fs.writeFileSync(tempFile, buffer);
+                            gotBuffer = true;
+                        } else {
+                            logToFile(`downloadImage returned empty - check UZAPI_URL and token`);
+                        }
+                    }
+
+                    if (gotBuffer && fs.existsSync(tempFile)) {
+                        logToFile(`Image content ready at ${tempFile} (${fs.statSync(tempFile).size} bytes)`);
+
+                        // Process with Vision first
                         const { VisionService } = await import('@/services/engine/vision');
-                        const description = await VisionService.analyze(tempFile, caption, botDoc);
-                        logToFile(`Image analyzed: ${description.substring(0, 100)}...`);
+                        let description = await VisionService.analyze(tempFile, caption, botDoc);
+                        if (!description || description.trim().length < 10) {
+                            description = caption || 'O usuário enviou uma imagem. Não foi possível analisar o conteúdo.';
+                            logToFile(`Vision returned empty/short - using fallback: ${description.substring(0, 50)}...`);
+                        } else {
+                            logToFile(`Image analyzed: ${description.substring(0, 100)}...`);
+                        }
 
                         // Clean up temp file
                         fs.unlinkSync(tempFile);
 
-                        let finalDescription = description;
-                        if (!finalDescription || finalDescription.trim().length === 0) {
-                            logToFile(`VisionService returned empty or very short description. Fallback applied.`);
-                            finalDescription = "O usuário enviou uma imagem, mas não foi possível extrair detalhes adicionais.";
-                        }
-                        
-                        logToFile(`Calling MessageProcessor directly for image...`);
-                        MessageProcessor.process(
-                            sessionName, 
-                            cleanPhone, 
-                            `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${finalDescription}`, 
-                            'whatsapp', 
-                            'sessionName', 
-                            { inputType: 'image', messageId, remoteJid }
-                        ).catch(err => {
+                        // Passar direto ao Processor (evita race com buffer que recebia "")
+                        const textToProcess = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${description}`;
+                        logToFile(`Sending image description (${textToProcess.length} chars) to Processor for ${cleanPhone}`);
+                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image' }).catch(err => {
                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
                         });
                     } else {
@@ -309,12 +374,12 @@ export async function POST(req: Request) {
                 // Text Message Handling with Smart Buffering
                 try {
                     const { BufferingService } = await import('@/services/engine/buffering');
-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', { messageId, remoteJid });
+                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp');
                     logToFile(`Message buffered for ${cleanPhone}`);
                 } catch (e: any) {
                     logToFile(`BUFFER ERROR: ${e.message}`);
                     // Fallback to direct processing if buffering fails
-                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', messageId, remoteJid }).catch(err => {
+                    MessageProcessor.process(sessionName, cleanPhone, messageBody).catch(err => {
                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
                     });
                 }

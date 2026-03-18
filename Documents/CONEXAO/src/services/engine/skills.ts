@@ -74,11 +74,16 @@ export function mapBotToSkill(bot: { name: string, businessType: string }): stri
     if (searchString.includes('closer') || searchString.includes('venda') || searchString.includes('fechad') || searchString.includes('fechamento')) {
         return getSkillPrompt('CLOSER');
     }
-    // Consultor Técnico/Especialista
-    if (searchString.includes('consult') || searchString.includes('especialista') || searchString.includes('técnico') || searchString.includes('tecnico') || searchString.includes('evento') || searchString.includes('networking') || searchString.includes('negócio') || searchString.includes('negocio') || searchString.includes('empresa') || searchString.includes('b2b') || searchString.includes('conexão') || searchString.includes('conexao') || searchString.includes('promoção') || searchString.includes('promocao')) {
+    // Consultant: eventos, networking, B2B, consultoria, qualificação
+    if (
+        searchString.includes('consult') || searchString.includes('especialista') || searchString.includes('técnico') ||
+        searchString.includes('evento') || searchString.includes('networking') || searchString.includes('negócio') ||
+        searchString.includes('empresa') || searchString.includes('b2b') || searchString.includes('conexão') ||
+        searchString.includes('promoção')
+    ) {
         return getSkillPrompt('CONSULTANT');
     }
-    // Agente de Suporte e Sucesso
+    // Support: suporte pós-venda, ajuda
     if (searchString.includes('suporte') || searchString.includes('ajuda') || searchString.includes('atendimento') || searchString.includes('sistema')) {
         return getSkillPrompt('SUPPORT');
     }

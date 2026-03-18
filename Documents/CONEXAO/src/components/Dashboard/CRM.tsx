@@ -310,7 +310,7 @@ export function CRM() {
                 </div>
 
                 {/* Kanban Horizontal Scroll Area */}
-                <div className="flex-1 overflow-x-auto pb-6 px-6">
+                <div className="flex-1 overflow-x-auto pb-6 px-6 custom-scrollbar">
                     {bots.length === 0 && !loading && (
                         <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white/50 rounded-xl border-2 border-dashed border-gray-200">
                             <User className="w-12 h-12 mb-3 text-gray-300" />
@@ -364,7 +364,7 @@ export function CRM() {
 
                                         {/* Cards Container */}
                                         <div
-                                            className="p-2 flex-1 overflow-y-auto space-y-2 bg-gray-50/30 min-h-[100px]"
+                                            className="p-2 flex-1 overflow-y-auto space-y-2 bg-gray-50/30 min-h-[100px] custom-scrollbar"
                                             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
                                             onDrop={(e) => handleContactDrop(e, stage.id, stage.name)}
                                         >

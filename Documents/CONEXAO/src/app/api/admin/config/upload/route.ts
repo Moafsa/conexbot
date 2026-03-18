@@ -26,8 +26,12 @@ export async function POST(req: Request) {
         
         const url = await StorageService.uploadFile(buffer, filename, file.type);
 
-        // We don't update the DB here, we just return the URL so the frontend can preview and then "Save All"
-        return NextResponse.json({ url });
+        // Return the exact key the frontend merges into settings state
+        // so the URL is immediately populated in the corresponding field.
+        if (type === 'colored') {
+            return NextResponse.json({ logoColoredUrl: url });
+        }
+        return NextResponse.json({ logoWhiteUrl: url });
 
     } catch (error) {
         console.error('[AdminUpload] Error:', error);

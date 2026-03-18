@@ -1,5 +1,9 @@
 const UZAPI_URL = process.env.UZAPI_URL || 'http://127.0.0.1:21465';
-const ADMIN_TOKEN = process.env.WUZAPI_ADMIN_TOKEN || 'admin_token_123';
+const ADMIN_TOKEN =
+    process.env.UZAPI_SECRET_KEY ||
+    process.env.WUZAPI_ADMIN_TOKEN ||
+    process.env.API_KEY ||
+    'admin_token_123';
 
 export const UzapiService = {
     // Helper: Ensure user exists in WuzAPI
@@ -141,6 +145,7 @@ export const UzapiService = {
             if (!res.ok) {
                 const errorText = await res.text();
                 console.error(`[UZAPI] sendMedia error: ${res.status} ${res.statusText} - ${errorText}`);
+                console.error(`[UZAPI] sendMedia request: endpoint=${endpoint}, urlLength=${url?.length || 0}, phone=${to}`);
                 return false;
             }
             return true;
@@ -280,6 +285,75 @@ export const UzapiService = {
         }
     },
 
+    /** Download image via WuzAPI /chat/downloadimage (when file_url not in webhook) */
+    async downloadImage(sessionName: string, imageMessage: {
+        URL?: string; Url?: string;
+        mimetype?: string; Mimetype?: string;
+        fileSHA256?: string; FileSHA256?: string;
+        fileLength?: number; FileLength?: number;
+        mediaKey?: string; MediaKey?: string;
+        fileEncSHA256?: string; FileEncSHA256?: string;
+        directPath?: string; DirectPath?: string;
+    }): Promise<Buffer | null> {
+        try {
+            let url = (imageMessage.URL || imageMessage.Url || '').replace(/ /g, '+');
+            const mimetype = imageMessage.mimetype || imageMessage.Mimetype || 'image/jpeg';
+            const fileLength = imageMessage.fileLength ?? imageMessage.FileLength ?? 0;
+            const directPath = imageMessage.directPath || imageMessage.DirectPath || '';
+
+            if (!url) return null;
+
+            const body: Record<string, unknown> = {
+                Url: url,
+                Mimetype: mimetype,
+                FileLength: fileLength,
+            };
+            if (directPath) body.DirectPath = directPath;
+            const sha = imageMessage.fileSHA256 || imageMessage.FileSHA256;
+            const encSha = imageMessage.fileEncSHA256 || imageMessage.FileEncSHA256;
+            const key = imageMessage.mediaKey || imageMessage.MediaKey;
+            if (sha) body.FileSHA256 = sha;
+            if (encSha) body.FileEncSHA256 = encSha;
+            if (key) body.MediaKey = key;
+
+            const res = await fetch(`${UZAPI_URL}/chat/downloadimage`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Token': sessionName,
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error('[UZAPI] downloadImage failed:', res.status, errText.substring(0, 200));
+                return null;
+            }
+
+            const data = await res.json();
+            const raw = data?.data?.Data ?? data?.Data ?? data?.data?.Image ?? data?.Image ?? data?.data ?? data?.base64;
+            if (typeof raw === 'string') {
+                const b64 = raw.includes(',') ? raw.split(',')[1] : raw;
+                const buf = Buffer.from(b64, 'base64');
+                const hex = buf.slice(0, 8).toString('hex');
+                console.log(`[UZAPI] downloadImage: ${buf.length} bytes, magic: ${hex}`);
+                return buf;
+            }
+            if (data?.data && typeof data.data === 'object' && data.data.Data) {
+                const b64 = String(data.data.Data).includes(',') ? String(data.data.Data).split(',')[1] : data.data.Data;
+                const buf = Buffer.from(b64, 'base64');
+                console.log(`[UZAPI] downloadImage (nested): ${buf.length} bytes`);
+                return buf;
+            }
+            console.warn('[UZAPI] downloadImage: no Data in response. Keys:', Object.keys(data || {}).join(','));
+            return null;
+        } catch (e: unknown) {
+            console.error('[UZAPI] downloadImage exception:', e);
+            return null;
+        }
+    },
+
     /** Download audio via WuzAPI /chat/downloadaudio (when file_url not in webhook) */
     async downloadAudio(sessionName: string, audioMessage: {
         URL?: string; Url?: string;
@@ -297,7 +371,7 @@ export const UzapiService = {
             const fileLength = audioMessage.fileLength ?? audioMessage.FileLength ?? 0;
             const directPath = audioMessage.directPath || audioMessage.DirectPath || '';
 
-            if(!url) return null;
+            if (!url) return null;
 
             const body: Record<string, unknown> = {
                 Url: url,
@@ -357,70 +431,6 @@ export const UzapiService = {
             return res.ok;
         } catch (e) {
             console.error('[UZAPI] setWebhook error:', e);
-            return false;
-        }
-    },
-
-    async markRead(sessionName: string, chat: string, sender: string, ids: string[]): Promise<boolean> {
-        try {
-            const res = await fetch(`${UZAPI_URL}/chat/markread`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Token': sessionName,
-                },
-                body: JSON.stringify({
-                    Chat: chat,
-                    Sender: sender,
-                    Id: ids
-                }),
-            });
-            return res.ok;
-        } catch (e) {
-            console.error('[UZAPI] markRead error:', e);
-            return false;
-        }
-    },
-
-    async chatPresence(sessionName: string, phone: string, state: 'composing' | 'recording' | 'paused'): Promise<boolean> {
-        try {
-            const res = await fetch(`${UZAPI_URL}/chat/presence`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Token': sessionName,
-                },
-                body: JSON.stringify({
-                    Phone: phone,
-                    State: state,
-                    Media: ""
-                }),
-            });
-            return res.ok;
-        } catch (e) {
-            console.error('[UZAPI] chatPresence error:', e);
-            return false;
-        }
-    },
-
-    async react(sessionName: string, chat: string, phone: string, id: string, reaction: string): Promise<boolean> {
-        try {
-            const res = await fetch(`${UZAPI_URL}/chat/react`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Token': sessionName,
-                },
-                body: JSON.stringify({
-                    Chat: chat,
-                    Phone: phone,
-                    Id: id,
-                    Reaction: reaction
-                }),
-            });
-            return res.ok;
-        } catch (e) {
-            console.error('[UZAPI] react error:', e);
             return false;
         }
     }
