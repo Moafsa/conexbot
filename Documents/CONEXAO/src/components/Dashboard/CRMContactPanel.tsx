@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     X, MessageCircle, History, Info, Send,
     TrendingUp, Star, Phone, Mail, MapPin,
@@ -25,6 +25,17 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
     const [loading, setLoading] = useState(true);
     const [bots, setBots] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        if (activeTab === 'chat') {
+            scrollToBottom();
+        }
+    }, [messages, activeTab]);
 
     useEffect(() => {
         fetchContactData();
@@ -173,11 +184,11 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-gray-50/30">
+            <div className="flex-1 overflow-hidden bg-gray-50/30">
 
                 {activeTab === 'chat' && (
                     <div className="flex flex-col h-full">
-                        <div className="flex-1 p-4 space-y-4">
+                        <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-smooth">
                             {messages.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2">
                                     <History size={40} className="opacity-20" />

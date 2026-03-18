@@ -280,6 +280,67 @@ export const UzapiService = {
         }
     },
 
+    /** Download audio via WuzAPI /chat/downloadaudio (when file_url not in webhook) */
+    async downloadAudio(sessionName: string, audioMessage: {
+        URL?: string; Url?: string;
+        mimetype?: string; Mimetype?: string;
+        fileSHA256?: string; FileSHA256?: string;
+        fileLength?: number; FileLength?: number;
+        mediaKey?: string; MediaKey?: string;
+        fileEncSHA256?: string; FileEncSHA256?: string;
+        directPath?: string; DirectPath?: string;
+    }): Promise<Buffer | null> {
+        try {
+            // WuzAPI issue #66: + in URL can become space when decoded - restore for API
+            let url = (audioMessage.URL || audioMessage.Url || '').replace(/ /g, '+');
+            const mimetype = audioMessage.mimetype || audioMessage.Mimetype || 'audio/ogg; codecs=opus';
+            const fileLength = audioMessage.fileLength ?? audioMessage.FileLength ?? 0;
+            const directPath = audioMessage.directPath || audioMessage.DirectPath || '';
+
+            if(!url) return null;
+
+            const body: Record<string, unknown> = {
+                Url: url,
+                Mimetype: mimetype,
+                FileLength: fileLength,
+            };
+            if (directPath) body.DirectPath = directPath;
+            const sha = audioMessage.fileSHA256 || audioMessage.FileSHA256;
+            const encSha = audioMessage.fileEncSHA256 || audioMessage.FileEncSHA256;
+            const key = audioMessage.mediaKey || audioMessage.MediaKey;
+            if (sha) body.FileSHA256 = sha;
+            if (encSha) body.FileEncSHA256 = encSha;
+            if (key) body.MediaKey = key;
+
+            const res = await fetch(`${UZAPI_URL}/chat/downloadaudio`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Token': sessionName,
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error('[UZAPI] downloadAudio failed:', res.status, errText.substring(0, 200));
+                return null;
+            }
+
+            const data = await res.json();
+            // WuzAPI returns { Mimetype, Data: "data:audio/ogg;base64,..." } or wrapped in data
+            const raw = data?.data?.Data ?? data?.Data ?? data?.data?.Audio ?? data?.Audio;
+            if (typeof raw === 'string') {
+                const b64 = raw.includes(',') ? raw.split(',')[1] : raw;
+                return Buffer.from(b64, 'base64');
+            }
+            return null;
+        } catch (e: unknown) {
+            console.error('[UZAPI] downloadAudio exception:', e);
+            return null;
+        }
+    },
+
     async setWebhook(sessionName: string, webhookUrl: string): Promise<boolean> {
         try {
             const res = await fetch(`${UZAPI_URL}/webhook`, {
@@ -289,13 +350,77 @@ export const UzapiService = {
                     'Token': sessionName,
                 },
                 body: JSON.stringify({
-                    webhook: webhookUrl,
+                    webhookurl: webhookUrl,
                     events: ["Message", "ReadReceipt", "Disconnected", "Connected"]
                 }),
             });
             return res.ok;
         } catch (e) {
             console.error('[UZAPI] setWebhook error:', e);
+            return false;
+        }
+    },
+
+    async markRead(sessionName: string, chat: string, sender: string, ids: string[]): Promise<boolean> {
+        try {
+            const res = await fetch(`${UZAPI_URL}/chat/markread`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Token': sessionName,
+                },
+                body: JSON.stringify({
+                    Chat: chat,
+                    Sender: sender,
+                    Id: ids
+                }),
+            });
+            return res.ok;
+        } catch (e) {
+            console.error('[UZAPI] markRead error:', e);
+            return false;
+        }
+    },
+
+    async chatPresence(sessionName: string, phone: string, state: 'composing' | 'recording' | 'paused'): Promise<boolean> {
+        try {
+            const res = await fetch(`${UZAPI_URL}/chat/presence`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Token': sessionName,
+                },
+                body: JSON.stringify({
+                    Phone: phone,
+                    State: state,
+                    Media: ""
+                }),
+            });
+            return res.ok;
+        } catch (e) {
+            console.error('[UZAPI] chatPresence error:', e);
+            return false;
+        }
+    },
+
+    async react(sessionName: string, chat: string, phone: string, id: string, reaction: string): Promise<boolean> {
+        try {
+            const res = await fetch(`${UZAPI_URL}/chat/react`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Token': sessionName,
+                },
+                body: JSON.stringify({
+                    Chat: chat,
+                    Phone: phone,
+                    Id: id,
+                    Reaction: reaction
+                }),
+            });
+            return res.ok;
+        } catch (e) {
+            console.error('[UZAPI] react error:', e);
             return false;
         }
     }

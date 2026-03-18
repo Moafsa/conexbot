@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
     serverExternalPackages: ['pdfjs-dist', '@napi-rs/canvas'],
     /* config options here */
     experimental: {
-        turbopack: {
-            root: '.',
-        },
     } as any,
     async headers() {
         return [
@@ -28,7 +25,7 @@ const nextConfig: NextConfig = {
                     },
                     {
                         key: 'Permissions-Policy',
-                        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+                        value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=()',
                     },
                     {
                         key: 'Strict-Transport-Security',

@@ -145,7 +145,16 @@ EXEMPLO CORRETO:
 ✅ Cliente: "moafsa@gmail.com"
 ✅ Você: "E-mail moafsa@gmail.com confirmado! ✅ Agora me conta: qual ingresso te interessa?"
 
-REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.`);
+REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.
+
+═══ REAÇÕES COM EMOJI (WHATSAPP) ═══
+Você pode reagir às mensagens do cliente usando o comando [REAGIR: <emoji>].
+Exemplos de uso:
+- Se o cliente agradece: "[REAGIR: 🙏] De nada! Precisando é só chamar."
+- Se o cliente envia um comprovante: "[REAGIR: ✅] Comprovante recebido! Vou validar aqui."
+- Se o cliente diz algo engraçado: "[REAGIR: 😂]"
+- Se o cliente fecha uma compra: "[REAGIR: 🚀]"
+Use com moderação para manter a conversa humanizada. NUNCA use mais de uma reação por mensagem.`);
 
     // Sales triggers
     sections.push(`═══ GATILHOS DE VENDA ═══
@@ -243,13 +252,19 @@ O sistema vai enviar o link automaticamente.`);
     if (bot.enablePayments) {
         sections.push(`═══ PAGAMENTOS HABILITADOS ═══
 
-Quando o cliente MOSTRAR INTENÇÃO DE COMPRA de um produto ou plano:
-1. OBRIGATÓRIO: Antes de fechar a compra, você PRECISA pedir o Nome Completo, E-mail e CPF (ou CNPJ) do cliente. Diga algo como: "Para gerar sua fatura, preciso do seu Nome Completo, E-mail e CPF. Pode me passar?"
-2. SÓ DEPOIS que o cliente informar esses 3 dados, use a função/tool "gerar_fatura" informando os parâmetros extraídos da conversa.
-3. IMPORTANTE: NUNCA tente gerar a fatura sem ter o CPF e o E-mail. Sempre pergunte primeiro se estiver faltando.
+Quando o cliente MOSTRAR INTENÇÃO DE COMPRA (ex: "quero", "vou levar", "fechado", "sim, quero reservar"):
+1. Peça Nome Completo, E-mail e CPF (ou CNPJ). O cliente pode enviar os 3 de uma vez ou um por vez — tanto faz.
+2. REGRA CRÍTICA: Só chame "gerar_fatura" quando você tiver os 3 dados SOMADOS (nome + email + cpf). Se faltar um, peça o que falta e NÃO gere a fatura.
+3. NÃO pergunte "prefere cartão ou Pix?" — o link do Asaas já oferece as duas opções.
+4. SEM ASAAS: Se gerar_fatura retornar que a integração não está configurada, use chamar_humano.
+5. ERRO AO GERAR: Se houver falha técnica, use chamar_humano.
 
-- **Promoções e Ofertas**: Se um produto no catálogo tiver um "Preço de Oferta" (salePrice), informe este valor como o preço atual, destacando o desconto em relação ao preço original.
-- **Cupons de Desconto**: Se o cliente mencionar um cupom ou você quiser oferecer um, use o parâmetro "cupom_desconto" na ferramenta "gerar_fatura".`);
+- **Promoções**: Se o produto tiver salePrice, informe esse valor.
+- **Cupons**: Use o parâmetro "cupom_desconto" na ferramenta "gerar_fatura" se aplicável.
+
+EXEMPLOS:
+❌ ERRADO: Chamar gerar_fatura tendo só nome e email (falta CPF).
+✅ CERTO: Só chamar gerar_fatura quando tiver nome, email E CPF coletados na conversa.`);
     }
 
     // Response examples (CONDITIONAL)

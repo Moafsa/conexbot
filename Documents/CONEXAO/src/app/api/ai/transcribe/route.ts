@@ -31,24 +31,28 @@ export async function POST(req: Request) {
         const geminiApiKey = tenant?.geminiApiKey || globalConfig?.geminiApiKey;
 
         const buffer = Buffer.from(await file.arrayBuffer());
+        console.log(`[Transcribe] Processing file: ${file.name}, size: ${buffer.length} bytes`);
 
         // 1. Try OpenAI Whisper (if available)
         if (openaiApiKey) {
             try {
+                console.log('[Transcribe] Attempting OpenAI Whisper...');
                 const openai = new OpenAI({ apiKey: openaiApiKey });
                 const transcription = await openai.audio.transcriptions.create({
                     file: await OpenAI.toFile(buffer, 'audio.webm'),
                     model: 'whisper-1',
                 });
+                console.log('[Transcribe] OpenAI success:', transcription.text);
                 return NextResponse.json({ text: transcription.text, provider: 'openai' });
-            } catch (err) {
-                console.error('[Transcribe] OpenAI failed, trying fallbacks...', err);
+            } catch (err: any) {
+                console.error('[Transcribe] OpenAI failed:', err.message);
             }
         }
 
         // 2. Try Gemini 1.5 Flash (Multimodal Transcription)
         if (geminiApiKey) {
             try {
+                console.log('[Transcribe] Attempting Gemini fallback...');
                 const base64Audio = buffer.toString('base64');
                 const reqBody = {
                     contents: [{
@@ -69,14 +73,19 @@ export async function POST(req: Request) {
                 if (res.ok) {
                     const data = await res.json();
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    console.log('[Transcribe] Gemini success:', text.trim());
                     return NextResponse.json({ text: text.trim(), provider: 'gemini' });
+                } else {
+                    const errText = await res.text();
+                    console.error('[Transcribe] Gemini API error:', res.status, errText);
                 }
-            } catch (err) {
-                console.error('[Transcribe] Gemini failed:', err);
+            } catch (err: any) {
+                console.error('[Transcribe] Gemini failed:', err.message);
             }
         }
 
-        return NextResponse.json({ error: 'Nenhuma chave de API configurada para transcrição (OpenAI ou Gemini).' }, { status: 400 });
+        console.error('[Transcribe] All providers failed or keys missing');
+        return NextResponse.json({ error: 'Nenhuma chave de API configurada ou falha em todos os provedores.' }, { status: 400 });
     } catch (error: any) {
         console.error('[Transcribe API] Error:', error);
         return NextResponse.json({ error: error.message || 'Failed to transcribe audio' }, { status: 500 });

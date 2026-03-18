@@ -1,8 +1,14 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 // CONFIGURATION
 const UZAPI_URL = 'http://127.0.0.1:21465';
 const ADMIN_TOKEN = process.env.WUZAPI_ADMIN_TOKEN || 'admin_token_123';
-const NEXT_APP_URL = 'http://host.docker.internal:3004'; // URL reachable from INSIDE Docker
+const NEXT_APP_URL =
+    process.env.INTERNAL_WEBHOOK_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://host.docker.internal:3000';
 
 async function fixWuzapi() {
     console.log('🔧 Starting WuzAPI Auto-Fixer...');
@@ -52,7 +58,7 @@ async function fixWuzapi() {
                     'Token': token,
                 },
                 body: JSON.stringify({
-                    webhook: webhookUrl,
+                    webhookurl: webhookUrl,
                     events: ["Message", "ReadReceipt", "Disconnected", "Connected"]
                 }),
             });

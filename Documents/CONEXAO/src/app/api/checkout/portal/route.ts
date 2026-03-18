@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 import { AsaasService } from '@/services/payment/asaas';
 import { MercadoPagoService } from '@/services/payment/mercadopago';
 
-const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
+const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
 
 
 export async function GET(req: Request) {

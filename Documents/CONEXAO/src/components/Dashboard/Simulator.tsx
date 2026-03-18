@@ -22,8 +22,10 @@ export function Simulator({ botId }: { botId: string }) {
     // Audio States
     const [isRecording, setIsRecording] = useState(false);
     const [transcriptionLoading, setTranscriptionLoading] = useState(false);
+    const [audioEnabled, setAudioEnabled] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +81,10 @@ export function Simulator({ botId }: { botId: string }) {
             if (data.text) {
                 setInput(data.text);
                 toast.success("Áudio transcrito!");
+                // Auto-send if audio is fully enabled
+                if (audioEnabled) {
+                    setTimeout(() => handleSend(data.text), 500);
+                }
             } else {
                 toast.error(data.error || "Erro na transcrição.");
             }
@@ -89,8 +95,32 @@ export function Simulator({ botId }: { botId: string }) {
         }
     };
 
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
+    const playAudioResponse = async (text: string) => {
+        try {
+            const res = await fetch('/api/ai/speak', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, botId })
+            });
+            const data = await res.json();
+            if (data.audio) {
+                if (audioPlayerRef.current) {
+                    audioPlayerRef.current.src = data.audio;
+                    audioPlayerRef.current.play();
+                } else {
+                    const audio = new Audio(data.audio);
+                    audioPlayerRef.current = audio;
+                    audio.play();
+                }
+            }
+        } catch (err) {
+            console.error("TTS playback failed:", err);
+        }
+    };
+
+    const handleSend = async (overrideInput?: string) => {
+        const messageText = overrideInput || input;
+        if (!messageText.trim() || loading) return;
 
         const userMsg: Message = {
             id: Date.now().toString(),
@@ -123,6 +153,11 @@ export function Simulator({ botId }: { botId: string }) {
                     createdAt: new Date()
                 };
                 setMessages(prev => [...prev, botMsg]);
+                
+                // Play audio if enabled
+                if (audioEnabled) {
+                    playAudioResponse(data.response);
+                }
             } else {
                 console.error("Simulator error", await res.text());
             }
@@ -141,8 +176,21 @@ export function Simulator({ botId }: { botId: string }) {
                     <Bot className="w-4 h-4" />
                     <span>Ambiente de Teste (Simulador)</span>
                 </div>
-                <div className="text-xs text-gray-400">
-                    Sessão: {sessionId}
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => {
+                            setAudioEnabled(!audioEnabled);
+                            toast.info(audioEnabled ? "Modo Áudio desativado" : "Modo Áudio ativado (Transcrição + Voz)");
+                        }}
+                        className={`p-1.5 rounded-lg transition-all flex items-center gap-2 text-xs font-medium ${audioEnabled ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'}`}
+                        title="Ativar/Desativar áudio"
+                    >
+                        <Mic className="w-3.5 h-3.5" />
+                        {audioEnabled ? "Áudio ON" : "Áudio OFF"}
+                    </button>
+                    <div className="text-xs text-gray-400">
+                        Sessão: {sessionId}
+                    </div>
                 </div>
             </div>
 
@@ -203,7 +251,7 @@ export function Simulator({ botId }: { botId: string }) {
                         disabled={loading || transcriptionLoading}
                     />
                     <button
-                        onClick={handleSend}
+                        onClick={() => handleSend()}
                         disabled={loading || !input.trim() || transcriptionLoading}
                         className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     >

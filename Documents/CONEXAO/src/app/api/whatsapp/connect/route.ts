@@ -41,17 +41,18 @@ export async function POST(req: Request) {
         console.log('[Connect] Step 1: Session name generated', sessionName);
 
         // Ensure UZAPI can reach Next.js (host machine) from Docker container
-        let baseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL;
+        // Webhook URL: priorizar URL pública (Traefik) para WuzAPI alcançar o app
+        let baseUrl =
+            process.env.INTERNAL_WEBHOOK_URL ||
+            process.env.NEXT_PUBLIC_APP_URL ||
+            process.env.NEXTAUTH_URL;
 
-        // Dynamic Port Resolution for Local Dev
         if (!baseUrl) {
             const hostHeader = req.headers.get('host') || 'localhost:3000';
             if (hostHeader.includes('localhost') || hostHeader.includes('127.0.0.1')) {
-                // If running locally, Docker needs 'host.docker.internal' to reach the host machine
                 const port = hostHeader.split(':')[1] || '3000';
                 baseUrl = `http://host.docker.internal:${port}`;
             } else {
-                // Production fallback
                 const protocol = req.headers.get('x-forwarded-proto') || 'https';
                 baseUrl = `${protocol}://${hostHeader}`;
             }

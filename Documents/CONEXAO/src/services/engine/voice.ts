@@ -135,15 +135,11 @@ export const VoiceService = {
                 buffer = Buffer.from(await mp3.arrayBuffer());
             }
 
-            // Save to public dir so it can be served/sent
+            // Save to /tmp (Docker-safe; public/media/temp can have EACCES)
             const fileName = `tts-${crypto.randomUUID()}.mp3`;
-            const publicDir = path.join(process.cwd(), 'public', 'media', 'temp');
+            const tempDir = '/tmp';
 
-            if (!fs.existsSync(publicDir)) {
-                fs.mkdirSync(publicDir, { recursive: true });
-            }
-
-            const filePath = path.join(publicDir, fileName);
+            const filePath = path.join(tempDir, fileName);
             fs.writeFileSync(filePath, buffer);
 
             console.log(`[VoiceService] MP3 saved to ${filePath}. Converting to OGG/Opus...`);

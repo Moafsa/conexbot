@@ -46,13 +46,14 @@ import path from 'path';
 
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
+const REACTION_TAG_REGEX = /\[REAGIR:\s*(.+?)\]/i;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
 
 const processingLocks = new Map<string, Promise<any>>();
 
 export const MessageProcessor = {
-    async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, messageId?: string, remoteJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
         // Concurrency Lock: prevent same phone processing parallelly
         const existingLock = processingLocks.get(senderPhone);
@@ -71,7 +72,7 @@ export const MessageProcessor = {
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, messageId?: string, remoteJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -113,6 +114,23 @@ export const MessageProcessor = {
                 return { text: "⚠️ Desculpe, o limite de mensagens do plano deste atendente foi atingido. Por favor, entre em contato com o administrador." };
             }
 
+            // 2.5 Mark as read and show presence
+            if (channel === 'whatsapp' && searchBy === 'sessionName') {
+                const remoteJid = options.remoteJid || `${senderPhone}@s.whatsapp.net`;
+                
+                // Mark as read
+                if (options.messageId) {
+                    UzapiService.markRead(identifier, remoteJid, remoteJid, [options.messageId]).catch(e => 
+                        console.error('[Processor] markRead error:', e)
+                    );
+                }
+
+                // Show "composing" (typing) status
+                UzapiService.chatPresence(identifier, remoteJid, 'composing').catch(e => 
+                    console.error('[Processor] chatPresence error:', e)
+                );
+            }
+
             logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} (with Fallback enabled)`);
 
             // 3. Find or create conversation
@@ -129,7 +147,7 @@ export const MessageProcessor = {
             });
 
             // 3.1. Check if conversation is PAUSED
-            if ((conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
+            if (channel !== 'simulator' && (conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
                 logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()}`);
                 return null;
             }
@@ -484,7 +502,7 @@ export const MessageProcessor = {
                                 const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
                                 await prisma.conversation.update({
                                     where: { id: conversation.id },
-                                    data: { pausedUntil } as any
+                                    data: { pausedUntil }
                                 });
                                 const title = `🚨 Atendimento Humano Solicitado`;
                                 const message = `O cliente *${existingContact.name || senderPhone}* solicitou um humano.\n\n*Motivo:* ${args.motivo}\n*Bot:* ${bot.name}`;
@@ -496,9 +514,9 @@ export const MessageProcessor = {
                             } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
                         } else if (name === 'gerar_fatura') {
                             try {
-                                const asaasKey = bot.asaasApiKey || bot.tenant.asaasApiKey;
+                                const asaasKey = bot.asaasApiKey || bot.tenant?.asaasApiKey;
                                 if (!asaasKey) {
-                                    toolResult = "A loja não tem a integração com Módulo de Pagamentos configurada. Peça desculpas ao cliente.";
+                                    toolResult = "ERRO: Integração de pagamentos (Asaas) não configurada no bot nem nas configurações do tenant. Use IMEDIATAMENTE a função chamar_humano com motivo 'Pagamento não configurado' para conectar o cliente com um atendente humano.";
                                 } else {
                                     const { ProductSelector } = await import('./product-selector');
                                     const matchedProduct = ProductSelector.findProduct(args.produto_nome, bot.products);
@@ -563,13 +581,17 @@ export const MessageProcessor = {
                                         let payment: any;
                                         const chargeDescription = `Pedido: ${matchedProduct.name}${discountDetail}`;
                                         
+                                        const phoneForAsaas = (channel === 'simulator' && senderPhone === '11999999999')
+                                            ? '11987654321'
+                                            : senderPhone;
+
                                         if ((matchedProduct as any).type === 'RECURRING') {
                                             payment = await (await import('../payment/asaas')).AsaasService.createSubscriptionForBot({
-                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: senderPhone, customerCpfCnpj: args.cliente_cpf, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: args.cliente_cpf, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
                                             });
                                         } else {
                                             payment = await (await import('../payment/asaas')).AsaasService.createPaymentLink({
-                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: senderPhone, customerCpfCnpj: args.cliente_cpf, amount: Math.round(finalPrice * 100), description: chargeDescription, splits
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: args.cliente_cpf, amount: Math.round(finalPrice * 100), description: chargeDescription, splits
                                             });
                                         }
                                         if (payment.success && payment.url) {
@@ -593,7 +615,12 @@ export const MessageProcessor = {
                                             });
                                             toolResult = `Fatura gerada com sucesso!${discountDetail} Link de pagamento: ${payment.url}. Use apenas este link e envie para o cliente para ele continuar o pagamento.`;
                                         } else {
-                                            toolResult = `Erro ao gerar fatura no sistema do Asaas: ${payment.error}. Avise o cliente gentilmente de que houve uma falha técnica.`;
+                                            const err = (payment.error || '').toLowerCase();
+                                            if (err.includes('celular') || err.includes('mobilephone') || err.includes('telefone') || err.includes('cpf') || err.includes('cnpj') || err.includes('inválido') || err.includes('invalid')) {
+                                                toolResult = `ERRO de validação: ${payment.error}. Peça ao cliente que informe os dados corretos (não use chamar_humano).`;
+                                            } else {
+                                                toolResult = `ERRO ao gerar fatura no Asaas: ${payment.error}. Use a função chamar_humano com motivo 'Falha técnica no pagamento' para conectar o cliente com um atendente humano.`;
+                                            }
                                         }
                                     }
                                 }
@@ -625,6 +652,22 @@ export const MessageProcessor = {
             // 11. Parse Media
             const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
             let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
+
+            // 11.5. Detect and handle Reactions
+            let reactionEmoji = '';
+            const reactionMatch = cleanResponse.match(REACTION_TAG_REGEX);
+            if (reactionMatch) {
+                reactionEmoji = reactionMatch[1].trim();
+                cleanResponse = cleanResponse.replace(REACTION_TAG_REGEX, '').trim();
+                logToFile(`[Processor] Reaction detected: ${reactionEmoji}`);
+
+                if (channel === 'whatsapp' && bot.sessionName && options.messageId) {
+                    const remoteJid = options.remoteJid || `${senderPhone}@s.whatsapp.net`;
+                    UzapiService.react(bot.sessionName, remoteJid, remoteJid, options.messageId, reactionEmoji).catch(e => 
+                        console.error('[Processor] react error:', e)
+                    );
+                }
+            }
 
             // 12. Save Assistant Final Response (only if not a tool call already handled)
             if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {

@@ -12,7 +12,11 @@ async function sync() {
         where: { sessionName: { not: null } }
     });
 
-    const baseUrl = process.env.INTERNAL_WEBHOOK_URL || 'http://host.docker.internal:3001';
+    const baseUrl =
+        process.env.INTERNAL_WEBHOOK_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXTAUTH_URL ||
+        'http://host.docker.internal:3000';
     const webhookUrl = `${baseUrl}/api/webhooks/whatsapp`;
 
     console.log(`Target Webhook: ${webhookUrl}`);

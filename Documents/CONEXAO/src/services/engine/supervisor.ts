@@ -134,17 +134,24 @@ export const SupervisorService = {
 
     /**
      * Returns a specific system prompt amendment based on the stage name.
+     * Suporta estágios em português e inglês.
      */
     getStagePrompt(stageName: string): string {
-        const name = (stageName || '').toUpperCase();
-        if (name === 'LEAD' || name === 'AWARENESS') {
-            return "FOCO: QUALIFICAÇÃO. Identifique as necessidades básicas e quem é o cliente.";
+        const name = (stageName || '').toUpperCase().trim();
+        if (name === 'LEAD' || name === 'AWARENESS' || name === 'NOVO') {
+            return "FOCO: QUALIFICAÇÃO. Identifique as necessidades básicas e quem é o cliente. Pergunte sobre a empresa ou o que busca.";
         }
-        if (name === 'INTEREST' || name === 'INTERESSADO') {
-            return "FOCO: Apresentação de Solução. Mostre como o produto resolve a dor dele.";
+        if (name === 'INTEREST' || name === 'INTERESSADO' || name === 'EM ATENDIMENTO' || name === 'EM_ATENDIMENTO') {
+            return "FOCO: Apresentação de Solução. Mostre como o produto resolve a dor dele. Conecte a necessidade com a oferta.";
         }
-        if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO') {
-            return "FOCO: FECHAMENTO. Seja direto e encoraje o pagamento/contratação.";
+        if (name === 'APRESENTAÇÃO' || name === 'APRESENTACAO' || name === 'PROPOSAL') {
+            return "FOCO: Apresentação de proposta. Destaque benefícios e valor. Responda dúvidas sobre preço e condições.";
+        }
+        if (name === 'NEGOCIAÇÃO' || name === 'NEGOCIACAO' || name === 'NEGOTIATION') {
+            return "FOCO: Negociação. Supere objeções. Ofereça alternativas (parcelamento, descontos se aplicável). Leve ao fechamento.";
+        }
+        if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO' || name === 'GANHO' || name === 'CUSTOMER') {
+            return "FOCO: FECHAMENTO. Seja direto e encoraje o pagamento/contratação. Confirme a decisão e parabenize.";
         }
         return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
     }

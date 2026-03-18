@@ -7,6 +7,8 @@ interface BufferedChat {
     sessionName: string;
     contactId: string; // phone
     channel: 'whatsapp' | 'simulator';
+    messageId?: string;
+    remoteJid?: string;
 }
 
 // In-memory storage for active buffers
@@ -18,7 +20,7 @@ export const BufferingService = {
      * Add a message to the buffer.
      * If a timer exists, clear it and restart (debounce).
      */
-    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
+    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text', options: { messageId?: string, remoteJid?: string } = {}) {
         const key = `${sessionName}:${contactId}`;
 
         // Get bot configuration for buffer delay
@@ -34,7 +36,15 @@ export const BufferingService = {
         if (delay === 0) {
             // Process immediately if buffer is disabled
             console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately.`);
-            MessageProcessor.process(sessionName, contactId, text, channel, 'sessionName', { 
+            
+            let formattedText = text;
+            if (inputType === 'audio') {
+                formattedText = `[ÁUDIO TRANSCRITO]: "${text}"`;
+            } else if (inputType === 'image') {
+                formattedText = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${text}`;
+            }
+
+            MessageProcessor.process(sessionName, contactId, formattedText, channel, 'sessionName', { 
                 inputType: inputType as any 
             }).catch(err => console.error('[Buffering] Immediate process error:', err));
             return;
@@ -48,9 +58,15 @@ export const BufferingService = {
                 timer: null,
                 sessionName,
                 contactId,
-                channel
+                channel,
+                messageId: options.messageId,
+                remoteJid: options.remoteJid
             };
             activeBuffers.set(key, buffer);
+        } else {
+            // Update last message ID to mark the whole thread as read
+            if (options.messageId) buffer.messageId = options.messageId;
+            if (options.remoteJid) buffer.remoteJid = options.remoteJid;
         }
 
         // Add message part
@@ -102,7 +118,7 @@ export const BufferingService = {
             combinedText,
             buffer.channel,
             'sessionName',
-            { inputType: 'text' }
+            { inputType: 'text', messageId: buffer.messageId, remoteJid: buffer.remoteJid }
         ).catch(err => console.error('[Buffering] Process error:', err));
     }
 };

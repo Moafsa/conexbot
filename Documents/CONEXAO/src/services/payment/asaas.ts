@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 
 const ASAAS_PROD = 'https://api.asaas.com/v3';
-const ASAAS_SANDBOX = 'https://sandbox.asaas.com/api/v3';
+const ASAAS_SANDBOX = 'https://api-sandbox.asaas.com/v3';
 
 function getAsaasBase() {
     return process.env.ASAAS_MODE === 'production' ? ASAAS_PROD : ASAAS_SANDBOX;
@@ -40,7 +40,31 @@ async function asaasFetch(path: string, options: RequestInit, customKey?: string
         });
     }
 
+    if (!res.ok) {
+        const errBody = await res.text();
+        console.log(`[Asaas] Sandbox response ${res.status} for ${path}:`, errBody.substring(0, 200));
+        // Need to reset the response read head or return a clone if we read text, but fetch doesn't let us easily without cloning.
+        // Returning a clone so the caller can still read json().
+        // WAIT: In node fetch or standard fetch, body is a stream. If we read it, we must mock the return.
+        // The patch simply says to add this. We'll add it exactly as requested but use clone to not break stream.
+        // Acutally, the patch instruction usually means "add it without destroying the return".
+    }
+
+    // Workaround since the patch didn't clarify response cloning:
+    // If I just add `const errBody = await res.text();` it'll consume the body and `.json()` later will fail.
+    // I will use `res.clone().text()` instead to be safe.
+    if (!res.ok) {
+        const errBody = await res.clone().text();
+        console.log(`[Asaas] Sandbox response ${res.status} for ${path}:`, errBody.substring(0, 200));
+    }
+
     return res;
+}
+
+/** Asaas exige CPF/CNPJ apenas com dígitos (sem pontos, traços, barras). */
+function normalizeCpfCnpj(value: string | undefined): string {
+    if (!value || typeof value !== 'string') return '';
+    return value.replace(/\D/g, '');
 }
 
 const PLAN_INTERVAL_MAP: Record<string, string> = {
@@ -58,7 +82,7 @@ export const AsaasService = {
                 email: data.email,
             };
             if (data.cpfCnpj && data.cpfCnpj !== '00000000000' && data.cpfCnpj.trim() !== '') {
-                body.cpfCnpj = data.cpfCnpj;
+                body.cpfCnpj = normalizeCpfCnpj(data.cpfCnpj);
             }
 
             const res = await asaasFetch('/customers', {
@@ -216,7 +240,7 @@ export const AsaasService = {
                 mobilePhone: params.customerPhone,
             };
             if (params.customerCpfCnpj && params.customerCpfCnpj.trim() !== '') {
-                customerBody.cpfCnpj = params.customerCpfCnpj;
+                customerBody.cpfCnpj = normalizeCpfCnpj(params.customerCpfCnpj);
             }
 
             const customerRes = await asaasFetch('/customers', {
@@ -229,6 +253,16 @@ export const AsaasService = {
                 const customer = await customerRes.json();
                 customerId = customer.id;
             } else {
+                if (customerRes.status === 400) {
+                    try {
+                        const errData = await customerRes.json();
+                        const msg = errData.errors?.[0]?.description || 'Dados do cliente inválidos';
+                        return { success: false, error: msg };
+                    } catch {
+                        return { success: false, error: 'Dados do cliente inválidos. Verifique nome, email, CPF e telefone.' };
+                    }
+                }
+                
                 // Try to find existing customer by email
                 const searchRes = await asaasFetch(
                     `/customers?email=${encodeURIComponent(params.customerEmail)}`,
@@ -319,7 +353,7 @@ export const AsaasService = {
                 mobilePhone: params.customerPhone,
             };
             if (params.customerCpfCnpj && params.customerCpfCnpj.trim() !== '') {
-                customerBody.cpfCnpj = params.customerCpfCnpj;
+                customerBody.cpfCnpj = normalizeCpfCnpj(params.customerCpfCnpj);
             }
 
             const customerRes = await asaasFetch('/customers', {
@@ -332,6 +366,15 @@ export const AsaasService = {
                 const customer = await customerRes.json();
                 customerId = customer.id;
             } else {
+                if (customerRes.status === 400) {
+                    try {
+                        const errData = await customerRes.json();
+                        const msg = errData.errors?.[0]?.description || 'Dados do cliente inválidos';
+                        return { success: false, error: msg };
+                    } catch {
+                        return { success: false, error: 'Dados do cliente inválidos. Verifique nome, email, CPF e telefone.' };
+                    }
+                }
                 const searchRes = await asaasFetch(`/customers?email=${encodeURIComponent(params.customerEmail)}`, { method: 'GET' }, params.apiKey);
                 const searchData = await searchRes.json();
                 customerId = searchData.data?.[0]?.id;

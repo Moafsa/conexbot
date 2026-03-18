@@ -12,6 +12,10 @@ function logToFile(msg: string) {
     } catch (e) {
         console.error('Failed to log to file:', e);
     }
+    // stdout para docker logs (áudio/debug)
+    if (msg.includes('Audio') || msg.includes('downloadAudio') || msg.includes('Transcription') || msg.includes('file_url')) {
+        console.error(`[Webhook] ${msg}`);
+    }
 }
 
 export async function POST(req: Request) {
@@ -81,6 +85,8 @@ export async function POST(req: Request) {
                 (message.imageMessage || message.ImageMessage ? '[IMAGE]' : '') ||
                 (message.documentMessage ? '[DOCUMENT]' : '');
             const fromMe = info.FromMe || info.fromMe || false;
+            const messageId = info.ID || info.id || '';
+            const remoteJid = senderPhone;
 
             const cleanPhone = senderPhone.replace('@c.us', '').replace('@s.whatsapp.net', '').split(':')[0].split('.')[0];
             logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}`);
@@ -143,67 +149,73 @@ export async function POST(req: Request) {
             logToFile(`Calling MessageProcessor for ${cleanPhone} / ${sessionName}`);
 
             if (audioMessage) {
-                logToFile(`Audio detected! URL: ${audioMessage.url || 'No URL'}`);
-                // Transcribe Logic
+                logToFile(`Audio detected! file_url: ${(body as any).file_url || 'none'}, audioMessage: ${!!audioMessage}`);
                 try {
                     const { VoiceService } = await import('@/services/engine/voice');
-                    // We need to download the file first. 
-                    // WuzAPI url might be internal Docker URL. 
-                    // For now, assume we can fetch it or it's base64 (if provided).
-                    // WuzAPI often provides a direct URL or we might need to use getMedia.
+                    const { UzapiService } = await import('@/services/engine/uzapi');
 
-                    // Let's assume audioMessage.url is accessible.
-                    // If passing URL directly to openai: openai.audio.transcriptions.create({ file: fs.createReadStream... }) requires a file.
-                    // So we download to temp.
-
-                    // WuzAPI Fix: file_url is often at the root when using S3/local storage
-                    const mediaUrl = (body as any).file_url || audioMessage.url;
+                    const mediaUrl = (body as any).file_url || (audioMessage as any).url;
                     const base64Data = (body as any).base64 || (body as any).data || (audioMessage as any).base64;
-                    logToFile(`Audio Candidates - file_url: ${(body as any).file_url}, audioMessage.url: ${audioMessage.url}, hasBase64: ${!!base64Data}`);
+                    logToFile(`Audio Candidates - file_url: ${(body as any).file_url}, hasBase64: ${!!base64Data}`);
 
-                    const tempFile = path.join(process.cwd(), 'temp_audio_' + Date.now() + '.ogg');
+                    const tempFile = path.join('/tmp', 'temp_audio_' + Date.now() + '.ogg');
+                    let gotBuffer = false;
 
                     if (base64Data) {
                         logToFile(`Processing audio from base64 data...`);
-                        const buffer = Buffer.from(base64Data.split(',').pop()!, 'base64');
+                        const buffer = Buffer.from((base64Data.split(',').pop() || base64Data), 'base64');
                         fs.writeFileSync(tempFile, buffer);
+                        gotBuffer = true;
                     } else if (mediaUrl) {
-                        logToFile(`Downloading audio from: ${mediaUrl}`);
-
-                        // Replace localhost with actual UZAPI_URL for Docker environments
+                        logToFile(`Downloading audio from file_url: ${mediaUrl}`);
                         let fetchUrl = mediaUrl;
                         if (fetchUrl.includes('localhost') || fetchUrl.includes('127.0.0.1')) {
+                            const uzapiBase = process.env.UZAPI_URL || 'http://uzapi:8080';
+                            const uzapiUrl = new URL(uzapiBase);
                             try {
                                 const urlObj = new URL(fetchUrl);
-                                const uzapiUrl = new URL(process.env.UZAPI_URL || 'http://host.docker.internal:21465');
                                 urlObj.protocol = uzapiUrl.protocol;
                                 urlObj.hostname = uzapiUrl.hostname;
-                                urlObj.port = uzapiUrl.port;
+                                urlObj.port = uzapiUrl.port || (uzapiUrl.protocol === 'https:' ? '443' : '80');
                                 fetchUrl = urlObj.toString();
-                            } catch (e) {
-                                fetchUrl = fetchUrl.replace('localhost', 'host.docker.internal').replace(':5555', ':21465');
+                            } catch {
+                                fetchUrl = fetchUrl.replace(/localhost|127\.0\.0\.1/, 'uzapi').replace(':5555', ':8080');
                             }
+                            logToFile(`Rewrote to: ${fetchUrl}`);
                         }
-
-                        // Use fetch to download (WuzAPI file_url is usually accessible)
-                        const buffer = await fetch(fetchUrl).then(r => {
-                            if (!r.ok) throw new Error(`Fetch failed: ${r.statusText} (${fetchUrl})`);
-                            return r.arrayBuffer();
-                        });
-                        fs.writeFileSync(tempFile, Buffer.from(buffer));
+                        try {
+                            const buffer = await fetch(fetchUrl).then(r => {
+                                if (!r.ok) throw new Error(`Fetch failed: ${r.status} ${r.statusText}`);
+                                return r.arrayBuffer();
+                            });
+                            fs.writeFileSync(tempFile, Buffer.from(buffer));
+                            gotBuffer = true;
+                        } catch (e: unknown) {
+                            logToFile(`Fetch file_url failed: ${(e as Error).message}`);
+                        }
                     }
 
-                    if (fs.existsSync(tempFile)) {
+                    // Fallback: WuzAPI não envia file_url (deleta antes do webhook). Usar /chat/downloadaudio.
+                    if (!gotBuffer && ((audioMessage as any).URL || (audioMessage as any).Url)) {
+                        logToFile(`No file_url - using UzapiService.downloadAudio session=${sessionName}`);
+                        const buffer = await UzapiService.downloadAudio(sessionName, audioMessage as any);
+                        logToFile(`downloadAudio result: ${buffer ? buffer.length + ' bytes' : 'null'}`);
+                        if (buffer && buffer.length > 0) {
+                            fs.writeFileSync(tempFile, buffer);
+                            gotBuffer = true;
+                        } else {
+                            logToFile(`downloadAudio returned empty - check UZAPI_URL and token`);
+                        }
+                    }
+
+                    if (gotBuffer && fs.existsSync(tempFile)) {
                         const transcription = await VoiceService.transcribe(
-                            tempFile, 
+                            tempFile,
                             botDoc?.tenant?.openaiApiKey || undefined,
                             botDoc?.tenant?.geminiApiKey || undefined
                         );
                         logToFile(`Transcription: ${transcription}`);
-
-                        // Clean up
                         fs.unlinkSync(tempFile);
-
                         if (transcription) {
                             const { BufferingService } = await import('@/services/engine/buffering');
                             BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
@@ -224,10 +236,11 @@ export async function POST(req: Request) {
 
                 try {
                     // Download Image
-                    // WuzAPI Fix: file_url is often at the root when using S3/local storage
-                    const mediaUrl = (body as any).file_url || imageMessage.url;
-                    const base64Data = (body as any).base64 || (body as any).data || (imageMessage as any).base64;
-                    logToFile(`Image Candidates - file_url: ${(body as any).file_url}, imageMessage.url: ${imageMessage.url}, hasBase64: ${!!base64Data}`);
+                    // WuzAPI Fix: file_url is often at the root when using S3/local storage, but can be "none"
+                    const rawFileUrl = (body as any).file_url;
+                    const mediaUrl = (rawFileUrl && rawFileUrl !== 'none') ? rawFileUrl : imageMessage.url;
+                    const base64Data = (body as any).base64 || (body as any).data || (imageMessage as any).base64 || (imageMessage as any).jpegThumbnail || (imageMessage as any).JPEGThumbnail;
+                    logToFile(`Image Candidates - file_url: ${rawFileUrl}, mediaUrl: ${mediaUrl}, hasBase64: ${!!base64Data}`);
 
                     const tempFile = path.join(process.cwd(), 'temp_image_' + Date.now() + '.jpg');
 
@@ -269,9 +282,22 @@ export async function POST(req: Request) {
                         // Clean up temp file
                         fs.unlinkSync(tempFile);
 
-                        const { BufferingService } = await import('@/services/engine/buffering');
-                        BufferingService.add(sessionName, cleanPhone, description, 'whatsapp', 'image').catch(err => {
-                            logToFile(`BUFFER ERROR (Image): ${err?.message || err}`);
+                        let finalDescription = description;
+                        if (!finalDescription || finalDescription.trim().length === 0) {
+                            logToFile(`VisionService returned empty or very short description. Fallback applied.`);
+                            finalDescription = "O usuário enviou uma imagem, mas não foi possível extrair detalhes adicionais.";
+                        }
+                        
+                        logToFile(`Calling MessageProcessor directly for image...`);
+                        MessageProcessor.process(
+                            sessionName, 
+                            cleanPhone, 
+                            `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${finalDescription}`, 
+                            'whatsapp', 
+                            'sessionName', 
+                            { inputType: 'image', messageId, remoteJid }
+                        ).catch(err => {
+                            logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
                         });
                     } else {
                         logToFile('Image content missing');
@@ -283,12 +309,12 @@ export async function POST(req: Request) {
                 // Text Message Handling with Smart Buffering
                 try {
                     const { BufferingService } = await import('@/services/engine/buffering');
-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp');
+                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', { messageId, remoteJid });
                     logToFile(`Message buffered for ${cleanPhone}`);
                 } catch (e: any) {
                     logToFile(`BUFFER ERROR: ${e.message}`);
                     // Fallback to direct processing if buffering fails
-                    MessageProcessor.process(sessionName, cleanPhone, messageBody).catch(err => {
+                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', messageId, remoteJid }).catch(err => {
                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
                     });
                 }
