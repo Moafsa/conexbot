@@ -29,7 +29,8 @@ export default async function DashboardLayout({
             
             // Let SUPERADMIN and ADMIN pass. For normal users, require a subscription.
             if (tenant && tenant.role === 'USER') {
-                const hasSub = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING'].includes(tenant.subscription.status);
+                const hasSub = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(tenant.subscription.status);
+
                 if (!hasSub) {
                     redirect('/pricing');
                 }
@@ -51,7 +52,20 @@ export default async function DashboardLayout({
                             </div>
                         );
                     }
+                } else if (tenant.subscription?.status === 'PAST_DUE') {
+                    trialBanner = (
+                        <div className="bg-amber-600/90 text-white text-center py-2 px-4 shadow-md w-full relative z-50 animate-fade-in flex flex-col sm:flex-row items-center justify-center gap-2 group border-b border-amber-500/50">
+                            <span className="flex items-center gap-2 font-semibold">
+                                <AlertTriangle size={18} className="animate-pulse" />
+                                ⚠️ ATENÇÃO: Sua fatura está vencida. Acesse Finanças para pagar e manter seu acesso.
+                            </span>
+                            <Link href="/dashboard/finance" className="bg-white text-amber-700 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider hover:bg-gray-100 transition-colors shadow-sm ml-2">
+                                Pagar Agora
+                            </Link>
+                        </div>
+                    );
                 }
+
             }
         } catch (error) {
             console.error('[DashboardLayout] Prisma Error:', error);

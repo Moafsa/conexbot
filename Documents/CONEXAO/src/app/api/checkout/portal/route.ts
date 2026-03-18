@@ -89,7 +89,8 @@ export async function GET(req: Request) {
                     cpfCnpj: tenant.cpfCnpj,
                 });
                 
-                const result = await AsaasService.createSubscription(customer.id, plan.id, value, interval);
+                const result = await AsaasService.createSubscription(customer.id, plan.id, value, interval, plan.trialDays || 0);
+
 
                 await prisma.subscription.upsert({
                     where: { tenantId },

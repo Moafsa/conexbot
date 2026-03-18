@@ -92,6 +92,13 @@ export const MessageProcessor = {
                 return null;
             }
 
+            const subStatus = bot.tenant.subscription?.status;
+            if (subStatus && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subStatus)) {
+                logToFile(`[Processor] Subscription PAST_DUE or inactive for tenant ${bot.tenantId}`);
+                return { text: "⚠️ O serviço deste atendente está temporariamente suspenso devido a pendências financeiras. Por favor, acesse o painel para regularizar." };
+            }
+
+
             // 2. Usage limits check
             let counter = bot.tenant.usageCounter;
             

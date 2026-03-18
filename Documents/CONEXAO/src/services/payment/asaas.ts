@@ -106,9 +106,13 @@ export const AsaasService = {
         }
     },
 
-    async createSubscription(customerId: string, planId: string, value: number, interval: string = 'MONTHLY') {
+    async createSubscription(customerId: string, planId: string, value: number, interval: string = 'MONTHLY', trialDays: number = 0) {
         try {
             const nextDueDate = new Date();
+            if (trialDays > 0) {
+                nextDueDate.setDate(nextDueDate.getDate() + trialDays);
+            }
+
             // Optional: add 1 day to give them a day, or keep it today.
             
             const res = await asaasFetch('/subscriptions', {

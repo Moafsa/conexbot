@@ -87,7 +87,8 @@ export async function POST(req: Request) {
                     email: tenant.email,
                     cpfCnpj: tenant.cpfCnpj,
                 });
-                result = await AsaasService.createSubscription(customer.id, planId, value, interval);
+                result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0);
+
 
                 // Save subscription record
                 await prisma.subscription.upsert({

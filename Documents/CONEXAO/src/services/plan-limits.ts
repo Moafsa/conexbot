@@ -8,7 +8,14 @@ export async function checkBotLimit(tenantId: string): Promise<{ allowed: boolea
         return { allowed: true };
     }
 
+    // Check subscription status
+    const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
+    if (subscription && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subscription.status)) {
+        return { allowed: false, reason: 'Sua assinatura está vencida ou inativa. Regularize seu pagamento para criar novos agentes.' };
+    }
+
     const counter = await prisma.usageCounter.findUnique({ where: { tenantId } });
+
 
     if (!counter) {
         // No counter = free tier, allow 10 bots for testing
@@ -24,7 +31,13 @@ export async function checkBotLimit(tenantId: string): Promise<{ allowed: boolea
 }
 
 export async function checkMessageLimit(tenantId: string): Promise<{ allowed: boolean; remaining: number }> {
+    const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
+    if (subscription && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subscription.status)) {
+        return { allowed: false, remaining: 0 };
+    }
+
     const counter = await prisma.usageCounter.findUnique({ where: { tenantId } });
+
 
     if (!counter) {
         return { allowed: true, remaining: 50 }; // Free trial: 50 messages
