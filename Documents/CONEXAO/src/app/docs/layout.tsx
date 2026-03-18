@@ -9,6 +9,7 @@ export default async function DocsLayout({
 }) {
     const prisma = (await import('@/lib/prisma')).default;
     const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } }) as any;
+    const session = await import('next-auth').then(m => m.getServerSession(require('@/lib/auth').authOptions)) as any;
     const logo = config?.logoWhiteUrl || "/logo.png";
     const systemName = config?.systemName || "Conext Bot";
 
@@ -56,7 +57,7 @@ export default async function DocsLayout({
                         {systemName} Docs
                     </span>
                 </Link>
-                <Link href="/dashboard" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                <Link href={session?.user ? "/dashboard" : "/"} className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
                     Voltar para o App
                 </Link>
             </header>

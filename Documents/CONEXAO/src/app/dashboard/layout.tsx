@@ -17,7 +17,15 @@ export default async function DashboardLayout({
 
     // Check if user has an active subscription
     const session = await import('next-auth').then(m => m.getServerSession(require('@/lib/auth').authOptions)) as any;
+    
+    // Redirect unauthenticated users to login (evita dashboard com "Plano Gratuito" para visitantes)
+    if (!session?.user) {
+        const { redirect } = await import('next/navigation');
+        redirect('/auth/login?callbackUrl=/dashboard');
+    }
+
     if (session?.user?.email) {
+
         const tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
             include: { subscription: true, usageCounter: true }
