@@ -93,12 +93,12 @@ export default function DashboardPage() {
                         Olá, {session?.user?.name || "👋"}
                     </h1>
                     <p className="text-gray-400 text-sm mt-1">
-                        {analytics?.subscription
-                            ? `Plano ${analytics.subscription.plan.charAt(0).toUpperCase() + analytics.subscription.plan.slice(1)} • ${analytics.subscription.status === 'active' ? '✅ Ativo' : '⚠️ ' + analytics.subscription.status}`
-                            : "Plano Gratuito • "}
-                        {analytics?.usage
-                            ? `${analytics.usage.messagesUsed}/${analytics.usage.messagesLimit} mensagens`
-                            : ""}
+                        {analytics?.subscription && (
+                            <>
+                                {`Plano ${analytics.subscription.plan.charAt(0).toUpperCase() + analytics.subscription.plan.slice(1)} • ${analytics.subscription.status === 'active' ? '✅ Ativo' : '⚠️ ' + analytics.subscription.status}`}
+                                {analytics?.usage && ` • ${analytics.usage.messagesUsed}/${analytics.usage.messagesLimit} mensagens`}
+                            </>
+                        )}
                     </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">

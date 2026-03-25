@@ -17,6 +17,13 @@ export async function POST(req: Request) {
 
         const { name, email, password, whatsapp, cpfCnpj, planId, trial } = parsed.data;
 
+        if (!planId) {
+            return NextResponse.json(
+                { error: 'Um plano deve ser selecionado para criar a conta.' },
+                { status: 400 }
+            );
+        }
+
         const existing = await prisma.tenant.findUnique({
             where: { email },
         });

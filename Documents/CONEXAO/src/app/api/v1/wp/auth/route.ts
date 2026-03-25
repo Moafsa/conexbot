@@ -33,14 +33,7 @@ export async function POST(req: Request) {
                     password: hashedPassword,
                     name: name || '',
                     whatsapp: whatsapp || null,
-                    role: 'USER',
-                    usageCounter: {
-                        create: {
-                            messagesLimit: starterPlan?.messageLimit || 5000,
-                            botsLimit: starterPlan?.botLimit || 1,
-                            periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                        }
-                    }
+                    role: 'USER'
                 }
             });
 
