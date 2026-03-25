@@ -246,10 +246,11 @@ export default function AIArchitect() {
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: 'Resposta inválida do servidor.' }));
       if (data.extractedData) setBotData((prev: any) => ({ ...prev, ...data.extractedData }));
 
-      const aiMsg: Message = { role: "ai", content: data.content || "Erro ao processar." };
+      const errorMsg = data.error ? `${data.error} ${data.details ? `(${data.details})` : ''}` : null;
+      const aiMsg: Message = { role: "ai", content: data.content || errorMsg || "Erro ao processar." };
 
       if (data.nextStep === 'done') {
         aiMsg.type = 'success';

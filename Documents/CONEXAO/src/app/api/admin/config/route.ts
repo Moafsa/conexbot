@@ -66,6 +66,7 @@ export async function PUT(req: Request) {
             asaasWalletId: body.asaasWalletId || null,
             openaiApiKey: body.openaiApiKey || null,
             geminiApiKey: body.geminiApiKey || null,
+            openrouterApiKey: body.openrouterApiKey || null,
             elevenLabsApiKey: body.elevenLabsApiKey || null,
             stripeSecretKey: body.stripeSecretKey || null,
             stripePublishableKey: body.stripePublishableKey || null,

@@ -21,24 +21,51 @@ function conexbot_render_admin_page() {
         </h1>
         
         <?php if (empty($token)): ?>
-            <!-- Tela de Boas Vindas se não tiver Token -->
-            <div style="background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-top: 20px; max-width: 600px;">
-                <h2>Boas-vindas ao ecossistema Conexão!</h2>
-                <p>Para ativar o seu Bot de WhatsApp e nosso CRM diretamente nesta tela, insira o seu <strong>Token de Integração</strong> abaixo.</p>
-                <form method="post" action="">
-                    <?php wp_nonce_field('conexbot_save_action'); ?>
-                    <table class="form-table">
-                        <tr valign="top">
-                            <th scope="row">Token de Acesso:</th>
-                            <td>
-                                <input type="text" name="conexbot_token" value="" size="50" placeholder="Cole aqui seu longo Token JWT" required />
-                                <p class="description">Você pode gerar na tela principal do sistema clicando em Integrações > WordPress.</p>
-                            </td>
-                        </tr>
-                    </table>
-                    <?php submit_button('Conectar Conta', 'primary', 'conexbot_save_token'); ?>
-                </form>
+            <!-- Tela de Cadastro/Login Integrada (Iframe) -->
+            <div style="background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-top: 20px; max-width: 100%; overflow: hidden;">
+                <iframe 
+                    src="https://app.conext.click/wp-onboarding" 
+                    style="width: 100%; height: 85vh; border: none;"
+                    id="conexbot-onboarding-iframe"
+                ></iframe>
             </div>
+            
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                window.addEventListener('message', function(event) {
+                    // Segurança: validar origem
+                    if (event.origin !== "https://app.conext.click" && event.origin !== "http://localhost:3000") {
+                        // return; // Em desenvolvimento podemos permitir localhost
+                    }
+                    
+                    if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
+                        // Recebemos o token! Salvar via AJAX
+                        var data = new FormData();
+                        data.append('action', 'conexbot_save_token_ajax');
+                        data.append('token', event.data.token);
+                        data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+
+                        fetch(ajaxurl, {
+                            method: 'POST',
+                            body: data
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Sucesso! Recarregar a página para abrir o CRM
+                                window.location.reload();
+                            } else {
+                                alert('Erro ao salvar a conexão com a inteligência: ' + (data.data.message || 'Erro desconhecido.'));
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Erro na requisição:', err);
+                            alert('Erro de rede ao conectar.');
+                        });
+                    }
+                });
+            });
+            </script>
         <?php else: ?>
             <!-- Iframe Seamless do Dashboard -->
             <div style="margin-top: 20px;">

@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Conexbot Automação & CRM (WhatsApp)
- * Plugin URI: https://conexao.ai
+ * Plugin URI: https://app.conext.click
  * Description: Integre perfeitamente a Inteligência Artificial Conexão ao seu WooCommerce. O Bot mapeia seu estoque, interage com clientes via WhatsApp e oferece um CRM completo dentro do seu Painel.
  * Version: 1.0.0
  * Author: Equipe Conexão AI
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
 }
 
 define('CONEXBOT_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('CONEXBOT_API_URL', 'https://seusite.com/api/v1/wp'); // Ajustaremos para a URL de produtção futura
-define('CONEXBOT_EMBED_URL', 'https://seusite.com/embed/crm');
+define('CONEXBOT_API_URL', 'https://app.conext.click/api/v1/wp'); // Integrando com a URL oficial
+define('CONEXBOT_EMBED_URL', 'https://app.conext.click/embed/crm');
 
 // Inclui as classes necessárias
 require_once CONEXBOT_PLUGIN_DIR . 'includes/class-woocommerce-sync.php';
@@ -42,3 +42,23 @@ add_action('plugins_loaded', function() {
         new Conexbot_WooCommerce_Sync();
     }
 });
+
+// Endpoint AJAX para salvar o Token
+add_action('wp_ajax_conexbot_save_token_ajax', 'conexbot_save_token_ajax_handler');
+
+function conexbot_save_token_ajax_handler() {
+    // Verifica nonces
+    check_ajax_referer('conexbot_save_action', 'security');
+    
+    // Pega o Token
+    $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+    
+    if (empty($token)) {
+        wp_send_json_error(array('message' => 'Token inválido.'));
+    }
+    
+    // Salva a opção no WP
+    update_option('conexbot_api_token', $token);
+    
+    wp_send_json_success(array('message' => 'Token salvo com sucesso.', 'token' => $token));
+}

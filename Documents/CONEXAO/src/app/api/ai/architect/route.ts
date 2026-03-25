@@ -16,8 +16,9 @@ export async function POST(req: Request) {
         }
 
         const userId = (session.user as any).id;
+        const userEmail = (session.user as any).email;
 
-        const tenant = await prisma.tenant.findUnique({
+        let tenant = await prisma.tenant.findUnique({
             where: { id: userId },
             select: {
                 openaiApiKey: true,
@@ -25,6 +26,17 @@ export async function POST(req: Request) {
                 openrouterApiKey: true
             }
         });
+
+        if (!tenant && userEmail) {
+            tenant = await prisma.tenant.findUnique({
+                where: { email: userEmail },
+                select: {
+                    openaiApiKey: true,
+                    geminiApiKey: true,
+                    openrouterApiKey: true
+                }
+            });
+        }
 
         if (!tenant) {
             return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
@@ -52,8 +64,10 @@ export async function POST(req: Request) {
         const effectiveTenant = {
             openaiApiKey: tenant.openaiApiKey || globalConfig?.openaiApiKey,
             geminiApiKey: tenant.geminiApiKey || globalConfig?.geminiApiKey,
-            openrouterApiKey: tenant.openrouterApiKey
+            openrouterApiKey: tenant.openrouterApiKey || globalConfig?.openrouterApiKey
         };
+        
+        console.log(`[AI Architect] Tenant OK. Keys: OpenAI=${!!effectiveTenant.openaiApiKey} Gemini=${!!effectiveTenant.geminiApiKey} OpenRouter=${!!effectiveTenant.openrouterApiKey}`);
 
         if (!effectiveTenant.openaiApiKey && !effectiveTenant.geminiApiKey && !effectiveTenant.openrouterApiKey) {
             return NextResponse.json({ error: 'AI Config is missing. Please contact administrator.' }, { status: 400 });
@@ -154,15 +168,37 @@ FORMATO JSON:
             { role: "user", content: detailedUserMessage }
         ];
 
-        const aiResult = await safeChatCompletion({
-            bot: dummyBot,
-            messages: messages as any,
-            response_format: { type: "json_object" },
-            temperature: 0.1,
-        }) as any;
+        let aiResult;
+        try {
+            aiResult = await safeChatCompletion({
+                bot: dummyBot,
+                messages: messages as any,
+                response_format: { type: "json_object" },
+                temperature: 0.1,
+            }) as any;
+        } catch (error: any) {
+            console.error('[AI Architect] SafeChatCompletion Error:', error);
+            return NextResponse.json({ 
+                error: 'Falha na chamada de IA. Verifique se as chaves configuradas estão válidas.', 
+                details: error.message 
+            }, { status: 500 });
+        }
 
-        const responseContent = typeof aiResult === 'string' ? aiResult : aiResult.content;
-        const parsedResponse = JSON.parse(responseContent || '{}');
+        let parsedResponse;
+        try {
+            const responseContent = typeof aiResult === 'string' ? aiResult : aiResult.content;
+            
+            if (!responseContent) {
+                 return NextResponse.json({ 
+                     error: 'Falha na chamada de IA. Resposta vazia. Verifique as chaves e os créditos da OpenAI/Gemini/OpenRouter.' 
+                 }, { status: 500 });
+            }
+            
+            parsedResponse = JSON.parse(responseContent || '{}');
+        } catch (error: any) {
+            console.error('[AI Architect] JSON Parse Error:', error);
+            return NextResponse.json({ error: 'Falha ao processar a resposta gerada pela IA.', details: error.message }, { status: 500 });
+        }
 
         // 🛑 SAFETY: Prevent premature 'done'
         if (parsedResponse.nextStep === 'done') {
