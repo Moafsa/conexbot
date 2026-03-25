@@ -12,7 +12,18 @@ const nextConfig: NextConfig = {
     async headers() {
         return [
             {
-                source: '/:path*',
+                // Libera o carregamento em Iframe para o WordPress
+                source: '/embed/:path*',
+                headers: [
+                    {
+                        key: 'Content-Security-Policy',
+                        value: "frame-ancestors *",
+                    }
+                ],
+            },
+            {
+                // Protege o restante da aplicação contra Clickjacking
+                source: '/((?!embed).*)',
                 headers: [
                     {
                         key: 'X-Frame-Options',

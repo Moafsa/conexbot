@@ -1,0 +1,31 @@
+name: Deploy para o WordPress.org (SVN)
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fazer Checkout do Código
+      uses: actions/checkout@v3
+
+    - name: Instalar Dependências do Deploy
+      run: |
+        sudo apt-get update
+        sudo apt-get install subversion -y
+
+    - name: Deploy para o Repositório Oficial do WordPress
+      uses: 10up/action-wordpress-plugin-deploy@v2.22.0
+      with:
+        generate-zip: true
+      env:
+        SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+        SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        PLUGIN_DIR: conexbot-wp/
+        SLUG: seu-slug-oficial-na-loja   # Substituir pelo slug quando aprovado na loja
+        # A action lerá automaticamente a versão que estiver no arquivo conexbot-wp.php
+        
+    - name: Notificar Sucesso
+      run: echo "🎉 Deploy do plugin na loja do WordPress.org concluído com sucesso!"

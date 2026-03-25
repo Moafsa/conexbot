@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3004",
     "build": "next build",
+    "build:plugin": "node scripts/build-wp-plugin.js",
     "start": "next start",
     "lint": "eslint",
     "test": "jest"
