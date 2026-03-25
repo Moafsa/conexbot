@@ -12,6 +12,16 @@ const nextConfig: NextConfig = {
     async headers() {
         return [
             {
+                // Libera o carregamento em Iframe para o WordPress Onboarding
+                source: '/wp-onboarding',
+                headers: [
+                    {
+                        key: 'Content-Security-Policy',
+                        value: "frame-ancestors *",
+                    }
+                ],
+            },
+            {
                 // Libera o carregamento em Iframe para o WordPress
                 source: '/embed/:path*',
                 headers: [
@@ -23,7 +33,7 @@ const nextConfig: NextConfig = {
             },
             {
                 // Protege o restante da aplicação contra Clickjacking
-                source: '/((?!embed).*)',
+                source: '/((?!embed|wp-onboarding).*)',
                 headers: [
                     {
                         key: 'X-Frame-Options',
