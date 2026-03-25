@@ -102,13 +102,29 @@ export default function WpOnboardingPage() {
         }
     };
 
+    const [tenantToken, setTenantToken] = useState("");
+
     const handleFinish = (finalToken: string) => {
+        setTenantToken(finalToken);
         window.parent.postMessage({
             type: 'CONEXBOT_AUTH',
             token: finalToken
         }, '*');
         setStep('ready');
     };
+
+    // Robustness: retry postMessage in ready step
+    useEffect(() => {
+        if (step === 'ready' && tenantToken) {
+            const timer = setTimeout(() => {
+                window.parent.postMessage({
+                    type: 'CONEXBOT_AUTH',
+                    token: tenantToken
+                }, '*');
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [step, tenantToken]);
 
     // Handle Google Login via Popup (to avoid Iframe 403)
     const handleGoogleLogin = () => {
@@ -392,8 +408,16 @@ export default function WpOnboardingPage() {
                             </div>
                             <h2 className="text-2xl font-black mb-2 text-white italic">Foguete Conectado! 🚀</h2>
                             <p className="text-gray-400 text-sm max-w-xs mb-8">
-                                Sua inteligência artificial já está ativa. Redirecionando para o seu dashboard...
+                                Sua inteligência artificial está ativa. Se não for redirecionado em instantes, clique no botão abaixo.
                             </p>
+                            
+                            <button 
+                                onClick={() => handleFinish(tenantToken)}
+                                className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-black transition-all shadow-lg shadow-green-500/20 mb-8"
+                            >
+                                Prosseguir para o Dashboard
+                            </button>
+
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                                 <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Sincronização em tempo real ativa</span>
