@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { LogOut, Users, MessageSquare } from "lucide-react";
+import { LogOut, Users, MessageSquare, Settings } from "lucide-react";
 import Link from "next/link";
 
 export default function EmbedLayout({
@@ -15,6 +15,7 @@ export default function EmbedLayout({
     const navItems = [
         { label: "CRM Pipeline", href: "/embed/crm", icon: Users },
         { label: "Meus Agentes", href: "/embed/bots", icon: MessageSquare },
+        { label: "Ajustes", href: "/embed/settings", icon: Settings },
     ];
 
     return (
