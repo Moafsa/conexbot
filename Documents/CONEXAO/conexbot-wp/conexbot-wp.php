@@ -38,16 +38,14 @@ add_action('admin_enqueue_scripts', function($hook) {
         return;
     }
 
-    wp_enqueue_script('conexbot-admin-js', plugin_dir_url(__FILE__) . 'admin/conexbot-admin.js', array('jquery'), '1.0.3', true);
+    wp_enqueue_script('conexbot-admin', plugin_dir_url(__FILE__) . 'admin/conexbot-admin.js', array(), '1.0.3', true);
 
-    wp_localize_script('conexbot-admin-js', 'conexbotData', array(
-        'ajaxurl'       => admin_url('admin-ajax.php'),
-        'dashboard_url' => admin_url('admin.php?page=conexbot-dashboard'),
-        'token'         => get_option('conexbot_api_token', ''),
-        'nonces'        => array(
-            'save_action' => wp_create_nonce('conexbot_save_action'),
-            'setup_nonce' => wp_create_nonce('conexbot_setup_nonce'),
-        )
+    wp_localize_script('conexbot-admin', 'conexbotAdmin', array(
+        'ajaxurl'      => admin_url('admin-ajax.php'),
+        'nonceSave'    => wp_create_nonce('conexbot_save_action'),
+        'nonceSetup'   => wp_create_nonce('conexbot_setup_nonce'),
+        'token'        => get_option('conexbot_api_token', ''),
+        'dashboardUrl' => admin_url('admin.php?page=conexbot-dashboard')
     ));
 });
 
@@ -111,9 +109,13 @@ add_action('wp_ajax_conexbot_save_token_ajax', function() {
     check_ajax_referer('conexbot_save_action', 'security');
     if (!current_user_can('manage_options')) wp_send_json_error('Sem permissão.');
 
-    $token = sanitize_text_field($_POST['token']);
+    $token = isset($_POST['token']) ? sanitize_text_field(wp_unslash($_POST['token'])) : '';
+    if (empty($token)) {
+        wp_send_json_error('Token vazio.');
+    }
+
     update_option('conexbot_api_token', $token);
-    wp_send_json_success(array('message' => 'Token salvo com sucesso.'));
+    wp_send_json_success(array('message' => 'Conexão salva com sucesso!'));
 });
 
 // 6. Chat Nativo no Frontend
