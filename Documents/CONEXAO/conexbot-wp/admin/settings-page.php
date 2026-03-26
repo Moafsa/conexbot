@@ -129,8 +129,84 @@ function conexbot_render_admin_page() {
 
     <div class="conexbot-wrap">
         
-        <?php if (!$is_connected && !isset($_GET['start_onboarding'])): ?>
-            <!-- Tela de Instruções / Welcome -->
+        <?php if ($is_connected): ?>
+            <!-- 1. TELA DE DASHBOARD: Só carrega se houver token -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="flex items-center gap-2">
+                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff;">
+                        <span class="dashicons dashicons-format-chat" style="font-size: 18px; width: 18px; height: 18px;"></span>
+                    </div>
+                    <h2 style="margin:0; font-weight: 800; font-size: 20px;">Painel Conext.click</h2>
+                </div>
+                <a href="#" id="conexbot-disconnect" class="btn-disconnect" style="margin:0;">Desconectar da Conta</a>
+            </div>
+
+            <div class="iframe-container" style="margin-top: 10px;">
+                <iframe 
+                    src="<?php echo esc_url(CONEXBOT_EMBED_URL . '?token=' . $token); ?>" 
+                    style="width: 100%; height: 85vh; border: none; display: block;"
+                    allow="clipboard-write; microphone; camera"
+                ></iframe>
+            </div>
+
+            <script>
+            document.getElementById('conexbot-disconnect').addEventListener('click', function(e) {
+                e.preventDefault();
+                if (confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
+                    var data = new FormData();
+                    data.append('action', 'conexbot_disconnect');
+                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+
+                    fetch(ajaxurl, { method: 'POST', body: data })
+                    .then(() => window.location.reload());
+                }
+            });
+            </script>
+
+        <?php elseif (isset($_GET['start_onboarding'])): ?>
+            <!-- 2. TELA DE ONBOARDING: Só carrega o iframe quando você clica em "Começar" -->
+            <div class="iframe-container">
+                <iframe 
+                    src="https://app.conext.click/wp-onboarding" 
+                    style="width: 100%; height: 85vh; border: none; display: block;"
+                    id="conexbot-onboarding-iframe"
+                ></iframe>
+            </div>
+
+            <div style="margin-top: 30px; padding: 20px; background: #fff; border: 1px dashed #ccc; border-radius: 8px;">
+                <h4 style="margin-top: 0; color: #d63638;"><span class="dashicons dashicons-warning" style="vertical-align: middle;"></span> Conexão de Emergência</h4>
+                <p style="font-size: 12px; color: #666;">Se o botão "Prosseguir" no quadro acima não funcionar, copie o código gerado no final do processo e cole abaixo:</p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('conexbot_manual_action', 'conexbot_manual_nonce'); ?>
+                    <input type="text" name="conexbot_manual_token" placeholder="CONEXT_..." style="width: 100%; margin-bottom: 10px; font-family: monospace; font-size: 11px; width: 100%;" />
+                    <button type="submit" name="conexbot_save_manual" class="button button-secondary">Salvar Código Manualmente</button>
+                    <a href="<?php echo esc_url(remove_query_arg('start_onboarding')); ?>" style="margin-left: 10px; font-size: 12px; text-decoration: none; color: #666;">Cancelar</a>
+                </form>
+            </div>
+            
+            <script>
+            window.addEventListener('message', function(event) {
+                if (event.origin !== "https://app.conext.click" && event.origin !== "http://localhost:3000") return;
+                
+                if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
+                    var data = new FormData();
+                    data.append('action', 'conexbot_save_token_ajax');
+                    data.append('token', event.data.token);
+                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+
+                    fetch(ajaxurl, { method: 'POST', body: data })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) window.location.href = "<?php echo admin_url('admin.php?page=conexbot-dashboard'); ?>";
+                        else alert('Erro ao salvar conexão.');
+                    });
+                }
+            });
+            </script>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard')); ?>" class="btn-disconnect">← Voltar para instruções</a>
+
+        <?php else: ?>
+            <!-- 3. TELA DE BOAS-VINDAS: Tela padrão sem iframe (evita auto-connect) -->
             <div class="conexbot-card">
                 <div class="conexbot-logo">
                     <span class="dashicons dashicons-format-chat" style="font-size: 40px; width: 40px; height: 40px;"></span>
@@ -160,77 +236,6 @@ function conexbot_render_admin_page() {
                     Começar Configuração <span class="dashicons dashicons-arrow-right-alt2" style="margin-top:4px"></span>
                 </a>
             </div>
-
-        <?php elseif (isset($_GET['start_onboarding']) && !$is_connected): ?>
-            <!-- Iframe de Onboarding -->
-            <div class="iframe-container">
-                <iframe 
-                    src="https://app.conext.click/wp-onboarding" 
-                    style="width: 100%; height: 85vh; border: none; display: block;"
-                    id="conexbot-onboarding-iframe"
-                ></iframe>
-            </div>
-
-            <div style="margin-top: 30px; padding: 20px; background: #fff; border: 1px dashed #ccc; border-radius: 8px;">
-                <h4 style="margin-top: 0; color: #d63638;"><span class="dashicons dashicons-warning" style="vertical-align: middle;"></span> Conexão de Emergência</h4>
-                <p style="font-size: 12px; color: #666;">Se o botão "Prosseguir" no quadro acima não funcionar, copie o código gerado no final do processo e cole abaixo:</p>
-                <form method="post" action="">
-                    <?php wp_nonce_field('conexbot_manual_action', 'conexbot_manual_nonce'); ?>
-                    <input type="text" name="conexbot_manual_token" placeholder="CONEXT_..." style="width: 100%; margin-bottom: 10px; font-family: monospace; font-size: 11px;" />
-                    <button type="submit" name="conexbot_save_manual" class="button button-secondary">Salvar Código Manualmente</button>
-                    <a href="<?php echo esc_url(remove_query_arg('start_onboarding')); ?>" style="margin-left: 10px; font-size: 12px; text-decoration: none; color: #666;">Cancelar</a>
-                </form>
-            </div>
-            
-            <script>
-            window.addEventListener('message', function(event) {
-                if (event.origin !== "https://app.conext.click" && event.origin !== "http://localhost:3000") return;
-                
-                if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
-                    var data = new FormData();
-                    data.append('action', 'conexbot_save_token_ajax');
-                    data.append('token', event.data.token);
-                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
-
-                    fetch(ajaxurl, { method: 'POST', body: data })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.success) window.location.href = "<?php echo admin_url('admin.php?page=conexbot-dashboard'); ?>";
-                        else alert('Erro ao salvar conexão.');
-                    });
-                }
-            });
-            </script>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard')); ?>" class="btn-disconnect">← Voltar para instruções</a>
-
-        <?php else: ?>
-            <!-- Dashboard Conectado -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2 style="margin:0; font-weight: 800;">Painel Conext.click</h2>
-                <a href="#" id="conexbot-disconnect" class="btn-disconnect" style="margin:0;">Desconectar da Conta</a>
-            </div>
-
-            <div class="iframe-container" style="margin-top: 10px;">
-                <iframe 
-                    src="<?php echo esc_url(CONEXBOT_EMBED_URL . '?token=' . $token); ?>" 
-                    style="width: 100%; height: 85vh; border: none; display: block;"
-                    allow="clipboard-write; microphone; camera"
-                ></iframe>
-            </div>
-
-            <script>
-            document.getElementById('conexbot-disconnect').addEventListener('click', function(e) {
-                e.preventDefault();
-                if (confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
-                    var data = new FormData();
-                    data.append('action', 'conexbot_disconnect');
-                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
-
-                    fetch(ajaxurl, { method: 'POST', body: data })
-                    .then(() => window.location.reload());
-                }
-            });
-            </script>
         <?php endif; ?>
     </div>
     
