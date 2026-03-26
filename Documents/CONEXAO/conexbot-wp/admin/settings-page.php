@@ -192,18 +192,25 @@ function conexbot_render_admin_page() {
                 </div>
             </div>
 
-            <!-- Multi-Bot & WhatsApp Config -->
-            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <!-- Multi-Bot & Chat Config -->
+            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                 <div>
                     <h4 style="margin:0 0 5px; font-size: 13px;">ID do Bot (UUID)</h4>
                     <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot" style="width: 100%; font-size: 12px; height: 32px;" />
                 </div>
                 <div>
-                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp do Canal de Chat (no Site)</h4>
-                    <input type="text" id="conexbot-whatsapp-number" value="<?php echo esc_attr(get_option('conexbot_whatsapp_number', '')); ?>" placeholder="Ex: 5511999999999" style="width: 100%; font-size: 12px; height: 32px;" />
-                    <p style="font-size: 10px; color: #64748b; margin: 4px 0 0;">Este número serve apenas para o link do botão flutuante. Comentários e Tickets funcionam via API.</p>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">Tipo de Atendimento</h4>
+                    <select id="conexbot-chat-type" style="width: 100%; font-size: 12px; height: 32px;">
+                        <option value="whatsapp" <?php echo get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp' ? 'selected' : ''; ?>>Botão de WhatsApp</option>
+                        <option value="native" <?php echo get_option('conexbot_chat_type', 'whatsapp') === 'native' ? 'selected' : ''; ?>>Chat IA Nativo (Beta)</option>
+                    </select>
                 </div>
-                <div style="grid-column: span 2; text-align: right;">
+                <div>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp (para o Botão)</h4>
+                    <input type="text" id="conexbot-whatsapp-number" value="<?php echo esc_attr(get_option('conexbot_whatsapp_number', '')); ?>" placeholder="Ex: 5511999999999" style="width: 100%; font-size: 12px; height: 32px;" />
+                </div>
+                <div style="grid-column: span 3; text-align: right;">
+                    <p style="font-size: 10px; color: #64748b; margin: 0 0 10px; text-align: left; float: left; width: 70%;">* O Chat Nativo usa a inteligência do robô diretamente no navegador, sem depender da conexão com o telefone.</p>
                     <button id="conexbot-save-settings" class="button button-primary" style="height: 32px;">Salvar Configurações</button>
                 </div>
             </div>
@@ -220,11 +227,14 @@ function conexbot_render_admin_page() {
             <div class="conexbot-instructions">
                 <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🛠️ Guia de Ativação WordPress</h2>
                 <div style="background: #fff4f4; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                    <h4 style="margin:0 0 5px; color: #b91c1c; font-size: 14px;">Requisitos Obrigatórios para a IA funcionar:</h4>
+                    <h4 style="margin:0 0 5px; color: #b91c1c; font-size: 14px;">Requisitos para a IA funcionar:</h4>
                     <ul style="margin:0; font-size: 13px; color: #7f1d1d;">
+                        <li>✅ <b>ID do Bot Correto:</b> O UUID acima define qual bot (treinado no Arquiteto) responderá este site.</li>
                         <li>✅ <b>Plano Ativo:</b> Sua conta Conext.click precisa de um plano assinado (ou trial).</li>
-                        <li>✅ <b>AI Key Configurada:</b> No painel acima, vá em <b>Configurações > IA</b> e insira sua chave da OpenAI ou Gemini. Sem isso, o robô não responde.</li>
-                        <li>✅ <b>WhatsApp Conectado:</b> Em <b>Meus Agentes</b>, o status do robô deve estar como <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
+                        <li>✅ <b>AI Key:</b> Em <b>Configurações > IA</b> (no painel acima), insira sua chave da OpenAI ou Gemini.</li>
+                        <?php if (get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp'): ?>
+                            <li>✅ <b>WhatsApp Conectado:</b> Para o modo "Botão de WhatsApp", o status em <b>Meus Agentes</b> deve estar <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
+                        <?php endif; ?>
                     </ul>
                 </div>
 
@@ -236,7 +246,7 @@ function conexbot_render_admin_page() {
                     
                     <div class="conexbot-inst-card">
                         <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-admin-comments"></span> Automação de Contatos</h3>
-                        <p class="conexbot-inst-p">Quando um cliente te chama pelo ícone de chat no site ou pelo WhatsApp, a IA usa o <b>Arquiteto</b> para saber como responder baseado no seu negócio.</p>
+                        <p class="conexbot-inst-p">Quando um cliente te chama no site ou WhatsApp, o bot usa o treinamento que você fez no <b>Arquiteto</b> para saber como responder baseado no seu negócio.</p>
                     </div>
                     
                     <div class="conexbot-inst-card">
@@ -272,10 +282,12 @@ function conexbot_render_admin_page() {
             // Salvar Configurações
             document.getElementById('conexbot-save-settings').addEventListener('click', function() {
                 var botId = document.getElementById('conexbot-bot-id').value;
+                var chatType = document.getElementById('conexbot-chat-type').value;
                 var whatsapp = document.getElementById('conexbot-whatsapp-number').value;
                 var data = new FormData();
                 data.append('action', 'conexbot_save_bot_id_ajax');
                 data.append('bot_id', botId);
+                data.append('chat_type', chatType);
                 data.append('whatsapp', whatsapp);
                 data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
 
