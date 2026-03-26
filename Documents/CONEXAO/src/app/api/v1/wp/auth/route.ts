@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { encode } from 'next-auth/jwt';
+import { generateWpToken } from '@/lib/wp-token';
 
 export async function GET(req: Request) {
     try {
@@ -17,12 +17,10 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 });
         }
 
-        const secret = process.env.NEXTAUTH_SECRET || '';
-        const token = await encode({
-            token: { id: tenant.id, email: tenant.email, role: tenant.role },
-            secret,
-            salt: 'next-auth.session-token',
-            maxAge: 10 * 365 * 24 * 60 * 60
+        const token = generateWpToken({ 
+            id: tenant.id, 
+            email: tenant.email, 
+            role: tenant.role 
         });
 
         return NextResponse.json({ token, tenantId: tenant.id });
@@ -39,8 +37,6 @@ export async function POST(req: Request) {
         if (!email || (action !== 'login' && !password)) {
             return NextResponse.json({ error: 'Dados insuficientes' }, { status: 400 });
         }
-
-        const secret = process.env.NEXTAUTH_SECRET || '';
 
         // Cadastrar nova conta pelo WordPress
         if (action === 'register') {
@@ -62,11 +58,10 @@ export async function POST(req: Request) {
                 }
             });
 
-            const token = await encode({
-                token: { id: newTenant.id, email: newTenant.email, role: newTenant.role },
-                secret,
-                salt: 'next-auth.session-token',
-                maxAge: 10 * 365 * 24 * 60 * 60
+            const token = generateWpToken({ 
+                id: newTenant.id, 
+                email: newTenant.email, 
+                role: newTenant.role 
             });
 
             return NextResponse.json({ token, tenantId: newTenant.id, message: 'Conta criada com sucesso!' });
@@ -84,11 +79,10 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
             }
 
-            const token = await encode({
-                token: { id: tenant.id, email: tenant.email, role: tenant.role },
-                secret,
-                salt: 'next-auth.session-token',
-                maxAge: 10 * 365 * 24 * 60 * 60
+            const token = generateWpToken({ 
+                id: tenant.id, 
+                email: tenant.email, 
+                role: tenant.role 
             });
 
             return NextResponse.json({ token, tenantId: tenant.id, message: 'Login realizado com sucesso!' });

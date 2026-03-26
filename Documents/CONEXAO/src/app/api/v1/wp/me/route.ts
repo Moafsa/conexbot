@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decode } from 'next-auth/jwt';
+import { verifyWpToken } from '@/lib/wp-token';
 
 export async function GET(req: Request) {
     try {
@@ -14,25 +14,14 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const secret = process.env.NEXTAUTH_SECRET || '';
-
-        // Decode token
-        let decoded;
-        try {
-            decoded = await decode({
-                token,
-                secret,
-                // Use a standard salt if none is provided. 
-                // NextAuth typically uses the cookie name as salt.
-                salt: 'next-auth.session-token'
-            }) as any;
-        } catch (e: any) {
-            console.error('JWT Decode Exception:', e);
-            return NextResponse.json({ error: 'Falha ao decodificar token', details: e.message }, { status: 401 });
-        }
+        // Decode token using our robust HMAC implementation
+        const decoded = verifyWpToken(token);
 
         if (!decoded || !decoded.id) {
-            return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
+            return NextResponse.json({ 
+                error: 'Token inválido', 
+                details: 'A assinatura do token não corresponde ou o token está malformado.' 
+            }, { status: 401 });
         }
 
         // Get tenant with sub and bots
