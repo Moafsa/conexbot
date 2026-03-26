@@ -17,10 +17,19 @@ export async function GET(req: Request) {
         const secret = process.env.NEXTAUTH_SECRET || '';
 
         // Decode token
-        const decoded = await decode({
-            token,
-            secret
-        }) as any;
+        let decoded;
+        try {
+            decoded = await decode({
+                token,
+                secret,
+                // Use a standard salt if none is provided. 
+                // NextAuth typically uses the cookie name as salt.
+                salt: 'next-auth.session-token'
+            }) as any;
+        } catch (e: any) {
+            console.error('JWT Decode Exception:', e);
+            return NextResponse.json({ error: 'Falha ao decodificar token', details: e.message }, { status: 401 });
+        }
 
         if (!decoded || !decoded.id) {
             return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
@@ -58,6 +67,9 @@ export async function GET(req: Request) {
 
     } catch (error) {
         console.error('WP Me Error:', error);
-        return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+        return NextResponse.json({ 
+            error: 'Erro interno', 
+            details: (error as Error).message 
+        }, { status: 500 });
     }
 }
