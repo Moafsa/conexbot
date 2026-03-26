@@ -124,7 +124,7 @@ export default function EmbedLayout({
             </div>
 
             {/* Content Area */}
-            <main className="flex-1 overflow-auto p-6 custom-scrollbar bg-[radial-gradient(circle_at_top_right,rgba(29,78,216,0.05),transparent),radial-gradient(circle_at_bottom_left,rgba(88,28,135,0.05),transparent)]">
+            <main className="flex-1 overflow-auto p-2 sm:p-6 custom-scrollbar bg-[radial-gradient(circle_at_top_right,rgba(29,78,216,0.05),transparent),radial-gradient(circle_at_bottom_left,rgba(88,28,135,0.05),transparent)]">
                 <div className="max-w-7xl mx-auto h-full">
                     {children}
                 </div>

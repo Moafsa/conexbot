@@ -11,16 +11,27 @@ function conexbot_render_admin_page() {
     ?>
     <style>
         .conexbot-wrap {
-            max-width: 98%;
-            margin: 10px auto;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 10px 20px 0 0;
+            box-sizing: border-box;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
         }
         .conexbot-card {
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            padding: 40px;
+            padding: 20px;
             text-align: center;
+        }
+        @media (max-width: 782px) {
+            .conexbot-wrap {
+                padding: 10px;
+            }
+            .conexbot-steps {
+                grid-template-columns: 1fr !important;
+            }
         }
         .conexbot-logo {
             width: 80px;
@@ -162,7 +173,7 @@ function conexbot_render_admin_page() {
             <div class="iframe-container" style="margin-top: 10px;">
                 <iframe 
                     src="<?php echo esc_url(CONEXBOT_EMBED_URL . '?token=' . $token); ?>" 
-                    style="width: 100%; height: 85vh; border: none; display: block;"
+                    style="width: 100%; height: 90vh; min-height: 600px; border: none; display: block;"
                     allow="clipboard-write; microphone; camera"
                 ></iframe>
             </div>
