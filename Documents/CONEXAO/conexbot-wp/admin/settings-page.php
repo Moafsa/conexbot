@@ -183,27 +183,14 @@ function conexbot_render_admin_page() {
                 </div>
             </div>
 
-            <!-- Multi-Bot & Chat Config -->
-            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                <div>
+            <!-- Bot Config -->
+            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: flex; align-items: flex-end; gap: 15px;">
+                <div style="flex: 1;">
                     <h4 style="margin:0 0 5px; font-size: 13px;">ID do Bot (UUID)</h4>
-                    <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot" style="width: 100%; font-size: 12px; height: 32px;" />
+                    <p style="font-size: 11px; color: #64748b; margin: 0 0 8px;">O ID que vincula este site à inteligência criada no Arquiteto.</p>
+                    <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="Cole o UUID do seu Bot aqui" style="width: 100%; font-size: 12px; height: 36px; border-radius: 6px;" />
                 </div>
-                <div>
-                    <h4 style="margin:0 0 5px; font-size: 13px;">Tipo de Atendimento</h4>
-                    <select id="conexbot-chat-type" style="width: 100%; font-size: 12px; height: 32px;">
-                        <option value="whatsapp" <?php echo get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp' ? 'selected' : ''; ?>>Botão de WhatsApp</option>
-                        <option value="native" <?php echo get_option('conexbot_chat_type', 'whatsapp') === 'native' ? 'selected' : ''; ?>>Chat IA Nativo (Beta)</option>
-                    </select>
-                </div>
-                <div>
-                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp (para o Botão)</h4>
-                    <input type="text" id="conexbot-whatsapp-number" value="<?php echo esc_attr(get_option('conexbot_whatsapp_number', '')); ?>" placeholder="Ex: 5511999999999" style="width: 100%; font-size: 12px; height: 32px;" />
-                </div>
-                <div style="grid-column: span 3; text-align: right;">
-                    <p style="font-size: 10px; color: #64748b; margin: 0 0 10px; text-align: left; float: left; width: 70%;">* O Chat Nativo usa a inteligência do robô diretamente no navegador, sem depender da conexão com o telefone.</p>
-                    <button id="conexbot-save-settings" class="button button-primary" style="height: 32px;">Salvar Configurações</button>
-                </div>
+                <button id="conexbot-save-settings" class="button button-primary" style="height: 36px; padding: 0 20px;">Salvar Configuração</button>
             </div>
 
             <div class="iframe-container" style="margin-top: 10px;">
@@ -223,9 +210,6 @@ function conexbot_render_admin_page() {
                         <li>💳 <b>1. Plano Ativo:</b> Sua conta Conext.click precisa estar com um plano assinado ou trial.</li>
                         <li>🔑 <b>2. AI Key:</b> Inserção obrigatória para o funcionamento do motor de IA (em <b>Configurações > IA</b>).</li>
                         <li>🤖 <b>3. ID do Bot:</b> Após criar um bot, vincule o UUID acima para ativar a inteligência neste site.</li>
-                        <?php if (get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp'): ?>
-                            <li>📱 <b>4. WhatsApp:</b> Opcional (necessário apenas para o modo "Botão de WhatsApp").</li>
-                        <?php endif; ?>
                     </ul>
                 </div>
 
@@ -273,23 +257,19 @@ function conexbot_render_admin_page() {
             // Salvar Configurações
             document.getElementById('conexbot-save-settings').addEventListener('click', function() {
                 var botId = document.getElementById('conexbot-bot-id').value;
-                var chatType = document.getElementById('conexbot-chat-type').value;
-                var whatsapp = document.getElementById('conexbot-whatsapp-number').value;
                 var data = new FormData();
-                data.append('action', 'conexbot_save_bot_id_ajax');
+                data.append('action', 'conexbot_save_setup'); // Matching correct AJAX handler
+                data.append('token', '<?php echo esc_attr($token); ?>');
                 data.append('bot_id', botId);
-                data.append('chat_type', chatType);
-                data.append('whatsapp', whatsapp);
-                data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+                data.append('security', '<?php echo wp_create_nonce('conexbot_setup_nonce'); ?>');
 
                 this.textContent = 'Salvando...';
                 fetch(ajaxurl, { method: 'POST', body: data })
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
-                        alert('Configurações salvas com sucesso!');
+                        alert('Configurações salvas!');
                         window.location.reload();
-                    } else alert('Erro ao salvar.');
                 });
             });
 
