@@ -50,9 +50,9 @@ export default function EmbedLayout({
     }, [token, router]);
 
     const navItems = [
-        { label: "CRM Pipeline", href: "/embed/crm", icon: Users },
         { label: "Meus Agentes", href: "/embed/bots", icon: MessageSquare },
-        { label: "Ajustes", href: "/embed/settings", icon: Settings },
+        { label: "CRM Pipeline", href: "/embed/crm", icon: Users },
+        { label: "Configurações", href: "/embed/settings", icon: Settings },
     ];
 
     if (loading) {

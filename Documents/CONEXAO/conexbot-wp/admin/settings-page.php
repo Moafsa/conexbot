@@ -136,6 +136,40 @@ function conexbot_render_admin_page() {
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             margin-top: 10px;
         }
+        .conexbot-instructions {
+            margin-top: 40px;
+            padding: 30px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            text-align: left;
+        }
+        .conexbot-inst-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-top: 20px;
+        }
+        .conexbot-inst-card {
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        .conexbot-inst-h3 {
+            font-size: 16px;
+            margin: 0 0 10px;
+            color: #7c3aed;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .conexbot-inst-p {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.5;
+            margin: 0;
+        }
     </style>
 
     <div class="conexbot-wrap">
@@ -176,6 +210,38 @@ function conexbot_render_admin_page() {
                     style="width: 100%; height: 90vh; min-height: 600px; border: none; display: block;"
                     allow="clipboard-write; microphone; camera"
                 ></iframe>
+            </div>
+
+            <!-- Central de Instruções -->
+            <div class="conexbot-instructions">
+                <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🚀 Guia Rápido de Utilização</h2>
+                <p style="color: #64748b; font-size: 14px; margin:0;">Tudo o que você precisa para dominar o Conext.click e vender mais.</p>
+                
+                <div class="conexbot-inst-grid">
+                    <div class="conexbot-inst-card">
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-groups"></span> Meus Agentes</h3>
+                        <p class="conexbot-inst-p">Aqui você cria e conecta seus números de WhatsApp. Cada agente pode ter uma personalidade e um papel diferente (Vendas, Suporte, etc).</p>
+                    </div>
+                    
+                    <div class="conexbot-inst-card">
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-welcome-learn-more"></span> Arquiteto de IA</h3>
+                        <p class="conexbot-inst-p">Dentro de cada agente, use o Arquiteto para treinar a IA. Cole links do seu catálogo, envie PDFs ou descreva as regras do seu negócio.</p>
+                    </div>
+                    
+                    <div class="conexbot-inst-card">
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-chart-bar"></span> CRM & Pipeline</h3>
+                        <p class="conexbot-inst-p">Acompanhe as conversas em tempo real. Movimente os leads entre as etapas do funil para nunca perder uma oportunidade de venda.</p>
+                    </div>
+                    
+                    <div class="conexbot-inst-card">
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-visibility"></span> Simulador</h3>
+                        <p class="conexbot-inst-p">Teste as respostas da sua IA antes de salvar. Use o simulador para garantir que ela está falando exatamente o que você deseja.</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+                    <p>💡 <b>Dica:</b> Use o botão "Sincronizar Tudo" no topo para enviar seu catálogo completo do WooCommerce para a IA em um clique.</p>
+                </div>
             </div>
 
             <script>
