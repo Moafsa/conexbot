@@ -34,16 +34,9 @@ function conexbot_render_admin_page() {
             }
         }
         .conexbot-logo {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 140px;
             margin: 0 auto 24px;
-            color: #fff;
-            box-shadow: 0 10px 25px rgba(124, 58, 237, 0.3);
+            display: block;
         }
         .conexbot-h1 {
             font-size: 28px;
@@ -178,10 +171,8 @@ function conexbot_render_admin_page() {
             <!-- 1. TELA DE DASHBOARD: Só carrega se houver token -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff;">
-                        <span class="dashicons dashicons-format-chat" style="font-size: 18px; width: 18px; height: 18px;"></span>
-                    </div>
-                    <h2 style="margin:0; font-weight: 800; font-size: 18px;">Painel Conext.click</h2>
+                    <img src="https://app.conext.click/logo-colored.png" alt="ConextBot" style="height: 24px; width: auto;">
+                    <h2 style="margin:0; font-weight: 800; font-size: 18px;">Painel de Controle</h2>
                 </div>
                 
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -227,13 +218,14 @@ function conexbot_render_admin_page() {
             <div class="conexbot-instructions">
                 <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🛠️ Guia de Ativação WordPress</h2>
                 <div style="background: #fff4f4; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                    <h4 style="margin:0 0 5px; color: #b91c1c; font-size: 14px;">Requisitos para a IA funcionar:</h4>
-                    <ul style="margin:0; font-size: 13px; color: #7f1d1d;">
-                        <li>✅ <b>ID do Bot Correto:</b> O UUID acima define qual bot (treinado no Arquiteto) responderá este site.</li>
-                        <li>✅ <b>Plano Ativo:</b> Sua conta Conext.click precisa de um plano assinado (ou trial).</li>
-                        <li>✅ <b>AI Key:</b> Em <b>Configurações > IA</b> (no painel acima), insira sua chave da OpenAI ou Gemini.</li>
+                    <h4 style="margin:0 0 8px; color: #b91c1c; font-size: 15px; font-weight: 700;">Requisitos Críticos para Funcionamento:</h4>
+                    <p style="font-size: 13px; color: #7f1d1d; margin-bottom: 12px;">Para que o <b>Arquiteto</b> possa gerar respostas e o bot funcionar, siga esta ordem:</p>
+                    <ul style="margin:0; font-size: 13px; color: #7f1d1d; line-height: 1.6;">
+                        <li>🔑 <b>1. AI Key (Obrigatório):</b> Vá em <b>Configurações > IA</b> no painel acima e insira sua chave da OpenAI ou Gemini. Sem isso, o Arquiteto não consegue "pensar".</li>
+                        <li>🤖 <b>2. ID do Bot (UUID):</b> Verifique se o ID preenchido no campo acima é o do bot que você deseja usar neste site.</li>
+                        <li>💳 <b>3. Plano Ativo:</b> Sua conta Conext.click precisa estar com um plano ativo ou em período de testes.</li>
                         <?php if (get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp'): ?>
-                            <li>✅ <b>WhatsApp Conectado:</b> Para o modo "Botão de WhatsApp", o status em <b>Meus Agentes</b> deve estar <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
+                            <li>📱 <b>4. WhatsApp Conectado:</b> Como você escolheu o modo "Botão de WhatsApp", o status em <b>Meus Agentes</b> deve estar como <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
                         <?php endif; ?>
                     </ul>
                 </div>
@@ -369,7 +361,7 @@ function conexbot_render_admin_page() {
             <!-- 3. TELA DE BOAS-VINDAS: Tela padrão sem iframe (evita auto-connect) -->
             <div class="conexbot-card">
                 <div class="conexbot-logo">
-                    <span class="dashicons dashicons-format-chat" style="font-size: 40px; width: 40px; height: 40px;"></span>
+                    <img src="https://app.conext.click/logo-colored.png" alt="ConextBot" style="width: 100%; height: auto;">
                 </div>
                 <h1 class="conexbot-h1">Turbine seu WordPress com IA</h1>
                 <p class="conexbot-p">O Conext.click integra a inteligência artificial mais avançada diretamente ao seu WooCommerce e WhatsApp. Automatize vendas e gerencie leads sem sair do painel.</p>
