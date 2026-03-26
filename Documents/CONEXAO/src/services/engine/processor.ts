@@ -293,6 +293,11 @@ export const MessageProcessor = {
                 `- ${p.name}: R$ ${p.price.toFixed(2)} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'}) ${p.externalUrl ? `[Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`
             ).join('\n');
 
+            logToFile(`[Processor] Product Context: ${bot.products.length} products found.`);
+            if (bot.products.length > 0) {
+                logToFile(`[Processor] DEBUG First Product Link: ${bot.products[0].externalUrl}`);
+            }
+
             const combinedContext = [vectorContext, legacyContext, productContext ? `═══ CATÁLOGO DE PRODUTOS ═══\n${productContext}` : ''].filter(Boolean).join('\n\n---\n\n');
 
             // 9. Prompt Building

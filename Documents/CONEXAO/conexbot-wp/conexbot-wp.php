@@ -96,6 +96,15 @@ add_action('wp_footer', function() {
     if (empty($token) || empty($bot_id)) return;
 
     $chat_url = "https://app.conext.click/chat-embed/" . $bot_id;
+
+    // Adicionar contexto do usuário logado no WordPress
+    if (is_user_logged_in()) {
+        $current_user = wp_get_current_user();
+        $chat_url = add_query_arg(array(
+            'name'  => $current_user->display_name,
+            'email' => $current_user->user_email
+        ), $chat_url);
+    }
     ?>
     <style>
         #conexbot-native-chat { position: fixed; bottom: 30px; right: 30px; z-index: 99999; font-family: sans-serif; }

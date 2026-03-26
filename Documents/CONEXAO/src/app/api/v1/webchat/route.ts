@@ -34,6 +34,31 @@ export async function POST(req: Request) {
              console.warn(`[WebChat API] Bot NOT ACTIVE: "${cleanBotId}", status: ${bot.status}`);
         }
 
+        // 1.5. Atualizar Informações de Contato (WordPress context)
+        if (contactInfo && (contactInfo.name || contactInfo.email)) {
+             try {
+                 await prisma.contact.upsert({
+                     where: { phone_botId: { phone: sessionId || 'web_user', botId: bot.id } },
+                     update: {
+                         name: contactInfo.name || undefined,
+                         email: contactInfo.email || undefined,
+                         lastActive: new Date()
+                     },
+                     create: {
+                         phone: sessionId || 'web_user',
+                         botId: bot.id,
+                         tenantId: bot.tenantId,
+                         name: contactInfo.name || undefined,
+                         email: contactInfo.email || undefined,
+                         funnelStage: 'LEAD'
+                     } as any
+                 });
+                 console.log(`[WebChat API] Contact updated from WP context: ${contactInfo.email || contactInfo.name}`);
+             } catch (contactErr) {
+                 console.error('[WebChat API] Error upserting contact:', contactErr);
+             }
+        }
+
         // 2. Processar Mensagem
         let response;
         try {

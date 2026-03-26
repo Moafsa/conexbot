@@ -17,11 +17,20 @@ export default function WebChatWidget() {
     const [loading, setLoading] = useState(false);
     const [botName, setBotName] = useState('Assistente IA');
     const [sessionId, setSessionId] = useState('');
+    const [userContext, setUserContext] = useState<{ name?: string, email?: string }>({});
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         // Inicializar ID de sessão único
         if (typeof window !== 'undefined') {
+            const searchParams = new URLSearchParams(window.location.search);
+            const wpName = searchParams.get('name');
+            const wpEmail = searchParams.get('email');
+            
+            if (wpName || wpEmail) {
+                setUserContext({ name: wpName || undefined, email: wpEmail || undefined });
+            }
+
             let sId = localStorage.getItem(`conext_session_${botId}`);
             if (!sId) {
                 sId = Math.random().toString(36).substring(2, 15);
@@ -37,12 +46,33 @@ export default function WebChatWidget() {
                 })
                 .catch(err => console.error('Error fetching bot info:', err));
 
-            // Mensagem de boas-vindas (opcional)
-            setMessages([{
-                role: 'assistant',
-                content: 'Olá! Como posso ajudar você hoje?',
-                timestamp: new Date()
-            }]);
+            // Buscar histórico de mensagens
+            fetch(`/api/v1/webchat/history?botId=${botId}&sessionId=${sId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.messages && data.messages.length > 0) {
+                        setMessages(data.messages.map((m: any) => ({
+                            role: m.role,
+                            content: m.content,
+                            timestamp: new Date(m.timestamp)
+                        })));
+                    } else {
+                        // Mensagem de boas-vindas se não houver histórico
+                        setMessages([{
+                            role: 'assistant',
+                            content: wpName ? `Olá ${wpName}! Como posso ajudar você hoje?` : 'Olá! Como posso ajudar você hoje?',
+                            timestamp: new Date()
+                        }]);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching history:', err);
+                    setMessages([{
+                        role: 'assistant',
+                        content: 'Olá! Como posso ajudar você hoje?',
+                        timestamp: new Date()
+                    }]);
+                });
         }
     }, [botId]);
 
@@ -72,7 +102,8 @@ export default function WebChatWidget() {
                 body: JSON.stringify({
                     botId,
                     message: userMsg.content,
-                    sessionId
+                    sessionId,
+                    contactInfo: userContext
                 })
             });
 
