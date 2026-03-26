@@ -161,6 +161,7 @@ function conexbot_render_admin_page() {
                 </a>
             </div>
 
+        <?php elseif (isset($_GET['start_onboarding']) && !$is_connected): ?>
             <!-- Iframe de Onboarding -->
             <div class="iframe-container">
                 <iframe 
