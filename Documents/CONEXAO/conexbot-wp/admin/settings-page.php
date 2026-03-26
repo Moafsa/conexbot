@@ -11,8 +11,8 @@ function conexbot_render_admin_page() {
     ?>
     <style>
         .conexbot-wrap {
-            max-width: 1000px;
-            margin: 20px auto;
+            max-width: 98%;
+            margin: 10px auto;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
         }
         .conexbot-card {
@@ -120,10 +120,10 @@ function conexbot_render_admin_page() {
         }
         .iframe-container {
             background: #000;
-            border-radius: 16px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            margin-top: 10px;
         }
     </style>
 
