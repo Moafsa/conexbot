@@ -218,14 +218,13 @@ function conexbot_render_admin_page() {
             <div class="conexbot-instructions">
                 <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🛠️ Guia de Ativação WordPress</h2>
                 <div style="background: #fff4f4; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                    <h4 style="margin:0 0 8px; color: #b91c1c; font-size: 15px; font-weight: 700;">Requisitos Críticos para Funcionamento:</h4>
-                    <p style="font-size: 13px; color: #7f1d1d; margin-bottom: 12px;">Para que o <b>Arquiteto</b> possa gerar respostas e o bot funcionar, siga esta ordem:</p>
+                    <h4 style="margin:0 0 8px; color: #b91c1c; font-size: 15px; font-weight: 700;">Requisitos para a IA funcionar:</h4>
                     <ul style="margin:0; font-size: 13px; color: #7f1d1d; line-height: 1.6;">
-                        <li>🔑 <b>1. AI Key (Obrigatório):</b> Vá em <b>Configurações > IA</b> no painel acima e insira sua chave da OpenAI ou Gemini. Sem isso, o Arquiteto não consegue "pensar".</li>
-                        <li>🤖 <b>2. ID do Bot (UUID):</b> Verifique se o ID preenchido no campo acima é o do bot que você deseja usar neste site.</li>
-                        <li>💳 <b>3. Plano Ativo:</b> Sua conta Conext.click precisa estar com um plano ativo ou em período de testes.</li>
+                        <li>💳 <b>1. Plano Ativo:</b> Sua conta Conext.click precisa estar com um plano assinado ou trial.</li>
+                        <li>🔑 <b>2. AI Key:</b> Inserção obrigatória para o funcionamento do motor de IA (em <b>Configurações > IA</b>).</li>
+                        <li>🤖 <b>3. ID do Bot:</b> Após criar um bot, vincule o UUID acima para ativar a inteligência neste site.</li>
                         <?php if (get_option('conexbot_chat_type', 'whatsapp') === 'whatsapp'): ?>
-                            <li>📱 <b>4. WhatsApp Conectado:</b> Como você escolheu o modo "Botão de WhatsApp", o status em <b>Meus Agentes</b> deve estar como <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
+                            <li>📱 <b>4. WhatsApp:</b> Opcional (necessário apenas para o modo "Botão de WhatsApp").</li>
                         <?php endif; ?>
                     </ul>
                 </div>
