@@ -4,6 +4,7 @@ import { buildSystemPrompt, buildConversationMessages } from './prompts';
 import { UzapiService } from './uzapi';
 import { logToFile } from './logger';
 import { NotificationService } from '../notification/service';
+import { PhoneUtils } from '@/lib/phone-utils';
 
 function detectAiMessage(text: string): boolean {
     if (!text) return false;
@@ -52,7 +53,8 @@ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b
 const processingLocks = new Map<string, Promise<any>>();
 
 export const MessageProcessor = {
-    async process(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+        const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
         console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
         // Concurrency Lock: prevent same phone processing parallelly
         const existingLock = processingLocks.get(senderPhone);
@@ -71,7 +73,7 @@ export const MessageProcessor = {
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -344,7 +346,18 @@ export const MessageProcessor = {
             });
 
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
-            const finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
+            
+            let finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
+
+            // WordPress Custom Tone Adjustment
+            if (channel === 'wordpress') {
+                finalSystemPrompt += `\n\n⚠️ AMBIENTE: WordPress Community\nVocê está respondendo a um COMENTÁRIO de um leitor em um post do site.
+                - Use um tom informativo, educado e semi-formal.
+                - Considere o contexto do post fornecido na primeira mensagem.
+                - Responda de forma completa mas não prolixa.
+                - NÃO use gírias ou emojis excessivos de chat.
+                - Trate o autor do comentário pelo nome (se fornecido).`;
+            }
 
             // 10. Call AI Provider with Tool Calling support
             const { SchedulingService } = await import('../scheduling/service');
@@ -736,6 +749,16 @@ export const MessageProcessor = {
                 for (const match of mediaMatches as any[]) {
                     const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
                     if (media) await UzapiService.sendMedia(bot.sessionName, senderPhone, media.type, media.url, media.description || media.filename);
+                }
+            } else if (channel === 'wordpress') {
+                const { WordpressService } = await import('./wordpress');
+                // senderPhone contains "wp_post_{postId}_comment_{commentId}"
+                const parts = senderPhone.split('_');
+                const postId = parseInt(parts[2]);
+                const commentId = parseInt(parts[4]);
+                
+                if (!isNaN(postId) && !isNaN(commentId)) {
+                    await WordpressService.sendReply(bot, postId, commentId, cleanResponse);
                 }
             }
 

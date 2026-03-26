@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { UzapiService } from './uzapi';
 import { SupervisorService } from './supervisor';
 import { FunnelStage } from '@prisma/client';
+import { PhoneUtils } from '@/lib/phone-utils';
 
 export const FollowUpService = {
     /**
@@ -141,6 +142,7 @@ export const FollowUpService = {
     async evaluateRule(bot: any, contact: any, rule: any) {
         const now = new Date();
         const lastActive = new Date(contact.lastActive || contact.updatedAt);
+        const normalizedPhone = PhoneUtils.normalize(contact.phone);
         const diffDays = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
 
         let shouldTrigger = false;
@@ -177,6 +179,19 @@ export const FollowUpService = {
             });
 
             if (!alreadySent) {
+                // Get last messages for context
+                const conversation = await prisma.conversation.findUnique({
+                    where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
+                    include: { messages: { orderBy: { createdAt: 'desc' }, take: 10 } }
+                });
+
+                // 2. Decide if follow-up is strategically good
+                const shouldFollowUp = await this.aiShouldFollowUp(bot, contact, rule, conversation?.messages || []);
+                if (!shouldFollowUp) {
+                    console.log(`[FollowUp] AI decided NOT to follow up with ${contact.phone} for rule ${rule.name}`);
+                    return;
+                }
+
                 console.log(`[FollowUp] Generating AI message for ${contact.phone} (${rule.name})`);
 
                 let actingBot = bot;
@@ -190,21 +205,22 @@ export const FollowUpService = {
                 const generatedMessage = await this.generateAiFollowup(actingBot, contact, rule);
 
                 if (generatedMessage) {
-                    await UzapiService.sendMessage(bot.sessionName!, contact.phone, generatedMessage);
+                    await UzapiService.sendMessage(bot.sessionName!, normalizedPhone, generatedMessage);
 
-                    const conversation = await prisma.conversation.findUnique({
-                        where: { botId_remoteId: { botId: bot.id, remoteId: contact.phone } }
+                    // ENSURE Conversation exists before logging message
+                    const conversation = await prisma.conversation.upsert({
+                        where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
+                        update: { updatedAt: new Date() },
+                        create: { botId: bot.id, remoteId: normalizedPhone, channel: 'whatsapp' }
                     });
 
-                    if (conversation) {
-                        await prisma.message.create({
-                            data: {
-                                conversationId: conversation.id,
-                                role: 'assistant',
-                                content: `[FOLLOW-UP: ${rule.name}] ${generatedMessage}`
-                            }
-                        });
-                    }
+                    await prisma.message.create({
+                        data: {
+                            conversationId: conversation.id,
+                            role: 'assistant',
+                            content: `[FOLLOW-UP: ${rule.name}] ${generatedMessage}`
+                        }
+                    });
                 }
             }
         }
@@ -215,8 +231,9 @@ export const FollowUpService = {
             const { safeChatCompletion } = require('@/lib/ai-provider');
 
             // Get last messages for context
+            const normalizedPhone = PhoneUtils.normalize(contact.phone);
             const conversation = await prisma.conversation.findUnique({
-                where: { botId_remoteId: { botId: bot.id, remoteId: contact.phone } },
+                where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
                 include: { messages: { orderBy: { createdAt: 'desc' }, take: 15 } }
             });
 
@@ -250,6 +267,54 @@ export const FollowUpService = {
         } catch (error) {
             console.error(`[FollowUp] Error generating AI message:`, error);
             return null;
+        }
+    },
+
+    /**
+     * AI-driven decision gate to avoid unwanted touchpoints.
+     */
+    async aiShouldFollowUp(bot: any, contact: any, rule: any, messages: any[]) {
+        try {
+            const { safeChatCompletion } = require('@/lib/ai-provider');
+
+            const history = messages
+                .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
+                .reverse()
+                .join('\n') || "Sem histórico anterior.";
+
+            const prompt = `
+                Você é o SUPERVISOR de atendimento. Decida se devemos enviar uma mensagem de follow-up agora.
+                
+                HISTÓRICO:
+                ${history}
+                
+                REGRA DE FOLLOW-UP: "${rule.name}"
+                OBJETIVO: ${rule.message}
+                
+                ANALISE:
+                1. O cliente já respondeu positivamente recentemente?
+                2. O cliente pediu para não ser incomodado?
+                3. A última mensagem foi concluída (ex: ele já comprou o que a regra propõe)?
+                4. O tom da conversa indica que um follow-up automático seria chato ou invasivo agora?
+                
+                Responda APENAS com um JSON:
+                { "shouldFollowUp": true/false, "reason": "breve motivo" }
+            `;
+
+            const aiResult = await safeChatCompletion({
+                bot,
+                messages: [{ role: 'system', content: prompt }],
+                response_format: { type: 'json_object' },
+                temperature: 0
+            }) as any;
+
+            const content = typeof aiResult === 'string' ? aiResult : aiResult.content;
+            const result = JSON.parse(content || '{"shouldFollowUp":true}');
+            
+            return !!result.shouldFollowUp;
+        } catch (e) {
+            console.error('[FollowUp] AI decision failed, defaulting to TRUE:', e);
+            return true;
         }
     }
 };

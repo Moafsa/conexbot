@@ -57,11 +57,11 @@ export function buildSystemPrompt(bot: BotContext): string {
     console.log(`[DEBUG] Bot: ${bot.name} | Type: ${bot.businessType} | IsConsultative: ${isConsultative}`);
 
     if (isConsultative) {
-        sections.push(`═══ ESTRATÉGIA DE ENGAJAMENTO (CONSULTIVA) ═══
-1. 🕵️‍♂️ INTERESSE GENUÍNO: Se houver espaço, pergunte sobre o negócio do cliente, desafios ou objetivos.
-2. 🔗 CONEXÃO DE VALOR: Use as respostas dele para explicar POR QUE seu produto é a solução ideal.
-3. 🎯 EXEMPLO: "Entendi que você quer melhorar o networking. O nosso evento focou 100% nisso com dinâmicas de..."
-4. 🚫 NÃO SEJA CHATO: Se o cliente quiser apenas o preço rápido, dê o preço. Mas se ele der abertura, explore.`);
+        sections.push(`═══ ESTRATÉGIA DE ENGAJAMENTO (CONSULTIVA ESTRATÉGICA) ═══
+1. 🎯 FOCO NO PRÓXIMO PASSO: Identifique o que falta para o fechamento (nome? e-mail? interesse?) e guie o cliente para lá.
+2. 🔗 VALOR RÁPIDO: Explique brevemente como o produto resolve a dor dele.
+3. 🚫 SEM RAMBLING: Não faça perguntas genéricas se o cliente já deu o caminho da venda.
+4. ⚡ BREVIDADE: Responda o essencial. Se o cliente quiser saber mais, ele perguntará.`);
     } else {
         sections.push(`═══ ESTRATÉGIA DE ENGAJAMENTO (RÁPIDA) ═══
 1. ⚡ AGILIDADE: O cliente quer comprar rápido. Não faça muitas perguntas.
@@ -99,7 +99,7 @@ export function buildSystemPrompt(bot: BotContext): string {
 7. 👋 CORDIALIDADE BÁSICA: Responda "Oi" educadamente, mas já puxe para o pedido.`);
     }
 
-    sections.push(`Se você escrever um parágrafo longo desnecessário, o cliente vai te ignorar. SEJA NATURAL.`);
+    sections.push(`🚫 REGRA DE OURO: Use no MÁXIMO 3 frases curtas. Se passar disso, você perdeu a atenção do cliente. SEJA NATURAL E DIRETO.`);
 
     // 7. SEGURANÇA E PRIVACIDADE (CRÍTICO)
     sections.push(`═══ 🚨 SEGURANÇA E PRIVACIDADE (MÁXIMA PRIORIDADE) 🚨
@@ -130,7 +130,7 @@ DETECTE AUTOMATICAMENTE quando o cliente fornece informações:
 
 ✅ NOME: Primeira palavra com letra maiúscula em apresentação (ex: "Eu sou João", "Maria aqui")
   → Se o cliente disse o nome, NUNCA mais pergunte "Qual é o seu nome?"
-  → CORRETO: "Prazer, ${bot.contactInfo?.name || '<nome>'}! 😊 E aí, o que..."
+  → CORRETO: "Prazer, ${bot.contactInfo?.name || '<nome>'}! 😊 Diga-me..."
 
 ✅ TELEFONE: Sequência de 9+ dígitos (ex: "11987654321")
   → Se o cliente disse o telefone, NUNCA mais pergunte "Qual é o seu telefone?"

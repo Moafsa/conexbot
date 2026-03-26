@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import prisma from '@/lib/prisma';
+import { PhoneUtils } from '@/lib/phone-utils';
 
 const TEMP_DIR = os.tmpdir();
 
@@ -94,8 +95,8 @@ export async function POST(req: Request) {
                 (message.documentMessage ? '[DOCUMENT]' : '');
             const fromMe = info.FromMe || info.fromMe || false;
 
-            const cleanPhone = senderPhone.replace('@c.us', '').replace('@s.whatsapp.net', '').split(':')[0].split('.')[0];
-            logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}`);
+            const cleanPhone = PhoneUtils.normalize(senderPhone);
+            logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
 
             const isGroup = senderPhone.includes('@g.us');
             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
@@ -139,14 +140,29 @@ export async function POST(req: Request) {
                     const pauseMinutes = (botDoc as any).humanTakeoverPause || 30;
                     const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
                     
-                    // Find or create conversation to apply pause
-                    await prisma.conversation.upsert({
+                    // Upsert conversation to show human interaction in CRM
+                    const conversation = await prisma.conversation.upsert({
                         where: { botId_remoteId: { botId: botDoc.id, remoteId: cleanPhone } },
                         update: { pausedUntil } as any,
                         create: { botId: botDoc.id, remoteId: cleanPhone, channel: 'whatsapp', pausedUntil } as any
                     });
+
+                    // Log the message in CRM as 'assistant' (since it came from the business)
+                    await prisma.message.create({
+                        data: {
+                            conversationId: conversation.id,
+                            role: 'assistant',
+                            content: `[HUMANO]: ${messageBody}`
+                        }
+                    });
+
+                    // Update contact last active
+                    await prisma.contact.updateMany({
+                        where: { phone: cleanPhone, botId: botDoc.id },
+                        data: { lastActive: new Date() }
+                    });
                     
-                    logToFile(`[Webhook] Human Takeover! Pausing bot ${botDoc.name} for ${pauseMinutes}m`);
+                    logToFile(`[Webhook] Human Takeover! Recorded message and Pausing bot ${botDoc.name} for ${pauseMinutes}m`);
                 }
 
                 return NextResponse.json({ status: 'skipped_own' });

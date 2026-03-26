@@ -154,3 +154,86 @@ add_action('wp_footer', function() {
     </div>
     <?php
 });
+
+// --- COMENTÁRIOS WP ---
+
+/**
+ * Hook para quando um novo comentário é inserido
+ */
+add_action('wp_insert_comment', 'conexbot_on_new_comment', 10, 2);
+function conexbot_on_new_comment($comment_ID, $comment) {
+    // Evitar loop infinito (não notificar se o autor for o próprio bot)
+    if (get_comment_meta($comment_ID, 'is_conexbot_reply', true)) {
+        return;
+    }
+
+    $token = get_option('conexbot_api_token');
+    if (!$token) return;
+
+    $post = get_post($comment->comment_post_ID);
+    
+    $payload = [
+        'bot_id'          => $token,
+        'post_id'         => $comment->comment_post_ID,
+        'post_title'      => $post->post_title,
+        'post_content'    => wp_strip_all_tags($post->post_content),
+        'comment_id'      => $comment_ID,
+        'comment_author'  => $comment->comment_author,
+        'comment_content' => $comment->comment_content,
+        'channel'         => 'wordpress'
+    ];
+
+    wp_remote_post('https://app.conext.click/api/webhooks/wordpress', [
+        'body'    => json_encode($payload),
+        'headers' => [
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . $token
+        ],
+        'timeout' => 15,
+        'blocking' => false // Assíncrono para não travar o WP
+    ]);
+}
+
+/**
+ * Handler AJAX para o SaaS postar a resposta da IA
+ */
+add_action('wp_ajax_nopriv_conexbot_ai_reply', 'conexbot_ai_reply_callback');
+add_action('wp_ajax_conexbot_ai_reply', 'conexbot_ai_reply_callback');
+
+function conexbot_ai_reply_callback() {
+    $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
+    $saved_token = get_option('conexbot_api_token');
+
+    if (empty($token) || $token !== $saved_token) {
+        wp_send_json_error('Token inválido', 403);
+    }
+
+    $post_id   = intval($_POST['post_id']);
+    $parent_id = intval($_POST['parent_id']);
+    $message   = wp_kses_post(wp_unslash($_POST['message']));
+    $bot_name  = isset($_POST['bot_name']) ? sanitize_text_field($_POST['bot_name']) : (get_bloginfo('name') . ' (IA)');
+
+    if (!$post_id || !$message) {
+        wp_send_json_error('Dados incompletos', 400);
+    }
+
+    $comment_data = [
+        'comment_post_ID'      => $post_id,
+        'comment_content'      => $message,
+        'comment_type'         => 'comment',
+        'comment_parent'       => $parent_id,
+        'comment_author'       => $bot_name,
+        'comment_author_email' => get_option('admin_email'),
+        'comment_approved'     => 1,
+    ];
+
+    $comment_id = wp_insert_comment($comment_data);
+
+    if ($comment_id) {
+        // Marcar este comentário como sendo do Bot para evitar recursividade
+        add_comment_meta($comment_id, 'is_conexbot_reply', '1');
+        wp_send_json_success(['comment_id' => $comment_id]);
+    } else {
+        wp_send_json_error('Erro ao inserir comentário');
+    }
+}
