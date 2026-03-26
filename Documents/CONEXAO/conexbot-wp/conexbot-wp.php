@@ -3,7 +3,7 @@
  * Plugin Name: Conexbot Automação & CRM (WhatsApp)
  * Plugin URI: https://app.conext.click
  * Description: Integre perfeitamente a Inteligência Artificial Conexão ao seu WooCommerce. O Bot mapeia seu estoque e interage com clientes via Chat e WhatsApp.
- * Version: 1.0.0
+ * Version: 1.0.3
  * Author: Equipe Conexão AI
  * License: GPLv2 or later
  * Text Domain: conexbot-wp
@@ -30,6 +30,25 @@ add_action('plugins_loaded', function() {
 // 3. Menu Administrativo
 add_action('admin_menu', function() {
     add_menu_page('Conexbot', 'Conexbot', 'manage_options', 'conexbot-dashboard', 'conexbot_render_admin_page', 'dashicons-format-chat', 30);
+});
+
+// 3.5 Enfileirar Scripts de Administração
+add_action('admin_enqueue_scripts', function($hook) {
+    if ('toplevel_page_conexbot-dashboard' !== $hook) {
+        return;
+    }
+
+    wp_enqueue_script('conexbot-admin-js', plugin_dir_url(__FILE__) . 'admin/conexbot-admin.js', array('jquery'), '1.0.3', true);
+
+    wp_localize_script('conexbot-admin-js', 'conexbotData', array(
+        'ajaxurl'       => admin_url('admin-ajax.php'),
+        'dashboard_url' => admin_url('admin.php?page=conexbot-dashboard'),
+        'token'         => get_option('conexbot_api_token', ''),
+        'nonces'        => array(
+            'save_action' => wp_create_nonce('conexbot_save_action'),
+            'setup_nonce' => wp_create_nonce('conexbot_setup_nonce'),
+        )
+    ));
 });
 
 // 4. Salvar Configurações (Token e Bot ID)
@@ -86,6 +105,15 @@ add_action('wp_ajax_conexbot_bulk_sync_ajax', function() {
     } else {
         wp_send_json_error(array('message' => 'Erro ao iniciar sincronização.'));
     }
+});
+
+add_action('wp_ajax_conexbot_save_token_ajax', function() {
+    check_ajax_referer('conexbot_save_action', 'security');
+    if (!current_user_can('manage_options')) wp_send_json_error('Sem permissão.');
+
+    $token = sanitize_text_field($_POST['token']);
+    update_option('conexbot_api_token', $token);
+    wp_send_json_success(array('message' => 'Token salvo com sucesso.'));
 });
 
 // 6. Chat Nativo no Frontend

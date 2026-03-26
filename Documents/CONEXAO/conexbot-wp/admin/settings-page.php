@@ -239,59 +239,6 @@ function conexbot_render_admin_page() {
                 </div>
             </div>
 
-            <script>
-            // Botão Desconectar
-            document.getElementById('conexbot-disconnect').addEventListener('click', function(e) {
-                e.preventDefault();
-                if (confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
-                    var data = new FormData();
-                    data.append('action', 'conexbot_disconnect');
-                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
-
-                    fetch(ajaxurl, { method: 'POST', body: data })
-                    .then(() => window.location.reload());
-                }
-            });
-
-            // Salvar Configurações
-            document.getElementById('conexbot-save-settings').addEventListener('click', function() {
-                var botId = document.getElementById('conexbot-bot-id').value;
-                var data = new FormData();
-                data.append('action', 'conexbot_save_setup'); // Matching correct AJAX handler
-                data.append('token', '<?php echo esc_attr($token); ?>');
-                data.append('bot_id', botId);
-                data.append('security', '<?php echo wp_create_nonce('conexbot_setup_nonce'); ?>');
-
-                this.textContent = 'Salvando...';
-                fetch(ajaxurl, { method: 'POST', body: data })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        alert('Configurações salvas!');
-                        window.location.reload();
-                });
-            });
-
-            // Sincronização em Massa
-            document.getElementById('conexbot-bulk-sync').addEventListener('click', function() {
-                if (confirm('Deseja enviar todos os seus produtos publicados para a inteligência artificial agora?')) {
-                    var data = new FormData();
-                    data.append('action', 'conexbot_bulk_sync_ajax');
-                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
-
-                    this.textContent = 'Sincronizando...';
-                    this.disabled = true;
-
-                    fetch(ajaxurl, { method: 'POST', body: data })
-                    .then(r => r.json())
-                    .then(res => {
-                        alert(res.data.message);
-                        this.textContent = 'Sincronizar Tudo';
-                        this.disabled = false;
-                    });
-                }
-            });
-            </script>
 
         <?php elseif (isset($_GET['start_onboarding'])): ?>
             <!-- 2. TELA DE ONBOARDING: Só carrega o iframe quando você clica em "Começar" -->
@@ -314,25 +261,6 @@ function conexbot_render_admin_page() {
                 </form>
             </div>
             
-            <script>
-            window.addEventListener('message', function(event) {
-                if (event.origin !== "https://app.conext.click" && event.origin !== "http://localhost:3000") return;
-                
-                if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
-                    var data = new FormData();
-                    data.append('action', 'conexbot_save_token_ajax');
-                    data.append('token', event.data.token);
-                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
-
-                    fetch(ajaxurl, { method: 'POST', body: data })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.success) window.location.href = "<?php echo admin_url('admin.php?page=conexbot-dashboard'); ?>";
-                        else alert('Erro ao salvar conexão.');
-                    });
-                }
-            });
-            </script>
             <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard')); ?>" class="btn-disconnect">← Voltar para instruções</a>
 
         <?php else: ?>
