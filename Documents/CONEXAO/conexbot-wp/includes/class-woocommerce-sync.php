@@ -33,7 +33,8 @@ class Conexbot_WooCommerce_Sync {
                 'price'       => $product->get_price(),
                 'stock'       => $product->get_stock_quantity() !== null ? $product->get_stock_quantity() : 999,
                 'description' => strip_tags($product->get_short_description()),
-                'active'      => $product->get_status() === 'publish'
+                'active'      => $product->get_status() === 'publish',
+                'url'         => $product->get_permalink()
             )
         );
 

@@ -290,7 +290,7 @@ export const MessageProcessor = {
             const legacyContext = retrieveRelevantChunks(legacyChunks, messageText);
 
             const productContext = bot.products.map((p: any) =>
-                `- ${p.name}: R$ ${p.price.toFixed(2)} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'}) - ${p.description || ''}`
+                `- ${p.name}: R$ ${p.price.toFixed(2)} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'}) ${p.externalUrl ? `[Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`
             ).join('\n');
 
             const combinedContext = [vectorContext, legacyContext, productContext ? `═══ CATÁLOGO DE PRODUTOS ═══\n${productContext}` : ''].filter(Boolean).join('\n\n---\n\n');
@@ -324,6 +324,7 @@ export const MessageProcessor = {
                 websiteUrl: activeBot.websiteUrl || undefined,
                 relevantKnowledge: combinedContext || undefined,
                 mediaList: mediaList.length > 0 ? mediaList : undefined,
+                isWordpress: activeBot.isWordpress,
                 contactInfo: {
                     name: existingContact.name,
                     email: existingContact.email,

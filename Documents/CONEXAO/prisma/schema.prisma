@@ -138,6 +138,7 @@ model Bot {
   smtpConfigs         SmtpConfig[]
   vectors             VectorStore[]
   coupons             Coupon[]
+  isWordpress         Boolean            @default(false)
 
   // Hierarchy for Agent Isolation
   masterId            String?
@@ -246,6 +247,7 @@ model Product {
   updatedAt     DateTime       @updatedAt
   botId         String
   videoUrl      String?
+  externalUrl   String?
   billingPeriod BillingPeriod?
   iterations    Int?
   type          ProductType    @default(SINGLE)

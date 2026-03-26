@@ -36,6 +36,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Nenhum Bot Ativo encontrado na conta para receber o Sync' }, { status: 404 });
         }
 
+        // Marcar como bot vinculado ao WordPress se ainda não estiver
+        if (!(bot as any).isWordpress) {
+            await prisma.bot.update({
+                where: { id: bot.id },
+                data: { isWordpress: true }
+            });
+        }
+
         if (type === 'product') {
             const existingProduct = await prisma.product.findFirst({
                 where: { botId: bot.id, name: data.name } // Pode ser substituído por SKU ou externalId futuro
@@ -48,7 +56,8 @@ export async function POST(req: Request) {
                         price: parseFloat(data.price || 0),
                         stock: parseInt(data.stock || 0),
                         description: data.description || existingProduct.description,
-                        active: data.active !== undefined ? data.active : true
+                        active: data.active !== undefined ? data.active : true,
+                        externalUrl: data.url || existingProduct.externalUrl
                     }
                 });
             } else {
@@ -59,7 +68,8 @@ export async function POST(req: Request) {
                         stock: parseInt(data.stock || 0),
                         description: data.description || '',
                         active: data.active !== undefined ? data.active : true,
-                        botId: bot.id
+                        botId: bot.id,
+                        externalUrl: data.url || ''
                     }
                 });
             }

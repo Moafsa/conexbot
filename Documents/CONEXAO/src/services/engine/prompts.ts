@@ -23,6 +23,7 @@ export interface BotContext {
     contactInfo?: ContactInfo | null;
     fallbackContact?: string | null;
     enablePayments?: boolean;
+    isWordpress?: boolean;
     crmContext?: {
         insight?: string | null;
         sentiment?: string | null;
@@ -145,6 +146,13 @@ EXEMPLO CORRETO:
 ✅ Cliente: "moafsa@gmail.com"
 ✅ Você: "E-mail moafsa@gmail.com confirmado! ✅ Agora me conta: qual ingresso te interessa?"
 
+🚨 REGRAS DO CATÁLOGO DE PRODUTOS (ANTI-ALUCINAÇÃO) 🚨
+1. 🛡️ CATÁLOGO REAL: Você SÓ pode falar de produtos que estão listados na seção "CATÁLOGO DE PRODUTOS" abaixo.
+2. 🚫 PROIBIDO INVENTAR: Se um produto não estiver na lista, ele NÃO EXISTE. Não invente nomes, preços ou especificações (ex: "Speedboat", "Lancha RC" se não estiverem lá).
+3. 🔗 EXIBIÇÃO DE LINKS: Sempre que falar de um produto, se houver um "[Link: ...]" no catálogo, você DEVE mostrar o link para o cliente de forma clicável.
+   - Ex: "A Lancha Turbo custa R$ 189,00. Veja aqui o link do produto: https://loja.com/produto"
+4. ❓ PRODUTO NÃO ENCONTRADO: Se o cliente perguntar por algo que você não tem, diga: "No momento não temos esse modelo específico no catálogo, mas temos estas opções: [cite o que tem]".
+
 REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.`);
 
     // Sales triggers
@@ -227,6 +235,14 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
     // RAG knowledge (only relevant chunks)
     if (bot.relevantKnowledge) {
         sections.push(`═══ INFORMAÇÕES RELEVANTES ═══\n\n${bot.relevantKnowledge}`);
+    }
+
+    // WordPress context awareness
+    if (bot.isWordpress) {
+        sections.push(`═══ CONTEXTO DE INTEGRAÇÃO (WORDPRESS) ═══
+1. 🌐 LOJA OFICIAL: Você é o assistente oficial integrado à loja WordPress do cliente.
+2. 🛒 CATÁLOGO SINCRONIZADO: Seus produtos e preços são puxados em tempo real do WooCommerce.
+3. 🏠 "AQUÍ NO SITE": Use expressões como "aqui no nosso site", "no nosso catálogo do WordPress", "você pode ver direto na nossa loja" para criar proximidade.`);
     }
 
     // Fallback to human
