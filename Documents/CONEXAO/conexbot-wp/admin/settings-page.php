@@ -192,15 +192,18 @@ function conexbot_render_admin_page() {
                 </div>
             </div>
 
-            <!-- Mini Config para Múltiplos Bots -->
-            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+            <!-- Multi-Bot & WhatsApp Config -->
+            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
-                    <h4 style="margin:0 0 5px; font-size: 13px;">ID do Bot Específico (Opcional)</h4>
-                    <p style="margin:0; font-size: 11px; color: #64748b;">Deixe em branco para usar o bot principal da sua conta.</p>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">ID do Bot (UUID)</h4>
+                    <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot" style="width: 100%; font-size: 12px; height: 32px;" />
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot (UUID)" style="width: 250px; font-size: 12px; height: 32px;" />
-                    <button id="conexbot-save-bot-id" class="button button-secondary" style="height: 32px;">Salvar ID</button>
+                <div>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp do Bot (p/ Ícone no Site)</h4>
+                    <input type="text" id="conexbot-whatsapp-number" value="<?php echo esc_attr(get_option('conexbot_whatsapp_number', '')); ?>" placeholder="Ex: 5511999999999" style="width: 100%; font-size: 12px; height: 32px;" />
+                </div>
+                <div style="grid-column: span 2; text-align: right;">
+                    <button id="conexbot-save-settings" class="button button-primary" style="height: 32px;">Salvar Configurações</button>
                 </div>
             </div>
 
@@ -212,35 +215,42 @@ function conexbot_render_admin_page() {
                 ></iframe>
             </div>
 
-            <!-- Central de Instruções -->
+            <!-- Central de Instruções WordPress-Native -->
             <div class="conexbot-instructions">
-                <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🚀 Guia Rápido de Utilização</h2>
-                <p style="color: #64748b; font-size: 14px; margin:0;">Tudo o que você precisa para dominar o Conext.click e vender mais.</p>
-                
+                <h2 style="margin:0 0 10px; font-size: 22px; font-weight: 800;">🛠️ Guia de Ativação WordPress</h2>
+                <div style="background: #fff4f4; border-left: 4px solid #ef4444; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
+                    <h4 style="margin:0 0 5px; color: #b91c1c; font-size: 14px;">Requisitos Obrigatórios para a IA funcionar:</h4>
+                    <ul style="margin:0; font-size: 13px; color: #7f1d1d;">
+                        <li>✅ <b>Plano Ativo:</b> Sua conta Conext.click precisa de um plano assinado (ou trial).</li>
+                        <li>✅ <b>AI Key Configurada:</b> No painel acima, vá em <b>Configurações > IA</b> e insira sua chave da OpenAI ou Gemini. Sem isso, o robô não responde.</li>
+                        <li>✅ <b>WhatsApp Conectado:</b> Em <b>Meus Agentes</b>, o status do robô deve estar como <span style="color: #059669; font-weight: bold;">CONECTADO</span>.</li>
+                    </ul>
+                </div>
+
                 <div class="conexbot-inst-grid">
                     <div class="conexbot-inst-card">
-                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-groups"></span> Meus Agentes</h3>
-                        <p class="conexbot-inst-p">Aqui você cria e conecta seus números de WhatsApp. Cada agente pode ter uma personalidade e um papel diferente (Vendas, Suporte, etc).</p>
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-cart"></span> Inteligência de Vendas</h3>
+                        <p class="conexbot-inst-p">O bot lê automaticamente seu catálogo WooCommerce. Ele sabe preços, estoque e envia links reais dos produtos para os clientes finalizarem a compra.</p>
                     </div>
                     
                     <div class="conexbot-inst-card">
-                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-welcome-learn-more"></span> Arquiteto de IA</h3>
-                        <p class="conexbot-inst-p">Dentro de cada agente, use o Arquiteto para treinar a IA. Cole links do seu catálogo, envie PDFs ou descreva as regras do seu negócio.</p>
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-admin-comments"></span> Automação de Contatos</h3>
+                        <p class="conexbot-inst-p">Quando um cliente te chama pelo ícone de chat no site ou pelo WhatsApp, a IA usa o <b>Arquiteto</b> para saber como responder baseado no seu negócio.</p>
                     </div>
                     
                     <div class="conexbot-inst-card">
-                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-chart-bar"></span> CRM & Pipeline</h3>
-                        <p class="conexbot-inst-p">Acompanhe as conversas em tempo real. Movimente os leads entre as etapas do funil para nunca perder uma oportunidade de venda.</p>
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-clock"></span> Gestão de Leads (CRM)</h3>
+                        <p class="conexbot-inst-p">Cada conversa vira um lead automático no seu CRM. Organize por etapas e nunca perca o histórico de quem quase comprou.</p>
                     </div>
                     
                     <div class="conexbot-inst-card">
-                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-visibility"></span> Simulador</h3>
-                        <p class="conexbot-inst-p">Teste as respostas da sua IA antes de salvar. Use o simulador para garantir que ela está falando exatamente o que você deseja.</p>
+                        <h3 class="conexbot-inst-h3"><span class="dashicons dashicons-admin-tools"></span> Teste no Simulador</h3>
+                        <p class="conexbot-inst-p">Antes de colocar o robô para atender público real, use o <b>Simulador</b> no painel para validar se as respostas estão de acordo com o tom da sua marca.</p>
                     </div>
                 </div>
 
-                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-                    <p>💡 <b>Dica:</b> Use o botão "Sincronizar Tudo" no topo para enviar seu catálogo completo do WooCommerce para a IA em um clique.</p>
+                <div style="margin-top: 25px; padding: 20px; background: #eff6ff; border-radius: 12px; font-size: 13px; color: #1e40af; border: 1px solid #bfdbfe;">
+                    <p style="margin:0;">🚀 <b>Dica Pró:</b> O botão "Sincronizar Tudo" envia seus produtos agora. Futuras atualizações de preço ou estoque no WooCommerce são sincronizadas <b>automaticamente</b> em tempo real.</p>
                 </div>
             </div>
 
@@ -258,12 +268,14 @@ function conexbot_render_admin_page() {
                 }
             });
 
-            // Salvar ID do Bot
-            document.getElementById('conexbot-save-bot-id').addEventListener('click', function() {
+            // Salvar Configurações
+            document.getElementById('conexbot-save-settings').addEventListener('click', function() {
                 var botId = document.getElementById('conexbot-bot-id').value;
+                var whatsapp = document.getElementById('conexbot-whatsapp-number').value;
                 var data = new FormData();
                 data.append('action', 'conexbot_save_bot_id_ajax');
                 data.append('bot_id', botId);
+                data.append('whatsapp', whatsapp);
                 data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
 
                 this.textContent = 'Salvando...';
@@ -271,7 +283,7 @@ function conexbot_render_admin_page() {
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
-                        alert('ID do Bot salvo com sucesso!');
+                        alert('Configurações salvas com sucesso!');
                         window.location.reload();
                     } else alert('Erro ao salvar.');
                 });
