@@ -4,12 +4,16 @@ import { decode } from 'next-auth/jwt';
 
 export async function GET(req: Request) {
     try {
+        const { searchParams } = new URL(req.url);
+        const queryToken = searchParams.get('token');
         const authHeader = req.headers.get('authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        
+        const token = queryToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+
+        if (!token) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const token = authHeader.split(' ')[1];
         const secret = process.env.NEXTAUTH_SECRET || '';
 
         // Decode token
@@ -37,7 +41,8 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Conta não encontrada' }, { status: 404 });
         }
 
-        const hasPlan = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(tenant.subscription.status);
+        const subStatus = tenant.subscription?.status;
+        const hasPlan = subStatus && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(subStatus);
         const hasBot = tenant.bots.length > 0;
         const botConnected = tenant.bots.some(b => b.connectionStatus === 'CONNECTED');
 
