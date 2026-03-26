@@ -13,15 +13,31 @@ if (!defined('ABSPATH')) {
     exit; // Segurança: Exit se acessado diretamente
 }
 
+// 1. Definição das constantes e inclusão de arquivos essenciais
 define('CONEXBOT_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('CONEXBOT_API_URL', 'https://app.conext.click/api/v1/wp'); // Integrando com a URL oficial
-define('CONEXBOT_EMBED_URL', 'https://app.conext.click/embed/crm'); // Base URL for dashboard
+define('CONEXBOT_API_URL', 'https://app.conext.click/api/v1/wp'); 
+define('CONEXBOT_EMBED_URL', 'https://app.conext.click/embed/crm'); 
+require_once CONEXBOT_PLUGIN_DIR . 'includes/class-woocommerce-sync.php';
+require_once CONEXBOT_PLUGIN_DIR . 'admin/settings-page.php';
 
-// Inicializa Sincronização
+// 2. Inicialização da Sincronização WooCommerce
 add_action('plugins_loaded', function() {
     if (class_exists('WooCommerce')) {
         new Conexbot_WooCommerce_Sync();
     }
+});
+
+// 3. Registro do Menu Administrativo (Obrigatório para o painel aparecer)
+add_action('admin_menu', function() {
+    add_menu_page(
+        'Conexbot',
+        'Conexbot',
+        'manage_options',
+        'conexbot-dashboard',
+        'conexbot_render_admin_page',
+        'dashicons-format-chat',
+        30
+    );
 });
 
 // Handler de Reset de Emergência via URL (?conexbot_reset=1)
