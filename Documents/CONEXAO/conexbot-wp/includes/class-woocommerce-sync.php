@@ -12,6 +12,9 @@ class Conexbot_WooCommerce_Sync {
         
         // Hooks para Pedidos
         add_action('woocommerce_order_status_changed', array($this, 'sync_order_to_conexbot'), 10, 4);
+
+        // Hooks para Comentários (Informar a IA sobre atividade no Blog)
+        add_action('comment_post', array($this, 'sync_comment_to_conexbot'), 10, 3);
     }
 
     public function sync_product_to_conexbot($product_id, $product = null) {
@@ -52,6 +55,28 @@ class Conexbot_WooCommerce_Sync {
                 'total'    => $order->get_total(),
                 'status'   => $status_to,
                 'email'    => $order->get_billing_email()
+            )
+        );
+
+        $this->disparar_webhook($payload, $token);
+    }
+
+    public function sync_comment_to_conexbot($comment_id, $comment_approved, $commentdata) {
+        $token = get_option('conexbot_api_token', '');
+        if (empty($token)) return;
+
+        // Só sincroniza comentários em posts/páginas (ignora pings/trackbacks)
+        if (!empty($commentdata['comment_type']) && $commentdata['comment_type'] !== 'comment') return;
+
+        $payload = array(
+            'type' => 'comment',
+            'data' => array(
+                'id'           => $comment_id,
+                'author_name'  => $commentdata['comment_author'],
+                'author_email' => $commentdata['comment_author_email'],
+                'content'      => $commentdata['comment_content'],
+                'post_id'      => $commentdata['comment_post_ID'],
+                'post_title'   => get_the_title($commentdata['comment_post_ID'])
             )
         );
 

@@ -199,8 +199,9 @@ function conexbot_render_admin_page() {
                     <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot" style="width: 100%; font-size: 12px; height: 32px;" />
                 </div>
                 <div>
-                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp do Bot (p/ Ícone no Site)</h4>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">WhatsApp do Canal de Chat (no Site)</h4>
                     <input type="text" id="conexbot-whatsapp-number" value="<?php echo esc_attr(get_option('conexbot_whatsapp_number', '')); ?>" placeholder="Ex: 5511999999999" style="width: 100%; font-size: 12px; height: 32px;" />
+                    <p style="font-size: 10px; color: #64748b; margin: 4px 0 0;">Este número serve apenas para o link do botão flutuante. Comentários e Tickets funcionam via API.</p>
                 </div>
                 <div style="grid-column: span 2; text-align: right;">
                     <button id="conexbot-save-settings" class="button button-primary" style="height: 32px;">Salvar Configurações</button>

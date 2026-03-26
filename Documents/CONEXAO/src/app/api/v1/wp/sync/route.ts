@@ -73,6 +73,34 @@ export async function POST(req: Request) {
                     }
                 });
             }
+        } else if (type === 'comment') {
+            // Sincronizar comentário como uma nova mensagem/conversa
+            const remoteId = `WP_COMMENT_${data.id}`;
+            const authorIdentifier = data.author_email || `WP_USER_${data.author_name || 'anon'}`;
+            
+            // Criar ou encontrar conversa
+            const conversation = await prisma.conversation.upsert({
+                where: {
+                    botId_remoteId: { botId: bot.id, remoteId: remoteId },
+                },
+                update: { updatedAt: new Date() },
+                create: {
+                    botId: bot.id,
+                    remoteId: remoteId,
+                    channel: 'wordpress',
+                },
+            });
+
+            // Adicionar a mensagem do comentário
+            await prisma.message.create({
+                data: {
+                    conversationId: conversation.id,
+                    content: `[COMENTÁRIO NO POST: ${data.post_title}]\n"${data.content}"`,
+                    role: 'user',
+                },
+            });
+
+            return NextResponse.json({ success: true, message: 'Comentário sincronizado com a IA do bot' });
         } else if (type === 'order') {
              // Futuramente: Update Order Table 
              return NextResponse.json({ success: true, message: 'Order sync não implementado ainda, mas payload recebido' });
