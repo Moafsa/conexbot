@@ -38,12 +38,12 @@ export default function WpOnboardingPage() {
 
     const [userName, setUserName] = useState("");
     const [debugInfo, setDebugInfo] = useState<any>(null);
+    const [details, setDetails] = useState("");
 
     const checkStatus = async (email: string) => {
         setLoading(true);
+        setDetails("");
         try {
-            // We need a token to check status statelessly, 
-            // but for the wizard we can use the common session if available
             const res = await fetch(`/api/v1/wp/auth?email=${email}`);
             const data = await res.json();
             
@@ -54,6 +54,12 @@ export default function WpOnboardingPage() {
                 });
                 const statusData = await statusRes.json();
                 
+                if (!statusRes.ok) {
+                    setError(statusData.error || "Erro de validação");
+                    setDetails(statusData.details || "");
+                    return;
+                }
+
                 setUserName(statusData.name);
                 setDebugInfo(statusData.debug);
 
@@ -63,8 +69,10 @@ export default function WpOnboardingPage() {
                     setStep('plan');
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Status Check Error:", err);
+            setError("Erro ao verificar status");
+            setDetails(err.message || "");
         } finally {
             setLoading(false);
         }
@@ -96,6 +104,12 @@ export default function WpOnboardingPage() {
                 headers: { "Authorization": `Bearer ${data.token}` }
             });
             const statusData = await statusRes.json();
+
+            if (!statusRes.ok) {
+                setError(statusData.error || "Erro ao validar conta");
+                setDetails(statusData.details || "");
+                return;
+            }
 
             if (statusData.hasPlan) {
                 handleFinish(data.token);

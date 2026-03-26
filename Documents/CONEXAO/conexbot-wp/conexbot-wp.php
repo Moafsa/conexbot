@@ -24,6 +24,15 @@ add_action('plugins_loaded', function() {
     }
 });
 
+// Handler de Reset de Emergência via URL (?conexbot_reset=1)
+add_action('admin_init', function() {
+    if (isset($_GET['conexbot_reset']) && current_user_can('manage_options')) {
+        delete_option('conexbot_api_token');
+        wp_redirect(remove_query_arg('conexbot_reset'));
+        exit;
+    }
+});
+
 /**
  * Handlers AJAX para Autenticação
  */

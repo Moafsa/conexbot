@@ -222,5 +222,12 @@ function conexbot_render_admin_page() {
             </script>
         <?php endif; ?>
     </div>
+    
+    <div style="text-align: center; margin-top: 15px; opacity: 0.5;">
+        <a href="<?php echo esc_url(add_query_arg('conexbot_reset', '1', admin_url('admin.php?page=conexbot-dashboard'))); ?>" style="color: #666; font-size: 11px; text-decoration: none;">
+            <span class="dashicons dashicons-image-rotate" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
+            Resetar Plugin (Usar em caso de erro de conexão)
+        </a>
+    </div>
     <?php
 }

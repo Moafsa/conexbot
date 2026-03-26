@@ -13,26 +13,26 @@ export function generateWpToken(payload: { id: string; email: string; role?: str
         iat: Date.now()
     });
     const signature = crypto.createHmac('sha256', SECRET).update(data).digest('hex');
-    // Base64 do payload + assinatura separada por ponto
-    const token = Buffer.from(data).toString('base64') + '.' + signature;
-    return token;
+    // Prefix for identification + Base64 payload + Signature
+    return 'CONEXT_' + Buffer.from(data).toString('base64') + '.' + signature;
 }
 
-/**
- * Verifica o token assinado
- */
 export function verifyWpToken(token: string) {
     try {
-        const [dataBase64, signature] = token.split('.');
+        if (!token.startsWith('CONEXT_')) {
+            console.error('Invalid token prefix');
+            return null;
+        }
+
+        const actualToken = token.replace('CONEXT_', '');
+        const [dataBase64, signature] = actualToken.split('.');
         if (!dataBase64 || !signature) return null;
 
         const data = Buffer.from(dataBase64, 'base64').toString('utf-8');
         const expectedSignature = crypto.createHmac('sha256', SECRET).update(data).digest('hex');
         
         if (signature === expectedSignature) {
-            const parsed = JSON.parse(data);
-            // Opcional: validar expiração se quiser (aqui deixamos longa duração como solicitado)
-            return parsed;
+            return JSON.parse(data);
         }
     } catch (e) {
         console.error('Verify WP Token Error:', e);
