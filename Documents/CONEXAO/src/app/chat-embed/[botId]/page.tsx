@@ -15,6 +15,7 @@ export default function WebChatWidget() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [botName, setBotName] = useState('Assistente IA');
     const [sessionId, setSessionId] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +29,14 @@ export default function WebChatWidget() {
             }
             setSessionId(sId);
             
+            // Buscar informações do bot
+            fetch(`/api/v1/bot-info/${botId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.name) setBotName(data.name);
+                })
+                .catch(err => console.error('Error fetching bot info:', err));
+
             // Mensagem de boas-vindas (opcional)
             setMessages([{
                 role: 'assistant',
@@ -91,7 +100,7 @@ export default function WebChatWidget() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
                 </div>
                 <div>
-                    <h3 className="font-bold text-slate-800 text-sm">Assistente IA</h3>
+                    <h3 className="font-bold text-slate-800 text-sm">{botName}</h3>
                     <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                         <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Online agora</span>
