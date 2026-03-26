@@ -94,3 +94,37 @@ function conexbot_disconnect_handler() {
     delete_option('conexbot_api_token');
     wp_send_json_success(array('message' => 'Desconectado com sucesso.'));
 }
+
+// 3. Sincronização em Massa (Bulk Sync)
+add_action('wp_ajax_conexbot_bulk_sync_ajax', 'conexbot_bulk_sync_ajax_handler');
+function conexbot_bulk_sync_ajax_handler() {
+    check_ajax_referer('conexbot_save_action', 'security');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Sem permissão.'));
+    }
+
+    $sync = new Conexbot_WooCommerce_Sync();
+    $count = $sync->sincronizar_todos_os_produtos();
+
+    if ($count !== false) {
+        wp_send_json_success(array('message' => "Sincronização iniciada! $count produtos enviados para a IA."));
+    } else {
+        wp_send_json_error(array('message' => 'Erro ao iniciar sincronização. Verifique se o plugin está conectado.'));
+    }
+}
+
+// 4. Salvar ID do Bot Específico
+add_action('wp_ajax_conexbot_save_bot_id_ajax', 'conexbot_save_bot_id_ajax_handler');
+function conexbot_save_bot_id_ajax_handler() {
+    check_ajax_referer('conexbot_save_action', 'security');
+    
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Sem permissão.'));
+    }
+
+    $bot_id = isset($_POST['bot_id']) ? sanitize_text_field($_POST['bot_id']) : '';
+    update_option('conexbot_bot_id', $bot_id);
+    
+    wp_send_json_success(array('message' => 'ID do Bot atualizado com sucesso.'));
+}

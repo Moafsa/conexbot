@@ -58,18 +58,43 @@ class Conexbot_WooCommerce_Sync {
     }
 
     private function disparar_webhook($payload, $token) {
+        $bot_id = get_option('conexbot_bot_id', '');
+
         // Disparo assíncrono para o SaaS no Next.js
         wp_remote_post(CONEXBOT_API_URL . '/sync', array(
             'method'      => 'POST',
-            'timeout'     => 5, // Curto para não travar o carregamento da página do lojista
+            'timeout'     => 5,
             'redirection' => 5,
             'httpversion' => '1.0',
-            'blocking'    => false, // Non-blocking é o ouro para WooCommerce! 
+            'blocking'    => false,
             'headers'     => array(
                 'Authorization' => 'Bearer ' . $token,
-                'Content-Type'  => 'application/json'
+                'Content-Type'  => 'application/json',
+                'x-bot-id'      => $bot_id
             ),
             'body'        => json_encode($payload),
         ));
+    }
+
+    /**
+     * Puxa todos os produtos publicados e envia para o SaaS (Bulk Sync)
+     */
+    public function sincronizar_todos_os_produtos() {
+        $token = get_option('conexbot_api_token', '');
+        if (empty($token)) return false;
+
+        $args = array(
+            'status' => 'publish',
+            'limit'  => -1,
+        );
+        $products = wc_get_products($args);
+        $count = 0;
+
+        foreach ($products as $product) {
+            $this->sync_product_to_conexbot($product->get_id(), $product);
+            $count++;
+        }
+
+        return $count;
     }
 }

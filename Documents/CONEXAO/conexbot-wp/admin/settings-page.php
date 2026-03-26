@@ -131,14 +131,32 @@ function conexbot_render_admin_page() {
         
         <?php if ($is_connected): ?>
             <!-- 1. TELA DE DASHBOARD: Só carrega se houver token -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div class="flex items-center gap-2">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff;">
                         <span class="dashicons dashicons-format-chat" style="font-size: 18px; width: 18px; height: 18px;"></span>
                     </div>
-                    <h2 style="margin:0; font-weight: 800; font-size: 20px;">Painel Conext.click</h2>
+                    <h2 style="margin:0; font-weight: 800; font-size: 18px;">Painel Conext.click</h2>
                 </div>
-                <a href="#" id="conexbot-disconnect" class="btn-disconnect" style="margin:0;">Desconectar da Conta</a>
+                
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="conexbot-bulk-sync" class="button button-primary" style="background: #10b981; border: none; height: 32px;">
+                        <span class="dashicons dashicons-update" style="font-size: 16px; margin-top: 4px;"></span> Sincronizar Tudo
+                    </button>
+                    <a href="#" id="conexbot-disconnect" class="btn-disconnect" style="margin:0; padding: 5px 10px; border: 1px solid #ef4444; border-radius: 6px; color: #ef4444;">Desconectar</a>
+                </div>
+            </div>
+
+            <!-- Mini Config para Múltiplos Bots -->
+            <div style="background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h4 style="margin:0 0 5px; font-size: 13px;">ID do Bot Específico (Opcional)</h4>
+                    <p style="margin:0; font-size: 11px; color: #64748b;">Deixe em branco para usar o bot principal da sua conta.</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="conexbot-bot-id" value="<?php echo esc_attr(get_option('conexbot_bot_id', '')); ?>" placeholder="ID do Bot (UUID)" style="width: 250px; font-size: 12px; height: 32px;" />
+                    <button id="conexbot-save-bot-id" class="button button-secondary" style="height: 32px;">Salvar ID</button>
+                </div>
             </div>
 
             <div class="iframe-container" style="margin-top: 10px;">
@@ -150,6 +168,7 @@ function conexbot_render_admin_page() {
             </div>
 
             <script>
+            // Botão Desconectar
             document.getElementById('conexbot-disconnect').addEventListener('click', function(e) {
                 e.preventDefault();
                 if (confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
@@ -159,6 +178,45 @@ function conexbot_render_admin_page() {
 
                     fetch(ajaxurl, { method: 'POST', body: data })
                     .then(() => window.location.reload());
+                }
+            });
+
+            // Salvar ID do Bot
+            document.getElementById('conexbot-save-bot-id').addEventListener('click', function() {
+                var botId = document.getElementById('conexbot-bot-id').value;
+                var data = new FormData();
+                data.append('action', 'conexbot_save_bot_id_ajax');
+                data.append('bot_id', botId);
+                data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+
+                this.textContent = 'Salvando...';
+                fetch(ajaxurl, { method: 'POST', body: data })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        alert('ID do Bot salvo com sucesso!');
+                        window.location.reload();
+                    } else alert('Erro ao salvar.');
+                });
+            });
+
+            // Sincronização em Massa
+            document.getElementById('conexbot-bulk-sync').addEventListener('click', function() {
+                if (confirm('Deseja enviar todos os seus produtos publicados para a inteligência artificial agora?')) {
+                    var data = new FormData();
+                    data.append('action', 'conexbot_bulk_sync_ajax');
+                    data.append('security', '<?php echo wp_create_nonce('conexbot_save_action'); ?>');
+
+                    this.textContent = 'Sincronizando...';
+                    this.disabled = true;
+
+                    fetch(ajaxurl, { method: 'POST', body: data })
+                    .then(r => r.json())
+                    .then(res => {
+                        alert(res.data.message);
+                        this.textContent = 'Sincronizar Tudo';
+                        this.disabled = false;
+                    });
                 }
             });
             </script>

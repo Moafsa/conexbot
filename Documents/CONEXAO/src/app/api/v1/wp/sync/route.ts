@@ -1,26 +1,21 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decode } from 'next-auth/jwt';
+import { verifyWpToken } from '@/lib/wp-token';
 
 export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get('authorization');
+        const botIdHeader = req.headers.get('x-bot-id'); // Header opcional para múltiplos bots
+
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return NextResponse.json({ error: 'Token (Bearer) não fornecido ou inválido' }, { status: 401 });
         }
 
         const tokenString = authHeader.split(' ')[1];
-        const secret = process.env.NEXTAUTH_SECRET || '';
-        
-        let decoded;
-        try {
-            decoded = await decode({ token: tokenString, secret });
-        } catch (e) {
-            return NextResponse.json({ error: 'Token JWT inválido ou expirado' }, { status: 401 });
-        }
+        const decoded = verifyWpToken(tokenString);
 
         if (!decoded || !decoded.id) {
-            return NextResponse.json({ error: 'Identificação de Tenant falhou' }, { status: 401 });
+            return NextResponse.json({ error: 'Token inválido ou expirado' }, { status: 401 });
         }
 
         const tenantId = decoded.id as string;
@@ -31,9 +26,9 @@ export async function POST(req: Request) {
              return NextResponse.json({ error: 'Payload malformado (type e data requeridos)' }, { status: 400 });
         }
         
-        // Pega o bot principal do usuário para atrelar a inteligência do WP
+        // Pega o bot específico (se header presente) ou o principal do usuário
         const bot = await prisma.bot.findFirst({
-            where: { tenantId, status: 'active' },
+            where: botIdHeader ? { id: botIdHeader, tenantId } : { tenantId, status: 'active' },
             orderBy: { createdAt: 'asc' }
         });
 
