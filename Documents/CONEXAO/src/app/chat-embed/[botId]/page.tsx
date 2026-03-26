@@ -76,6 +76,11 @@ export default function WebChatWidget() {
                 })
             });
 
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `Erro ${res.status}`);
+            }
+
             const data = await res.json();
             
             if (data.text) {
@@ -85,8 +90,13 @@ export default function WebChatWidget() {
                     timestamp: new Date()
                 }]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error sending message:', error);
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `Desculpe, não consegui processar sua mensagem. (Erro: ${error.message})`,
+                timestamp: new Date()
+            }]);
         } finally {
             setLoading(false);
         }
