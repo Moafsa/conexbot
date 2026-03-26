@@ -21,6 +21,7 @@ export async function GET(req: Request) {
         const token = await encode({
             token: { id: tenant.id, email: tenant.email, role: tenant.role },
             secret,
+            salt: 'next-auth.session-token',
             maxAge: 10 * 365 * 24 * 60 * 60
         });
 
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
             const token = await encode({
                 token: { id: newTenant.id, email: newTenant.email, role: newTenant.role },
                 secret,
+                salt: 'next-auth.session-token',
                 maxAge: 10 * 365 * 24 * 60 * 60
             });
 

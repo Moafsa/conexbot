@@ -51,18 +51,21 @@ export async function GET(req: Request) {
         }
 
         const subStatus = tenant.subscription?.status;
-        const hasPlan = subStatus && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(subStatus);
+        const hasPlan = subStatus && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE', 'FREE'].includes(subStatus);
         const hasBot = tenant.bots.length > 0;
         const botConnected = tenant.bots.some(b => b.connectionStatus === 'CONNECTED');
 
         return NextResponse.json({
             id: tenant.id,
-            name: tenant.name,
+            name: tenant.name || 'Usuário',
             email: tenant.email,
             hasPlan: !!hasPlan,
-            subscriptionStatus: tenant.subscription?.status || 'NONE',
+            subscriptionStatus: subStatus || 'NONE',
             hasBot,
-            botConnected
+            botConnected,
+            debug: {
+                subStatus
+            }
         });
 
     } catch (error) {

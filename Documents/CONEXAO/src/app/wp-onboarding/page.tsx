@@ -36,6 +36,9 @@ export default function WpOnboardingPage() {
         }
     }, [sessionStatus, step]);
 
+    const [userName, setUserName] = useState("");
+    const [debugInfo, setDebugInfo] = useState<any>(null);
+
     const checkStatus = async (email: string) => {
         setLoading(true);
         try {
@@ -45,10 +48,14 @@ export default function WpOnboardingPage() {
             const data = await res.json();
             
             if (data.token) {
+                setTenantToken(data.token);
                 const statusRes = await fetch("/api/v1/wp/me", {
                     headers: { "Authorization": `Bearer ${data.token}` }
                 });
                 const statusData = await statusRes.json();
+                
+                setUserName(statusData.name);
+                setDebugInfo(statusData.debug);
 
                 if (statusData.hasPlan) {
                     handleFinish(data.token);
@@ -397,6 +404,14 @@ export default function WpOnboardingPage() {
                             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-relaxed px-10">
                                 Após a confirmação, o WordPress será <br/>habilitado automaticamente.
                             </p>
+
+                            {debugInfo?.subStatus && (
+                                <div className="mt-2 p-1.5 bg-white/5 rounded-lg border border-white/5 inline-block mx-auto">
+                                    <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">
+                                        Status da Assinatura: {debugInfo.subStatus}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
 
