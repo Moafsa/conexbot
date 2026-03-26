@@ -442,10 +442,37 @@ export default function WpOnboardingPage() {
                             
                             <button 
                                 onClick={() => handleFinish(tenantToken)}
-                                className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-black transition-all shadow-lg shadow-green-500/20 mb-8"
+                                className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl text-sm font-black transition-all shadow-lg shadow-green-500/20 mb-6"
                             >
                                 Prosseguir para o Dashboard
                             </button>
+
+                            <div className="w-full max-w-xs p-4 bg-white/5 rounded-2xl border border-white/5 text-left mb-6">
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse" />
+                                    Conexão Manual (Obrigatória se o botão falhar)
+                                </p>
+                                <p className="text-[#9ea0a3] text-[10px] leading-relaxed mb-3">
+                                    Copie o código abaixo e cole nas configurações do Plugin no seu WordPress:
+                                </p>
+                                <div className="flex gap-2">
+                                    <input 
+                                        readOnly 
+                                        value={tenantToken || ""}
+                                        className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[9px] font-mono text-gray-400 focus:outline-none"
+                                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(tenantToken || "");
+                                            alert("Código Copiado!");
+                                        }}
+                                        className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg text-[10px] font-bold transition-all"
+                                    >
+                                        Copiar
+                                    </button>
+                                </div>
+                            </div>
 
                             <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />

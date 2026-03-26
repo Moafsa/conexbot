@@ -161,7 +161,6 @@ function conexbot_render_admin_page() {
                 </a>
             </div>
 
-        <?php elseif (isset($_GET['start_onboarding']) && !$is_connected): ?>
             <!-- Iframe de Onboarding -->
             <div class="iframe-container">
                 <iframe 
@@ -169,6 +168,17 @@ function conexbot_render_admin_page() {
                     style="width: 100%; height: 85vh; border: none; display: block;"
                     id="conexbot-onboarding-iframe"
                 ></iframe>
+            </div>
+
+            <div style="margin-top: 30px; padding: 20px; background: #fff; border: 1px dashed #ccc; border-radius: 8px;">
+                <h4 style="margin-top: 0; color: #d63638;"><span class="dashicons dashicons-warning" style="vertical-align: middle;"></span> Conexão de Emergência</h4>
+                <p style="font-size: 12px; color: #666;">Se o botão "Prosseguir" no quadro acima não funcionar, copie o código gerado no final do processo e cole abaixo:</p>
+                <form method="post" action="">
+                    <?php wp_nonce_field('conexbot_manual_action', 'conexbot_manual_nonce'); ?>
+                    <input type="text" name="conexbot_manual_token" placeholder="CONEXT_..." style="width: 100%; margin-bottom: 10px; font-family: monospace; font-size: 11px;" />
+                    <button type="submit" name="conexbot_save_manual" class="button button-secondary">Salvar Código Manualmente</button>
+                    <a href="<?php echo esc_url(remove_query_arg('start_onboarding')); ?>" style="margin-left: 10px; font-size: 12px; text-decoration: none; color: #666;">Cancelar</a>
+                </form>
             </div>
             
             <script>

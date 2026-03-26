@@ -31,6 +31,17 @@ add_action('admin_init', function() {
         wp_redirect(remove_query_arg('conexbot_reset'));
         exit;
     }
+
+    // Handler de Salvamento Manual
+    if (isset($_POST['conexbot_save_manual']) && current_user_can('manage_options')) {
+        check_admin_referer('conexbot_manual_action', 'conexbot_manual_nonce');
+        $token = sanitize_text_field($_POST['conexbot_manual_token']);
+        if (!empty($token)) {
+            update_option('conexbot_api_token', $token);
+            wp_redirect(add_query_arg('message', 'connected'));
+            exit;
+        }
+    }
 });
 
 /**
