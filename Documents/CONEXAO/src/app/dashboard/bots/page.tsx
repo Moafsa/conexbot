@@ -26,6 +26,15 @@ export default function BotsPage() {
         }
     };
 
+    const handleCopyBotId = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            toast.success("ID do Agente copiado!");
+        }).catch(err => {
+            console.error('Clipboard error:', err);
+            toast.error("Erro ao copiar ID.");
+        });
+    };
+
     const handleShare = (bot: any) => {
         console.log('Bot sharing requested:', { id: bot.id, name: bot.name, token: bot.connectToken });
         
@@ -244,6 +253,13 @@ export default function BotsPage() {
                                                     Compartilhar QR Code
                                                 </button>
                                                 <button
+                                                    onClick={() => handleCopyBotId(bot.id)}
+                                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-indigo-400 hover:bg-white/5 hover:text-indigo-300 rounded-lg transition-colors"
+                                                >
+                                                    <Zap size={16} />
+                                                    Copiar ID do Agente
+                                                </button>
+                                                <button
                                                     onClick={() => handleDelete(bot.id)}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors"
                                                 >
@@ -306,6 +322,16 @@ export default function BotsPage() {
                                     title="Compartilhar Link de Conexão"
                                 >
                                     <Share2 size={18} />
+                                </button>
+                                <button
+                                    className="p-2 bg-indigo-600/10 hover:bg-indigo-600/20 rounded-lg text-indigo-400 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyBotId(bot.id);
+                                    }}
+                                    title="Copiar ID do Agente"
+                                >
+                                    <Zap size={18} />
                                 </button>
                                 <button
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"
