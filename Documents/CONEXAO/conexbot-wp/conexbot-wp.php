@@ -95,7 +95,7 @@ add_action('wp_footer', function() {
     
     if (empty($token) || empty($bot_id)) return;
 
-    $chat_url = "https://app.conext.click/embed/chat/" . $bot_id;
+    $chat_url = "https://app.conext.click/chat-embed/" . $bot_id;
     ?>
     <style>
         #conexbot-native-chat { position: fixed; bottom: 30px; right: 30px; z-index: 99999; font-family: sans-serif; }

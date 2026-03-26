@@ -171,7 +171,6 @@ function conexbot_render_admin_page() {
             <!-- 1. TELA DE DASHBOARD: Só carrega se houver token -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <img src="https://app.conext.click/logo-colored.png" alt="ConextBot" style="height: 24px; width: auto;">
                     <h2 style="margin:0; font-weight: 800; font-size: 18px;">Painel de Controle</h2>
                 </div>
                 

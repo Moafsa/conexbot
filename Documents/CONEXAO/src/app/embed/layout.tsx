@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LogOut, Users, MessageSquare, Settings, Loader2 } from "lucide-react";
+import { LogOut, Users, MessageSquare, Settings, Loader2, LayoutDashboard, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -50,10 +50,13 @@ export default function EmbedLayout({
     }, [token, router]);
 
     const navItems = [
+        { label: "Métricas", href: "/embed/dashboard", icon: LayoutDashboard },
         { label: "Meus Agentes", href: "/embed/bots", icon: MessageSquare },
         { label: "CRM Pipeline", href: "/embed/crm", icon: Users },
+        { label: "Financeiro", href: "/embed/finance", icon: CreditCard },
         { label: "Configurações", href: "/embed/settings", icon: Settings },
     ];
+Line 56
 
     if (loading) {
         return (
@@ -74,9 +77,7 @@ export default function EmbedLayout({
             <div className="flex items-center justify-between px-6 py-4 bg-[#0a0a0c] border-b border-white/5 shrink-0 shadow-2xl z-50">
                 <div className="flex items-center gap-8">
                     <div className="flex items-center gap-2">
-                         <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
-                            <span className="text-white font-black text-xs">C</span>
-                        </div>
+                        <img src="/logo-colored.png" alt="ConextBot" className="h-8 w-auto" />
                         <span className="text-lg font-black tracking-tighter text-white">CONEXT<span className="text-purple-500 text-xs shadow-sm">.click</span></span>
                     </div>
                     

@@ -12,18 +12,8 @@ const nextConfig: NextConfig = {
     async headers() {
         return [
             {
-                // Libera o carregamento em Iframe para o WordPress Onboarding
-                source: '/wp-onboarding',
-                headers: [
-                    {
-                        key: 'Content-Security-Policy',
-                        value: "frame-ancestors *",
-                    }
-                ],
-            },
-            {
-                // Libera o carregamento em Iframe para o WordPress
-                source: '/embed/:path*',
+                // Libera o carregamento em Iframe para o WordPress e Chat Widget
+                source: '/(embed|chat-embed|wp-onboarding)/:path*',
                 headers: [
                     {
                         key: 'Content-Security-Policy',
@@ -33,7 +23,7 @@ const nextConfig: NextConfig = {
             },
             {
                 // Protege o restante da aplicação contra Clickjacking
-                source: '/((?!embed|wp-onboarding).*)',
+                source: '/((?!embed|chat-embed|wp-onboarding).*)',
                 headers: [
                     {
                         key: 'X-Frame-Options',
