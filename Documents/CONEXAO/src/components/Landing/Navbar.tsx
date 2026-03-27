@@ -27,7 +27,6 @@ export default function Navbar({ branding }: { branding?: any }) {
                     <Link href="#features" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Funcionalidades</Link>
                     <Link href="#pricing" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Preços</Link>
                     <Link href="/docs" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Documentação</Link>
-                    <Link href="/conexbot-wp.zip" download className="text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">Plugin WP</Link>
                 </div>
 
                 {/* Auth */}
