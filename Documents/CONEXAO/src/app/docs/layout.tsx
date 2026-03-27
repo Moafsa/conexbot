@@ -1,6 +1,9 @@
 import Link from "next/link";
 export const dynamic = 'force-dynamic';
-import { BookOpen, Rocket, Zap, Settings, ShieldCheck, HelpCircle, Brain, AudioLines, Users, CreditCard } from "lucide-react";
+import { 
+    BookOpen, Rocket, Zap, Settings, ShieldCheck, 
+    Brain, AudioLines, Users, CreditCard, Calendar, Database, Cpu 
+} from "lucide-react";
 
 export default async function DocsLayout({
     children,
@@ -23,10 +26,25 @@ export default async function DocsLayout({
             ]
         },
         {
-            title: "Arquiteto de IA",
+            title: "Cérebro IA",
             items: [
-                { title: "Criação & Simulador", href: "/docs/ai-training", icon: Brain },
-                { title: "Insights & Supervisor", href: "/docs/intelligence", icon: Brain },
+                { title: "Arquiteto (Treino)", href: "/docs/ai-training", icon: Brain },
+                { title: "Inteligência (Supervisor)", href: "/docs/intelligence", icon: Cpu },
+            ]
+        },
+        {
+            title: "Vendas & Automação",
+            items: [
+                { title: "CRM Pipeline", href: "/docs/crm", icon: Users },
+                { title: "Follow-up & Réguas", href: "/docs/automation", icon: Zap },
+                { title: "Agenda & Booking", href: "/docs/agenda", icon: Calendar },
+            ]
+        },
+        {
+            title: "Financeiro & Catálogo",
+            items: [
+                { title: "Produtos & Catálogo", href: "/docs/catalog", icon: Database },
+                { title: "Pagamentos & Asaas", href: "/docs/payments", icon: CreditCard },
             ]
         },
         {
@@ -34,14 +52,6 @@ export default async function DocsLayout({
             items: [
                 { title: "Plugin WordPress", href: "/docs/wordpress", icon: Rocket },
                 { title: "Conexões Uzapi", href: "/docs/uzapi", icon: ShieldCheck },
-            ]
-        },
-        {
-            title: "Ferramentas Pro",
-            items: [
-                { title: "CRM e Leads", href: "/docs/crm", icon: Users },
-                { title: "Pagamentos e Faturas", href: "/docs/payments", icon: CreditCard },
-                { title: "Catálogo e Automação", href: "/docs/catalog", icon: BookOpen },
             ]
         }
     ];
@@ -56,14 +66,20 @@ export default async function DocsLayout({
                         {systemName} Docs
                     </span>
                 </Link>
-                <Link href={session?.user ? "/dashboard" : "/"} className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
-                    Voltar para o App
-                </Link>
+                <div className="flex items-center gap-6">
+                    <Link href="/docs/wordpress" className="hidden md:flex items-center gap-2 text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20 hover:bg-blue-500/20 transition-all">
+                        <Rocket size={14} />
+                        Download Plugin WP
+                    </Link>
+                    <Link href={session?.user ? "/dashboard" : "/"} className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                        Voltar para o App
+                    </Link>
+                </div>
             </header>
 
-            <div className="max-w-8xl mx-auto flex pt-16">
+            <div className="max-w-8xl mx-auto flex pt-20">
                 {/* Sidebar */}
-                <aside className="fixed left-0 top-16 bottom-0 w-64 border-r border-white/5 p-6 overflow-y-auto hidden md:block">
+                <aside className="fixed left-0 top-20 bottom-0 w-64 border-r border-white/5 p-6 overflow-y-auto hidden md:block">
                     {sections.map((section, idx) => (
                         <div key={idx} className="mb-8">
                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">
@@ -74,9 +90,9 @@ export default async function DocsLayout({
                                     <li key={i}>
                                         <Link
                                             href={item.href}
-                                            className="flex items-center gap-3 text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors py-1"
+                                            className="flex items-center gap-3 text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors py-1 group"
                                         >
-                                            <item.icon size={16} />
+                                            <item.icon size={16} className="group-hover:scale-110 transition-transform" />
                                             {item.title}
                                         </Link>
                                     </li>
@@ -87,8 +103,8 @@ export default async function DocsLayout({
                 </aside>
 
                 {/* Content */}
-                <main className="flex-grow md:ml-64 p-8 lg:p-12 min-h-[calc(100vh-64px)]">
-                    <div className="max-w-3xl">
+                <main className="flex-grow md:ml-64 p-8 lg:p-12 min-h-[calc(100vh-80px)]">
+                    <div className="max-w-4xl">
                         {children}
                     </div>
                 </main>

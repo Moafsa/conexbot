@@ -632,13 +632,13 @@ function SettingsContent() {
                                 <div className="space-y-6 animate-fade-in">
                                     <div className="flex items-center justify-between gap-4">
                                         <h3 className="text-xl font-semibold">Plugin WordPress</h3>
-                                        <a 
-                                            href="/conexbot-wp.zip" 
+                                        <a
+                                            href="/conexbot-wp.zip"
                                             download
-                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
+                                            className="px-4 py-2 bg-[#21759b] hover:bg-[#1a5d7c] text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-600/20"
                                         >
-                                            <Download size={14} />
-                                            Baixar ZIP
+                                            <Globe size={14} />
+                                            Baixar Plugin WP
                                         </a>
                                     </div>
                                     
