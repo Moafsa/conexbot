@@ -1,141 +1,146 @@
 import Link from "next/link";
-import { Cpu, Zap, Brain, MessageSquare, ShieldCheck, PieChart, Globe, Calendar, Database, ArrowRight } from "lucide-react";
+import { 
+    Cpu, Zap, Brain, MessageSquare, ShieldCheck, PieChart, 
+    Globe, Calendar, Database, ArrowRight, PlayCircle, Rocket, Settings
+} from "lucide-react";
 
 export default function DocsPage() {
     return (
-        <div className="space-y-16 pb-20">
+        <div className="space-y-16 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-1000">
             {/* Hero Section */}
-            <section>
-                <h1 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
-                    Manual do Conext Bot
-                </h1>
-                <p className="text-xl text-gray-400 leading-relaxed max-w-3xl">
-                    Sua infraestrutura completa de **atendimento automatizado com IA**. 
-                    Utilize o poder do RAG para responder baseado em dados reais, integrando 
-                    WhatsApp e WordPress com fluxos de vendas e pagamentos nativos.
-                </p>
-            </section>
-
-            {/* Core Pillars */}
-            <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <FeatureCard 
-                    title="Motor de IA" 
-                    desc="GPT-4o com processamento de contexto semântico e memória de curto prazo." 
-                    icon={Cpu} 
-                    color="text-blue-400" 
-                />
-                <FeatureCard 
-                    title="RAG & Treino" 
-                    desc="Indexação automática de sites, PDFs e manuais diretamente no banco vetorial." 
-                    icon={Brain} 
-                    color="text-purple-400" 
-                />
-                <FeatureCard 
-                    title="Plugin Híbrido" 
-                    desc="Sincronização WooCommerce e atendimento em posts/comentários WordPress." 
-                    icon={Globe} 
-                    color="text-indigo-400" 
-                />
-                <FeatureCard 
-                    title="Vozes Reais" 
-                    desc="Áudios premium via ElevenLabs com entonação humana ultra-realista no WhatsApp." 
-                    icon={MessageSquare} 
-                    color="text-pink-400" 
-                />
-                <FeatureCard 
-                    title="Automação CRM" 
-                    desc="Classificação de leads, follow-ups e movimentação de funil orientada por IA." 
-                    icon={PieChart} 
-                    color="text-green-400" 
-                />
-                <FeatureCard 
-                    title="Agenda & Pagos" 
-                    desc="Agendamentos via Google Calendar e checkout direto com PIX Asaas." 
-                    icon={ShieldCheck} 
-                    color="text-yellow-400" 
-                />
-            </section>
-
-            {/* Quick Access Cards */}
-            <section className="space-y-8">
-                <h2 className="text-2xl font-bold text-white italic underline decoration-indigo-500 underline-offset-8">Principais Módulos</h2>
-                <div className="grid md:grid-cols-3 gap-6">
-                    <DocCard 
-                        title="Follow-up & Réguas" 
-                        description="Automações inteligentes de retomada e pós-venda." 
-                        href="/docs/automation"
-                        icon={Zap}
-                    />
-                    <DocCard 
-                        title="Agenda & Booking" 
-                        description="Sincronize com o Google Calendar e agende reuniões via Chat." 
-                        href="/docs/agenda"
-                        icon={Calendar}
-                    />
-                    <DocCard 
-                        title="Catálogo & Pagamentos" 
-                        description="Links dinâmicos de pagamento Asaas e gestão WooCommerce." 
-                        href="/docs/catalog"
-                        icon={Database}
-                    />
-                </div>
-            </section>
-
-            {/* Core Workflow */}
-            <section className="p-8 glass rounded-3xl border border-white/10 bg-white/5 space-y-8">
-                <h3 className="text-2xl font-bold text-white italic">Como começar?</h3>
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-sm">1</div>
-                            <div>
-                                <h4 className="font-bold text-gray-200">Alimente o Cérebro</h4>
-                                <p className="text-xs text-gray-500 mt-1">Configure o Arquiteto de IA com seus arquivos ou links de site para criar a base de conhecimento (RAG).</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-sm">2</div>
-                            <div>
-                                <h4 className="font-bold text-gray-200">Conecte os Canais</h4>
-                                <p className="text-xs text-gray-500 mt-1">Vincule seu WhatsApp via Uzapi ou instale o Plugin WordPress para sincronizar produtos e comentários.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-sm">3</div>
-                            <div>
-                                <h4 className="font-bold text-gray-200">Ative as Vendas</h4>
-                                <p className="text-xs text-gray-500 mt-1">Configure o seu Catálogo e Agenda para que a IA possa fechar negócios e marcar reuniões automaticamente.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-6 bg-black/40 rounded-2xl border border-white/5 flex flex-col justify-center">
-                        <p className="text-sm text-gray-400 italic mb-4">"O ConextBot não é apenas um chatbot, é um funcionário digital que aprende com o seu negócio."</p>
-                        <Link href="/docs/settings" className="flex items-center gap-2 text-indigo-400 font-bold hover:underline">
-                            Configurações Iniciais <ArrowRight size={16} />
+            <section className="relative overflow-hidden p-12 rounded-[2.5rem] bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent border border-white/5">
+                <div className="relative z-10 max-w-2xl">
+                    <h1 className="text-4xl md:text-6xl font-black mb-6 bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
+                        Manual ConextBot
+                    </h1>
+                    <p className="text-xl text-gray-400 leading-relaxed">
+                        Bem-vindo à documentação oficial. Aprenda a configurar seu assistente de IA, conectar canais e automatizar suas vendas de ponta a ponta.
+                    </p>
+                    <div className="flex flex-wrap gap-4 mt-8">
+                        <Link href="/docs/settings" className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 text-sm shadow-xl shadow-white/5">
+                            Começar agora <ArrowRight size={18} />
+                        </Link>
+                        <Link 
+                            href="/conexbot-wp.zip" 
+                            download 
+                            className="px-6 py-3 bg-blue-600/10 border border-blue-500/20 text-blue-400 font-bold rounded-xl hover:bg-blue-600/20 transition-all flex items-center gap-2 text-sm shadow-xl shadow-blue-500/5 group"
+                        >
+                            <Globe size={18} className="group-hover:rotate-12 transition-transform" />
+                            Download Plugin WP
                         </Link>
                     </div>
                 </div>
+                {/* Decoration */}
+                <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-96 h-96 bg-indigo-500/10 blur-[120px] rounded-full" />
+            </section>
+
+            {/* Core Pillars Grid */}
+            <div className="space-y-12">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3 italic">
+                    <Rocket className="text-indigo-400" /> Explorar Módulos
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <ModuleCard 
+                        title="Conexão WhatsApp" 
+                        desc="Configure sua instância Uzapi e conecte via QR Code." 
+                        href="/docs/whatsapp" 
+                        icon={Zap} 
+                        color="text-emerald-400"
+                        bg="bg-emerald-500/5"
+                    />
+                    <ModuleCard 
+                        title="Plugin WordPress" 
+                        desc="Sincronize WooCommerce, posts e comentários." 
+                        href="/docs/wordpress" 
+                        icon={Globe} 
+                        color="text-blue-400"
+                        bg="bg-blue-500/5"
+                    />
+                    <ModuleCard 
+                        title="Arquiteto & Treino" 
+                        desc="Defina a personalidade e treine a IA com seus dados." 
+                        href="/docs/ai-training" 
+                        icon={Brain} 
+                        color="text-purple-400"
+                        bg="bg-purple-500/5"
+                    />
+                    <ModuleCard 
+                        title="Follow-up & Réguas" 
+                        desc="Automação de retomada de leads e mensagens pós-venda." 
+                        href="/docs/automation" 
+                        icon={ShieldCheck} 
+                        color="text-yellow-400"
+                        bg="bg-yellow-500/5"
+                    />
+                    <ModuleCard 
+                        title="Agenda & Booking" 
+                        desc="Links de agendamento e sincronia com Google Calendar." 
+                        href="/docs/agenda" 
+                        icon={Calendar} 
+                        color="text-indigo-400"
+                        bg="bg-indigo-500/5"
+                    />
+                    <ModuleCard 
+                        title="CRM & Pipeline" 
+                        desc="Movimentação automática de funil e lead scoring." 
+                        href="/docs/crm" 
+                        icon={PieChart} 
+                        color="text-pink-400"
+                        bg="bg-pink-500/5"
+                    />
+                    <ModuleCard 
+                        title="Catálogo & Vendas" 
+                        desc="Produtos, links de checkout e pagamentos Asaas." 
+                        href="/docs/catalog" 
+                        icon={Database} 
+                        color="text-orange-400"
+                        bg="bg-orange-500/5"
+                    />
+                    <ModuleCard 
+                        title="Insights IA" 
+                        desc="Análise estratégica do Supervisor em tempo real." 
+                        href="/docs/intelligence" 
+                        icon={Cpu} 
+                        color="text-cyan-400"
+                        bg="bg-cyan-500/5"
+                    />
+                    <ModuleCard 
+                        title="Setup & Chaves" 
+                        desc="Ajustes de API, OpenAI, ElevenLabs e Asaas." 
+                        href="/docs/settings" 
+                        icon={Settings} 
+                        color="text-gray-400"
+                        bg="bg-gray-500/5"
+                    />
+                </div>
+            </div>
+
+            {/* Quick Tips */}
+            <section className="p-8 border border-white/5 rounded-3xl bg-black/20">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <MessageSquare size={18} className="text-indigo-400" /> Dica de Especialista
+                </h3>
+                <p className="text-sm text-gray-500 italic leading-relaxed">
+                    "Para obter os melhores resultados, comece treinando seu bot no módulo **Arquiteto** e use o **Simulador** para validar as respostas antes de conectar ao WhatsApp oficial."
+                </p>
             </section>
         </div>
     );
 }
 
-function FeatureCard({ title, desc, icon: Icon, color }: any) {
+function ModuleCard({ title, desc, href, icon: Icon, color, bg }: any) {
     return (
-        <div className="glass p-6 rounded-3xl border border-white/5 hover:border-white/10 transition-all group">
-            <Icon className={`${color} mb-4 group-hover:scale-110 transition-transform`} size={28} />
-            <h3 className="font-bold text-white mb-2">{title}</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-        </div>
-    );
-}
-
-function DocCard({ title, description, href, icon: Icon }: any) {
-    return (
-        <Link href={href} className="p-6 glass rounded-3xl border border-white/5 hover:bg-white/5 transition-all block group">
-            <Icon className="text-indigo-400 mb-4 group-hover:scale-110 transition-transform" size={24} />
-            <h4 className="text-white font-bold mb-2">{title}</h4>
-            <p className="text-xs text-gray-500">{description}</p>
+        <Link href={href} className={`p-6 rounded-[2rem] border border-white/5 ${bg} hover:border-white/10 hover:scale-[1.02] transition-all group relative overflow-hidden`}>
+            <div className="relative z-10">
+                <Icon className={`${color} mb-4 group-hover:scale-110 transition-transform`} size={28} />
+                <h3 className="font-bold text-white mb-2">{title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+            </div>
+            {/* Hover Arrow */}
+            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                <ArrowRight size={16} className={color} />
+            </div>
         </Link>
     );
 }

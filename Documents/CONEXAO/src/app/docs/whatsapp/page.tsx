@@ -1,39 +1,85 @@
+import { Zap, ShieldCheck, Smartphone, Globe, ArrowRight, CheckCircle, Binary } from "lucide-react";
+
 export default function WhatsAppDocsPage() {
     return (
-        <div className="space-y-12">
+        <div className="space-y-12 pb-20">
+            {/* Hero */}
             <section>
-                <h1 className="text-4xl font-black mb-6 bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent">
-                    Conexão WhatsApp (WuzAPI)
-                </h1>
-                <p className="text-gray-400 leading-relaxed">
-                    A integração com o WhatsApp é feita através de uma instância dedicada da **WuzAPI**, garantindo estabilidade e velocidade.
+                <div className="flex items-center gap-3 mb-6">
+                    <Zap className="text-emerald-400" size={32} />
+                    <h1 className="text-4xl font-black bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
+                        WhatsApp (WuzAPI / Uzapi)
+                    </h1>
+                </div>
+                <p className="text-gray-400 leading-relaxed text-lg max-w-2xl">
+                    Conecte seu assistente de IA ao canal mais importante de vendas do Brasil. Através da tecnologia **WuzAPI**, garantimos uma conexão estável, rápida e sem quedas.
                 </p>
             </section>
 
-            <section className="space-y-6">
-                <h2 className="text-2xl font-bold">Como Conectar</h2>
-                <div className="space-y-4">
-                    <div className="flex gap-4 items-start">
-                        <div className="w-6 h-6 rounded-full bg-green-600 flex-shrink-0 flex items-center justify-center text-xs font-bold">1</div>
-                        <p className="text-sm text-gray-400">Vá em **Meus Bots** e clique no botão de "Conectar" (ícone de link) do robô desejado.</p>
+            {/* Connection Steps */}
+            <section className="space-y-8">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3 italic font-black underline decoration-emerald-500 underline-offset-8 decoration-4">
+                    <Smartphone className="text-gray-400" /> Como Conectar sua Instância
+                </h2>
+                
+                <div className="grid md:grid-cols-3 gap-6">
+                    <div className="p-8 glass rounded-[2rem] border border-white/5 bg-white/5 hover:border-emerald-500/20 transition-all group">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold mb-4 shadow-xl">1</div>
+                        <h4 className="text-white font-bold mb-2">Acesse Meus Bots</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed italic">Localize o bot que deseja conectar e clique no ícone de "Link" ou "Conectar".</p>
                     </div>
-                    <div className="flex gap-4 items-start">
-                        <div className="w-6 h-6 rounded-full bg-green-600 flex-shrink-0 flex items-center justify-center text-xs font-bold">2</div>
-                        <p className="text-sm text-gray-400">Aguarde a geração do QR Code. Abra o WhatsApp no seu celular &gt; Aparelhos Conectados &gt; Conectar um aparelho.</p>
+                    <div className="p-8 glass rounded-[2rem] border border-white/5 bg-white/5 hover:border-emerald-500/20 transition-all group">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold mb-4 shadow-xl">2</div>
+                        <h4 className="text-white font-bold mb-2">QR Code Scan</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed italic">Escaneie o código gerado usando o "Aparelhos Conectados" do seu WhatsApp Celular.</p>
                     </div>
-                    <div className="flex gap-4 items-start">
-                        <div className="w-6 h-6 rounded-full bg-green-600 flex-shrink-0 flex items-center justify-center text-xs font-bold">3</div>
-                        <p className="text-sm text-gray-400">Aponte a câmera e pronto! O status mudará para <span className="text-green-500 font-bold uppercase">Conectado</span>.</p>
+                    <div className="p-8 glass rounded-[2rem] border border-white/5 bg-white/5 hover:border-emerald-500/20 transition-all group">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold mb-4 shadow-xl">3</div>
+                        <h4 className="text-white font-bold mb-2">Pronto!</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed italic">O status mudará automaticamente para "Conectado" e a IA começará a responder.</p>
                     </div>
                 </div>
             </section>
 
-            <section className="p-6 glass rounded-2xl border border-white/5">
-                <h3 className="font-bold text-white mb-3">Manutenção da Conexão</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                    O sistema mantém a sessão ativa 24/7. Caso o celular fique offline por muito tempo, a sessão pode expirar. 
-                    Nesse caso, basta clicar em "Desconectar" e gerar um novo QR Code.
+            {/* Technical Flow Section (Consolidated from Uzapi) */}
+            <section className="space-y-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3 italic font-black">
+                    <Binary className="text-indigo-400" /> Como as mensagens fluem?
+                </h2>
+                <div className="grid md:grid-cols-2 gap-6 relative">
+                    <div className="p-6 glass rounded-2xl border border-white/5 bg-black/40">
+                        <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-3">Recebimento (Inbound)</h4>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">Quando um cliente envia uma mensagem, o motor Uzapi a recebe e encaminha via Webhook para o Conext Bot processar com IA e RAG.</p>
+                    </div>
+                    <div className="p-6 glass rounded-2xl border border-white/5 bg-black/40">
+                        <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-3">Resposta (Outbound)</h4>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">Após a IA gerar o texto ou áudio (ElevenLabs), o sistema usa a Uzapi para disparar a resposta de volta ao cliente em milissegundos.</p>
+                    </div>
+                    {/* Arrow between them */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block opacity-20">
+                        <ArrowRight size={24} className="text-indigo-400" />
+                    </div>
+                </div>
+            </section>
+
+            {/* Maintenance */}
+            <section className="p-10 glass rounded-[2.5rem] border border-white/10 bg-emerald-500/5 max-w-2xl shadow-2xl">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-4 italic font-black">
+                    <ShieldCheck className="text-emerald-400" /> Estabilidade e Segurança
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed mb-6 italic border-l-2 border-emerald-500/20 pl-4 py-1">
+                    "Sua sessão permanece ativa 24 horas por dia. Se o aparelho ficar offline por longos períodos, o WhatsApp pode exigir um novo escaneamento."
                 </p>
+                <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/5">
+                        <CheckCircle size={14} className="text-emerald-500" />
+                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Sessão Persistente</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-black/40 rounded-full border border-white/5">
+                        <CheckCircle size={14} className="text-emerald-500" />
+                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Suporte a Áudio/Voz</span>
+                    </div>
+                </div>
             </section>
         </div>
     );

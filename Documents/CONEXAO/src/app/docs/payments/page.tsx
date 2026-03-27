@@ -1,48 +1,68 @@
+import { CreditCard, DollarSign, Repeat, ShieldCheck, Zap, ArrowRight, Wallet } from "lucide-react";
+
 export default function PaymentsDocsPage() {
     return (
-        <div className="space-y-12">
+        <div className="space-y-12 pb-20">
+            {/* Hero */}
             <section>
-                <h1 className="text-4xl font-black mb-6 bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic">
-                    Pagamentos Avançados & Split
-                </h1>
-                <p className="text-gray-400 leading-relaxed text-lg">
-                    Transforme o WhatsApp em um checkout de alta performance com a integração Asaas personalizada.
+                <div className="flex items-center gap-3 mb-6">
+                    <CreditCard className="text-emerald-400" size={32} />
+                    <h1 className="text-4xl font-black bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
+                        Pagamentos & Checkout Asaas
+                    </h1>
+                </div>
+                <p className="text-gray-400 leading-relaxed text-lg max-w-2xl">
+                    Transforme o WhatsApp em um checkout de alta performance. Com a integração nativa ao **Asaas**, seu bot gera links de pagamento, PIX e assinaturas em segundos.
                 </p>
             </section>
 
-            <section className="space-y-6">
-                <h2 className="text-2xl font-bold text-white">1. Pagamento Simples vs Assinatura</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="p-5 glass rounded-2xl border border-white/5">
-                        <h4 className="font-bold text-white mb-2">Venda Única</h4>
-                        <p className="text-xs text-gray-500">Geração de link PIX/Boleto para um item específico. Ideal para serviços rápidos.</p>
+            {/* Payment Types Grid */}
+            <section className="space-y-8">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3 italic font-black">
+                    <DollarSign className="text-gray-400" /> Modalidades de Venda
+                </h2>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="p-8 glass rounded-[2.5rem] border border-white/5 bg-emerald-500/5 group hover:border-emerald-500/20 transition-all">
+                        <Zap className="text-emerald-400 mb-4" size={24} />
+                        <h4 className="text-white font-bold mb-2">Venda Única (PIX/Cartão)</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed">Geração de link dinâmico para produtos físicos ou serviços pontuais. O bot envia o link e o código PIX Copia e Cola diretamente no chat.</p>
                     </div>
-                    <div className="p-5 glass rounded-2xl border border-white/5">
-                        <h4 className="font-bold text-white mb-2">Plano de Assinatura</h4>
-                        <p className="text-xs text-gray-500">Configurado no Catálogo, permite criar cobranças recorrentes (Mensal/Anual) automáticas.</p>
+                    <div className="p-8 glass rounded-[2.5rem] border border-white/5 bg-purple-500/5 group hover:border-purple-500/20 transition-all">
+                        <Repeat className="text-purple-400 mb-4" size={24} />
+                        <h4 className="text-white font-bold mb-2">Assinaturas Recorrentes</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed">Criação automática de planos (Mensal, Trimestral, Anual) no Asaas. Ideal para SaaS, clubes de assinatura e consultorias.</p>
                     </div>
                 </div>
             </section>
 
-            <section className="space-y-6">
-                <h2 className="text-2xl font-bold text-white">2. Lógica de Split (Comissão)</h2>
-                <p className="text-sm text-gray-400">
-                    O Conext Bot permite configurar o **Split de Pagamento** para divisão automática de valores.
+            {/* Split Section */}
+            <section className="p-10 glass rounded-[2.5rem] border border-white/10 bg-indigo-500/5 max-w-3xl">
+                <h3 className="text-2xl font-black text-white flex items-center gap-3 mb-6 italic underline decoration-indigo-500 underline-offset-8">
+                    <Wallet className="text-indigo-400" /> Split de Pagamento
+                </h3>
+                <p className="text-sm text-gray-400 leading-relaxed mb-8">
+                    O ConextBot permite a divisão automática de valores entre contas Asaas, ideal para modelos de plataforma e parcerias.
                 </p>
-                <div className="p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-3xl space-y-4">
-                    <h4 className="text-white font-bold italic underline">Como funciona:</h4>
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                        Ao gerar uma cobrança, o sistema pode enviar uma instrução de Split para o Asaas. 
-                        Isso significa que uma porcentagem ou valor fixo da venda vai para a conta principal do Tenant e outra parte para 
-                        uma carteira de parceiro ou taxa da plataforma, tudo de forma transparente e instantânea.
-                    </p>
+                <div className="bg-black/40 rounded-3xl p-6 border border-white/5">
+                    <ul className="space-y-4">
+                        <li className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                            <p className="text-xs text-gray-500 leading-relaxed"><strong>Automatização Total:</strong> A divisão acontece no momento exato da liquidação da fatura.</p>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
+                            <p className="text-xs text-gray-500 leading-relaxed"><strong>Transparência:</strong> O parceiro recebe sua parte instantaneamente em sua subconta Asaas.</p>
+                        </li>
+                    </ul>
                 </div>
             </section>
 
-            <section className="p-6 bg-yellow-500/5 border border-yellow-500/10 rounded-2xl">
-                <h3 className="font-bold text-yellow-500 mb-2">Checkout no Chat</h3>
-                <p className="text-[10px] text-gray-500 leading-relaxed italic">
-                    Dica: A IA só oferecerá pagamento se o catálago estiver preenchido e a opção "Habilitar Vendas" estiver ativa nas configurações do robô.
+            {/* Final tip */}
+            <section className="flex items-center gap-4 p-8 glass rounded-[2rem] border border-white/5 bg-black/20 max-w-2xl">
+                <ShieldCheck size={28} className="text-emerald-400 shrink-0" />
+                <p className="text-sm text-gray-500 leading-relaxed italic">
+                    "Aumente sua conversão em até 40% enviando o QR Code PIX diretamente no WhatsApp do cliente."
                 </p>
             </section>
         </div>
