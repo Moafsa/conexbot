@@ -8,7 +8,7 @@ const integrations = [
     { name: "WhatsApp", src: "https://cdn.simpleicons.org/whatsapp/white" },
     { name: "WordPress", src: "https://cdn.simpleicons.org/wordpress/white" },
     { name: "Uzapi", src: "https://uzapi.com.br/wp-content/uploads/2022/03/uzapi-logo-dark.png", invert: true },
-    { name: "Asaas", src: "https://vagas.com.br/logos-empresas/69389_logo.png", invert: true },
+    { name: "Asaas", src: "https://logo.clearbit.com/asaas.com", invert: true },
     { name: "OpenAI", src: "https://cdn.simpleicons.org/openai/white" },
     { name: "Gemini", src: "https://cdn.simpleicons.org/googlegemini/white" },
     { name: "Google", src: "https://cdn.simpleicons.org/google/white" },

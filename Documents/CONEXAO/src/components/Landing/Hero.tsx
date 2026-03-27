@@ -33,7 +33,7 @@ export default function Hero({ branding }: { branding?: any }) {
                 </Link>
                 <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-3 text-lg px-8 py-3 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 group">
                     <svg className="w-6 h-6 fill-current group-hover:scale-110 transition-all duration-300" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12.001 2c-5.523 0-10 4.477-10 10s4.477 10 10 10 10-4.477 10-10-4.477-10-10-10zm0 18.836c-2.43 0-4.63-.984-6.225-2.57l3.05-8.358 1.94 5.318 1.235-3.377 1.235 3.377 1.94-5.318 3.05 8.358c-1.595 1.586-3.795 2.57-6.225 2.57zM2 12c0 1.264.235 2.473.662 3.593L7.756 3.03C4.346 4.673 2 8.06 2 12zm10 10c-1.264 0-2.473-.235-3.593-.662l12.563-5.094C19.327 19.654 15.94 22 12 22z"/>
+                        <path d="M12 2C6.47 2 2 6.47 2 12c0 1.25.23 2.45.65 3.56l3.41-9.33L9.5 12h-3L12 22l5.5-10h-3l3.44-5.77 3.41 9.33c.42-1.11.65-2.31.65-3.56 0-5.53-4.47-10-10-10zm0 18.83l-3.05-8.36 1.94 5.31 1.24-3.38 1.23 3.38 1.95-5.31 3.05 8.36C16.63 19.85 14.43 20.83 12 20.83z"/>
                     </svg>
                     baixar plugin wordpress
                 </Link>
