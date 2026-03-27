@@ -257,7 +257,7 @@ function conexbot_on_new_comment($comment_ID, $comment)
         'bot_id' => $bot_id !== '' ? $bot_id : $token,
         'post_id' => $comment->comment_post_ID,
         'post_title' => $post->post_title,
-        'post_content' => wp_strip_all_tags($post->post_content),
+        'post_content' => strip_tags($post->post_content),
         'comment_id' => $comment_ID,
         'comment_author' => $author_name,
         'comment_content' => $comment->comment_content,

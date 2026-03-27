@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSession } from "next-auth/react";
-import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail, Globe, Download } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function SettingsContent() {
@@ -235,6 +235,7 @@ function SettingsContent() {
                     <TabButton id="smtp" label="Servidores E-mail (SMTP)" icon={Mail} />
                     <TabButton id="notifications" label="Notificações" icon={Bell} />
                     <TabButton id="security" label="Segurança" icon={Shield} />
+                    <TabButton id="wordpress" label="WordPress" icon={Globe} />
                 </div>
 
                 {/* Conteúdo */}
@@ -432,7 +433,7 @@ function SettingsContent() {
                                                 className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                                             />
                                             <p className="mt-2 text-[10px] text-gray-500 leading-relaxed">
-                                                Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank" className="underline">platform.openai.com</a>. É necessário ter saldo (credits) para o bot funcionar.
+                                                Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank" className="underline">platform.openai.com</a>. É necessário ter saldo (credits) para the bot funcionar.
                                             </p>
                                         </div>
 
@@ -474,7 +475,7 @@ function SettingsContent() {
                                             />
                                             <div className="mt-2 p-3 bg-purple-500/5 border border-purple-500/10 rounded-lg">
                                                 <p className="text-[10px] text-gray-400">
-                                                    Para vozes personalizadas, pegue a chave em <a href="https://elevenlabs.io" target="_blank" className="underline">elevenlabs.io</a>. Depois, insira o <strong>Voice ID</strong> desejado nas configurações individuais de cada bot.
+                                                    Para vozes personalizadas, pegue a chave em <a href="https://elevenlabs.io" target="_blank" className="underline">elevenlabs.io</a>. Depois, insira the **Voice ID** desejado nas configurações individuais de cada bot.
                                                 </p>
                                             </div>
                                         </div>
@@ -624,6 +625,43 @@ function SettingsContent() {
                                         {saving ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
                                         Atualizar Senha
                                     </button>
+                                </div>
+                            )}
+
+                            {activeTab === "wordpress" && (
+                                <div className="space-y-6 animate-fade-in">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <h3 className="text-xl font-semibold">Plugin WordPress</h3>
+                                        <a 
+                                            href="/conexbot-wp.zip" 
+                                            download
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
+                                        >
+                                            <Download size={14} />
+                                            Baixar ZIP
+                                        </a>
+                                    </div>
+                                    
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Use o plugin oficial para integrar o ConextBot ao seu site. Com ele, você sincroniza produtos do WooCommerce e automatiza respostas nos comentários.
+                                    </p>
+
+                                    <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+                                        <h4 className="text-sm font-bold text-gray-200">Como Instalar:</h4>
+                                        <ol className="text-xs text-gray-500 list-decimal ml-4 space-y-2">
+                                            <li>Clique no botão **Baixar ZIP** acima.</li>
+                                            <li>No seu WordPress, vá em **Plugins {" > "} Adicionar Novo {" > "} Enviar Plugin**.</li>
+                                            <li>Selecione o arquivo e clique em **Instalar Agora**.</li>
+                                            <li>Após ativar, vá no menu **ConextBot** e insira suas credenciais.</li>
+                                        </ol>
+                                    </div>
+
+                                    <div className="p-4 bg-yellow-500/5 border border-yellow-500/10 rounded-xl">
+                                        <p className="text-[10px] text-yellow-500 font-black uppercase tracking-widest mb-1">💡 Dica Pro:</p>
+                                        <p className="text-xs text-gray-400">
+                                            A sincronização é automática. Quando você altera um produto no WooCommerce, a base de conhecimento do bot é atualizada em instantes.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </>

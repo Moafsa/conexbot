@@ -1,11 +1,10 @@
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download } from "lucide-react";
 
 export default function Sidebar({ branding }: { branding?: any }) {
     const pathname = usePathname();
@@ -82,6 +81,16 @@ export default function Sidebar({ branding }: { branding?: any }) {
 
             {/* User / Footer */}
             <div className="p-4 border-t border-white/5 space-y-2 bg-[#0f172a]">
+                <a 
+                    href="/conexbot-wp.zip" 
+                    download
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl bg-[#00a884]/10 hover:bg-[#00a884]/20 text-[#00a884] transition-colors border border-[#00a884]/20 ${collapsed ? 'justify-center' : ''}`}
+                    title="Baixar Plugin WP"
+                >
+                    <Download size={20} />
+                    {!collapsed && <span className="text-[10px] font-black uppercase tracking-widest">Plugin WordPress</span>}
+                </a>
+
                 <button className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors ${collapsed ? 'justify-center' : ''}`}>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#00a884] to-emerald-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
                         U

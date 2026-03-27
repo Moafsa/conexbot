@@ -18,31 +18,30 @@ export default async function DocsLayout({
             title: "Começando",
             items: [
                 { title: "Visão Geral", href: "/docs", icon: BookOpen },
-                { title: "Criação de Agente", href: "/docs/bot-creation", icon: Rocket },
                 { title: "Conexão WhatsApp", href: "/docs/whatsapp", icon: Zap },
+                { title: "Configurações & Chaves", href: "/docs/settings", icon: Settings },
             ]
         },
         {
-            title: "Inteligência Artificial",
+            title: "Arquiteto de IA",
             items: [
-                { title: "Treinamento de IA", href: "/docs/ai-training", icon: Brain },
-                { title: "Comportamento Avançado", href: "/docs/intelligence", icon: Brain },
-                { title: "Simulador de Conversas", href: "/docs/simulator", icon: HelpCircle },
+                { title: "Criação & Simulador", href: "/docs/ai-training", icon: Brain },
+                { title: "Insights & Supervisor", href: "/docs/intelligence", icon: Brain },
             ]
         },
         {
-            title: "Ferramentas",
+            title: "Integrações",
             items: [
-                { title: "CRM e Gestão de Leads", href: "/docs/crm", icon: Users },
-                { title: "Pagamentos e Faturas", href: "/docs/payments", icon: CreditCard },
-                { title: "Catálogo e Produtos", href: "/docs/catalog", icon: BookOpen },
-                { title: "Automação e Follow-ups", href: "/docs/automation", icon: Rocket },
-            ]
-        },
-        {
-            title: "Integração e API",
-            items: [
+                { title: "Plugin WordPress", href: "/docs/wordpress", icon: Rocket },
                 { title: "Conexões Uzapi", href: "/docs/uzapi", icon: ShieldCheck },
+            ]
+        },
+        {
+            title: "Ferramentas Pro",
+            items: [
+                { title: "CRM e Leads", href: "/docs/crm", icon: Users },
+                { title: "Pagamentos e Faturas", href: "/docs/payments", icon: CreditCard },
+                { title: "Catálogo e Automação", href: "/docs/catalog", icon: BookOpen },
             ]
         }
     ];
