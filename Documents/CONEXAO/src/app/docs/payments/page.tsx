@@ -1,4 +1,4 @@
-import { CreditCard, DollarSign, Repeat, ShieldCheck, Zap, ArrowRight, Wallet } from "lucide-react";
+import { CreditCard, DollarSign, Repeat, ShieldCheck, Zap, ArrowRight, Wallet, Settings } from "lucide-react";
 
 export default function PaymentsDocsPage() {
     return (
@@ -37,24 +37,54 @@ export default function PaymentsDocsPage() {
             </section>
 
             {/* Split Section */}
-            <section className="p-10 glass rounded-[2.5rem] border border-white/10 bg-indigo-500/5 max-w-3xl">
-                <h3 className="text-2xl font-black text-white flex items-center gap-3 mb-6 italic underline decoration-indigo-500 underline-offset-8">
-                    <Wallet className="text-indigo-400" /> Split de Pagamento
-                </h3>
-                <p className="text-sm text-gray-400 leading-relaxed mb-8">
-                    O ConextBot permite a divisão automática de valores entre contas Asaas, ideal para modelos de plataforma e parcerias.
-                </p>
-                <div className="bg-black/40 rounded-3xl p-6 border border-white/5">
-                    <ul className="space-y-4">
-                        <li className="flex items-start gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                            <p className="text-xs text-gray-500 leading-relaxed"><strong>Automatização Total:</strong> A divisão acontece no momento exato da liquidação da fatura.</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0" />
-                            <p className="text-xs text-gray-500 leading-relaxed"><strong>Transparência:</strong> O parceiro recebe sua parte instantaneamente em sua subconta Asaas.</p>
-                        </li>
-                    </ul>
+            <section className="p-10 glass rounded-[2.5rem] border border-white/10 bg-indigo-500/5">
+                <div className="max-w-3xl">
+                    <h3 className="text-2xl font-black text-white flex items-center gap-3 mb-6 italic underline decoration-indigo-500 underline-offset-8">
+                        <Wallet className="text-indigo-400" /> Split de Pagamento & Marketplace
+                    </h3>
+                    <p className="text-sm text-gray-400 leading-relaxed mb-8">
+                        O ConextBot não apenas automatiza conversas, mas cria um ecossistema financeiro completo. Com o **Split do Asaas**, você pode escalar sua operação ou criar um modelo de agência lucrativo.
+                    </p>
+                    
+                    <div className="grid md:grid-cols-2 gap-6 mb-8">
+                        <div className="p-6 bg-black/40 rounded-3xl border border-white/5">
+                            <h5 className="text-white font-bold mb-2 flex items-center gap-2 italic">
+                                <Zap size={16} className="text-yellow-400" /> Fluxo Automático
+                            </h5>
+                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                Cada venda realizada pelo bot é processada e dividida instantaneamente. O percentual configurado vai direto para a wallet parceira.
+                            </p>
+                        </div>
+                        <div className="p-6 bg-black/40 rounded-3xl border border-white/5">
+                            <h5 className="text-white font-bold mb-2 flex items-center gap-2 italic">
+                                <Settings size={16} className="text-blue-400" /> Configuração por Bot
+                            </h5>
+                            <p className="text-[11px] text-gray-500 leading-relaxed">
+                                Você pode definir percentuais de split diferentes para cada robô, permitindo parcerias personalizadas com cada cliente.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="p-8 border border-indigo-500/20 rounded-3xl bg-indigo-500/5">
+                        <h4 className="text-indigo-400 font-black mb-4 uppercase tracking-tighter italic text-xl">🚀 Modelo de Negócios para Parceiros</h4>
+                        <p className="text-sm text-gray-400 mb-6 font-light">
+                            Transforme o ConextBot em sua própria agência de IA. Você pode monetizar de três formas simultâneas:
+                        </p>
+                        <ul className="space-y-4">
+                            <li className="flex items-start gap-3">
+                                <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
+                                <p className="text-xs text-gray-300"><strong>Setup & Criação:</strong> Cobre pela configuração inicial e personalização do bot para o cliente.</p>
+                            </li>
+                            <li className="flex items-start gap-3">
+                                <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
+                                <p className="text-xs text-gray-300"><strong>Mensalidade (SaaS):</strong> Cancele ou ative o acesso do bot conforme o pagamento recorrente do seu cliente.</p>
+                            </li>
+                            <li className="flex items-start gap-3">
+                                <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
+                                <p className="text-xs text-gray-300"><strong>Split de Vendas:</strong> Receba um percentual automático de cada transação que o bot fechar via WhatsApp.</p>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </section>
 

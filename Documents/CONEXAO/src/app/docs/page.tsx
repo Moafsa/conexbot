@@ -91,15 +91,15 @@ export default function DocsPage() {
                     />
                     <ModuleCard 
                         title="Catálogo & Vendas" 
-                        desc="Produtos, links de checkout e pagamentos Asaas." 
+                        desc="Produtos, links de checkout e Split de Pagamentos Asaas." 
                         href="/docs/catalog" 
                         icon={Database} 
                         color="text-orange-400"
                         bg="bg-orange-500/5"
                     />
                     <ModuleCard 
-                        title="Insights IA" 
-                        desc="Análise estratégica do Supervisor em tempo real." 
+                        title="Insights & Voz IA" 
+                        desc="Supervisor estratégico e síntese neural ElevenLabs." 
                         href="/docs/intelligence" 
                         icon={Cpu} 
                         color="text-cyan-400"
