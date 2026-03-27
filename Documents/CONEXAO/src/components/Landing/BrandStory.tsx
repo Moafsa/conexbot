@@ -10,7 +10,7 @@ export default function BrandStory() {
                     <div className="relative">
                         <div className="aspect-square glass rounded-[3rem] border border-white/10 bg-gradient-to-br from-cyan-500/20 via-emerald-500/10 to-transparent p-12 flex items-center justify-center animate-pulse">
                             <div className="text-center">
-                                <Target className="w-24 h-24 text-cyan-400 mx-auto mb-6 opacity-50" />
+                                <Target className="w-24 h-24 text-indigo-400 mx-auto mb-6 opacity-50" />
                                 <h4 className="text-2xl font-black text-white italic uppercase tracking-[0.2em]">Missão ConextBot</h4>
                             </div>
                         </div>
@@ -28,7 +28,7 @@ export default function BrandStory() {
                         <div>
                             <h2 className="text-5xl md:text-7xl font-black mb-8 italic tracking-tighter text-white leading-none">
                                 Por que o <br />
-                                <span className="text-cyan-500 tracking-widest uppercase text-3xl block mt-2">ConextBot?</span>
+                                <span className="text-indigo-500 tracking-widest uppercase text-3xl block mt-2">ConextBot?</span>
                             </h2>
                             <p className="text-gray-400 text-xl font-light leading-relaxed max-w-xl">
                                 Nascemos de uma premissa simples: **Humanos não foram feitos para tarefas repetitivas.** 
@@ -38,8 +38,8 @@ export default function BrandStory() {
 
                         <div className="grid sm:grid-cols-2 gap-8">
                             <div className="space-y-3 p-6 rounded-3xl hover:bg-white/5 transition-colors">
-                                <Zap className="text-cyan-400" size={20} />
-                                <h5 className="text-white font-bold italic lowercase tracking-tight text-lg">Velocidade <span className="text-cyan-500">Exponencial</span></h5>
+                                <Zap className="text-indigo-400" size={20} />
+                                <h5 className="text-white font-bold italic lowercase tracking-tight text-lg">Velocidade <span className="text-indigo-500">Exponencial</span></h5>
                                 <p className="text-xs text-gray-500 leading-relaxed">Leads não esperam. Respondemos em milissegundos, garantindo que o timing da venda nunca seja perdido.</p>
                             </div>
                             <div className="space-y-3 p-6 rounded-3xl hover:bg-white/5 transition-colors">

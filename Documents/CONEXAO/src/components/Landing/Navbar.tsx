@@ -8,8 +8,7 @@ import { User } from "lucide-react";
 export default function Navbar({ branding }: { branding?: any }) {
     const { data: session } = useSession();
     const systemName = branding?.systemName || "Conext Bot";
-    const [firstName, ...rest] = systemName.split(' ');
-    const lastName = rest.join(' ');
+    const logo = branding?.logo || "/logo.svg";
 
     const [scrolled, setScrolled] = useState(false);
 
@@ -27,25 +26,23 @@ export default function Navbar({ branding }: { branding?: any }) {
                 <div className={`glass rounded-[2rem] px-8 py-4 flex items-center justify-between border border-white/5 transition-all duration-500 ${scrolled ? 'bg-black/80 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10' : 'bg-transparent'}`}>
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-500 flex items-center justify-center group-hover:rotate-12 transition-transform shadow-lg shadow-cyan-500/20">
-                            <span className="text-black font-black text-xl italic">C</span>
-                        </div>
-                        <span className="text-2xl font-black tracking-tighter text-white italic">
-                            {firstName}<span className="text-cyan-500">{lastName}</span>
+                        <img src={logo} alt={systemName} className="h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
+                        <span className="text-2xl font-black bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent italic">
+                            {systemName}
                         </span>
                     </Link>
 
                     {/* Desktop Menu */}
                     <div className="hidden md:flex items-center gap-10">
                         {[
-                            { label: 'Poderes', href: '#features' },
+                            { label: 'Funcionalidades', href: '#features' },
                             { label: 'Planos', href: '#pricing' },
                             { label: 'Documentação', href: '/docs' }
                         ].map((link) => (
                             <Link 
                                 key={link.label} 
                                 href={link.href}
-                                className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-cyan-400 transition-colors italic"
+                                className="text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors"
                             >
                                 {link.label}
                             </Link>
@@ -55,19 +52,19 @@ export default function Navbar({ branding }: { branding?: any }) {
                     {/* Actions */}
                     <div className="flex items-center gap-6">
                         {session ? (
-                            <Link href="/dashboard" className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-cyan-400 transition-all italic shadow-xl shadow-white/10">
+                            <Link href="/dashboard" className="px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">
                                 Dashboard
                             </Link>
                         ) : (
                             <>
-                                <Link href="/auth/login" className="hidden sm:block text-[10px] font-black uppercase tracking-[0.2em] text-white hover:text-cyan-400 transition-colors italic">
+                                <Link href="/auth/login" className="hidden sm:block text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors">
                                     Entrar
                                 </Link>
                                 <Link 
                                     href="/auth/register" 
-                                    className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-cyan-400 hover:text-black transition-all shadow-xl shadow-white/10 italic"
+                                    className="px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20"
                                 >
-                                    Começar
+                                    Começar Agora
                                 </Link>
                             </>
                         )}
