@@ -27,12 +27,12 @@ export default function Hero({ branding }: { branding?: any }) {
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                <Link href="/auth/login" className="btn-primary flex items-center justify-center gap-2 text-lg">
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center">
+                <Link href="/auth/login" className="btn-primary flex items-center justify-center gap-2 text-lg px-8 py-3">
                     criar meu agente agora
                 </Link>
-                <Link href="#demo" className="btn-outline flex items-center justify-center gap-2 text-lg">
-                    ver funcionamento
+                <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-2 text-lg px-8 py-3 border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+                    baixar plugin wordpress
                 </Link>
             </div>
 
