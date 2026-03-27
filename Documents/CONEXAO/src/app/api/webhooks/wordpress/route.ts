@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MessageProcessor } from '@/services/engine/processor';
 import prisma from '@/lib/prisma';
+import { verifyWpToken } from '@/lib/wp-token';
 import fs from 'fs';
 import path from 'path';
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Invalid JSON' }, { status: 400 });
         }
 
-        const botId = body.bot_id;
+        const botIdRaw = body.bot_id;
         const commentContent = body.comment_content;
         const author = body.comment_author || 'Visitante';
         const postId = body.post_id;
@@ -31,25 +32,36 @@ export async function POST(req: Request) {
         const postTitle = body.post_title || '';
         const postContent = body.post_content || '';
 
-        logToFile(`[Wordpress Webhook] Received comment from ${author} on Post ${postId} (Bot: ${botId})`);
+        logToFile(`[Wordpress Webhook] Received comment from ${author} on Post ${postId} (Bot raw: ${String(botIdRaw).slice(0, 24)}...)`);
 
-        if (!botId || !commentContent) {
+        if (!botIdRaw || !commentContent) {
             logToFile(`[Wordpress Webhook] Missing botId or commentContent`);
             return NextResponse.json({ status: 'error', message: 'Missing required fields' }, { status: 400 });
         }
 
-        // Identify the Bot
-        const bot = await prisma.bot.findFirst({
+        // Identificar o bot: UUID, webhookToken, ou token CONEXT_ (tenant) — o plugin enviava o token errado como bot_id
+        let bot = await prisma.bot.findFirst({
             where: {
                 OR: [
-                    { webhookToken: botId },
-                    { id: botId }
-                ]
-            }
+                    { id: botIdRaw },
+                    { webhookToken: botIdRaw },
+                ],
+            },
         });
 
+        if (!bot && typeof botIdRaw === 'string' && botIdRaw.startsWith('CONEXT_')) {
+            const decoded = verifyWpToken(botIdRaw);
+            if (decoded?.id) {
+                bot = await prisma.bot.findFirst({
+                    where: { tenantId: decoded.id as string, status: 'active' },
+                    orderBy: { createdAt: 'asc' },
+                });
+                logToFile(`[Wordpress Webhook] Resolved bot via CONEXT tenant ${decoded.id} -> ${bot?.id || 'none'}`);
+            }
+        }
+
         if (!bot) {
-            logToFile(`[Wordpress Webhook] Bot not found: ${botId}`);
+            logToFile(`[Wordpress Webhook] Bot not found for: ${String(botIdRaw).slice(0, 40)}`);
             return NextResponse.json({ status: 'error', message: 'Bot not found' }, { status: 404 });
         }
 

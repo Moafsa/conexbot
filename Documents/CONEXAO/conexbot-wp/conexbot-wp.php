@@ -32,20 +32,23 @@ add_action('admin_menu', function() {
     add_menu_page('Conexbot', 'Conexbot', 'manage_options', 'conexbot-dashboard', 'conexbot_render_admin_page', 'dashicons-format-chat', 30);
 });
 
-// 3.5 Enfileirar Scripts de Administração
 add_action('admin_enqueue_scripts', function($hook) {
-    if ('toplevel_page_conexbot-dashboard' !== $hook) {
+    if ($hook !== 'toplevel_page_conexbot-dashboard') {
         return;
     }
-
-    wp_enqueue_script('conexbot-admin', plugin_dir_url(__FILE__) . 'admin/conexbot-admin.js', array(), '1.0.3', true);
-
+    wp_enqueue_script(
+        'conexbot-admin',
+        plugins_url('admin/conexbot-admin.js', __FILE__),
+        array(),
+        '1.0.3',
+        true
+    );
     wp_localize_script('conexbot-admin', 'conexbotAdmin', array(
-        'ajaxurl'      => admin_url('admin-ajax.php'),
-        'nonceSave'    => wp_create_nonce('conexbot_save_action'),
-        'nonceSetup'   => wp_create_nonce('conexbot_setup_nonce'),
-        'token'        => get_option('conexbot_api_token', ''),
-        'dashboardUrl' => admin_url('admin.php?page=conexbot-dashboard')
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonceSave' => wp_create_nonce('conexbot_save_action'),
+        'nonceSetup' => wp_create_nonce('conexbot_setup_nonce'),
+        'token' => get_option('conexbot_api_token', ''),
+        'dashboardUrl' => admin_url('admin.php?page=conexbot-dashboard'),
     ));
 });
 
@@ -74,6 +77,19 @@ add_action('admin_init', function() {
 });
 
 // 5. Handlers AJAX
+add_action('wp_ajax_conexbot_save_token_ajax', function() {
+    check_ajax_referer('conexbot_save_action', 'security');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Sem permissão.'));
+    }
+    $token = isset($_POST['token']) ? sanitize_text_field(wp_unslash($_POST['token'])) : '';
+    if ($token === '') {
+        wp_send_json_error(array('message' => 'Token vazio.'));
+    }
+    update_option('conexbot_api_token', $token);
+    wp_send_json_success(array('message' => 'Conexão salva.'));
+});
+
 add_action('wp_ajax_conexbot_save_setup', function() {
     check_ajax_referer('conexbot_setup_nonce', 'security');
     if (!current_user_can('manage_options')) wp_send_json_error('Sem permissão.');
@@ -103,19 +119,6 @@ add_action('wp_ajax_conexbot_bulk_sync_ajax', function() {
     } else {
         wp_send_json_error(array('message' => 'Erro ao iniciar sincronização.'));
     }
-});
-
-add_action('wp_ajax_conexbot_save_token_ajax', function() {
-    check_ajax_referer('conexbot_save_action', 'security');
-    if (!current_user_can('manage_options')) wp_send_json_error('Sem permissão.');
-
-    $token = isset($_POST['token']) ? sanitize_text_field(wp_unslash($_POST['token'])) : '';
-    if (empty($token)) {
-        wp_send_json_error('Token vazio.');
-    }
-
-    update_option('conexbot_api_token', $token);
-    wp_send_json_success(array('message' => 'Conexão salva com sucesso!'));
 });
 
 // 6. Chat Nativo no Frontend
@@ -171,9 +174,11 @@ function conexbot_on_new_comment($comment_ID, $comment) {
     if (!$token) return;
 
     $post = get_post($comment->comment_post_ID);
-    
+    /** ID do bot no painel (UUID). O SaaS procura o bot por id; antes enviava-se o token CONEXT por engano. */
+    $bot_id = get_option('conexbot_bot_id', '');
+
     $payload = [
-        'bot_id'          => $token,
+        'bot_id'          => $bot_id !== '' ? $bot_id : $token,
         'post_id'         => $comment->comment_post_ID,
         'post_title'      => $post->post_title,
         'post_content'    => wp_strip_all_tags($post->post_content),
@@ -203,8 +208,14 @@ add_action('wp_ajax_conexbot_ai_reply', 'conexbot_ai_reply_callback');
 function conexbot_ai_reply_callback() {
     $token = isset($_POST['token']) ? sanitize_text_field($_POST['token']) : '';
     $saved_token = get_option('conexbot_api_token');
+    $saved_bot_id = get_option('conexbot_bot_id', '');
 
-    if (empty($token) || $token !== $saved_token) {
+    // SaaS envia bot.webhookToken ou bot.id; o site guarda token CONEXT no login — aceitar também o UUID do bot
+    $ok = ! empty($token) && (
+        hash_equals((string) $saved_token, $token) ||
+        ( $saved_bot_id !== '' && hash_equals((string) $saved_bot_id, $token) )
+    );
+    if (! $ok) {
         wp_send_json_error('Token inválido', 403);
     }
 
