@@ -8,7 +8,7 @@ import { User } from "lucide-react";
 export default function Navbar({ branding }: { branding?: any }) {
     const { data: session } = useSession();
     const systemName = branding?.systemName || "Conext Bot";
-    const logo = branding?.logo || "/logo.svg";
+    const logo = branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png";
 
     const [scrolled, setScrolled] = useState(false);
 
