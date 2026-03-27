@@ -31,7 +31,8 @@ export default function Hero({ branding }: { branding?: any }) {
                 <Link href="/auth/login" className="btn-primary flex items-center justify-center gap-2 text-lg px-8 py-3">
                     criar meu agente agora
                 </Link>
-                <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-2 text-lg px-8 py-3 border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+                <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-2 text-lg px-8 py-3 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 group">
+                    <svg className="w-6 h-6 fill-current group-hover:scale-110 transition-transform" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.477 2 2 6.477 2 12c0 .49.036.972.105 1.442l3.41-9.337C7.23 3.447 9.49 2.164 12 2.164c2.51 0 4.77 1.283 6.485 3.278l3.41 9.337c.07-.47.105-.952.105-1.442 0-5.523-4.477-10-10-10zm0 19.836c-2.43 0-4.63-.984-6.225-2.57l3.05-8.358 1.94 5.318 1.235-3.377 1.235 3.377 1.94-5.318 3.05 8.358c-1.595 1.586-3.795 2.57-6.225 2.57zM2 12c0 1.264.235 2.473.662 3.593L7.756 3.03C4.346 4.673 2 8.06 2 12zm10 10c-1.264 0-2.473-.235-3.593-.662l12.563-5.094C19.327 19.654 15.94 22 12 22z"/></svg>
                     baixar plugin wordpress
                 </Link>
             </div>

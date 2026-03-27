@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Hero from "@/components/Landing/Hero";
 import Features from "@/components/Landing/Features";
 import Pricing from "@/components/Landing/Pricing";
+import Integrations from "@/components/Landing/Integrations";
 import Footer from "@/components/Landing/Footer";
 import prisma from "@/lib/prisma";
 
@@ -14,6 +15,7 @@ export default async function Home() {
             <Navbar branding={config} />
             <main className="flex-grow pt-20">
                 <Hero branding={config} />
+                <Integrations />
                 <div id="features"><Features /></div>
                 <div id="pricing"><Pricing /></div>
             </main>
