@@ -27,8 +27,8 @@ export default function Navbar({ branding }: { branding?: any }) {
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-3 group">
                         <img src={logo} alt={systemName} className="h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
-                        <span className="text-2xl font-black bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent italic">
-                            {systemName}
+                        <span className="text-2xl font-black text-white italic">
+                            Conext <span className="text-gradient">Bot</span>
                         </span>
                     </Link>
 

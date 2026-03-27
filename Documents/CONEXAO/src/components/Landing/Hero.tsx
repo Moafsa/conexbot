@@ -22,29 +22,18 @@ export default function Hero({ branding }: { branding?: any }) {
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-                Não é apenas um bot. É um ecossistema autônomo que vende, agenda e sincroniza sua empresa 24/7 com voz humana e inteligência estratégica.
+                Não é apenas um <span className="text-gradient font-bold italic">Bot</span>. É um ecossistema autônomo que vende, agenda e sincroniza sua empresa 24/7 com voz humana e inteligência estratégica.
             </p>
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center mb-16">
-                <Link href="/auth/register" className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full text-lg font-bold transition-all shadow-lg shadow-indigo-500/20">
+                <Link href="/auth/register" className="btn-primary flex items-center justify-center px-10 py-4 text-lg shadow-[0_0_20px_rgba(99,102,241,0.3)]">
                     Criar meu Agente agora
                 </Link>
                 <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-3 text-lg px-8 py-3 border-white/10 text-white hover:bg-white/5 group">
                     <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" className="w-7 h-7 group-hover:scale-110 transition-all duration-300" />
                     Baixar Plugin WordPress
                 </Link>
-            </div>
-
-            {/* Dashboard Glow (Restored as a subtle feature) */}
-            <div className="relative w-full max-w-4xl mx-auto mb-16 opacity-40">
-                <div className="aspect-video glass rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent shadow-2xl overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                         <div className="w-16 h-16 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center animate-pulse">
-                            <img src="https://cdn.simpleicons.org/openai/white" className="w-8 h-8" alt="IA" />
-                         </div>
-                    </div>
-                </div>
             </div>
 
             {/* Stats/Social Proof */}
