@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
 import { buildSystemPrompt, buildConversationMessages } from './prompts';
-import { UzapiService } from './uzapi';
 import { logToFile } from './logger';
+import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
 import { PhoneUtils } from '@/lib/phone-utils';
 
@@ -42,10 +42,6 @@ import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
 import { format } from 'date-fns';
 
-import fs from 'fs';
-import path from 'path';
-
-
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
@@ -53,27 +49,28 @@ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b
 const processingLocks = new Map<string, Promise<any>>();
 
 export const MessageProcessor = {
-    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
-        console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
-        // Concurrency Lock: prevent same phone processing parallelly
-        const existingLock = processingLocks.get(senderPhone);
+        // Lock por canal + identificador: WhatsApp e WordPress nunca competem pela mesma chave
+        const lockKey = `${channel}:${senderPhone}`;
+        console.log(`[Processor] DEBUG: Processing message from ${lockKey} (V3-RECURSIVE-HACK)`);
+        const existingLock = processingLocks.get(lockKey);
         if (existingLock) {
-            logToFile(`[Processor] WAITING for existing lock: ${senderPhone}`);
+            logToFile(`[Processor] WAITING for existing lock: ${lockKey}`);
             await existingLock;
         }
 
         const currentProcess = this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
-        processingLocks.set(senderPhone, currentProcess);
+        processingLocks.set(lockKey, currentProcess);
 
         try {
             return await currentProcess;
         } finally {
-            processingLocks.delete(senderPhone);
+            processingLocks.delete(lockKey);
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -708,59 +705,15 @@ export const MessageProcessor = {
                 }
             }
 
-            // 14. Primary Channel Sending
-            if (channel === 'whatsapp' && bot.sessionName) {
-                if (options.inputType === 'audio') {
-                    const { VoiceService } = await import('./voice');
-                    try {
-                        const audioPath = await VoiceService.speak(
-                            cleanResponse,
-                            bot.tenant?.openaiApiKey,
-                            (bot.tenant as any)?.elevenLabsApiKey,
-                            bot.voiceId
-                        );
-
-                        const hasElevenLabs = !!(bot.tenant as any)?.elevenLabsApiKey;
-                        const hasVoiceId = !!bot.voiceId;
-                        logToFile(`[Processor] TTS Config: elevenLabs=${hasElevenLabs}, voiceId=${hasVoiceId}`);
-                        if (!hasElevenLabs || !hasVoiceId) {
-                            logToFile(`[Processor] HINT: Configure Dashboard -> Settings -> AI (ElevenLabs API Key) and Edit Bot -> Voice ID for audio replies.`);
-                        }
-
-                        const audioBuffer = fs.readFileSync(audioPath);
-                        // Ensure correct extension and mimetype for WuzAPI
-                        const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
-                        const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');
-
-                        if (sent) {
-                            logToFile(`[Processor] Audio reply sent successfully.`);
-                        } else {
-                            logToFile(`[Processor] sendMedia (audio) returned false; falling back to text.`);
-                            await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
-                        }
-                    } catch (e: any) {
-                        logToFile(`[Processor] TTS or send failed: ${e.message}; sending text fallback.`);
-                        await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
-                    }
-                } else {
-                    await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
-                }
-
-                for (const match of mediaMatches as any[]) {
-                    const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
-                    if (media) await UzapiService.sendMedia(bot.sessionName, senderPhone, media.type, media.url, media.description || media.filename);
-                }
-            } else if (channel === 'wordpress') {
-                const { WordpressService } = await import('./wordpress');
-                // senderPhone contains "wp_post_{postId}_comment_{commentId}"
-                const parts = senderPhone.split('_');
-                const postId = parseInt(parts[2]);
-                const commentId = parseInt(parts[4]);
-                
-                if (!isNaN(postId) && !isNaN(commentId)) {
-                    await WordpressService.sendReply(bot, postId, commentId, cleanResponse);
-                }
-            }
+            // 14. Entrega por canal (WhatsApp ‖ WordPress — ver outbound/deliver-assistant.ts)
+            await deliverAssistantOutbound({
+                channel,
+                bot,
+                remoteId: senderPhone,
+                cleanResponse,
+                mediaMatches: mediaMatches as RegExpMatchArray[],
+                options,
+            });
 
             // 15. Subscription Autonomy (Cancellation & Status)
             const CANCELLATION_KEYWORDS = /(cancelar|encerrar|parar|desistir).*(assinatura|plano|serviço|mensalidade)/i;

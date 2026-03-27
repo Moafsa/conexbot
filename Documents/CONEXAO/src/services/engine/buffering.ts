@@ -5,9 +5,11 @@ interface BufferedChat {
     messages: string[];
     timer: NodeJS.Timeout | null;
     sessionName: string;
-    contactId: string; // phone
+    contactId: string; // phone normalizado (CRM)
     channel: 'whatsapp' | 'simulator';
     hadAudio: boolean; // se alguma mensagem veio de áudio, responder com TTS
+    /** Info.Chat do WuzAPI — envio da resposta deve usar este JID */
+    whatsappChatJid?: string;
 }
 
 // In-memory storage for active buffers
@@ -19,7 +21,7 @@ export const BufferingService = {
      * Add a message to the buffer.
      * If a timer exists, clear it and restart (debounce).
      */
-    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
+    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text', whatsappChatJid?: string) {
         const key = `${sessionName}:${contactId}`;
 
         // Get bot configuration for buffer delay
@@ -42,7 +44,8 @@ export const BufferingService = {
             }
             console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately (${contentToProcess.length} chars).`);
             MessageProcessor.process(sessionName, contactId, contentToProcess, channel, 'sessionName', { 
-                inputType: inputType as any 
+                inputType: inputType as any,
+                whatsappChatJid,
             }).catch(err => console.error('[Buffering] Immediate process error:', err));
             return;
         }
@@ -56,9 +59,12 @@ export const BufferingService = {
                 sessionName,
                 contactId,
                 channel,
-                hadAudio: false
+                hadAudio: false,
+                whatsappChatJid: whatsappChatJid || undefined,
             };
             activeBuffers.set(key, buffer);
+        } else if (whatsappChatJid && !buffer.whatsappChatJid) {
+            buffer.whatsappChatJid = whatsappChatJid;
         }
 
         // Add message part
@@ -112,7 +118,7 @@ export const BufferingService = {
             combinedText,
             buffer.channel,
             'sessionName',
-            { inputType: flushInputType as any }
+            { inputType: flushInputType as any, whatsappChatJid: buffer.whatsappChatJid }
         ).catch(err => console.error('[Buffering] Process error:', err));
     }
 };

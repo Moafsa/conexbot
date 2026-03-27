@@ -96,7 +96,9 @@ export async function POST(req: Request) {
             const fromMe = info.FromMe || info.fromMe || false;
 
             const cleanPhone = PhoneUtils.normalize(senderPhone);
-            logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
+            /** JID do chat (WuzAPI Info.Chat) — usar no envio; normalize() pode alterar o número internacional */
+            const chatJid = String(info.Chat || info.chat || senderPhone || '').trim();
+            logToFile(`Processing message: From=${senderPhone}, Chat=${chatJid}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
 
             const isGroup = senderPhone.includes('@g.us');
             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
@@ -244,7 +246,7 @@ export async function POST(req: Request) {
 
                         if (transcription) {
                             const { BufferingService } = await import('@/services/engine/buffering');
-                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
+                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio', chatJid).catch(err => {
                                 logToFile(`BUFFER ERROR (Audio): ${err?.message || err}`);
                             });
                         }
@@ -377,7 +379,7 @@ export async function POST(req: Request) {
                         // Passar direto ao Processor (evita race com buffer que recebia "")
                         const textToProcess = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${description}`;
                         logToFile(`Sending image description (${textToProcess.length} chars) to Processor for ${cleanPhone}`);
-                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image' }).catch(err => {
+                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image', whatsappChatJid: chatJid }).catch(err => {
                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
                         });
                     } else {
@@ -390,12 +392,12 @@ export async function POST(req: Request) {
                 // Text Message Handling with Smart Buffering
                 try {
                     const { BufferingService } = await import('@/services/engine/buffering');
-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp');
+                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', chatJid);
                     logToFile(`Message buffered for ${cleanPhone}`);
                 } catch (e: any) {
                     logToFile(`BUFFER ERROR: ${e.message}`);
                     // Fallback to direct processing if buffering fails
-                    MessageProcessor.process(sessionName, cleanPhone, messageBody).catch(err => {
+                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', whatsappChatJid: chatJid }).catch(err => {
                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
                     });
                 }

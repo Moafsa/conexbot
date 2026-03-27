@@ -74,13 +74,14 @@ export async function POST(req: Request) {
         // This ensures the bot "remembers" it's replying to a specific comment thread
         const remoteId = `wp_post_${postId}_comment_${commentId}`;
 
+        const channel = body.channel || 'wordpress';
+        const whatsappChatJid = body.whatsapp_chat_jid || null;
+
         // Send to processor
-        // We pass the postId and commentId in a specialized format (or we could extend the signature, but let's keep it simple)
-        // Actually, we need a way to pass postId/commentId back to the sender.
-        // I'll use a hack of including metadata in the senderPhone or similar if needed, 
-        // OR better: MessageProcessor will store the latest wp_context in the conversation metadata.
-        
-        MessageProcessor.process(bot.id, remoteId, contextualMessage, 'wordpress' as any, 'id').catch(err => {
+        MessageProcessor.process(bot.id, remoteId, contextualMessage, channel as any, 'id', {
+            inputType: 'text',
+            whatsappChatJid: whatsappChatJid
+        }).catch(err => {
             logToFile(`[Wordpress Webhook] Processor Error: ${err?.message || err}`);
             console.error(err);
         });
