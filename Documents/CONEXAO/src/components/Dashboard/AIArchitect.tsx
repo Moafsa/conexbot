@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Upload, X, File, Image as ImageIcon, Check, Loader2, Edit, BookOpen, Mic, Square } from "lucide-react";
 import EditBotModal from "./EditBotModal";
 import FactsReview from "./FactsReview";
+import { buildArchitectBotPayload } from "@/lib/architect-bot-payload";
 import { toast } from "sonner";
 
 type Message = {
@@ -249,7 +250,9 @@ export default function AIArchitect() {
       const data = await res.json().catch(() => ({ error: 'Resposta inválida do servidor.' }));
       if (data.extractedData) setBotData((prev: any) => ({ ...prev, ...data.extractedData }));
 
-      const errorMsg = data.error ? `${data.error} ${data.details ? `(${data.details})` : ''}` : null;
+      const errorMsg = !res.ok
+        ? (data.error || data.content || data.details || `Erro ${res.status}`)
+        : (data.error ? `${data.error}${data.details ? ` (${data.details})` : ''}` : null);
       const aiMsg: Message = { role: "ai", content: data.content || errorMsg || "Erro ao processar." };
 
       if (data.nextStep === 'done') {
@@ -258,23 +261,7 @@ export default function AIArchitect() {
           if (botData.creating) return;
           setBotData((prev: any) => ({ ...prev, creating: true }));
 
-          const payload = {
-            ...botData,
-            name: data.extractedData?.name || botData.name || "Novo Agente",
-            businessType: data.extractedData?.businessType || botData.businessType || "Geral",
-            voiceId: botData.voiceId || "",
-            knowledgeBase: data.extractedData?.knowledgeBase || botData.knowledgeBase,
-            description: data.extractedData?.description || botData.description,
-            systemPrompt: data.extractedData?.systemPrompt || botData.systemPrompt,
-            webhookUrl: data.extractedData?.webhookUrl || botData.webhookUrl,
-            webhookToken: data.extractedData?.webhookToken || botData.webhookToken,
-            chatwootUrl: data.extractedData?.chatwootUrl || botData.chatwootUrl,
-            chatwootToken: data.extractedData?.chatwootToken || botData.chatwootToken,
-            chatwootAccountId: data.extractedData?.chatwootAccountId || botData.chatwootAccountId,
-            aiProvider: data.extractedData?.aiProvider || botData.aiProvider || "openai",
-            aiModel: data.extractedData?.aiModel || botData.aiModel || "gpt-4o-mini",
-            fallbackContact: (data.extractedData?.fallbackContact || botData.fallbackContact || "").toString().replace(/\D/g, ''),
-          };
+          const payload = buildArchitectBotPayload(botData, data.extractedData);
 
           if (editId) {
             const updateRes = await fetch(`/api/bots/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
