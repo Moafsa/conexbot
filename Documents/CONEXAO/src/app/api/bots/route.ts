@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 // crypto is native in Node 19+ and latest versions of Node 18, so we can use randomUUID directly
-import { createBotSchema } from '@/lib/validations';
+import { buildArchitectBotPayload } from '@/lib/architect-bot-payload';
 import { checkBotLimit } from '@/services/plan-limits';
 import { UzapiService } from '@/services/engine/uzapi';
 
@@ -15,19 +15,23 @@ export async function POST(req: Request) {
         }
 
         const tenantId = (session.user as any).id;
-        const body = await req.json();
+        const raw = await req.json().catch(() => null);
+        const body =
+            raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 
         console.log('[API /bots POST] TenantId:', tenantId);
         console.log('[API /bots POST] Request body:', JSON.stringify(body, null, 2));
 
-        const parsed = createBotSchema.safeParse(body);
-
-        if (!parsed.success) {
-            console.error('[API /bots POST] Validation failed:', parsed.error.issues);
-            return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+        let sanitized;
+        try {
+            sanitized = buildArchitectBotPayload(body, {});
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : 'Dados do agente inválidos';
+            console.error('[API /bots POST] Sanitize/validation failed:', e);
+            return NextResponse.json({ error: msg }, { status: 400 });
         }
 
-        console.log('[API /bots POST] Validation passed');
+        console.log('[API /bots POST] Validation passed (sanitized payload)');
 
         // Check bot limit
         const limitCheck = await checkBotLimit(tenantId);
@@ -39,13 +43,13 @@ export async function POST(req: Request) {
         }
 
         // Validate Asaas configuration if payments enabled
-        if (parsed.data.enablePayments) {
+        if (sanitized.enablePayments) {
             const tenant = await prisma.tenant.findUnique({
                 where: { id: tenantId },
                 select: { asaasApiKey: true },
             });
 
-            const hasAnyAsaasKey = !!(parsed.data.asaasApiKey || tenant?.asaasApiKey);
+            const hasAnyAsaasKey = !!(sanitized.asaasApiKey || tenant?.asaasApiKey);
 
             if (!hasAnyAsaasKey) {
                 console.warn('[API /bots POST] Asaas key missing for payment-enabled bot');
@@ -60,27 +64,27 @@ export async function POST(req: Request) {
 
         const bot = await prisma.bot.create({
             data: {
-                name: parsed.data.name,
-                businessType: parsed.data.businessType,
-                voiceId: parsed.data.voiceId || null,
+                name: sanitized.name,
+                businessType: sanitized.businessType,
+                voiceId: sanitized.voiceId || null,
                 modules: ['delivery', 'support'],
-                address: parsed.data.address,
-                hours: parsed.data.hours,
-                paymentMethods: parsed.data.paymentMethods || [],
-                knowledgeBase: parsed.data.knowledgeBase,
-                description: parsed.data.description,
-                productsServices: parsed.data.productsServices,
-                systemPrompt: parsed.data.systemPrompt,
-                websiteUrl: parsed.data.websiteUrl,
-                enablePayments: parsed.data.enablePayments || false,
-                asaasApiKey: parsed.data.asaasApiKey || null,
-                fallbackContact: parsed.data.fallbackContact,
-                aiProvider: parsed.data.aiProvider || 'openai',
-                aiModel: parsed.data.aiModel || 'gpt-4o-mini',
+                address: sanitized.address,
+                hours: sanitized.hours,
+                paymentMethods: sanitized.paymentMethods || [],
+                knowledgeBase: sanitized.knowledgeBase,
+                description: sanitized.description,
+                productsServices: sanitized.productsServices,
+                systemPrompt: sanitized.systemPrompt,
+                websiteUrl: sanitized.websiteUrl,
+                enablePayments: sanitized.enablePayments || false,
+                asaasApiKey: sanitized.asaasApiKey || null,
+                fallbackContact: sanitized.fallbackContact,
+                aiProvider: sanitized.aiProvider || 'openai',
+                aiModel: sanitized.aiModel || 'gpt-4o-mini',
                 tenantId,
                 connectToken: crypto.randomUUID(),
-                groupResponseMode: parsed.data.groupResponseMode,
-                allowedGroups: parsed.data.allowedGroups,
+                groupResponseMode: sanitized.groupResponseMode,
+                allowedGroups: sanitized.allowedGroups,
             },
         });
 
