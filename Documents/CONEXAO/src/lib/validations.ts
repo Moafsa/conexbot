@@ -34,7 +34,9 @@ export const createBotSchema = z.object({
     systemPrompt: z.string().optional(),
     websiteUrl: z.string().url('URL inválida').optional().or(z.literal('')),
     enablePayments: z.boolean().optional().default(false),
-    fallbackContact: z.string().regex(/^\d{10,15}$/, 'WhatsApp inválido (ex: 5511999999999)').optional(),
+    fallbackContact: z.string().optional().refine(val => !val || /^\d{10,15}$/.test(val), {
+        message: 'WhatsApp inválido (ex: 5511999999999)'
+    }),
     webhookUrl: z.string().url('URL de webhook inválida').optional().or(z.literal('')),
     webhookToken: z.string().optional(),
     chatwootUrl: z.string().url('URL do Chatwoot inválida').optional().or(z.literal('')),

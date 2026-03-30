@@ -57,6 +57,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         userSplitValue: 0,
         groupResponseMode: "ALL",
         allowedGroups: [] as string[],
+        fallbackContact: "",
     });
 
     const [materials, setMaterials] = useState<any[]>([]);
@@ -85,6 +86,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 userSplitValue: botData.userSplitValue || 0,
                 groupResponseMode: botData.groupResponseMode || "ALL",
                 allowedGroups: botData.allowedGroups || [],
+                fallbackContact: botData.fallbackContact || "",
             });
             fetchExtraData();
         }
@@ -254,6 +256,27 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                             onChange={e => setFormData({ ...formData, systemPrompt: e.target.value })}
                                             className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-indigo-100/70 font-mono text-[11px] focus:ring-1 focus:ring-indigo-500 outline-none min-h-[200px]"
                                         />
+                                    </div>
+
+                                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-6 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-amber-500/20 rounded-lg">
+                                                <Users size={18} className="text-amber-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white">Transbordo Humano</h4>
+                                                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mt-1">WhatsApp para onde o bot deve escalar se não souber responder</p>
+                                            </div>
+                                        </div>
+                                        <Field 
+                                            label="WhatsApp de Suporte (Apenas Números)" 
+                                            value={formData.fallbackContact} 
+                                            onChange={v => setFormData({ ...formData, fallbackContact: v.replace(/\D/g, '') })} 
+                                            placeholder="Ex: 5511999999999" 
+                                        />
+                                        <p className="text-[9px] text-gray-600 italic">
+                                            * Opcional. Se vazio, o bot tentará resolver sozinho ou informará que não tem um atendente disponível.
+                                        </p>
                                     </div>
                                 </div>
                             )}

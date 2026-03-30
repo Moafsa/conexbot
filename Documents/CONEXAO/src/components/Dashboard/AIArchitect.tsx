@@ -272,24 +272,39 @@ export default function AIArchitect() {
             chatwootToken: data.extractedData?.chatwootToken || botData.chatwootToken,
             chatwootAccountId: data.extractedData?.chatwootAccountId || botData.chatwootAccountId,
             aiProvider: data.extractedData?.aiProvider || botData.aiProvider || "openai",
-            aiModel: data.extractedData?.aiModel || botData.aiModel || "gpt-4o-mini"
+            aiModel: data.extractedData?.aiModel || botData.aiModel || "gpt-4o-mini",
+            fallbackContact: (data.extractedData?.fallbackContact || botData.fallbackContact || "").toString().replace(/\D/g, ''),
           };
 
           if (editId) {
-            await fetch(`/api/bots/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            aiMsg.content = `✨ **${payload.name}** atualizado!`;
+            const updateRes = await fetch(`/api/bots/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!updateRes.ok) {
+              const errData = await updateRes.json();
+              aiMsg.content = `❌ Erro ao atualizar agente: ${errData.error || 'Erro desconhecido'}`;
+              aiMsg.type = undefined;
+              setBotData((prev: any) => ({ ...prev, creating: false }));
+            } else {
+              aiMsg.content = `✨ **${payload.name}** atualizado!`;
+            }
           } else {
             const createRes = await fetch('/api/bots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const createdBot = await createRes.json();
-            if (currentFiles.length > 0) {
-              for (const { file } of currentFiles) {
-                const formData = new FormData();
-                formData.append('file', file);
-                await fetch(`/api/bots/${createdBot.id}/media`, { method: 'POST', body: formData });
+            
+            if (!createRes.ok) {
+              aiMsg.content = `❌ Erro ao criar agente: ${createdBot.error || 'Erro desconhecido'}`;
+              aiMsg.type = undefined;
+              setBotData((prev: any) => ({ ...prev, creating: false }));
+            } else {
+              if (currentFiles.length > 0) {
+                for (const { file } of currentFiles) {
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  await fetch(`/api/bots/${createdBot.id}/media`, { method: 'POST', body: formData });
+                }
               }
+              aiMsg.content = `🎉 **${payload.name}** criado!`;
+              aiMsg.payload = { botId: createdBot.id };
             }
-            aiMsg.content = `🎉 **${payload.name}** criado!`;
-            aiMsg.payload = { botId: createdBot.id };
           }
         } catch (e: any) {
           aiMsg.content = `Erro ao salvar: ${e.message}`;

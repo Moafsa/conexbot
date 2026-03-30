@@ -42,9 +42,10 @@ export async function proxy(request: NextRequest) {
     });
 
     if (!token) {
-        console.log(`[Middleware] No token found for ${pathname}, redirecting to login`);
+        const fullPath = request.nextUrl.pathname + request.nextUrl.search;
+        console.log(`[Middleware] No token found for ${fullPath}, redirecting to login`);
         const loginUrl = new URL('/auth/login', baseUrl());
-        loginUrl.searchParams.set('callbackUrl', pathname);
+        loginUrl.searchParams.set('callbackUrl', fullPath);
         return NextResponse.redirect(loginUrl);
     }
 

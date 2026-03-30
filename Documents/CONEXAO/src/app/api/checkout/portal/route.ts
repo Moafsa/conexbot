@@ -13,7 +13,9 @@ export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
-            return NextResponse.redirect(new URL('/auth/login', safeUrl));
+            const url = new URL(req.url);
+            const callbackUrl = url.pathname + url.search;
+            return NextResponse.redirect(new URL(`/auth/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, safeUrl));
         }
 
         const { searchParams } = new URL(req.url);
