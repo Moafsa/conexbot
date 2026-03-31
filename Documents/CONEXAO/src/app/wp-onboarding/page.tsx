@@ -15,6 +15,7 @@ export default function WpOnboardingPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [mode, setMode] = useState<'login' | 'register'>('register');
+    const [plans, setPlans] = useState<any[]>([]);
 
     // Auth Form State
     const [form, setForm] = useState({ 
@@ -29,7 +30,23 @@ export default function WpOnboardingPage() {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
-    // Auto-jump if already logged in
+    // 1. Fetch real plans from API
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const res = await fetch("/api/plans");
+                const data = await res.json();
+                if (data.plans) {
+                    setPlans(data.plans);
+                }
+            } catch (err) {
+                console.error("Failed to fetch plans:", err);
+            }
+        };
+        fetchPlans();
+    }, []);
+
+    // 2. Auto-jump if already logged in (Only if it's the auth step)
     useEffect(() => {
         if (sessionStatus === 'authenticated' && step === 'auth') {
             checkStatus(session.user?.email || "");
@@ -55,8 +72,9 @@ export default function WpOnboardingPage() {
                 const statusData = await statusRes.json();
                 
                 if (!statusRes.ok) {
-                    setError(statusData.error || "Erro de validação");
-                    setDetails(statusData.details || "");
+                    // Se estiver autenticado mas o token do WP falhar (tenant não existe ou erro), 
+                    // não trava no loading, deixa o usuário tentar logar manualmente se quiser
+                    setLoading(false);
                     return;
                 }
 
@@ -99,7 +117,9 @@ export default function WpOnboardingPage() {
                 throw new Error(data.error || "Erro na autenticação");
             }
 
-            // If login/register success, we might have a token or need a plan
+            // Success! Store token and check profile
+            setTenantToken(data.token);
+            
             const statusRes = await fetch("/api/v1/wp/me", {
                 headers: { "Authorization": `Bearer ${data.token}` }
             });
@@ -127,12 +147,16 @@ export default function WpOnboardingPage() {
 
     const handleFinish = (finalToken: string) => {
         setTenantToken(finalToken);
-        window.parent.postMessage({
-            type: 'CONEXBOT_AUTH',
-            token: finalToken
-        }, '*');
+        // Post message to parent WordPress
+        if (typeof window !== 'undefined') {
+            window.parent.postMessage({
+                type: 'CONEXBOT_AUTH',
+                token: finalToken
+            }, '*');
+        }
         setStep('ready');
     };
+
 
     // Robustness: retry postMessage in ready step
     useEffect(() => {
@@ -374,45 +398,46 @@ export default function WpOnboardingPage() {
                                 <p className="text-gray-400 text-xs px-10">Escolha o plano ideal e libere sua inteligência artificial.</p>
                             </div>
 
-                            <div className="space-y-3.5 mb-8">
-                                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-left flex items-center justify-between group hover:border-purple-500/30 hover:bg-white/[0.08] transition-all cursor-pointer">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-800 rounded-lg flex items-center justify-center font-black text-xs text-white shadow-lg shadow-purple-500/20">STARTER</div>
-                                        <div>
-                                            <h4 className="font-bold text-white leading-none mb-1">Plano Starter</h4>
-                                            <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-1">
-                                                <div className="w-1 h-1 bg-green-500 rounded-full" /> 5.000 Mensagens / Mês
-                                            </p>
-                                        </div>
+                            <div className="space-y-3.5 mb-8 overflow-y-auto max-h-[280px] custom-scrollbar pr-1">
+                                {plans.length > 0 ? (
+                                    plans.map((p) => {
+                                        const isAdvanced = p.name.toLowerCase().includes('adv') || p.price > 100;
+                                        return (
+                                            <div 
+                                                key={p.id}
+                                                onClick={() => window.open(`${window.location.origin}/pricing?plan=${p.id}`, '_blank')}
+                                                className={`p-4 rounded-2xl bg-white/5 border border-white/5 text-left flex items-center justify-between group hover:bg-white/[0.08] transition-all cursor-pointer ${isAdvanced ? 'hover:border-blue-500/30' : 'hover:border-purple-500/30'}`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-10 h-10 bg-gradient-to-br rounded-lg flex items-center justify-center font-black text-[10px] text-white shadow-lg ${isAdvanced ? 'from-blue-500 to-blue-800 shadow-blue-500/20' : 'from-purple-500 to-purple-800 shadow-purple-500/20'}`}>
+                                                        {p.name.split(' ')[0].toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-white leading-none mb-1 text-[13px]">{p.name}</h4>
+                                                        <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-1">
+                                                            <div className="w-1 h-1 bg-green-500 rounded-full" /> {p.messageLimit.toLocaleString()} Msg / Mês
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xl font-black text-white leading-none tracking-tight">R$ {p.price}</p>
+                                                    <p className="text-[10px] text-gray-600 font-bold uppercase">{p.interval === 'YEARLY' ? 'ANUAL' : 'MENSAL'}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="py-10 text-gray-500 text-sm italic">
+                                        {loading ? "Carregando planos..." : "Nenhum plano disponível no momento."}
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-xl font-black text-white leading-none tracking-tight">R$ 97</p>
-                                        <p className="text-[10px] text-gray-600 font-bold">MENSAL</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-left flex items-center justify-between group hover:border-blue-500/30 hover:bg-white/[0.08] transition-all cursor-pointer">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-800 rounded-lg flex items-center justify-center font-black text-xs text-white shadow-lg shadow-blue-500/20">ADVANCED</div>
-                                        <div>
-                                            <h4 className="font-bold text-white leading-none mb-1 text-[13px]">Plano Advanced</h4>
-                                            <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-1">
-                                                <div className="w-1 h-1 bg-green-500 rounded-full" /> 15.000 Mensagens / Mês
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xl font-black text-white leading-none tracking-tight">R$ 147</p>
-                                        <p className="text-[10px] text-gray-600 font-bold">MENSAL</p>
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
                             <button 
                                 onClick={() => window.open('https://conext.click/pricing', '_blank')}
                                 className="w-full btn-primary h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 mb-4 group shadow-xl shadow-purple-600/20"
                             >
-                                Assinar Plano Agora
+                                Ver Todos os Planos
                                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                             </button>
                             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-relaxed px-10">
@@ -428,6 +453,7 @@ export default function WpOnboardingPage() {
                             )}
                         </div>
                     )}
+
 
                     {step === 'ready' && (
                         <div className="animate-in zoom-in-95 fade-in duration-700 h-full flex flex-col items-center justify-center text-center py-8">
