@@ -513,8 +513,15 @@ export const MessageProcessor = {
                                 const title = `🚨 Atendimento Humano Solicitado`;
                                 const message = `O cliente *${existingContact.name || senderPhone}* solicitou um humano.\n\n*Motivo:* ${args.motivo}\n*Bot:* ${bot.name}`;
                                 const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
+                                // WhatsApp: número do "Transbordo" no bot (fallbackContact) ou WhatsApp do perfil do tenant
+                                const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
+                                const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
                                 if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
-                                if (channels.includes('WHATSAPP') && bot.tenant.whatsapp) await NotificationService.sendWhatsApp(bot.tenant.whatsapp, message);
+                                if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
+                                    await NotificationService.sendWhatsApp(whatsappNotifyTarget, message);
+                                } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
+                                    console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');
+                                }
                                 if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
                                 toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
                             } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
