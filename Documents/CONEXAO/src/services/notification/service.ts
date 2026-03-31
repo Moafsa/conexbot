@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import prisma from '@/lib/prisma';
+import { PhoneUtils } from '@/lib/phone-utils';
 import { UzapiService } from '../engine/uzapi';
 
 export class NotificationService {
@@ -56,11 +57,18 @@ export class NotificationService {
                 return false;
             }
 
-            // Clean number
-            const cleanTo = to.replace(/\D/g, '');
-            const remoteJid = cleanTo.includes('@') ? cleanTo : `${cleanTo}@s.whatsapp.net`;
+            const cleanTo = PhoneUtils.normalizeBrazilWhatsAppE164(to);
+            if (!cleanTo) {
+                console.warn('[NotificationService] WhatsApp: número vazio após normalização');
+                return false;
+            }
+            const remoteJid = `${cleanTo}@s.whatsapp.net`;
 
-            await UzapiService.sendMessage(bot.sessionName, remoteJid, message);
+            const sent = await UzapiService.sendMessage(bot.sessionName, remoteJid, message);
+            if (!sent) {
+                console.warn('[NotificationService] WhatsApp send failed (UzAPI returned false — session down or API error)');
+                return false;
+            }
             return true;
         } catch (error) {
             console.error('[NotificationService] WhatsApp Error:', error);
