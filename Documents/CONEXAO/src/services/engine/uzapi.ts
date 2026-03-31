@@ -1,9 +1,31 @@
+import { logToFile } from './logger';
+import { normalizeBrazilWhatsAppE164 } from '@/lib/phone-utils';
+
 const UZAPI_URL = process.env.UZAPI_URL || 'http://127.0.0.1:21465';
 const ADMIN_TOKEN =
     process.env.UZAPI_SECRET_KEY ||
     process.env.WUZAPI_ADMIN_TOKEN ||
     process.env.API_KEY ||
     'admin_token_123';
+
+/**
+ * WuzAPI costuma esperar JID (ex.: 5511999999999@s.whatsapp.net).
+ * Normaliza números BR (DDI 55, 9º dígito, 9 duplicado) antes de montar o JID.
+ */
+function formatRecipientJid(to: string): string {
+    const t = String(to).trim();
+    if (!t) return t;
+    if (t.includes('@g.us')) return t;
+    if (t.includes('@lid')) return t;
+
+    const domain = t.includes('@') ? t.split('@').slice(1).join('@') : 's.whatsapp.net';
+    const isPhoneJid = domain === 's.whatsapp.net' || domain === 'c.us';
+    if (t.includes('@') && !isPhoneJid) return t;
+
+    const rawLocal = t.includes('@') ? t.split('@')[0] : t;
+    const digits = normalizeBrazilWhatsAppE164(rawLocal);
+    return digits ? `${digits}@${domain}` : t;
+}
 
 export const UzapiService = {
     // Helper: Ensure user exists in WuzAPI
@@ -68,6 +90,7 @@ export const UzapiService = {
 
     async sendMessage(sessionName: string, to: string, text: string): Promise<boolean> {
         try {
+            const phone = formatRecipientJid(to);
             const res = await fetch(`${UZAPI_URL}/chat/send/text`, {
                 method: 'POST',
                 headers: {
@@ -75,19 +98,25 @@ export const UzapiService = {
                     'Token': sessionName,
                 },
                 body: JSON.stringify({
-                    Phone: to,
+                    Phone: phone,
                     Body: text,
                 }),
             });
 
             if (!res.ok) {
-                console.error('UZAPI send error:', await res.text());
+                const errBody = await res.text();
+                console.error('UZAPI send error:', errBody);
+                logToFile(
+                    `[UZAPI] sendMessage failed session=${sessionName} to=${phone} status=${res.status} body=${errBody.slice(0, 300)}`,
+                    'Uzapi'
+                );
                 return false;
             }
 
             return true;
         } catch (error) {
             console.error('UZAPI connection error:', error);
+            logToFile(`[UZAPI] sendMessage exception: ${error}`, 'Uzapi');
             return false;
         }
     },
@@ -105,8 +134,9 @@ export const UzapiService = {
                     : (type === 'video') ? 'chat/send/video'
                         : 'chat/send/image';
 
+            const phone = formatRecipientJid(to);
             const body: Record<string, string> = {
-                Phone: to,
+                Phone: phone,
                 [type === 'audio' ? 'Audio' : 'Url']: url,
             };
 
