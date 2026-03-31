@@ -76,12 +76,18 @@ body {
   background: var(--gradient-main);
   color: white;
   border: none;
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 0 15px var(--primary-glow);
+}
+
+@media (min-width: 640px) {
+  .btn-primary {
+    padding: 12px 24px;
+  }
 }
 
 .btn-primary:hover {
@@ -93,11 +99,17 @@ body {
   background: transparent;
   border: 1px solid var(--primary);
   color: var(--text-primary);
-  padding: 12px 24px;
+  padding: 10px 20px;
   border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+@media (min-width: 640px) {
+  .btn-outline {
+    padding: 12px 24px;
+  }
 }
 
 .btn-outline:hover {

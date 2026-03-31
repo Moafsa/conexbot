@@ -35,19 +35,19 @@ const integrations = [
 
 export default function Integrations() {
     return (
-        <section className="py-32 relative overflow-hidden bg-black/40">
+        <section className="py-20 md:py-32 relative overflow-hidden bg-black/40">
             <div className="max-w-7xl mx-auto px-6">
-                <div className="text-center mb-24">
-                    <h2 className="text-4xl md:text-6xl font-black text-white mb-8 italic tracking-tighter">
+                <div className="text-center mb-16 md:mb-24">
+                    <h2 className="text-4xl md:text-6xl font-black text-white mb-6 md:mb-8 italic tracking-tighter">
                         Ecossistema de <span className="text-indigo-500">Integrações</span>
                     </h2>
-                    <p className="text-gray-400 max-w-3xl mx-auto text-xl leading-relaxed font-light">
+                    <p className="text-gray-400 max-w-3xl mx-auto text-lg md:text-xl leading-relaxed font-light px-2">
                         Conectividade nativa com as maiores potências tecnológicas do mundo 
                         para escalar sua operação com inteligência.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-16 gap-y-24 items-center justify-items-center">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-8 md:gap-x-16 gap-y-16 md:gap-y-24 items-center justify-items-center">
                     {integrations.map((item: any, index) => (
                         <div 
                             key={index} 

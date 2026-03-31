@@ -21,13 +21,13 @@ export default function Navbar({ branding }: { branding?: any }) {
     }, []);
 
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-4' : 'py-8'}`}>
-            <div className="max-w-7xl mx-auto px-6">
-                <div className={`glass rounded-[2rem] px-8 py-4 flex items-center justify-between border border-white/5 transition-all duration-500 ${scrolled ? 'bg-black/80 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10' : 'bg-transparent'}`}>
+        <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-2 md:py-4' : 'py-4 md:py-8'}`}>
+            <div className="max-w-7xl mx-auto px-4 md:px-6">
+                <div className={`glass rounded-2xl md:rounded-[2rem] px-4 md:px-8 py-3 md:py-4 flex items-center justify-between border border-white/5 transition-all duration-500 ${scrolled ? 'bg-black/80 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10' : 'bg-transparent'}`}>
                     {/* Logo */}
-                    <Link href="/" className="flex items-center gap-3 group">
-                        <img src={logo} alt={systemName} className="h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
-                        <span className="text-2xl font-black text-white italic">
+                    <Link href="/" className="flex items-center gap-2 md:gap-3 group">
+                        <img src={logo} alt={systemName} className="h-10 md:h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
+                        <span className="text-xl md:text-2xl font-black text-white italic hidden sm:inline-block">
                             Conext <span className="text-gradient">Bot</span>
                         </span>
                     </Link>
@@ -50,9 +50,9 @@ export default function Navbar({ branding }: { branding?: any }) {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 md:gap-6">
                         {session ? (
-                            <Link href="/dashboard" className="px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">
+                            <Link href="/dashboard" className="px-4 md:px-8 py-2 md:py-3 bg-indigo-600 text-white text-xs md:text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">
                                 Dashboard
                             </Link>
                         ) : (
@@ -62,7 +62,7 @@ export default function Navbar({ branding }: { branding?: any }) {
                                 </Link>
                                 <Link 
                                     href="/auth/register" 
-                                    className="px-8 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20"
+                                    className="px-4 md:px-8 py-2 md:py-3 bg-indigo-600 text-white text-[10px] md:text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 whitespace-nowrap"
                                 >
                                     Começar Agora
                                 </Link>

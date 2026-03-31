@@ -62,8 +62,8 @@ export default function Pricing() {
                 </div>
 
                 {/* Interval Toggle */}
-                <div className="flex justify-center mb-16">
-                    <div className="glass p-1 rounded-2xl border-white/5 flex gap-1">
+                <div className="flex justify-center mb-12 px-2">
+                    <div className="glass p-1 rounded-2xl border-white/5 flex gap-1 overflow-x-auto no-scrollbar max-w-full">
                         {[
                             { id: 'MONTHLY', label: 'Mensal' },
                             { id: 'QUARTERLY', label: 'Trimestral' },
@@ -73,7 +73,7 @@ export default function Pricing() {
                             <button
                                 key={opt.id}
                                 onClick={() => setInterval(opt.id as Interval)}
-                                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${interval === opt.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-gray-500 hover:text-white'}`}
+                                className={`px-4 md:px-6 py-2 rounded-xl text-[10px] md:text-xs font-bold transition-all whitespace-nowrap ${interval === opt.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-gray-500 hover:text-white'}`}
                             >
                                 {opt.label}
                             </button>
@@ -105,7 +105,7 @@ export default function Pricing() {
                         const discountPercent = Math.round((1 - (currentPrice / originalPrice)) * 100);
 
                         return (
-                        <div key={plan.id} className={`glass p-8 rounded-3xl border flex flex-col h-full relative transition-all duration-500 hover:scale-[1.02] ${idx === 1 ? 'border-indigo-500/30 bg-gradient-to-b from-indigo-900/10 to-transparent shadow-2xl md:-translate-y-4' : 'border-white/5'}`}>
+                        <div key={plan.id} className={`glass p-6 md:p-8 rounded-3xl border flex flex-col h-full relative transition-all duration-500 hover:scale-[1.02] ${idx === 1 ? 'border-indigo-500/30 bg-gradient-to-b from-indigo-900/10 to-transparent shadow-2xl md:-translate-y-4' : 'border-white/5'}`}>
                             
                             {idx === 1 && (
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-xl shadow-indigo-500/20">
@@ -134,10 +134,10 @@ export default function Pricing() {
 
                             <div className="flex items-baseline gap-1 mb-2">
                                 <span className="text-sm text-gray-500 font-medium">R$</span>
-                                <span className="text-5xl font-black text-white">
+                                <span className="text-4xl md:text-5xl font-black text-white">
                                     {currentPrice.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                                 </span>
-                                <span className="text-xs font-normal text-gray-500 uppercase tracking-widest ml-1">/{periodLabel}</span>
+                                <span className="text-[10px] md:text-xs font-normal text-gray-500 uppercase tracking-widest ml-1">/{periodLabel}</span>
                             </div>
                             
                             <p className="text-xs text-gray-400 mb-8 leading-relaxed h-8 line-clamp-2">{plan.description}</p>

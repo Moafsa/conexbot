@@ -5,6 +5,7 @@ import path from 'path';
 import os from 'os';
 import prisma from '@/lib/prisma';
 import { PhoneUtils } from '@/lib/phone-utils';
+import { resolveMessageFromMe, resolveWhatsAppCustomerKeys } from '@/lib/whatsapp-identity';
 
 const TEMP_DIR = os.tmpdir();
 
@@ -72,6 +73,14 @@ export async function POST(req: Request) {
         const eventType = body.type || body.event_type || body.event;
         logToFile(`Event Type detected: ${eventType}`);
 
+        const etLower = String(eventType || '').toLowerCase();
+        if (etLower === 'undecryptablemessage') {
+            logToFile(
+                `UndecryptableMessage (WhatsApp E2E — não gera Message legível; nada a gravar no CRM): ${JSON.stringify(body).substring(0, 2000)}`
+            );
+            return NextResponse.json({ status: 'undecryptable_logged' });
+        }
+
         // CATCH-ALL DEBUG FOR MEDIA
         if (JSON.stringify(body).includes('imageMessage') || JSON.stringify(body).includes('ImageMessage')) {
             logToFile(`[DEBUG] RAW IMAGE BODY: ${JSON.stringify(body).substring(0, 1000)}`);
@@ -83,8 +92,17 @@ export async function POST(req: Request) {
             const message = eventData.Message || eventData.message || {};
 
             const senderPhoneRaw = info.Sender || info.sender || '';
-            const senderAltRaw = info.SenderAlt || info.senderAlt || '';
-            const senderPhone = senderPhoneRaw.includes('@lid') && senderAltRaw ? senderAltRaw : senderPhoneRaw;
+            const chatRaw = String(info.Chat || info.chat || '').trim();
+            const fromMe = resolveMessageFromMe(info as Record<string, unknown>);
+            const isGroup =
+                chatRaw.includes('@g.us') ||
+                String(senderPhoneRaw).includes('@g.us');
+
+            const { remoteId: cleanPhone, chatJid } = resolveWhatsAppCustomerKeys({
+                info: info as Record<string, unknown>,
+                fromMe,
+                isGroup,
+            });
             // WuzAPI: audio pode vir em audioMessage OU em Info.Type=media + Info.MediaType=ptt
             const isAudioPtt = (info.Type === 'media' && info.MediaType === 'ptt') && !message.conversation && !message.extendedTextMessage?.text;
             const audioMessage = message.audioMessage || message.AudioMessage || (isAudioPtt ? { url: '' } : null);
@@ -93,20 +111,23 @@ export async function POST(req: Request) {
                 (audioMessage ? '[AUDIO]' : '') ||
                 (message.imageMessage || message.ImageMessage ? '[IMAGE]' : '') ||
                 (message.documentMessage ? '[DOCUMENT]' : '');
-            const fromMe = info.FromMe || info.fromMe || false;
 
-            const cleanPhone = PhoneUtils.normalize(senderPhone);
-            /** JID do chat (WuzAPI Info.Chat) — usar no envio; normalize() pode alterar o número internacional */
-            const chatJid = String(info.Chat || info.chat || senderPhone || '').trim();
-            logToFile(`Processing message: From=${senderPhone}, Chat=${chatJid}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
-
-            const isGroup = senderPhone.includes('@g.us');
-            const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
+            logToFile(
+                `Processing message: Chat=${chatRaw}, fromMe=${fromMe}, isGroup=${isGroup}, ` +
+                    `resolvedRemoteId=${cleanPhone}, chatJid=${chatJid}, Body=${messageBody?.substring?.(0, 120) ?? messageBody}`
+            );
 
             if (!messageBody) {
                 logToFile(`Skipping: empty body.`);
                 return NextResponse.json({ status: 'skipped_empty' });
             }
+
+            if (!cleanPhone) {
+                logToFile(`Skipping: could not resolve customer remoteId from WhatsApp identities.`);
+                return NextResponse.json({ status: 'skipped_no_remote_id' });
+            }
+
+            const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
 
             // Group Filtering Logic
             if (isGroup) {
@@ -124,9 +145,12 @@ export async function POST(req: Request) {
                 }
 
                 if (mode === 'SPECIFIC') {
-                    const isAllowed = allowedGroups.includes(senderPhone) || allowedGroups.includes(cleanPhone);
+                    const isAllowed =
+                        allowedGroups.includes(chatRaw) ||
+                        allowedGroups.includes(senderPhoneRaw) ||
+                        allowedGroups.includes(cleanPhone);
                     if (!isAllowed) {
-                        logToFile(`Skipping group message: Group ${senderPhone} not in allowed list.`);
+                        logToFile(`Skipping group message: Group ${chatRaw} not in allowed list.`);
                         return NextResponse.json({ status: 'skipped_group_not_allowed' });
                     }
                 }

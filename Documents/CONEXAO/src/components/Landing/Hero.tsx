@@ -26,12 +26,12 @@ export default function Hero({ branding }: { branding?: any }) {
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center mb-16">
-                <Link href="/auth/register" className="btn-primary flex items-center justify-center px-10 py-4 text-lg shadow-[0_0_20px_rgba(99,102,241,0.3)]">
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center mb-16 px-4 sm:px-0">
+                <Link href="/auth/register" className="btn-primary flex items-center justify-center w-full sm:w-auto px-6 md:px-10 py-3 md:py-4 text-base md:text-lg shadow-[0_0_20px_rgba(99,102,241,0.3)]">
                     Criar meu Agente agora
                 </Link>
-                <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-3 text-lg px-8 py-3 border-white/10 text-white hover:bg-white/5 group">
-                    <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" className="w-7 h-7 group-hover:scale-110 transition-all duration-300" />
+                <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-3 w-full sm:w-auto text-base md:text-lg px-6 md:px-8 py-3 md:py-3 border-white/10 text-white hover:bg-white/5 group">
+                    <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" className="w-6 h-6 md:w-7 md:h-7 group-hover:scale-110 transition-all duration-300" />
                     Baixar Plugin WordPress
                 </Link>
             </div>
