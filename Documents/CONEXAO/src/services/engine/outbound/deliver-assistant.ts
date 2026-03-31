@@ -52,7 +52,10 @@ async function deliverWhatsApp(
         logToFile(`[Outbound/WhatsApp] destino WuzAPI: JID Chat (${recipient.substring(0, 48)}…)`);
     }
 
-    if (options.inputType === 'audio') {
+    // Regra: Sempre que houver link na resposta, tem que ser em texto (para ser clicável e evitar leitura robótica de URL)
+    const hasLink = cleanResponse.includes('http://') || cleanResponse.includes('https://');
+
+    if (options.inputType === 'audio' && !hasLink) {
         const { VoiceService } = await import('../voice');
         try {
             const audioPath = await VoiceService.speak(
@@ -65,40 +68,31 @@ async function deliverWhatsApp(
             const hasElevenLabs = !!(bot.tenant as any)?.elevenLabsApiKey;
             const hasVoiceId = !!bot.voiceId;
             logToFile(`[Outbound/WhatsApp] TTS: elevenLabs=${hasElevenLabs}, voiceId=${hasVoiceId}`);
-            if (!hasElevenLabs || !hasVoiceId) {
-                logToFile(
-                    `[Outbound/WhatsApp] HINT: ElevenLabs + Voice ID para resposta em áudio.`
-                );
-            }
-
+            
             const audioBuffer = fs.readFileSync(audioPath);
             const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
             const sent = await UzapiService.sendMedia(bot.sessionName, recipient, 'audio', dataUri, '');
 
-            if (sent) {
-                logToFile(`[Outbound/WhatsApp] Áudio enviado.`);
-            } else {
-                logToFile(`[Outbound/WhatsApp] sendMedia (áudio) false; texto.`);
-                const okText = await UzapiService.sendMessage(bot.sessionName, recipient, cleanResponse);
-                if (!okText) {
-                    logToFile(`[Outbound/WhatsApp] fallback texto também falhou (remoteId=${recipient})`);
-                }
+            if (!sent) {
+                logToFile(`[Outbound/WhatsApp] sendMedia (áudio) false; fallback texto.`);
+                await UzapiService.sendMessage(bot.sessionName, recipient, cleanResponse);
             }
         } catch (e: any) {
-            logToFile(`[Outbound/WhatsApp] TTS/áudio falhou: ${e.message}; texto.`);
-            const okText = await UzapiService.sendMessage(bot.sessionName, recipient, cleanResponse);
-            if (!okText) {
-                logToFile(`[Outbound/WhatsApp] fallback texto falhou após erro TTS (remoteId=${recipient})`);
-            }
+            logToFile(`[Outbound/WhatsApp] TTS/áudio falhou: ${e.message}; fallback texto.`);
+            await UzapiService.sendMessage(bot.sessionName, recipient, cleanResponse);
         }
     } else {
+        // Envio normal por texto (usado se input for texto OU se houver link na resposta)
+        if (hasLink && options.inputType === 'audio') {
+            logToFile(`[Outbound/WhatsApp] Link detectado em resposta de áudio. Forçando envio por texto.`);
+        }
+        
         const ok = await UzapiService.sendMessage(bot.sessionName, recipient, cleanResponse);
         if (!ok) {
-            logToFile(
-                `[Outbound/WhatsApp] sendMessage retornou false (remoteId=${recipient}). Ver UZAPI_URL/logs Uzapi.`
-            );
+            logToFile(`[Outbound/WhatsApp] sendMessage retornou false (remoteId=${recipient}).`);
         }
     }
+
 
     for (const match of mediaMatches as any[]) {
         const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
