@@ -258,7 +258,7 @@ export function CRM() {
     }, {} as Record<string, Contact[]>);
 
     return (
-        <div className="h-full w-full flex flex-col relative overflow-hidden bg-gray-50/50 -m-4 md:-m-8">
+        <div className="h-full w-full flex flex-row relative overflow-hidden bg-gray-50/50">
             <div className="flex-1 flex flex-col min-w-0 h-full">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 px-6 pt-6">
