@@ -258,8 +258,8 @@ export function CRM() {
     }, {} as Record<string, Contact[]>);
 
     return (
-        <div className="h-full flex relative overflow-hidden bg-gray-50/50">
-            <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-full w-full flex flex-col relative overflow-hidden bg-gray-50/50 -m-4 md:-m-8">
+            <div className="flex-1 flex flex-col min-w-0 h-full">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 px-6 pt-6">
                     <div>
@@ -310,7 +310,7 @@ export function CRM() {
                 </div>
 
                 {/* Kanban Horizontal Scroll Area */}
-                <div className="flex-1 overflow-x-auto pb-6 px-6 custom-scrollbar">
+                <div className="flex-1 overflow-x-auto pb-4 px-6 custom-scrollbar h-full">
                     {bots.length === 0 && !loading && (
                         <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white/50 rounded-xl border-2 border-dashed border-gray-200">
                             <User className="w-12 h-12 mb-3 text-gray-300" />

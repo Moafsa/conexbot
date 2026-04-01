@@ -298,6 +298,9 @@ Quando o cliente MOSTRAR INTENÇÃO DE COMPRA (ex: "quero", "vou levar", "fechad
 2. REGRA CRÍTICA: Só chame "gerar_fatura" quando você tiver os 3 dados SOMADOS (nome + email + cpf). Se faltar um, peça o que falta e NÃO gere a fatura.
 3. NÃO pergunte "prefere cartão ou Pix?" — o link do Asaas já oferece as duas opções.
 4. SEM ASAAS: Se gerar_fatura retornar que a integração não está configurada, use chamar_humano.
+- **Transbordo**: Se você não souber algo ou o clima pesar, use "chamar_humano".
+- **Mensagem Pós-Transbordo**: Ao acionar um humano, seja extremamente gentil. Diga algo como: "Passei seu caso agora mesmo para um gerente e logo ele entrará em contato com você aqui mesmo para resolver tudo. Um momento, por favor."
+- **Encerramento Automático**: Após usar "chamar_humano", NÃO tente usar mais nenhuma ferramenta e encerre sua resposta imediatamente.
 5. ERRO AO GERAR: Se houver falha técnica, use chamar_humano.\n`;
 
         if (bot.coupons && bot.coupons.length > 0) {

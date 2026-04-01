@@ -439,8 +439,9 @@ export const MessageProcessor = {
             let aiResult: any;
             let toolIteration = 0;
             const maxToolIterations = 5;
+            let handoffDone = false;
 
-            while (toolIteration < maxToolIterations) {
+            while (toolIteration < maxToolIterations && !handoffDone) {
                 const messages = buildConversationMessages(finalSystemPrompt, history as any);
                 aiResult = await safeChatCompletion({
                     bot,
@@ -505,41 +506,44 @@ export const MessageProcessor = {
                             } catch (e: any) { toolResult = `Erro ao agendar: ${e.message}`; }
                         } else if (name === 'chamar_humano') {
                             try {
-                                logToFile(`[Processor] Handoff requested: ${args.motivo}`);
-                                const humanStage = await prisma.crmStage.findFirst({
-                                    where: { botId: bot.id, name: { contains: 'HUMAN', mode: 'insensitive' } }
-                                });
-                                await prisma.contact.update({
-                                    where: { id: existingContact.id },
-                                    data: { 
-                                        funnelStage: humanStage?.name || 'ATENDIMENTO HUMANO',
-                                        stageId: humanStage?.id || undefined
-                                    }
-                                });
-                                const pauseMinutes = (bot as any).handoffPause || 1440;
-                                const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
-                                await prisma.conversation.update({
-                                    where: { id: conversation.id },
-                                    data: { pausedUntil }
-                                });
-                                const title = `🚨 Atendimento Humano Solicitado`;
-                                const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
-                                
-                                const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
-                                // WhatsApp: número do "Transbordo" no bot (fallbackContact) ou WhatsApp do perfil do tenant
-                                const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
-                                const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
+                                if (handoffDone || (conversation.pausedUntil && new Date(conversation.pausedUntil) > new Date())) {
+                                    toolResult = "Atendimento humano já solicitado. O bot está pausado e aguardando um atendente.";
+                                    handoffDone = true;
+                                } else {
+                                    logToFile(`[Processor] Handoff requested: ${args.motivo}`);
+                                    const humanStage = await prisma.crmStage.findFirst({
+                                        where: { botId: bot.id, name: { contains: 'HUMAN', mode: 'insensitive' } }
+                                    });
+                                    await prisma.contact.update({
+                                        where: { id: existingContact.id },
+                                        data: { 
+                                            funnelStage: humanStage?.name || 'ATENDIMENTO HUMANO',
+                                            stageId: humanStage?.id || undefined
+                                        }
+                                    });
+                                    const pauseMinutes = (bot as any).handoffPause || 1440;
+                                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
+                                    await prisma.conversation.update({
+                                        where: { id: conversation.id },
+                                        data: { pausedUntil }
+                                    });
+                                    const title = `🚨 Atendimento Humano Solicitado`;
+                                    const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
+                                    
+                                    const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
+                                    const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
+                                    const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
 
-                                if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
-                                
-                                if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
-                                    // Use the bot's own session to notify the human
-                                    await NotificationService.sendWhatsAppAsBot(identifier, whatsappNotifyTarget, message);
-                                } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
-                                    console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');
+                                    if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
+                                    
+                                    if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
+                                        await NotificationService.sendWhatsAppAsBot(identifier, whatsappNotifyTarget, message);
+                                    }
+                                    if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
+                                    
+                                    handoffDone = true;
+                                    toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
                                 }
-                                if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
-                                toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
                             } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
                         } else if (name === 'gerar_fatura') {
                             try {
@@ -675,6 +679,7 @@ export const MessageProcessor = {
                             }
                         });
                         history.push({ role: 'tool', content: toolResult, tool_call_id: toolCall.id } as any);
+                        if (handoffDone) break;
                     }
                     toolIteration++;
                 } else {
