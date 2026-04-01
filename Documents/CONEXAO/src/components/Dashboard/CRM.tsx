@@ -258,8 +258,8 @@ export function CRM() {
     }, {} as Record<string, Contact[]>);
 
     return (
-        <div className="flex-1 w-full h-full flex flex-row relative overflow-hidden bg-gray-50/50">
-            <div className="flex-1 flex flex-col min-w-0 h-full">
+        <div className="flex-1 w-full h-full flex flex-row relative overflow-hidden bg-gray-50/50 min-h-0">
+            <div className="flex-1 flex flex-col min-w-0 h-full min-h-0">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 px-6 pt-6">
                     <div>
@@ -319,7 +319,7 @@ export function CRM() {
                         </div>
                     )}
                     {bots.length > 0 && (
-                        <div className="flex gap-4 min-w-max h-full">
+                        <div className="flex gap-4 min-w-max h-full min-h-0">
                             {stages.map((stage) => {
                                 const stageContacts = grouped[stage.id] || [];
 
