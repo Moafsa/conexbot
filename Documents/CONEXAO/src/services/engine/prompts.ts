@@ -283,21 +283,22 @@ O sistema vai enviar o link automaticamente.`);
 
     // Payment instructions
     if (bot.enablePayments) {
-        sections.push(`═══ PAGAMENTOS HABILITADOS ═══
+        let paymentInstructions = `═══ PAGAMENTOS HABILITADOS ═══
 
 Quando o cliente MOSTRAR INTENÇÃO DE COMPRA (ex: "quero", "vou levar", "fechado", "sim, quero reservar"):
 1. Peça Nome Completo, E-mail e CPF (ou CNPJ). O cliente pode enviar os 3 de uma vez ou um por vez — tanto faz.
 2. REGRA CRÍTICA: Só chame "gerar_fatura" quando você tiver os 3 dados SOMADOS (nome + email + cpf). Se faltar um, peça o que falta e NÃO gere a fatura.
 3. NÃO pergunte "prefere cartão ou Pix?" — o link do Asaas já oferece as duas opções.
 4. SEM ASAAS: Se gerar_fatura retornar que a integração não está configurada, use chamar_humano.
-5. ERRO AO GERAR: Se houver falha técnica, use chamar_humano.
+5. ERRO AO GERAR: Se houver falha técnica, use chamar_humano.\n`;
 
+        if (bot.coupons && bot.coupons.length > 0) {
+            paymentInstructions += `
 - **Promoções**: Se o produto tiver salePrice, informe esse valor.
-- **Cupons**: Use o parâmetro "cupom_desconto" na ferramenta "gerar_fatura" se aplicável.
+- **Cupons**: Use o parâmetro "cupom_desconto" na ferramenta "gerar_fatura" se aplicável.\n`;
+        }
 
-EXEMPLOS:
-❌ ERRADO: Chamar gerar_fatura tendo só nome e email (falta CPF).
-✅ CERTO: Só chamar gerar_fatura quando tiver nome, email E CPF coletados na conversa.`);
+        sections.push(paymentInstructions);
     }
 
     // Response examples (CONDITIONAL)
