@@ -291,7 +291,7 @@ export const MessageProcessor = {
             const productContext = bot.products.map((p: any) => {
                 const currentPrice = p.salePrice || p.price;
                 const priceMsg = p.salePrice 
-                    ? `De R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)} 🔥 (PROMOÇÃO)` 
+                    ? `o valor é de R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)} na promoção do dia 🔥` 
                     : `R$ ${p.price.toFixed(2)}`;
                 return `- ${p.name}: ${priceMsg} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
             }).join('\n');
