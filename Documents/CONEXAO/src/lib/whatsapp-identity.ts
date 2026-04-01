@@ -19,7 +19,7 @@ function isLidJid(jid: string): boolean {
     return jid.includes('@lid');
 }
 
-function isNoiseChat(jid: string): boolean {
+export function isNoiseChat(jid: string): boolean {
     return (
         !jid ||
         jid.includes('status@broadcast') ||

@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import prisma from '@/lib/prisma';
 import { PhoneUtils } from '@/lib/phone-utils';
-import { resolveMessageFromMe, resolveWhatsAppCustomerKeys } from '@/lib/whatsapp-identity';
+import { resolveMessageFromMe, resolveWhatsAppCustomerKeys, isNoiseChat } from '@/lib/whatsapp-identity';
 
 const TEMP_DIR = os.tmpdir();
 
@@ -93,6 +93,10 @@ export async function POST(req: Request) {
 
             const senderPhoneRaw = info.Sender || info.sender || '';
             const chatRaw = String(info.Chat || info.chat || '').trim();
+            if (isNoiseChat(chatRaw)) {
+                logToFile(`Skipping noise message from chat: ${chatRaw}`);
+                return NextResponse.json({ status: 'skipped_noise' });
+            }
             const fromMe = resolveMessageFromMe(info as Record<string, unknown>);
             const isGroup =
                 chatRaw.includes('@g.us') ||
