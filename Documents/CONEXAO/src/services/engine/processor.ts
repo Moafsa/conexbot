@@ -613,13 +613,15 @@ export const MessageProcessor = {
                                             ? '11987654321'
                                             : senderPhone;
                                         
+                                        const cleanCpfCnpj = String(args.cliente_cpf || '').replace(/\D/g, '');
+                                        
                                         if ((matchedProduct as any).type === 'RECURRING') {
                                             payment = await (await import('../payment/asaas')).AsaasService.createSubscriptionForBot({
-                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: args.cliente_cpf, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: cleanCpfCnpj, value: finalPrice, cycle: (matchedProduct as any).billingPeriod as any || 'MONTHLY', description: chargeDescription, splits
                                             });
                                         } else {
                                             payment = await (await import('../payment/asaas')).AsaasService.createPaymentLink({
-                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: args.cliente_cpf, amount: Math.round(finalPrice * 100), description: chargeDescription, splits
+                                                apiKey: asaasKey, customerName: args.cliente_nome, customerEmail: args.cliente_email, customerPhone: phoneForAsaas, customerCpfCnpj: cleanCpfCnpj, amount: Math.round(finalPrice * 100), description: chargeDescription, splits
                                             });
                                         }
                                         if (payment.success && payment.url) {
