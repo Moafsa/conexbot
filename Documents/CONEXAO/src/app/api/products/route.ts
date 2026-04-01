@@ -61,6 +61,7 @@ export async function POST(req: Request) {
                 imageUrl,
                 type: type || 'SINGLE',
                 billingPeriod: billingPeriod as any,
+                allowCoupons: body.allowCoupons !== undefined ? body.allowCoupons : true,
                 iterations: iterations ? parseInt(iterations.toString()) : null
             }
         });

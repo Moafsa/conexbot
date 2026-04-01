@@ -293,7 +293,8 @@ export const MessageProcessor = {
                 const priceMsg = p.salePrice 
                     ? `o valor é de R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)} na promoção do dia 🔥` 
                     : `R$ ${p.price.toFixed(2)}`;
-                return `- ${p.name}: ${priceMsg} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
+                const couponInfo = p.allowCoupons ? "" : " [NÃO ACEITA CUPONS/DESCONTOS ADICIONAIS]";
+                return `- ${p.name}: ${priceMsg}${couponInfo} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
             }).join('\n');
 
             logToFile(`[Processor] Product Context: ${bot.products.length} products found.`);
@@ -565,28 +566,32 @@ export const MessageProcessor = {
                                             });
 
                                             if (coupon && coupon.active) {
-                                                // Check expiration
-                                                const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
-                                                const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
-
-                                                if (!isExpired && !isLimitReached) {
-                                                    appliedCouponId = coupon.id;
-                                                    const originalValue = finalPrice;
-                                                    if (coupon.type === 'PERCENTAGE') {
-                                                        finalPrice = finalPrice * (1 - coupon.value / 100);
-                                                        discountDetail = ` (Cupom ${coupon.code}: -${coupon.value}%)`;
-                                                    } else {
-                                                        finalPrice = Math.max(0, finalPrice - coupon.value);
-                                                        discountDetail = ` (Cupom ${coupon.code}: -R$ ${coupon.value.toFixed(2)})`;
-                                                    }
-                                                    
-                                                    // Increment usage count
-                                                    await prisma.coupon.update({
-                                                        where: { id: coupon.id },
-                                                        data: { usedCount: { increment: 1 } }
-                                                    });
+                                                if (!matchedProduct.allowCoupons) {
+                                                    discountDetail = " (Este produto não permite uso de cupons)";
                                                 } else {
-                                                    discountDetail = " (Cupom inválido ou expirado)";
+                                                    // Check expiration
+                                                    const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
+                                                    const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
+
+                                                    if (!isExpired && !isLimitReached) {
+                                                        appliedCouponId = coupon.id;
+                                                        const originalValue = finalPrice;
+                                                        if (coupon.type === 'PERCENTAGE') {
+                                                            finalPrice = finalPrice * (1 - coupon.value / 100);
+                                                            discountDetail = ` (Cupom ${coupon.code}: -${coupon.value}%)`;
+                                                        } else {
+                                                            finalPrice = Math.max(0, finalPrice - coupon.value);
+                                                            discountDetail = ` (Cupom ${coupon.code}: -R$ ${coupon.value.toFixed(2)})`;
+                                                        }
+                                                        
+                                                        // Increment usage count
+                                                        await prisma.coupon.update({
+                                                            where: { id: coupon.id },
+                                                            data: { usedCount: { increment: 1 } }
+                                                        });
+                                                    } else {
+                                                        discountDetail = " (Cupom inválido ou expirado)";
+                                                    }
                                                 }
                                             } else {
                                                 discountDetail = " (Cupom não encontrado)";

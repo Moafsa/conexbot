@@ -14,6 +14,7 @@ interface Product {
     stock: number;
     sku?: string;
     active: boolean;
+    allowCoupons: boolean;
     type: 'SINGLE' | 'RECURRING';
     billingPeriod?: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
     iterations?: number | null;
@@ -38,6 +39,7 @@ export function ProductManager({ botId }: { botId: string }) {
         type: "SINGLE",
         billingPeriod: "MONTHLY",
         iterations: "",
+        allowCoupons: true,
     });
 
     useEffect(() => {
@@ -84,7 +86,7 @@ export function ProductManager({ botId }: { botId: string }) {
             if (res.ok) {
                 setIsModalOpen(false);
                 setEditingProduct(null);
-                setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "" });
+                setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
                 fetchProducts();
             }
         } catch (error) {
@@ -116,6 +118,7 @@ export function ProductManager({ botId }: { botId: string }) {
             type: product.type,
             billingPeriod: product.billingPeriod || "MONTHLY",
             iterations: product.iterations?.toString() || "",
+            allowCoupons: product.allowCoupons !== false, // Default to true if undefined
         });
         setIsModalOpen(true);
     }
@@ -130,7 +133,7 @@ export function ProductManager({ botId }: { botId: string }) {
                 <button
                     onClick={() => {
                         setEditingProduct(null);
-                        setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "" });
+                        setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
                         setIsModalOpen(true);
                     }}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
@@ -161,6 +164,7 @@ export function ProductManager({ botId }: { botId: string }) {
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Tipo</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Preço</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-left">Estoque</th>
+                                <th className="py-3 px-4 text-gray-600 font-medium text-sm text-center">Cupom</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm text-right">Ações</th>
                             </tr>
                         </thead>
@@ -187,6 +191,11 @@ export function ProductManager({ botId }: { botId: string }) {
                                     <td className="py-3 px-4 text-gray-600">
                                         <span className={`px-2 py-1 rounded-full text-xs ${p.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                             {p.stock} un
+                                        </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-center">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${p.allowCoupons !== false ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'}`}>
+                                            {p.allowCoupons !== false ? 'Sim' : 'Não'}
                                         </span>
                                     </td>
                                     <td className="py-3 px-4 text-right">
@@ -329,6 +338,19 @@ export function ProductManager({ botId }: { botId: string }) {
                                         placeholder="https://..."
                                     />
                                 </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <input
+                                    type="checkbox"
+                                    id="allowCoupons"
+                                    checked={formData.allowCoupons}
+                                    onChange={(e) => setFormData({ ...formData, allowCoupons: e.target.checked })}
+                                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                />
+                                <label htmlFor="allowCoupons" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                                    Permitir uso de cupons neste produto
+                                </label>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-4">

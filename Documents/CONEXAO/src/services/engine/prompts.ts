@@ -4,6 +4,14 @@ interface MediaInfo {
     description: string | null;
 }
 
+interface Product {
+    name: string;
+    price: number;
+    salePrice?: number | null;
+    allowCoupons: boolean;
+    description?: string | null;
+}
+
 interface ContactInfo {
     name?: string | null;
     email?: string | null;

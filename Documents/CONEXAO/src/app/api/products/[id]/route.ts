@@ -32,6 +32,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 sku: body.sku,
                 imageUrl: body.imageUrl,
                 active: body.active,
+                allowCoupons: body.allowCoupons,
                 type: body.type,
                 billingPeriod: body.billingPeriod,
                 iterations: body.iterations !== undefined ? (body.iterations ? parseInt(body.iterations.toString()) : null) : undefined
