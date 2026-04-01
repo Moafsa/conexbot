@@ -41,6 +41,35 @@ export class NotificationService {
     }
 
     /**
+     * Sends a WhatsApp message using a specific bot's session
+     */
+    static async sendWhatsAppAsBot(botSessionName: string, to: string, message: string) {
+        try {
+            if (!botSessionName) {
+                console.warn('[NotificationService] sendWhatsAppAsBot: botSessionName is empty');
+                return false;
+            }
+
+            const cleanTo = PhoneUtils.normalizeBrazilWhatsAppE164(to);
+            if (!cleanTo) {
+                console.warn('[NotificationService] WhatsApp: número vazio após normalização');
+                return false;
+            }
+            const remoteJid = `${cleanTo}@s.whatsapp.net`;
+
+            const sent = await UzapiService.sendMessage(botSessionName, remoteJid, message);
+            if (!sent) {
+                console.warn(`[NotificationService] WhatsApp send failed (UzAPI returned false — session ${botSessionName} down or API error)`);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('[NotificationService] WhatsApp (AsBot) Error:', error);
+            return false;
+        }
+    }
+
+    /**
      * Sends a WhatsApp message using the System Bot
      */
     static async sendWhatsApp(to: string, message: string) {
@@ -57,19 +86,7 @@ export class NotificationService {
                 return false;
             }
 
-            const cleanTo = PhoneUtils.normalizeBrazilWhatsAppE164(to);
-            if (!cleanTo) {
-                console.warn('[NotificationService] WhatsApp: número vazio após normalização');
-                return false;
-            }
-            const remoteJid = `${cleanTo}@s.whatsapp.net`;
-
-            const sent = await UzapiService.sendMessage(bot.sessionName, remoteJid, message);
-            if (!sent) {
-                console.warn('[NotificationService] WhatsApp send failed (UzAPI returned false — session down or API error)');
-                return false;
-            }
-            return true;
+            return this.sendWhatsAppAsBot(bot.sessionName, to, message);
         } catch (error) {
             console.error('[NotificationService] WhatsApp Error:', error);
             return false;

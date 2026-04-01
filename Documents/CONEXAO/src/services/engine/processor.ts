@@ -288,9 +288,13 @@ export const MessageProcessor = {
             const legacyChunks = chunkKnowledge(bot.knowledgeBase, bot.scrapedContent, materialsText);
             const legacyContext = retrieveRelevantChunks(legacyChunks, messageText);
 
-            const productContext = bot.products.map((p: any) =>
-                `- ${p.name}: R$ ${p.price.toFixed(2)} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'}) ${p.externalUrl ? `[Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`
-            ).join('\n');
+            const productContext = bot.products.map((p: any) => {
+                const currentPrice = p.salePrice || p.price;
+                const priceMsg = p.salePrice 
+                    ? `De R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)} 🔥 (PROMOÇÃO)` 
+                    : `R$ ${p.price.toFixed(2)}`;
+                return `- ${p.name}: ${priceMsg} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
+            }).join('\n');
 
             logToFile(`[Processor] Product Context: ${bot.products.length} products found.`);
             if (bot.products.length > 0) {
@@ -298,6 +302,12 @@ export const MessageProcessor = {
             }
 
             const combinedContext = [vectorContext, legacyContext, productContext ? `═══ CATÁLOGO DE PRODUTOS ═══\n${productContext}` : ''].filter(Boolean).join('\n\n---\n\n');
+
+            // 8.5. Coupons Context
+            const activeCoupons = await prisma.coupon.findMany({
+                where: { botId: bot.id, active: true },
+                select: { code: true, value: true, type: true }
+            });
 
             // 9. Prompt Building
             const mediaList = bot.media.map((m: any) => ({ id: m.id, type: m.type, description: m.description }));
@@ -339,7 +349,8 @@ export const MessageProcessor = {
                     sentiment: existingContact.sentiment,
                     assignedRole: activeBot.name,
                     specialistSkill: specialistSkill
-                }
+                },
+                coupons: activeCoupons as any
             });
 
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
@@ -511,14 +522,18 @@ export const MessageProcessor = {
                                     data: { pausedUntil }
                                 });
                                 const title = `🚨 Atendimento Humano Solicitado`;
-                                const message = `O cliente *${existingContact.name || senderPhone}* solicitou um humano.\n\n*Motivo:* ${args.motivo}\n*Bot:* ${bot.name}`;
+                                const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
+                                
                                 const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
                                 // WhatsApp: número do "Transbordo" no bot (fallbackContact) ou WhatsApp do perfil do tenant
                                 const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
                                 const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
+
                                 if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
+                                
                                 if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
-                                    await NotificationService.sendWhatsApp(whatsappNotifyTarget, message);
+                                    // Use the bot's own session to notify the human
+                                    await NotificationService.sendWhatsAppAsBot(identifier, whatsappNotifyTarget, message);
                                 } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
                                     console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');
                                 }

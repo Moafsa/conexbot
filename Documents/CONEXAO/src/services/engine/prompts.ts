@@ -8,6 +8,13 @@ interface ContactInfo {
     name?: string | null;
     email?: string | null;
     company?: string | null;
+    phone?: string | null;
+}
+
+interface CouponInfo {
+    code: string;
+    value: number;
+    type: 'PERCENTAGE' | 'FIXED';
 }
 
 export interface BotContext {
@@ -30,6 +37,7 @@ export interface BotContext {
         assignedRole?: string | null;
         specialistSkill?: string | null;
     };
+    coupons?: CouponInfo[];
 }
 
 export function buildSystemPrompt(bot: BotContext): string {
@@ -243,6 +251,24 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 1. 🌐 LOJA OFICIAL: Você é o assistente oficial integrado à loja WordPress do cliente.
 2. 🛒 CATÁLOGO SINCRONIZADO: Seus produtos e preços são puxados em tempo real do WooCommerce.
 3. 🏠 "AQUÍ NO SITE": Use expressões como "aqui no nosso site", "no nosso catálogo do WordPress", "você pode ver direto na nossa loja" para criar proximidade.`);
+    }
+
+    // Coupons (Strategic)
+    if (bot.coupons && bot.coupons.length > 0) {
+        const couponLines = bot.coupons.map(c => 
+            `- ${c.code}: ${c.type === 'PERCENTAGE' ? c.value + '%' : 'R$ ' + c.value.toFixed(2)} de desconto`
+        );
+        sections.push(`═══ CUPONS E DESCONTOS (ESTRATÉGICO) ═══
+Abaixo estão os códigos de desconto ativos no sistema. 
+
+${couponLines.join('\n')}
+
+🚨 REGRA DE OURO PARA CUPONS:
+1. JAMAIS ofereça o cupom logo no início da conversa.
+2. SÓ ofereça um cupom se:
+   - O cliente hesitar ou desistir da compra (ex: "está caro", "não posso agora", "vou pensar").
+   - O cliente perguntar explicitamente se existe algum desconto ou cupom.
+3. Use o cupom como um "empurrão final" para fechar a venda agora.`);
     }
 
     // Fallback to human
