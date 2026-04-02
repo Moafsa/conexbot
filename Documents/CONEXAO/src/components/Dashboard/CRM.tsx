@@ -258,16 +258,16 @@ export function CRM() {
     }, {} as Record<string, Contact[]>);
 
     return (
-        <div className="flex-1 w-full h-full flex flex-row relative overflow-hidden bg-gray-50/50 min-h-0">
+        <div className="flex-1 w-full h-full flex flex-row relative overflow-hidden bg-transparent min-h-0">
             <div className="flex-1 flex flex-col min-w-0 h-full min-h-0">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 px-6 pt-6">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                             Pipeline de Vendas
                         </h2>
                         <div className="flex items-center gap-2 mt-1">
-                            <p className="text-gray-500 text-sm">Gerencie leads para:</p>
+                            <p className="text-gray-400 text-sm">Gerencie leads para:</p>
                             <select
                                 value={selectedBotId}
                                 onChange={(e) => setSelectedBotId(e.target.value)}
@@ -281,19 +281,19 @@ export function CRM() {
                     </div>
 
                     <div className="flex gap-2">
-                        <div className="flex items-center gap-2 bg-white/50 border border-gray-200 rounded-lg px-3 py-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-indigo-500/30 transition-shadow">
+                        <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-lg px-3 py-2 w-full md:w-64 focus-within:ring-2 focus-within:ring-indigo-500 transition-shadow">
                             <Search size={16} className="text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Buscar nome ou mensagem..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="bg-transparent border-none outline-none text-sm text-gray-700 placeholder-gray-400 w-full"
+                                className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-400 w-full"
                             />
                         </div>
                         <button
                             onClick={() => handleExport()}
-                            className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium transition"
+                            className="flex items-center gap-2 bg-white/10 border border-white/20 px-4 py-2 rounded-lg text-white hover:bg-white/20 text-sm font-medium transition"
                         >
                             <Download className="w-4 h-4" />
                             Exportar Tudo
@@ -301,7 +301,7 @@ export function CRM() {
                         <button
                             onClick={() => setIsAddingStage(true)}
                             disabled={bots.length === 0 || !selectedBotId}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition ${bots.length === 0 || !selectedBotId ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#00a884] text-white hover:bg-[#008f6f]'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition ${bots.length === 0 || !selectedBotId ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#00a884] text-white hover:bg-[#008f6f]'}`}
                         >
                             <Plus className="w-4 h-4" />
                             Nova Coluna
@@ -312,10 +312,10 @@ export function CRM() {
                 {/* Kanban Horizontal Scroll Area */}
                 <div className="flex-1 flex overflow-x-auto pb-4 px-6 custom-scrollbar min-h-0">
                     {bots.length === 0 && !loading && (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white/50 rounded-xl border-2 border-dashed border-gray-200">
-                            <User className="w-12 h-12 mb-3 text-gray-300" />
-                            <h3 className="text-lg font-bold text-gray-500 mb-1">Nenhum Assistente</h3>
-                            <p className="text-sm px-4 text-center max-w-sm">Você precisa criar um bot (assistente) para acessar e gerenciar o CRM.</p>
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 bg-white/5 rounded-xl border-2 border-dashed border-white/20">
+                            <User className="w-12 h-12 mb-3 text-gray-500" />
+                            <h3 className="text-lg font-bold text-gray-300 mb-1">Nenhum Assistente</h3>
+                            <p className="text-sm px-4 text-center max-w-sm text-gray-500">Você precisa criar um bot (assistente) para acessar e gerenciar o CRM.</p>
                         </div>
                     )}
                     {bots.length > 0 && (
@@ -439,8 +439,8 @@ export function CRM() {
 
                             {/* New Stage Form */}
                             {isAddingStage ? (
-                                <div className="w-80 flex-shrink-0 bg-white rounded-xl border-2 border-indigo-100 p-4 h-fit shadow-lg outline outline-indigo-200">
-                                    <h3 className="font-bold text-gray-700 text-sm mb-3">Nova Coluna</h3>
+                                <div className="w-80 flex-shrink-0 bg-white/10 rounded-xl border-2 border-indigo-500/50 p-4 h-fit shadow-lg outline outline-indigo-500/20 backdrop-blur-md">
+                                    <h3 className="font-bold text-white text-sm mb-3">Nova Coluna</h3>
                                     <input
                                         autoFocus
                                         type="text"
@@ -448,7 +448,7 @@ export function CRM() {
                                         value={newStageName}
                                         onChange={(e) => setNewStageName(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleAddStage()}
-                                        className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
+                                        className="w-full bg-black/30 border border-white/20 rounded-lg p-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
                                     />
                                     <div className="flex gap-2">
                                         <button
@@ -459,7 +459,7 @@ export function CRM() {
                                         </button>
                                         <button
                                             onClick={() => { setIsAddingStage(false); setNewStageName(""); }}
-                                            className="flex-1 bg-gray-100 text-gray-600 rounded-lg py-1.5 text-xs font-bold hover:bg-gray-200 transition"
+                                            className="flex-1 bg-white/20 text-white rounded-lg py-1.5 text-xs font-bold hover:bg-white/30 transition"
                                         >
                                             Cancelar
                                         </button>
@@ -468,14 +468,14 @@ export function CRM() {
                             ) : (
                                 <div className="flex items-center gap-4">
                                     {stages.length === 0 && !loading && (
-                                        <div className="w-80 flex-shrink-0 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center p-6 text-center bg-white/50 h-32">
-                                            <p className="text-sm font-semibold text-gray-600 mb-1">Nenhuma coluna</p>
-                                            <p className="text-xs text-gray-400 mb-3">Seu funil está vazio.</p>
+                                        <div className="w-80 flex-shrink-0 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center p-6 text-center bg-white/5 h-32">
+                                            <p className="text-sm font-semibold text-gray-300 mb-1">Nenhuma coluna</p>
+                                            <p className="text-xs text-gray-500 mb-3">Seu funil está vazio.</p>
                                         </div>
                                     )}
                                     <button
                                         onClick={() => setIsAddingStage(true)}
-                                        className="w-80 flex-shrink-0 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:border-indigo-300 hover:text-indigo-400 transition bg-white/50 group h-32"
+                                        className="w-80 flex-shrink-0 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center text-gray-400 hover:border-indigo-400 hover:text-indigo-400 transition bg-black/20 group h-32"
                                     >
                                         <div className="flex flex-col items-center gap-2">
                                             <Plus className="w-6 h-6 group-hover:scale-110 transition" />
