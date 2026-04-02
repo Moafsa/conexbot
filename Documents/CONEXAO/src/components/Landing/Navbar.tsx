@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { User } from "lucide-react";
+import { User, Menu, X } from "lucide-react";
 
 export default function Navbar({ branding }: { branding?: any }) {
     const { data: session } = useSession();
@@ -11,6 +11,7 @@ export default function Navbar({ branding }: { branding?: any }) {
     const logo = branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png";
 
     const [scrolled, setScrolled] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -68,8 +69,44 @@ export default function Navbar({ branding }: { branding?: any }) {
                                 </Link>
                             </>
                         )}
+                        {/* Mobile Hamburger Toggle */}
+                        <button 
+                            className="md:hidden p-1 text-gray-400 hover:text-white transition-colors"
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        >
+                            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                        </button>
                     </div>
                 </div>
+
+                {/* Mobile Menu Dropdown */}
+                {mobileMenuOpen && (
+                    <div className="md:hidden mt-2 p-4 glass rounded-2xl border border-white/5 bg-black/90 backdrop-blur-2xl flex flex-col gap-4 animate-in slide-in-from-top-4">
+                        {[
+                            { label: 'Funcionalidades', href: '#features' },
+                            { label: 'Planos', href: '#pricing' },
+                            { label: 'Documentação', href: '/docs' }
+                        ].map((link) => (
+                            <Link 
+                                key={link.label} 
+                                href={link.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="text-sm font-medium text-gray-300 hover:text-indigo-400 transition-colors p-2 rounded-lg hover:bg-white/5"
+                            >
+                                {link.label}
+                            </Link>
+                        ))}
+                        {!session && (
+                            <Link 
+                                href="/auth/login" 
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="sm:hidden text-sm font-medium text-gray-300 hover:text-indigo-400 p-2"
+                            >
+                                Entrar
+                            </Link>
+                        )}
+                    </div>
+                )}
             </div>
         </nav>
     );
