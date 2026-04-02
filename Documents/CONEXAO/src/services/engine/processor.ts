@@ -6,7 +6,7 @@ import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
 import { PhoneUtils } from '@/lib/phone-utils';
 
-function detectAiMessage(text: string): boolean {
+async function detectAiMessage(text: string, bot?: any): Promise<boolean> {
     if (!text) return false;
     
     // Heuristic 1: Length (Bots often send long, structured texts)
@@ -31,6 +31,30 @@ function detectAiMessage(text: string): boolean {
     const lines = text.split('\n');
     if (lines.length > 5 && lines.every(l => l.trim().startsWith('-') || l.trim().startsWith('•'))) return true;
 
+    // Heuristic 4: LLM-based AI Scout (Only if enabled and heuristics are uncertain)
+    if (bot?.enableAiDetection && text.length > 20) {
+        try {
+            logToFile(`[AI-Scout] Verificando se a mensagem é de uma IA: "${text.substring(0, 50)}..."`);
+            const scoutResult = await safeChatCompletion({
+                bot,
+                messages: [
+                    { role: 'system', content: 'Você é um detector de robôs. Analise o texto e responda APENAS "AI" se parecer uma mensagem automática/bot ou "HUMAN" se parecer uma pessoa real. Se estiver em dúvida, responda "HUMAN".' },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0,
+                max_tokens: 5
+            }) as any;
+
+            const answer = (scoutResult.content || "").toUpperCase();
+            if (answer.includes('AI')) {
+                logToFile(`[AI-Scout] IA DETECTADA com sucesso via LLM.`);
+                return true;
+            }
+        } catch (e) {
+            console.error('[AI-Scout] Error:', e);
+        }
+    }
+
     return false;
 }
 import { chunkKnowledge, retrieveRelevantChunks } from './knowledge-rag';
@@ -40,7 +64,7 @@ import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
-import { format } from 'date-fns';
+import { format, addHours } from 'date-fns';
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
@@ -137,8 +161,9 @@ export const MessageProcessor = {
             // 3.1. Check if conversation is PAUSED (handoff para humano)
             // No simulador: ignora pausa para permitir continuar testando
             if (channel !== 'simulator' && (conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
-                logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()}`);
-                return { text: "Esta conversa está pausada para atendimento humano. Um atendente irá retornar em breve. 😊", media: [] };
+                logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()} (Silent Mode)`);
+                // SILENT MODE: Return null instead of the "atendimento humano" message to avoid bot competition
+                return null;
             }
 
             // 3.5. Specialized input processing
@@ -202,8 +227,8 @@ export const MessageProcessor = {
                 return null;
             }
 
-            // 6.0.5 AI Detection
-            if (bot.enableAiDetection && detectAiMessage(messageText)) {
+            // 6.0.5 AI Detection (Enhanced with LLM Scout)
+            if (bot.enableAiDetection && await detectAiMessage(messageText, bot)) {
                 logToFile(`[Processor] AI DETECTED from ${senderPhone}`);
                 
                 const action = bot.aiDetectionAction || "PAUSE";
@@ -521,8 +546,9 @@ export const MessageProcessor = {
                                             stageId: humanStage?.id || undefined
                                         }
                                     });
+                                    // 24-HOUR SILENCER (Exactly 24h from now)
                                     const pauseMinutes = (bot as any).handoffPause || 1440;
-                                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
+                                    const pausedUntil = addHours(new Date(), 24);
                                     await prisma.conversation.update({
                                         where: { id: conversation.id },
                                         data: { pausedUntil }

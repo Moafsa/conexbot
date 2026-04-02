@@ -80,23 +80,29 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
         setInput("");
     };
 
-    const handleToggleBlock = async () => {
-        const newStatus = !contact.isBlocked;
+    const handleReleaseBot = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/contacts/${contactId}`, {
+            // First, unblock the contact
+            const resContact = await fetch(`/api/contacts/${contactId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isBlocked: newStatus })
+                body: JSON.stringify({ isBlocked: false })
             });
-            if (res.ok) {
-                toast.success(newStatus ? "Contato bloqueado" : "Contato desbloqueado");
-                setContact({ ...contact, isBlocked: newStatus });
-            } else {
-                toast.error("Erro ao alterar status de bloqueio");
+
+            // Second, find the conversation and clear pausedUntil
+            if (contact.conversations?.[0]?.id) {
+                await fetch(`/api/conversations/${contact.conversations[0].id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pausedUntil: null })
+                });
             }
+
+            toast.success("Bot liberado para este contato!");
+            fetchContactData();
         } catch (error) {
-            toast.error("Erro de conexão");
+            toast.error("Erro ao liberar bot");
         } finally {
             setSaving(false);
         }
@@ -135,22 +141,33 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                     </div>
                     <div>
                         <h2 className="font-bold text-gray-900 leading-tight">{contact?.name || contact?.phone}</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                {contact?.funnelStage}
-                            </span>
-                            <span className="text-[10px] text-gray-400">ID: {contact?.id.slice(0, 8)}</span>
-                        </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                        {contact?.funnelStage}
+                                    </span>
+                                    {contact?.isBlocked && (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-red-100 text-red-700 rounded-full flex items-center gap-1">
+                                            <ShieldAlert size={10} /> BLOQUEADO
+                                        </span>
+                                    )}
+                                    {contact?.conversations?.[0]?.pausedUntil && new Date(contact.conversations[0].pausedUntil) > new Date() && (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full flex items-center gap-1">
+                                            <Clock size={10} /> PAUSADO (HUMANO)
+                                        </span>
+                                    )}
+                                </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={handleToggleBlock}
-                        className={`p-2 rounded-full transition-all group ${contact?.isBlocked ? 'text-red-600 bg-red-50' : 'text-gray-400 hover:bg-indigo-50 hover:text-indigo-600'}`}
-                        title={contact?.isBlocked ? "Desbloquear Contato" : "Bloquear Contato"}
-                    >
-                        {contact?.isBlocked ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-                    </button>
+                    {(contact?.isBlocked || (contact?.conversations?.[0]?.pausedUntil && new Date(contact.conversations[0].pausedUntil) > new Date())) && (
+                        <button
+                            onClick={handleReleaseBot}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100"
+                            title="Liberar I.A. para este contato"
+                        >
+                            <Bot size={14} /> Liberar Bot
+                        </button>
+                    )}
                     <button
                         onClick={handleDelete}
                         className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full transition-all group"

@@ -25,6 +25,7 @@ interface Contact {
     sentiment: string | null;
     lastAiInsight: string | null;
     lastActive: string;
+    isBlocked: boolean;
     notes: string | null;
     _count?: { orders: number };
 }
@@ -198,13 +199,20 @@ export function CRMBoard({ botId }: { botId: string }) {
                                             </div>
 
                                             <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs">
+                                                <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-50 flex items-center justify-center text-indigo-600 font-black text-xs ${contact.isBlocked ? 'opacity-50' : ''}`}>
                                                     {contact.name ? contact.name.substring(0, 2).toUpperCase() : <User size={16} />}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors">
-                                                        {contact.name || contact.phone}
-                                                    </h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className={`font-bold text-gray-900 text-sm truncate group-hover:text-indigo-600 transition-colors ${contact.isBlocked ? 'text-gray-400 line-through' : ''}`}>
+                                                            {contact.name || contact.phone}
+                                                        </h4>
+                                                        {contact.isBlocked && (
+                                                            <div className="bg-red-100 text-red-600 p-0.5 rounded-full" title="Contato Bloqueado">
+                                                                <ShieldAlert size={10} />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-1.5 mt-0.5">
                                                         <div className={`w-1.5 h-1.5 rounded-full ${contact.sentiment === 'POSITIVE' ? 'bg-emerald-400' : contact.sentiment === 'NEGATIVE' ? 'bg-rose-400' : 'bg-amber-300'}`} />
                                                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Score: {contact.leadScore}</span>
