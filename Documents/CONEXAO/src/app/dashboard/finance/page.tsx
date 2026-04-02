@@ -161,7 +161,7 @@ export default function FinancePage() {
     const { summary, asaas, subscription, invoices } = stats || {};
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
             <Suspense fallback={null}>
                 <ErrorBanner />
             </Suspense>
