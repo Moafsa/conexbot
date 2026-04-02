@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: 9096bets_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: somerootpassword
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wp_network
+
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:latest
+    container_name: 9096bets_wp
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+      - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+    networks:
+      - wp_network
+
+volumes:
+  db_data:
+
+networks:
+  wp_network:
+    driver: bridge

@@ -1,0 +1,125 @@
+/*
+Theme Name: ConexBot 9096 Clone
+Theme URI: https://conexbot.com
+Description: Tema de alta conversão clone do 9096bets.com com Glassmorphism.
+Author: ConexBot
+Version: 1.0.0
+*/
+
+:root {
+    --bg-dark: #051670;
+    --primary-magenta: #db0df6;
+    --secondary-cyan: rgba(17, 171, 206, 0.66);
+    --header-bg: rgba(6, 39, 71, 0.9);
+    --text-light: #ffffff;
+    --text-muted: #a0a5b1;
+    --section-purple: #3a1c71;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* Site Wrapper (Mobile Centric) */
+.site-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #0b1a47;
+    min-height: 100vh;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    position: relative;
+    padding-bottom: 80px; /* Space for sticky footer */
+}
+
+/* Sticky Header Glassmorphism */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background-color: var(--header-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    height: 60px;
+}
+
+.site-header .logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-magenta);
+    text-decoration: none;
+    letter-spacing: 1px;
+}
+
+.icon-menu, .icon-profile {
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+/* Sticky Footer Buttons */
+.sticky-footer {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 800px;
+    background-color: var(--header-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 20px;
+    box-sizing: border-box;
+    z-index: 1000;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.btn {
+    flex: 1;
+    text-align: center;
+    padding: 12px 0;
+    border-radius: 8px;
+    font-weight: bold;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn-login {
+    background-color: var(--secondary-cyan);
+    color: white;
+    margin-right: 10px;
+}
+
+.btn-register {
+    background-color: var(--primary-magenta);
+    color: white;
+    box-shadow: 0 4px 15px rgba(219, 13, 246, 0.4);
+}
+
+/* Gutenberg Content Optimization */
+.entry-content {
+    padding: 20px;
+}
+
+.entry-content h2, .entry-content h3 {
+    color: var(--primary-magenta);
+    margin-top: 30px;
+}
+
+.entry-content p {
+    color: #e0e0e0;
+    font-size: 16px;
+}
