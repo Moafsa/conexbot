@@ -30,10 +30,26 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
                 {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
 
-            {/* Mobile Menu Dropdown - Matches Home Logic */}
+            {/* Mobile Menu Dropdown */}
             {isOpen && (
-                <div className="fixed top-20 left-4 right-4 z-[9999] p-6 glass rounded-2xl border border-white/10 bg-[#02000a] flex flex-col gap-6 shadow-2xl animate-in slide-in-from-top-4 duration-300 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-2 shrink-0">
+                <div className="fixed inset-0 z-[9999] md:hidden">
+                    {/* Dark Solid Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-[#030014]/98 backdrop-blur-xl"
+                        onClick={() => setIsOpen(false)}
+                    />
+
+                    {/* Content (Drawer-style Dropdown) */}
+                    <div className="absolute top-20 left-4 right-4 p-6 glass rounded-2xl border border-white/10 bg-[#02000a] flex flex-col gap-6 shadow-2xl animate-in slide-in-from-top-4 duration-300 max-h-[80vh] overflow-y-auto custom-scrollbar z-[10000]">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-2 shrink-0">
+                            <span className="text-xs font-black text-indigo-400 uppercase tracking-widest italic">Navegação Docs</span>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="p-2 text-gray-400 hover:text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
                         <span className="text-xs font-black text-indigo-400 uppercase tracking-widest italic">Navegação Docs</span>
                         <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Conext Bot</span>
                     </div>
