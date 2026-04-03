@@ -32,8 +32,8 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
 
             {/* Mobile Menu Dropdown - Matches Home Logic */}
             {isOpen && (
-                <div className="fixed top-20 left-4 right-4 z-[100] p-6 glass rounded-2xl border border-white/10 bg-black/95 backdrop-blur-3xl flex flex-col gap-6 shadow-2xl animate-in slide-in-from-top-4 duration-300 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-2">
+                <div className="fixed top-20 left-4 right-4 z-[9999] p-6 glass rounded-2xl border border-white/10 bg-[#02000a] flex flex-col gap-6 shadow-2xl animate-in slide-in-from-top-4 duration-300 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-2 shrink-0">
                         <span className="text-xs font-black text-indigo-400 uppercase tracking-widest italic">Navegação Docs</span>
                         <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Conext Bot</span>
                     </div>
