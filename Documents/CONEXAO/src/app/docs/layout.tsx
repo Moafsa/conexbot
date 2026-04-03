@@ -1,10 +1,10 @@
 import Link from "next/link";
 export const dynamic = 'force-dynamic';
 import { 
-    BookOpen, Rocket, Zap, Settings, ShieldCheck, 
-    Brain, AudioLines, Users, CreditCard, Calendar, Database, Cpu, PlayCircle, Layout
+    ShieldCheck, Rocket
 } from "lucide-react";
 import { MobileDocsNav } from "@/components/Docs/MobileDocsNav";
+import { docsNavSections, docsNavIconMap } from "@/components/Docs/docs-nav-data";
 
 export default async function DocsLayout({
     children,
@@ -17,40 +17,6 @@ export default async function DocsLayout({
     const logo = config?.logoWhiteUrl || "/logo.png";
     const systemName = config?.systemName || "Conext Bot";
 
-    const sections = [
-        {
-            title: "Começando",
-            items: [
-                { title: "Manual Inicial", href: "/docs", icon: BookOpen },
-                { title: "API Keys & Sistema", href: "/docs/settings", icon: Settings },
-            ]
-        },
-        {
-            title: "Canais de Conexão",
-            items: [
-                { title: "WhatsApp (Uzapi)", href: "/docs/whatsapp", icon: Zap },
-                { title: "Plugin WordPress", href: "/docs/wordpress", icon: Rocket },
-            ]
-        },
-        {
-            title: "Cérebro IA",
-            items: [
-                { title: "Arquiteto & Treino", href: "/docs/ai-training", icon: Brain },
-                { title: "Simulador Vendas", href: "/docs/simulator", icon: PlayCircle },
-                { title: "Supervisor Insights", href: "/docs/intelligence", icon: Cpu },
-            ]
-        },
-        {
-            title: "Fluxos de Venda",
-            items: [
-                { title: "CRM & Funil", href: "/docs/crm", icon: Users },
-                { title: "Follow-up & Réguas", href: "/docs/automation", icon: Zap },
-                { title: "Agenda & Booking", href: "/docs/agenda", icon: Calendar },
-                { title: "Produtos & Catálogo", href: "/docs/catalog", icon: Database },
-                { title: "Pagamentos Asaas", href: "/docs/payments", icon: CreditCard },
-            ]
-        }
-    ];
 
     return (
         <div className="min-h-screen bg-[#030014] text-gray-300">
@@ -72,30 +38,33 @@ export default async function DocsLayout({
                     </Link>
                     
                     {/* Mobile Menu */}
-                    <MobileDocsNav sections={sections} />
+                    <MobileDocsNav sections={docsNavSections} />
                 </div>
             </header>
 
             <div className="max-w-8xl mx-auto flex pt-20">
                 {/* Sidebar */}
                 <aside className="fixed left-0 top-20 bottom-0 w-64 border-r border-white/5 p-6 overflow-y-auto hidden md:block scrollbar-thin scrollbar-thumb-white/10">
-                    {sections.map((section, idx) => (
+                    {docsNavSections.map((section, idx) => (
                         <div key={idx} className="mb-8">
                             <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">
                                 {section.title}
                             </h4>
                             <ul className="space-y-1">
-                                {section.items.map((item, i) => (
+                                {section.items.map((item, i) => {
+                                    const Icon = docsNavIconMap[item.iconKey];
+                                    return (
                                     <li key={i}>
                                         <Link
                                             href={item.href}
                                             className="flex items-center gap-3 text-sm font-medium text-gray-400 hover:text-indigo-400 hover:bg-white/5 px-2 py-2 rounded-lg transition-all group"
                                         >
-                                            <item.icon size={16} className="group-hover:scale-110 transition-transform text-gray-500 group-hover:text-indigo-400" />
+                                            <Icon size={16} className="group-hover:scale-110 transition-transform text-gray-500 group-hover:text-indigo-400" />
                                             {item.title}
                                         </Link>
                                     </li>
-                                ))}
+                                    );
+                                })}
                             </ul>
                         </div>
                     ))}

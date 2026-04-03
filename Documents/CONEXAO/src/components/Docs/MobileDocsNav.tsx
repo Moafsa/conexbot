@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { docsNavIconMap, type DocsNavIconKey } from "@/components/Docs/docs-nav-data";
 
 interface MobileDocsNavProps {
     sections: {
@@ -10,7 +11,7 @@ interface MobileDocsNavProps {
         items: {
             title: string;
             href: string;
-            icon: any;
+            iconKey: DocsNavIconKey;
         }[];
     }[];
 }
@@ -57,18 +58,21 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
                                         {section.title}
                                     </h4>
                                     <ul className="space-y-2">
-                                        {section.items.map((item, i) => (
+                                        {section.items.map((item, i) => {
+                                            const Icon = docsNavIconMap[item.iconKey];
+                                            return (
                                             <li key={i}>
                                                 <Link
                                                     href={item.href}
                                                     onClick={() => setIsOpen(false)}
                                                     className="flex items-center gap-3 text-sm font-medium text-gray-400 hover:text-indigo-400 hover:bg-white/5 px-2 py-2 rounded-lg transition-all group"
                                                 >
-                                                    <item.icon size={18} className="text-gray-500 group-hover:text-indigo-400" />
+                                                    <Icon size={18} className="text-gray-500 group-hover:text-indigo-400" />
                                                     {item.title}
                                                 </Link>
                                             </li>
-                                        ))}
+                                            );
+                                        })}
                                     </ul>
                                 </div>
                             ))}
