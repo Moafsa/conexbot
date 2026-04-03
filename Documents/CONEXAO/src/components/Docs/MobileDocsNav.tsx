@@ -32,17 +32,17 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
 
             {/* Slide-over Menu */}
             {isOpen && (
-                <div className="fixed inset-0 z-[60] md:hidden">
+                <div className="fixed inset-0 z-[100] md:hidden">
                     {/* Backdrop */}
                     <div 
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+                        className="absolute inset-0 bg-black/80 backdrop-blur-md"
                         onClick={() => setIsOpen(false)}
                     />
 
                     {/* Content (Drawer) */}
-                    <div className="absolute right-0 top-0 bottom-0 w-72 bg-[#02000a] border-l border-white/10 p-6 shadow-2xl animate-in slide-in-from-right duration-500 z-[70] flex flex-col">
-                        <div className="flex justify-between items-center mb-10">
-                            <span className="text-sm font-black text-indigo-400 uppercase tracking-widest italic">Documentação</span>
+                    <div className="absolute right-0 top-0 bottom-0 w-72 bg-neutral-950 border-l border-white/10 p-6 shadow-2xl flex flex-col overflow-hidden">
+                        <div className="flex justify-between items-center mb-10 shrink-0">
+                            <span className="text-sm font-black text-indigo-400 font-mono uppercase tracking-widest italic">MENU DOCS</span>
                             <button
                                 onClick={() => setIsOpen(false)}
                                 className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -51,10 +51,10 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
                             </button>
                         </div>
 
-                        <nav className="space-y-8 overflow-y-auto max-h-[calc(100vh-120px)] custom-scrollbar">
+                        <nav className="flex-1 overflow-y-auto pr-2 space-y-8 scrollbar-thin scrollbar-thumb-white/10">
                             {sections.map((section, idx) => (
                                 <div key={idx}>
-                                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">
+                                    <h4 className="text-[10px] font-bold text-indigo-500/60 uppercase tracking-[0.2em] mb-4">
                                         {section.title}
                                     </h4>
                                     <ul className="space-y-2">
@@ -77,6 +77,16 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
                                 </div>
                             ))}
                         </nav>
+                        
+                        <div className="mt-auto pt-6 border-t border-white/5 shrink-0">
+                            <Link 
+                                href="/dashboard" 
+                                onClick={() => setIsOpen(false)}
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white transition-all uppercase tracking-widest"
+                            >
+                                Voltar para o App
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )}
