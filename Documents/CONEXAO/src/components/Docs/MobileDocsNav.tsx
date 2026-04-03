@@ -20,76 +20,64 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
-        <>
-            {/* Hamburger Button */}
+        <div className="md:hidden">
+            {/* Hamburger Button - Matches Home Style */}
             <button
-                onClick={() => setIsOpen(true)}
-                className="p-2 md:hidden text-gray-400 hover:text-white transition-colors"
-                aria-label="Abrir menu"
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 text-gray-400 hover:text-white transition-colors"
+                aria-label="Toggle menu"
             >
-                <Menu size={24} />
+                {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
 
-            {/* Slide-over Menu */}
+            {/* Mobile Menu Dropdown - Matches Home Logic */}
             {isOpen && (
-                <div className="fixed inset-0 z-[100] md:hidden">
-                    {/* Backdrop */}
-                    <div 
-                        className="absolute inset-0 bg-black/80 backdrop-blur-md"
-                        onClick={() => setIsOpen(false)}
-                    />
+                <div className="fixed top-20 left-4 right-4 z-[100] p-6 glass rounded-2xl border border-white/10 bg-black/95 backdrop-blur-3xl flex flex-col gap-6 shadow-2xl animate-in slide-in-from-top-4 duration-300 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-2">
+                        <span className="text-xs font-black text-indigo-400 uppercase tracking-widest italic">Navegação Docs</span>
+                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">Conext Bot</span>
+                    </div>
 
-                    {/* Content (Drawer) */}
-                    <div className="absolute right-0 top-0 bottom-0 w-72 bg-neutral-950 border-l border-white/10 p-6 shadow-2xl flex flex-col overflow-hidden">
-                        <div className="flex justify-between items-center mb-10 shrink-0">
-                            <span className="text-sm font-black text-indigo-400 font-mono uppercase tracking-widest italic">MENU DOCS</span>
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="p-2 text-gray-400 hover:text-white transition-colors"
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
+                    <nav className="space-y-8">
+                        {sections.map((section, idx) => (
+                            <div key={idx}>
+                                <h4 className="text-[10px] font-bold text-indigo-500/60 uppercase tracking-[0.2em] mb-4">
+                                    {section.title}
+                                </h4>
+                                <ul className="grid grid-cols-1 gap-2">
+                                    {section.items.map((item, i) => {
+                                        const Icon = docsNavIconMap[item.iconKey];
+                                        return (
+                                        <li key={i}>
+                                            <Link
+                                                href={item.href}
+                                                onClick={() => setIsOpen(false)}
+                                                className="flex items-center gap-3 text-sm font-medium text-gray-300 hover:text-indigo-400 hover:bg-white/5 px-3 py-3 rounded-xl transition-all border border-transparent hover:border-white/5"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                                                    <Icon size={18} className="text-gray-400" />
+                                                </div>
+                                                {item.title}
+                                            </Link>
+                                        </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        ))}
+                    </nav>
 
-                        <nav className="flex-1 overflow-y-auto pr-2 space-y-8 scrollbar-thin scrollbar-thumb-white/10">
-                            {sections.map((section, idx) => (
-                                <div key={idx}>
-                                    <h4 className="text-[10px] font-bold text-indigo-500/60 uppercase tracking-[0.2em] mb-4">
-                                        {section.title}
-                                    </h4>
-                                    <ul className="space-y-2">
-                                        {section.items.map((item, i) => {
-                                            const Icon = docsNavIconMap[item.iconKey];
-                                            return (
-                                            <li key={i}>
-                                                <Link
-                                                    href={item.href}
-                                                    onClick={() => setIsOpen(false)}
-                                                    className="flex items-center gap-3 text-sm font-medium text-gray-400 hover:text-indigo-400 hover:bg-white/5 px-2 py-2 rounded-lg transition-all group"
-                                                >
-                                                    <Icon size={18} className="text-gray-500 group-hover:text-indigo-400" />
-                                                    {item.title}
-                                                </Link>
-                                            </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-                            ))}
-                        </nav>
-                        
-                        <div className="mt-auto pt-6 border-t border-white/5 shrink-0">
-                            <Link 
-                                href="/dashboard" 
-                                onClick={() => setIsOpen(false)}
-                                className="flex items-center justify-center gap-2 w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white transition-all uppercase tracking-widest"
-                            >
-                                Voltar para o App
-                            </Link>
-                        </div>
+                    <div className="pt-4 border-t border-white/5 mt-2">
+                        <Link 
+                            href="/dashboard" 
+                            onClick={() => setIsOpen(false)}
+                            className="flex items-center justify-center gap-2 w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all uppercase tracking-widest shadow-xl shadow-indigo-500/20"
+                        >
+                            Voltar para o App
+                        </Link>
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 }
