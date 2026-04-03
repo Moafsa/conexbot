@@ -4,6 +4,7 @@ import {
     BookOpen, Rocket, Zap, Settings, ShieldCheck, 
     Brain, AudioLines, Users, CreditCard, Calendar, Database, Cpu, PlayCircle, Layout
 } from "lucide-react";
+import { MobileDocsNav } from "@/components/Docs/MobileDocsNav";
 
 export default async function DocsLayout({
     children,
@@ -66,9 +67,12 @@ export default async function DocsLayout({
                         <Rocket size={14} />
                         Download Plugin WP
                     </Link>
-                    <Link href={session?.user ? "/dashboard" : "/"} className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                    <Link href={session?.user ? "/dashboard" : "/"} className="hidden md:block text-sm font-medium text-gray-400 hover:text-white transition-colors">
                         Voltar para o App
                     </Link>
+                    
+                    {/* Mobile Menu */}
+                    <MobileDocsNav sections={sections} />
                 </div>
             </header>
 
