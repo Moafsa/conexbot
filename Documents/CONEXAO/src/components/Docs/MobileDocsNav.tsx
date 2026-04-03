@@ -39,8 +39,8 @@ export function MobileDocsNav({ sections }: MobileDocsNavProps) {
                         onClick={() => setIsOpen(false)}
                     />
 
-                    {/* Content */}
-                    <div className="absolute right-0 top-0 bottom-0 w-80 bg-[#030014] border-l border-white/5 p-6 shadow-2xl animate-in slide-in-from-right duration-300">
+                    {/* Content (Drawer) */}
+                    <div className="absolute right-0 top-0 bottom-0 w-72 bg-[#02000a] border-l border-white/10 p-6 shadow-2xl animate-in slide-in-from-right duration-500 z-[70] flex flex-col">
                         <div className="flex justify-between items-center mb-10">
                             <span className="text-sm font-black text-indigo-400 uppercase tracking-widest italic">Documentação</span>
                             <button

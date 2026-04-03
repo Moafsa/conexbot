@@ -1,8 +1,6 @@
 import Link from "next/link";
 export const dynamic = 'force-dynamic';
-import { 
-    ShieldCheck, Rocket
-} from "lucide-react";
+import { Rocket } from "lucide-react";
 import { MobileDocsNav } from "@/components/Docs/MobileDocsNav";
 import { docsNavSections, docsNavIconMap } from "@/components/Docs/docs-nav-data";
 
@@ -16,7 +14,6 @@ export default async function DocsLayout({
     const session = await import('next-auth').then(m => m.getServerSession(require('@/lib/auth').authOptions)) as any;
     const logo = config?.logoWhiteUrl || "/logo.png";
     const systemName = config?.systemName || "Conext Bot";
-
 
     return (
         <div className="min-h-screen bg-[#030014] text-gray-300">
