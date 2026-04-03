@@ -1,10 +1,28 @@
-
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+
+async function requireContactForTenant(contactId: string, tenantId: string) {
+    return prisma.contact.findFirst({
+        where: { id: contactId, tenantId },
+    });
+}
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const session = await getServerSession(authOptions);
+        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        if (!session || !tenantId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { id } = await params;
+        const existing = await requireContactForTenant(id, tenantId);
+        if (!existing) {
+            return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+        }
+
         const body = await req.json();
         const { funnelStage, name, email, notes, tags } = body;
 
@@ -34,9 +52,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const session = await getServerSession(authOptions);
+        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        if (!session || !tenantId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { id } = await params;
+        const existing = await requireContactForTenant(id, tenantId);
+        if (!existing) {
+            return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+        }
+
         await prisma.contact.delete({
-            where: { id }
+            where: { id },
         });
         return NextResponse.json({ success: true });
     } catch (error) {
@@ -47,9 +76,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const session = await getServerSession(authOptions);
+        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        if (!session || !tenantId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { id } = await params;
-        const contact = await prisma.contact.findUnique({
-            where: { id },
+        const contact = await prisma.contact.findFirst({
+            where: { id, tenantId },
             include: {
                 orders: {
                     include: {
@@ -70,13 +105,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
         }
 
-        // Fetch recent messages for context
-        // We find conversation by remoteId (phone) and botId
-        // Improvement: If contact has a botId, use it. Otherwise try to find any conversation with this phone.
+        // Conversa sempre no âmbito do tenant (mesmo telefone noutro bot/tenant = outra linha).
         const conversation = await prisma.conversation.findFirst({
             where: {
                 remoteId: contact.phone,
-                ...(contact.botId ? { botId: contact.botId } : {})
+                bot: { tenantId },
+                ...(contact.botId ? { botId: contact.botId } : {}),
             },
             include: {
                 messages: {
