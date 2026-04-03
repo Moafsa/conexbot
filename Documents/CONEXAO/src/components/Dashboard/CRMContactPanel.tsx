@@ -80,6 +80,28 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
         setInput("");
     };
 
+    const handleToggleBlock = async () => {
+        const newStatus = !contact.isBlocked;
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/contacts/${contactId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isBlocked: newStatus })
+            });
+            if (res.ok) {
+                toast.success(newStatus ? "Contato bloqueado" : "Contato desbloqueado");
+                setContact({ ...contact, isBlocked: newStatus });
+            } else {
+                toast.error("Erro ao alterar status de bloqueio");
+            }
+        } catch (error) {
+            toast.error("Erro de conexão");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleReleaseBot = async () => {
         setSaving(true);
         try {
@@ -159,7 +181,7 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {(contact?.isBlocked || (contact?.conversations?.[0]?.pausedUntil && new Date(contact.conversations[0].pausedUntil) > new Date())) && (
+                    {(contact?.conversations?.[0]?.pausedUntil && new Date(contact.conversations[0].pausedUntil) > new Date()) && (
                         <button
                             onClick={handleReleaseBot}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-100"
@@ -168,6 +190,13 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
                             <Bot size={14} /> Liberar Bot
                         </button>
                     )}
+                    <button
+                        onClick={handleToggleBlock}
+                        className={`p-2 rounded-full transition-all group ${contact?.isBlocked ? 'text-red-600 bg-red-50' : 'text-gray-400 hover:bg-indigo-50 hover:text-indigo-600'}`}
+                        title={contact?.isBlocked ? "Desbloquear Contato" : "Bloquear Contato"}
+                    >
+                        {contact?.isBlocked ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
+                    </button>
                     <button
                         onClick={handleDelete}
                         className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full transition-all group"

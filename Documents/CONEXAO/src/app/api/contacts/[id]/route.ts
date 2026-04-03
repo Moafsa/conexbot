@@ -18,7 +18,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
                 name: body.name,
                 email: body.email,
                 notes: body.notes,
-                tags: body.tags
+                tags: body.tags,
+                isBlocked: body.isBlocked,
+                assignedBotId: body.assignedBotId === 'none' ? null : body.assignedBotId
             }
         });
 
