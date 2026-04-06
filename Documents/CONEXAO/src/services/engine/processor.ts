@@ -321,7 +321,7 @@ export const MessageProcessor = {
             const productContext = bot.products.map((p: any) => {
                 const currentPrice = p.salePrice || p.price;
                 const priceMsg = p.salePrice 
-                    ? `valor ORIGINAL R$ ${p.price.toFixed(2)}, mas hoje está por APENAS R$ ${p.salePrice.toFixed(2)} (Promoção Ativa!) 🔥` 
+                    ? `[OFERTA] Preço Original: R$ ${p.price.toFixed(2)} | Preço Promocional de Hoje: R$ ${p.salePrice.toFixed(2)} (Use SEMPRE o formato: De R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)}) 🔥` 
                     : `R$ ${p.price.toFixed(2)}`;
                 const couponInfo = p.allowCoupons ? "" : " [NÃO ACEITA CUPONS/DESCONTOS ADICIONAIS]";
                 return `- ${p.name}: ${priceMsg}${couponInfo} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
