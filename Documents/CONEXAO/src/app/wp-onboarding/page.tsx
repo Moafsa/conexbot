@@ -499,7 +499,7 @@ export default function WpOnboardingPage() {
                                                 </ul>
 
                                                 <button 
-                                                    onClick={() => window.open(`${window.location.origin}/pricing?plan=${p.id}&interval=${interval}`, '_blank')}
+                                                    onClick={() => window.open(`${window.location.origin}/api/checkout/portal?planId=${p.id}&interval=${interval}&gateway=asaas`, '_blank')}
                                                     className={`w-full py-3 rounded-xl text-center font-black text-[10px] uppercase tracking-widest transition-all ${isFeatured ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
                                                 >
                                                     Assinar Agora
