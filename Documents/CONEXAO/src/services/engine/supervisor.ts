@@ -43,8 +43,8 @@ export const SupervisorService = {
             : `1. LEAD: Cliente novo.\n        2. INTEREST: Interessado.\n        3. CUSTOMER: Cliente.`;
 
         const botsList = availableBots
-            .filter(b => b.id !== botId)
-            .map(b => `- ID: ${b.id} | NOME: ${b.name} | PERFIL: ${b.businessType}`)
+            .filter((b: any) => b.id !== botId)
+            .map((b: any) => `- ID: ${b.id} | NOME: ${b.name} | PERFIL: ${b.businessType}`)
             .join('\n        ');
 
         const historyString = history.map(h => `${h.role.toUpperCase()}: ${h.content}`).join('\n');
@@ -138,6 +138,10 @@ export const SupervisorService = {
      */
     getStagePrompt(stageName: string): string {
         const name = (stageName || '').toUpperCase().trim();
+        // Saudação e boas-vindas
+        if (name === 'GREETING' || name === 'SAUDAÇÃO' || name === 'SAUDACAO' || name === 'INÍCIO') {
+            return "FOCO: SAUDAÇÃO. Seja educado, amigável e receptivo. NÃO empurre vendas ou preços ainda. Apenas se coloque à disposição para ajudar.";
+        }
         // Qualificação inicial
         if (name === 'LEAD' || name === 'AWARENESS' || name === 'NOVO') {
             return "FOCO: QUALIFICAÇÃO. Identifique as necessidades básicas e quem é o cliente. Pergunte sobre a empresa ou o que busca.";

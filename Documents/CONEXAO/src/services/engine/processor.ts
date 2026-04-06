@@ -390,13 +390,12 @@ export const MessageProcessor = {
             
             // 9.5 REINFORCE SALES RULES AND USER PRIMACY (Absolute recency bias fix)
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
-🚨 DIRETRIZ FINAL DE FORMATAÇÃO (MANDATÓRIO):
-Ao falar de preços em promoção, você JAMAIS deve dizer "Custa X (originalmente Y)". 
-Use SEMPRE e RIGOROSAMENTE o formato: "De R$ [Original] por APENAS R$ [Promocional]". 
-Isso é uma regra de design de vendas absoluta. Termine sempre com um Convite ao Fechamento.
+🚨 DIRETRIZ DE FORMATAÇÃO DE PREÇOS:
+Caso você decida citar preços que possuam valor original e promocional, use SEMPRE o formato: "De R$ [Original] por APENAS R$ [Promocional]". 
+NÃO utilize o formato "Custa X (originalmente Y)". Isso é uma regra de design básica.
 
-🚨 PRIORIDADE DE RESPOSTA:
-${bot.systemPrompt ? `Se as instruções acima ("${bot.systemPrompt}") disserem para responder de forma diferente, SIGA O USUÁRIO (Primasia do Usuário). Caso contrário, use a técnica de ancoragem acima.` : "Use a técnica de ancoragem acima para todas as ofertas."}
+🚨 PRIORIDADE ABSOLUTA:
+${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras de ancoragem e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga as diretrizes de ancoragem acima."}
 ═════════════════════════════════════════════════════════════════════════`;
 
             // WordPress Custom Tone Adjustment
@@ -486,7 +485,7 @@ ${bot.systemPrompt ? `Se as instruções acima ("${bot.systemPrompt}") disserem 
                 // FINAL HARD CONTRAINT: Inject a final system instruction AFTER the history to override any bias from previous messages
                 messages.push({
                     role: 'system',
-                    content: `🚨 LEMRETE DE FORMATAÇÃO FINAL PARA ESTA RESPOSTA:\nSe o produto estiver em oferta (preço original vs promocional), use OBRIGATORIAMENTE o formato "De R$ [Original] por APENAS R$ [Promocional]".\nNÃO use o formato "Custa X (originalmente Y)".\nSempre termine com uma pergunta de fechamento convidativa.`
+                    content: `🚨 LEMRETE: Se mencionar preços em oferta, use o formato "De R$ [Original] por APENAS R$ [Promocional]". Fora isso, siga o fluxo natural da conversa e respeite as instruções específicas do seu prompt de criação.`
                 });
 
                 aiResult = await safeChatCompletion({

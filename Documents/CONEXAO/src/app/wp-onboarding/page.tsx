@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
-import { Check, Loader2, Rocket, Shield, Zap, CreditCard, UserPlus, LogIn, ArrowRight, LayoutDashboard, MessageSquare } from "lucide-react";
+import { Check, Loader2, Rocket, Shield, Zap, CreditCard, UserPlus, LogIn, ArrowRight, LayoutDashboard, MessageSquare, X } from "lucide-react";
 
 type Step = 'auth' | 'plan' | 'ready';
 
@@ -16,6 +16,7 @@ export default function WpOnboardingPage() {
     const [error, setError] = useState("");
     const [mode, setMode] = useState<'login' | 'register'>('register');
     const [plans, setPlans] = useState<any[]>([]);
+    const [interval, setInterval] = useState<'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'YEARLY'>('MONTHLY');
 
     // Auth Form State
     const [form, setForm] = useState({ 
@@ -213,7 +214,7 @@ export default function WpOnboardingPage() {
 
     return (
         <div className="min-h-screen bg-[#070708] text-white flex flex-col items-center justify-center p-6 bg-[radial-gradient(circle_at_top,rgba(88,28,135,0.15),transparent)]">
-            <div className="w-full max-w-xl">
+            <div className={`w-full transition-all duration-700 ${step === 'plan' ? 'max-w-7xl' : 'max-w-xl'}`}>
                 
                 {/* Site-Perfect Logo Section */}
                 <div className="flex flex-col items-center mb-10 text-center animate-in fade-in zoom-in duration-700">
@@ -398,59 +399,124 @@ export default function WpOnboardingPage() {
                                 <p className="text-gray-400 text-xs px-10">Escolha o plano ideal e libere sua inteligência artificial.</p>
                             </div>
 
-                            <div className="space-y-3.5 mb-8 overflow-y-auto max-h-[280px] custom-scrollbar pr-1">
+                            {/* Interval Toggle */}
+                            <div className="flex justify-center mb-8 px-2">
+                                <div className="p-1 rounded-2xl border border-white/5 flex gap-1 overflow-x-auto no-scrollbar max-w-full bg-white/5 backdrop-blur-md">
+                                    {[
+                                        { id: 'MONTHLY', label: 'Mensal' },
+                                        { id: 'QUARTERLY', label: 'Trimestral' },
+                                        { id: 'SEMIANNUAL', label: 'Semestral' },
+                                        { id: 'YEARLY', label: 'Anual' }
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => setInterval(opt.id as any)}
+                                            className={`px-4 py-2 rounded-xl text-[10px] font-bold transition-all whitespace-nowrap ${interval === opt.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' : 'text-gray-500 hover:text-white'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-start">
                                 {plans.length > 0 ? (
-                                    plans.map((p) => {
-                                        const isAdvanced = p.name.toLowerCase().includes('adv') || p.price > 100;
+                                    plans.map((p, idx) => {
+                                        const baseMonthPrice = Number(p.price) || 0;
+                                        let currentPrice = baseMonthPrice;
+                                        let originalPrice = baseMonthPrice * 1.25; 
+                                        let periodLabel = 'mês';
+
+                                        if (interval === 'QUARTERLY') {
+                                            currentPrice = p.priceQuarterly !== null && p.priceQuarterly !== undefined ? Number(p.priceQuarterly) : (baseMonthPrice * 3);
+                                            originalPrice = (baseMonthPrice * 3) * 1.2;
+                                            periodLabel = 'trimestre';
+                                        } else if (interval === 'SEMIANNUAL') {
+                                            currentPrice = p.priceSemiannual !== null && p.priceSemiannual !== undefined ? Number(p.priceSemiannual) : (baseMonthPrice * 6);
+                                            originalPrice = (baseMonthPrice * 6) * 1.25;
+                                            periodLabel = 'semestre';
+                                        } else if (interval === 'YEARLY') {
+                                            currentPrice = p.priceYearly !== null && p.priceYearly !== undefined ? Number(p.priceYearly) : (baseMonthPrice * 12);
+                                            originalPrice = (baseMonthPrice * 12) * 1.35;
+                                            periodLabel = 'ano';
+                                        }
+
+                                        const discountPercent = Math.round((1 - (currentPrice / originalPrice)) * 100);
+                                        const isFeatured = idx === 1;
+
                                         return (
                                             <div 
                                                 key={p.id}
-                                                onClick={() => window.open(`${window.location.origin}/pricing?plan=${p.id}`, '_blank')}
-                                                className={`p-4 rounded-2xl bg-white/5 border border-white/5 text-left flex items-center justify-between group hover:bg-white/[0.08] transition-all cursor-pointer ${isAdvanced ? 'hover:border-blue-500/30' : 'hover:border-purple-500/30'}`}
+                                                className={`p-6 rounded-[2rem] border relative transition-all duration-500 hover:scale-[1.02] flex flex-col h-full text-left bg-white/[0.03] backdrop-blur-sm ${isFeatured ? 'border-purple-500/30 bg-purple-500/[0.05] shadow-2xl' : 'border-white/5'}`}
                                             >
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-10 h-10 bg-gradient-to-br rounded-lg flex items-center justify-center font-black text-[10px] text-white shadow-lg ${isAdvanced ? 'from-blue-500 to-blue-800 shadow-blue-500/20' : 'from-purple-500 to-purple-800 shadow-purple-500/20'}`}>
-                                                        {p.name.split(' ')[0].toUpperCase()}
+                                                {isFeatured && (
+                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                                                        Mais Popular
                                                     </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-white leading-none mb-1 text-[13px]">{p.name}</h4>
-                                                        <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-1">
-                                                            <div className="w-1 h-1 bg-green-500 rounded-full" /> {p.messageLimit.toLocaleString()} Msg / Mês
-                                                        </p>
-                                                    </div>
+                                                )}
+
+                                                <h3 className={`text-lg font-bold mb-1 tracking-tight ${isFeatured ? 'text-purple-400' : 'text-white'}`}>{p.name}</h3>
+                                                
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-[10px] text-gray-500 line-through">
+                                                        R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                                                    </span>
+                                                    <span className="bg-green-500/20 text-green-400 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
+                                                        -{discountPercent}%
+                                                    </span>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-xl font-black text-white leading-none tracking-tight">R$ {p.price}</p>
-                                                    <p className="text-[10px] text-gray-600 font-bold uppercase">{p.interval === 'YEARLY' ? 'ANUAL' : 'MENSAL'}</p>
+
+                                                <div className="flex items-baseline gap-1 mb-4">
+                                                    <span className="text-xs text-gray-500 font-medium tracking-tight">R$</span>
+                                                    <span className="text-3xl font-black text-white tracking-tighter">
+                                                        {currentPrice.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                                                    </span>
+                                                    <span className="text-[10px] font-normal text-gray-500 uppercase tracking-widest ml-1">/{periodLabel}</span>
                                                 </div>
+                                                
+                                                <p className="text-[10px] text-gray-500 mb-6 leading-relaxed line-clamp-2 h-8">{p.description}</p>
+
+                                                <ul className="space-y-3 mb-8 text-[11px] text-gray-300 flex-grow">
+                                                    <li className="flex gap-2.5 items-center italic">
+                                                        <Check size={12} className="text-purple-500" />
+                                                        <span className="font-medium text-white">{p.botLimit} {p.botLimit === 1 ? 'Agente de IA' : 'Agentes de IA'}</span>
+                                                    </li>
+                                                    <li className="flex gap-2.5 items-center italic">
+                                                        <Check size={12} className="text-purple-500" />
+                                                        <span className="font-medium text-white">{p.messageLimit === 0 ? 'Conversas Ilimitadas' : `${p.messageLimit.toLocaleString()} Mensagens`}</span>
+                                                    </li>
+                                                    {(p.features || []).map((feature: any, fIdx: number) => (
+                                                        <li key={fIdx} className={`flex gap-2.5 items-center italic ${!feature.enabled ? 'opacity-30' : ''}`}>
+                                                            {feature.enabled ? (
+                                                                <Check size={12} className="text-purple-500" />
+                                                            ) : (
+                                                                <X size={12} className="text-gray-600" />
+                                                            )}
+                                                            <span className={feature.enabled ? 'text-gray-300' : ''}>{feature.text}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+
+                                                <button 
+                                                    onClick={() => window.open(`${window.location.origin}/pricing?plan=${p.id}&interval=${interval}`, '_blank')}
+                                                    className={`w-full py-3 rounded-xl text-center font-black text-[10px] uppercase tracking-widest transition-all ${isFeatured ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/20' : 'bg-white/5 hover:bg-white/10 text-white border border-white/5'}`}
+                                                >
+                                                    Assinar Agora
+                                                </button>
                                             </div>
                                         );
                                     })
                                 ) : (
-                                    <div className="py-10 text-gray-500 text-sm italic">
+                                    <div className="col-span-full py-10 text-gray-500 text-sm italic">
                                         {loading ? "Carregando planos..." : "Nenhum plano disponível no momento."}
                                     </div>
                                 )}
                             </div>
 
-                            <button 
-                                onClick={() => window.open('https://conext.click/pricing', '_blank')}
-                                className="w-full btn-primary h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 mb-4 group shadow-xl shadow-purple-600/20"
-                            >
-                                Ver Todos os Planos
-                                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                            </button>
                             <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-relaxed px-10">
                                 Após a confirmação, o WordPress será <br/>habilitado automaticamente.
                             </p>
-
-                            {debugInfo?.subStatus && (
-                                <div className="mt-2 p-1.5 bg-white/5 rounded-lg border border-white/5 inline-block mx-auto">
-                                    <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">
-                                        Status da Assinatura: {debugInfo.subStatus}
-                                    </span>
-                                </div>
-                            )}
                         </div>
                     )}
 

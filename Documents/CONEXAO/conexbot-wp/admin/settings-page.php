@@ -111,6 +111,28 @@ function conexbot_render_admin_page() {
             box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
             color: #fff;
         }
+        .btn-login {
+            background: #fff;
+            color: #7c3aed;
+            padding: 14px 32px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            border: 2px solid #7c3aed;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .btn-login:hover {
+            background: #f5f3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+            color: #7c3aed;
+        }
         .btn-disconnect {
             background: transparent;
             color: #94a3b8;
@@ -290,9 +312,14 @@ function conexbot_render_admin_page() {
                     </div>
                 </div>
 
-                <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard&start_onboarding=1')); ?>" class="btn-connect">
-                    Começar Configuração <span class="dashicons dashicons-arrow-right-alt2" style="margin-top:4px"></span>
-                </a>
+                <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px;">
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard&start_onboarding=1')); ?>" class="btn-connect">
+                        Começar Configuração <span class="dashicons dashicons-arrow-right-alt2" style="margin-top:4px"></span>
+                    </a>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=conexbot-dashboard&start_onboarding=1')); ?>" class="btn-login">
+                        Fazer Login
+                    </a>
+                </div>
             </div>
         <?php endif; ?>
     </div>
