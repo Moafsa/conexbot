@@ -93,7 +93,10 @@ export const VoiceService = {
      */
     async speak(text: string, openaiApiKey?: string, elevenLabsApiKey?: string, voiceId?: string): Promise<string> {
         try {
-            console.log(`[VoiceService] Generating audio for: "${text.substring(0, 50)}..."`);
+            // Normalize text for natural speech (currencies, URLs, measurements)
+            const normalizedText = this.normalizeForSpeech(text);
+            
+            console.log(`[VoiceService] Generating audio for: "${normalizedText.substring(0, 50)}..."`);
             let buffer: Buffer;
 
             if (elevenLabsApiKey && voiceId && voiceId.trim() !== "") {
@@ -106,7 +109,7 @@ export const VoiceService = {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        text: text,
+                        text: normalizedText,
                         model_id: "eleven_multilingual_v2",
                         voice_settings: {
                             stability: 0.5,
@@ -129,7 +132,7 @@ export const VoiceService = {
                 const mp3 = await client.audio.speech.create({
                     model: "tts-1",
                     voice: "alloy", // 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
-                    input: text,
+                    input: normalizedText,
                 });
 
                 buffer = Buffer.from(await mp3.arrayBuffer());
@@ -175,5 +178,102 @@ export const VoiceService = {
                 })
                 .save(outputPath);
         });
+    },
+
+    /**
+     * Normalizes text for more natural speech.
+     * Converts currencies, URLs and measurements to natural language.
+     */
+    normalizeForSpeech(text: string): string {
+        if (!text) return "";
+        let result = text;
+
+        // 1. Normalize URLs (google.com.br -> google ponto com ponto b r)
+        result = result.replace(/(https?:\/\/)?(www\.)?([a-zA-Z0-9-]+\.[a-z]{2,3}(?:\.[a-z]{2})?)(?:\/[^\s]*)?/gi, (match, protocol, www, domain) => {
+            return domain.replace(/\./g, ' ponto ').split('').join(' '); // split join helps reading chars if needed, but ponto is enough
+        });
+        // Simplify: just domain with "ponto"
+        result = result.replace(/([a-zA-Z0-9-]{2,})\.([a-z]{2,3}(?:\.[a-z]{2,3})?)/gi, '$1 ponto $2');
+
+        // 2. Normalize Currencies (R$ 388,00 -> trezentos e oitenta e oito reais)
+        result = result.replace(/R\$\s?(\d+(?:\.\d+)?)(?:,(\d{2}))?/g, (match, integer, cents) => {
+            const num = parseInt(integer.replace(/\./g, ''));
+            const centsNum = cents ? parseInt(cents) : 0;
+            
+            let parts = [];
+            if (num > 0) {
+                parts.push(this.numberToWordsPT(num));
+                parts.push(num === 1 ? 'real' : 'reais');
+            }
+            if (centsNum > 0) {
+                if (parts.length > 0) parts.push('e');
+                parts.push(this.numberToWordsPT(centsNum));
+                parts.push(centsNum === 1 ? 'centavo' : 'centavos');
+            }
+            return parts.join(' ');
+        });
+
+        // 3. Normalize Measurements (2,5cm x 3m -> dois vírgula cinco centímetros por três metros)
+        const unitMap: any = {
+            'cm': 'centímetros',
+            'm': 'metros',
+            'mm': 'milímetros',
+            'km': 'quilômetros',
+            'kg': 'quilos',
+            'g': 'gramas',
+            'l': 'litros',
+            'ml': 'mililitros',
+            'x': 'por',
+        };
+
+        result = result.replace(/(\d+(?:,\d+)?)\s*(cm|mm|km|kg|ml|m|g|l|(?:\sx\s)|x)/gi, (match, val, unit) => {
+            const normalizedVal = val.replace(',', ' vírgula ');
+            // If comma was used, split and convert parts
+            let spokenVal = normalizedVal;
+            if (normalizedVal.includes(' vírgula ')) {
+                const [int, dec] = normalizedVal.split(' vírgula ');
+                spokenVal = `${this.numberToWordsPT(parseInt(int))} vírgula ${this.numberToWordsPT(parseInt(dec))}`;
+            } else {
+                spokenVal = this.numberToWordsPT(parseInt(val));
+            }
+
+            const cleanUnit = unit.trim().toLowerCase();
+            const spokenUnit = unitMap[cleanUnit] || cleanUnit;
+            return `${spokenVal} ${spokenUnit}`;
+        });
+
+        return result;
+    },
+
+    numberToWordsPT(num: number): string {
+        if (num === 0) return "zero";
+        const units = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+        const tens = ["", "dez", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+        const teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+        const hundreds = ["", "cem", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+        const hundredsSpecial = "cento";
+
+        if (num < 10) return units[num];
+        if (num >= 10 && num < 20) return teens[num - 10];
+        if (num >= 20 && num < 100) {
+            const t = Math.floor(num / 10);
+            const u = num % 10;
+            return u === 0 ? tens[t] : `${tens[t]} e ${units[u]}`;
+        }
+        if (num >= 100 && num < 1000) {
+            if (num === 100) return "cem";
+            const h = Math.floor(num / 100);
+            const rem = num % 100;
+            const hStr = h === 1 ? hundredsSpecial : hundreds[h];
+            return rem === 0 ? hStr : `${hStr} e ${this.numberToWordsPT(rem)}`;
+        }
+        if (num >= 1000 && num < 1000000) {
+            const k = Math.floor(num / 1000);
+            const rem = num % 1000;
+            const kStr = k === 1 ? "mil" : `${this.numberToWordsPT(k)} mil`;
+            return rem === 0 ? kStr : `${kStr} e ${this.numberToWordsPT(rem)}`;
+        }
+        
+        return num.toString(); // Fallback for very large numbers
     }
 };

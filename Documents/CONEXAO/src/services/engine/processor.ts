@@ -318,11 +318,21 @@ export const MessageProcessor = {
             const legacyChunks = chunkKnowledge(bot.knowledgeBase, bot.scrapedContent, materialsText);
             const legacyContext = retrieveRelevantChunks(legacyChunks, messageText);
 
+            // Decide if we should show prices based on stage
+            const hidePrices = ['GREETING', 'SAUDAÇÃO', 'SAUDACAO', 'INÍCIO', 'LEAD', 'AWARENESS', 'NOVO'].includes(analysis.nextStage.toUpperCase().trim());
+
             const productContext = bot.products.map((p: any) => {
                 const currentPrice = p.salePrice || p.price;
-                const priceMsg = p.salePrice 
-                    ? `[OFERTA] Preço Original: R$ ${p.price.toFixed(2)} | Preço Promocional de Hoje: R$ ${p.salePrice.toFixed(2)} (Use SEMPRE o formato: De R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)}) 🔥` 
-                    : `R$ ${p.price.toFixed(2)}`;
+                let priceMsg = "";
+                
+                if (hidePrices) {
+                    priceMsg = "[Preço Oculto nesta fase para focar na qualificação]";
+                } else {
+                    priceMsg = p.salePrice 
+                        ? `[OFERTA] Preço Original: R$ ${p.price.toFixed(2)} | Preço Promocional: R$ ${p.salePrice.toFixed(2)} 🔥` 
+                        : `R$ ${p.price.toFixed(2)}`;
+                }
+                
                 const couponInfo = p.allowCoupons ? "" : " [NÃO ACEITA CUPONS/DESCONTOS ADICIONAIS]";
                 return `- ${p.name}: ${priceMsg}${couponInfo} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
             }).join('\n');
@@ -390,12 +400,13 @@ export const MessageProcessor = {
             
             // 9.5 REINFORCE SALES RULES AND USER PRIMACY (Absolute recency bias fix)
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
-🚨 DIRETRIZ DE FORMATAÇÃO DE PREÇOS:
-Caso você decida citar preços que possuam valor original e promocional, use SEMPRE o formato: "De R$ [Original] por APENAS R$ [Promocional]". 
-NÃO utilize o formato "Custa X (originalmente Y)". Isso é uma regra de design básica.
+🚨 DIRETRIZ ESTRATÉGICA DE VENDAS:
+1. FOCO TOTAL NA QUALIFICAÇÃO: Em saudações ou no início da conversa, NUNCA empurre preços ou o catálogo. Siga 100% o seu prompt de usuário.
+2. PREÇOS REATIVOS: Fale de preços SOMENTE se o cliente perguntar OU se a sua estratégia (prompt) indicar o momento certo.
+3. FORMATO DE ANCORAGEM: SE e QUANDO falar de preços promocionais, use: "De R$ [Original] por APENAS R$ [Promocional]".
 
 🚨 PRIORIDADE ABSOLUTA:
-${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras de ancoragem e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga as diretrizes de ancoragem acima."}
+${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
 ═════════════════════════════════════════════════════════════════════════`;
 
             // WordPress Custom Tone Adjustment
@@ -485,7 +496,7 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                 // FINAL HARD CONTRAINT: Inject a final system instruction AFTER the history to override any bias from previous messages
                 messages.push({
                     role: 'system',
-                    content: `🚨 LEMRETE: Se mencionar preços em oferta, use o formato "De R$ [Original] por APENAS R$ [Promocional]". Fora isso, siga o fluxo natural da conversa e respeite as instruções específicas do seu prompt de criação.`
+                    content: `🚨 LEMRETE: Não empurre vendas se estiver no início da conversa. Siga o fluxo de qualificação do seu criador. Use a ancoragem de preço (De X por Y) apenas se necessário nesta etapa.`
                 });
 
                 aiResult = await safeChatCompletion({
