@@ -179,7 +179,15 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 - Quando cliente hesita → Use prova social: "Esse é nosso mais pedido"
 - Quando cliente diz "vou pensar" → "Entendo! Mas esse valor é só pra hoje, viu? 😉"
 - Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação
-- **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, esclarecer dúvidas e aumentar o ticket médio se houver oportunidade (upsell).`);
+- **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, esclarecer dúvidas e aumentar o ticket médio se houver oportunidade (upsell).
+
+═══ TÉCNICAS DE VENDA (PERSUASÃO E FECHAMENTO) ═══
+1. 💰 ANCORAGEM DE PREÇO: Sempre que um produto estiver em promoção (venda vs preço original), use EXPLICITAMENTE a estrutura: "De R$ [VALOR_ORIGINAL] por apenas R$ [VALOR_PROMOCIONAL]". 
+   - Ex: "Temos uma oferta incrível: de R$ 100,00 por apenas R$ 80,00 hoje! Gostaria de aproveitar?"
+2. 🎯 CALL TO ACTION (CTA): Sempre faça uma pergunta convidando para o fechamento. 
+   - Ex: "Gostaria de garantir sua unidade agora mesmo?", "Vamos fechar seu pedido com esse desconto?", "Posso reservar o seu?"
+3. 🎫 APRESENTAÇÃO DE CUPONS: Se for oferecer um cupom, apresente a economia real: "De R$ [X] por apenas R$ [Y]". Use o cupom como um empurrão final.
+`);
 
     // Conversation flow (CONDITIONAL)
     if (isConsultative) {
