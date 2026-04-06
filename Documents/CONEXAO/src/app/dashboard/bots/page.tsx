@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Plus, MoreVertical, MessageSquare, Play, Zap, RefreshCw, Trash2, Settings, Edit, X, LogOut, Share2 } from "lucide-react";
+import { Bot, Plus, MoreVertical, MessageSquare, Play, Zap, RefreshCw, Trash2, Settings, Edit, X, LogOut, Share2, Pause } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -98,6 +98,31 @@ export default function BotsPage() {
         } catch (error) {
             console.error('Failed to clone bot:', error);
             alert('Erro ao duplicar agente.');
+        } finally {
+            setLoading(false);
+            setOpenDropdown(null);
+        }
+    };
+
+    const handleToggleStatus = async (id: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+        try {
+            setLoading(true);
+            const res = await fetch(`/api/bots/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (res.ok) {
+                setBots(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
+                toast.success(newStatus === 'active' ? "Agente ativado!" : "Agente pausado!");
+            } else {
+                toast.error("Erro ao atualizar status.");
+            }
+        } catch (error) {
+            console.error("Error toggling bot status", error);
+            toast.error("Erro ao atualizar status.");
         } finally {
             setLoading(false);
             setOpenDropdown(null);
@@ -236,6 +261,13 @@ export default function BotsPage() {
                                                     <Edit size={16} />
                                                     Editar Prompt
                                                 </Link>
+                                                <button
+                                                    onClick={() => handleToggleStatus(bot.id, bot.status)}
+                                                    className={`flex items-center gap-2 w-full px-4 py-2 text-sm rounded-lg transition-colors border-t border-white/5 mt-1 pt-2 ${bot.status === 'active' ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}`}
+                                                >
+                                                    {bot.status === 'active' ? <Pause size={16} /> : <Zap size={16} />}
+                                                    {bot.status === 'active' ? 'Pausar Atendimento' : 'Ativar Atendimento'}
+                                                </button>
                                                 {bot.connectionStatus === 'CONNECTED' && (
                                                     <button
                                                         onClick={() => handleDisconnect(bot.id)}
@@ -279,6 +311,22 @@ export default function BotsPage() {
                                 <span className={bot.connectionStatus === 'CONNECTED' ? 'text-emerald-500' : 'text-yellow-500'}>
                                     {bot.connectionStatus === 'CONNECTED' ? 'Conectado' : (bot.connectionStatus || 'Aguardando Conexão')}
                                 </span>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleStatus(bot.id, bot.status);
+                                        }}
+                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all border ${
+                                            bot.status === 'active'
+                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
+                                                : 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20'
+                                        }`}
+                                    >
+                                        {bot.status === 'active' ? <Zap size={10} className="fill-current" /> : <Pause size={10} className="fill-current" />}
+                                        {bot.status === 'active' ? 'Ativo' : 'Pausado'}
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 mb-6">
