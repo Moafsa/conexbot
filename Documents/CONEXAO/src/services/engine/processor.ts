@@ -387,13 +387,22 @@ export const MessageProcessor = {
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
             
             let finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
+            
+            // 9.5 REINFORCE SALES RULES AND USER PRIMACY (Absolute recency bias fix)
+            finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
+🚨 DIRETRIZ FINAL DE FORMATAÇÃO (MANDATÓRIO):
+Ao falar de preços em promoção, você JAMAIS deve dizer "Custa X (originalmente Y)". 
+Use SEMPRE e RIGOROSAMENTE o formato: "De R$ [Original] por APENAS R$ [Promocional]". 
+Isso é uma regra de design de vendas absoluta. Termine sempre com um Convite ao Fechamento.
+
+🚨 PRIORIDADE DE RESPOSTA:
+${bot.systemPrompt ? `Se as instruções acima ("${bot.systemPrompt}") disserem para responder de forma diferente, SIGA O USUÁRIO (Primasia do Usuário). Caso contrário, use a técnica de ancoragem acima.` : "Use a técnica de ancoragem acima para todas as ofertas."}
+═════════════════════════════════════════════════════════════════════════`;
 
             // WordPress Custom Tone Adjustment
             if (channel === 'wordpress') {
                 finalSystemPrompt += `\n\n⚠️ AMBIENTE: WordPress Community\nVocê está respondendo a um COMENTÁRIO de um leitor em um post do site.
                 - Use um tom informativo, educado e semi-formal.
-                - Considere o contexto do post fornecido na primeira mensagem.
-                - Responda de forma completa mas não prolixa.
                 - NÃO use gírias ou emojis excessivos de chat.
                 - Trate o autor do comentário pelo nome (se fornecido).`;
             }
@@ -473,6 +482,13 @@ export const MessageProcessor = {
 
             while (toolIteration < maxToolIterations && !handoffDone) {
                 const messages = buildConversationMessages(finalSystemPrompt, history as any);
+                
+                // FINAL HARD CONTRAINT: Inject a final system instruction AFTER the history to override any bias from previous messages
+                messages.push({
+                    role: 'system',
+                    content: `🚨 LEMRETE DE FORMATAÇÃO FINAL PARA ESTA RESPOSTA:\nSe o produto estiver em oferta (preço original vs promocional), use OBRIGATORIAMENTE o formato "De R$ [Original] por APENAS R$ [Promocional]".\nNÃO use o formato "Custa X (originalmente Y)".\nSempre termine com uma pergunta de fechamento convidativa.`
+                });
+
                 aiResult = await safeChatCompletion({
                     bot,
                     messages: messages as any[],

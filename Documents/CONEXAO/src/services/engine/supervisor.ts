@@ -70,8 +70,8 @@ export const SupervisorService = {
         2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar.
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
-        5. ESTRATÉGIA: Como o bot deve agir agora?
-        6. DELEGAÇÃO: Se você perceber que o cliente precisa de um "Closer" (fechamento), "Consultor" (suporte técnico) ou outro especialista da lista acima, retorne o "assignedBotId" correspondente. Caso contrário, retorne null.
+        5. ESTRATÉGIA: Como o bot deve agir agora? 🚨 REGRA DE PREÇO: Se sugerir falar de oferta, use sempre o formato "De R$ [Original] por APENAS R$ [Promocional]".
+        6. DELEGAÇÃO: Se você perceber que o cliente precisa de um especialista da lista acima, retorne o "assignedBotId" correspondente.
         7. NOME/EMAIL/RESUMO: Extraia dados do cliente se disponíveis.
 
         Retorne APENAS um JSON estrito:
