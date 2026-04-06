@@ -58,6 +58,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         groupResponseMode: "ALL",
         allowedGroups: [] as string[],
         fallbackContact: "",
+        status: "active",
     });
 
     const [materials, setMaterials] = useState<any[]>([]);
@@ -87,6 +88,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 groupResponseMode: botData.groupResponseMode || "ALL",
                 allowedGroups: botData.allowedGroups || [],
                 fallbackContact: botData.fallbackContact || "",
+                status: botData.status || "active",
             });
             fetchExtraData();
         }
@@ -198,6 +200,26 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                     <div className="grid grid-cols-2 gap-6">
                                         <Field label="Nome do Agente" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} placeholder="Ex: Pedro Vendas" />
                                         <Field label="Tipo de Negócio" value={formData.businessType} onChange={v => setFormData({ ...formData, businessType: v })} placeholder="Ex: E-commerce" />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-3xl">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-tighter">
+                                                <Zap size={18} className="text-indigo-400" /> Status do Agente
+                                            </h4>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
+                                                {formData.status === 'active' ? 'O AGENTE ESTÁ ATIVO E RESPONDENDO' : 'O AGENTE ESTÁ PAUSADO (APENAS REGISTRANDO)'}
+                                            </p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={formData.status === 'active'}
+                                                onChange={e => setFormData({ ...formData, status: e.target.checked ? 'active' : 'paused' })}
+                                            />
+                                            <div className="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                                        </label>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Descrição e Contexto</label>

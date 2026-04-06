@@ -109,8 +109,8 @@ export const MessageProcessor = {
                 },
             }) as any;
 
-            if (!bot || bot.status !== 'active') {
-                logToFile(`[Processor] Bot invalid or inactive: ${identifier}`);
+            if (!bot) {
+                logToFile(`[Processor] Bot not found: ${identifier}`);
                 return null;
             }
 
@@ -189,6 +189,11 @@ export const MessageProcessor = {
                     role: 'user',
                 },
             });
+
+            if (bot.status === 'paused') {
+                logToFile(`[Processor] Bot ${bot.name} is PAUSED. Message recorded. Skipping AI response.`);
+                return null;
+            }
 
             // 5. Get conversation history
             const rawHistory = await (prisma.message as any).findMany({

@@ -6,7 +6,7 @@ export default function Shell({ children, branding, alertBanner }: { children: R
             {alertBanner}
             <div className="flex flex-1 overflow-hidden min-h-0">
                 <Sidebar branding={branding} />
-                <main className="flex-1 relative overflow-hidden h-full flex flex-col min-h-0">
+                <main className="flex-1 relative overflow-y-auto h-full flex flex-col min-h-0 custom-scrollbar-white">
                     {/* Background Orbs for Dashboard internal feel */}
                     <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px] -z-10 pointer-events-none"></div>
                     {children}

@@ -133,6 +133,33 @@ export async function POST(req: Request) {
 
             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
 
+            // Admin Commands Handling
+            if (botDoc && botDoc.tenant.whatsapp) {
+                const isTenantAdmin = PhoneUtils.compare(cleanPhone, botDoc.tenant.whatsapp);
+                
+                const cmd = messageBody.trim().toLowerCase();
+                if (isTenantAdmin && (cmd === '/pausar' || cmd === '/ativar')) {
+                    const newStatus = cmd === '/pausar' ? 'paused' : 'active';
+                    logToFile(`Admin Command Detected: ${cmd} from ${cleanPhone}. Updating bot status to ${newStatus}`);
+                    
+                    await prisma.bot.update({
+                        where: { id: botDoc.id },
+                        data: { status: newStatus }
+                    });
+
+                    // Send confirmation message back using UzapiService
+                    try {
+                        const { UzapiService } = await import('@/services/engine/uzapi');
+                        const msg = newStatus === 'paused' ? '⏸️ *Bot Pausado.* Não responderei mais mensagens até ser reativado.' : '▶️ *Bot Ativado.* Voltando a responder normalmente!';
+                        await UzapiService.sendMessage(sessionName, cleanPhone, msg);
+                    } catch (err) {
+                        logToFile(`Failed to send command confirmation: ${err}`);
+                    }
+
+                    return NextResponse.json({ status: 'command_processed' });
+                }
+            }
+
             // Group Filtering Logic
             if (isGroup) {
                 if (!botDoc) {

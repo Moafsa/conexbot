@@ -18,7 +18,7 @@ export default async function DocsLayout({
     return (
         <div className="min-h-screen bg-[#030014] text-gray-300">
             {/* Nav Header */}
-            <header className="fixed top-0 left-0 w-full h-20 border-b border-white/5 bg-[#030014]/95 backdrop-blur-md z-[999] flex items-center px-6 justify-between">
+            <header className="fixed top-0 left-0 w-full h-20 border-b border-white/10 bg-[#030014] z-[9999] flex items-center px-6 justify-between">
                 <Link href="/" className="flex items-center gap-3 group">
                     <img src={logo} alt={systemName} className="h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
                     <span className="text-xl font-black bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent italic">

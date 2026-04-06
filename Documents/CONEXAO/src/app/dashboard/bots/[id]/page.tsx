@@ -15,7 +15,8 @@ import {
     LogOut,
     Calendar,
     ShieldAlert,
-    Ticket
+    Ticket,
+    Pause
 } from "lucide-react";
 import { ProductManager } from "@/components/Dashboard/ProductManager";
 import { MediaManager } from "@/components/Dashboard/MediaManager";
@@ -78,6 +79,29 @@ export default function BotDetailsPage() {
         }
     }
 
+    async function handleToggleStatus() {
+        const newStatus = bot.status === 'active' ? 'paused' : 'active';
+        try {
+            setLoading(true);
+            const res = await fetch(`/api/bots/${botId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (res.ok) {
+                setBot({ ...bot, status: newStatus });
+            } else {
+                alert("Erro ao atualizar status.");
+            }
+        } catch (error) {
+            console.error("Error toggling bot status", error);
+            alert("Erro ao atualizar status.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Carregando agente...</div>;
     }
@@ -106,6 +130,17 @@ export default function BotDetailsPage() {
 
                 <div className="flex gap-2">
                     <button
+                        onClick={handleToggleStatus}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                            bot.status === 'active' 
+                            ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20' 
+                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20'
+                        }`}
+                    >
+                        {bot.status === 'active' ? <Zap className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+                        {bot.status === 'active' ? 'Ativo' : 'Pausado'}
+                    </button>
+                    <button
                         onClick={() => router.push(`/dashboard/create-bot?id=${botId}`)}
                         className="btn-secondary flex items-center gap-2"
                     >
@@ -122,7 +157,7 @@ export default function BotDetailsPage() {
                     {bot.connectionStatus === 'CONNECTED' && (
                         <button
                             onClick={handleDisconnect}
-                            className="bg-red-500/10 hover:bg-red-500/20 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 border border-red-500/20"
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-red-500/20"
                         >
                             <LogOut className="w-4 h-4" />
                             Desconectar
