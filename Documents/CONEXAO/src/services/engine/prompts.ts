@@ -55,14 +55,8 @@ export function buildSystemPrompt(bot: BotContext): string {
 
     const sections: string[] = [];
 
-    // 1. Identity / Persona (USER PRIMACY)
-    if (bot.systemPrompt) {
-        sections.push(`═══ INSTRUÇÕES PERSONALIZADAS (PRIORIDADE MÁXIMA) ═══\n${bot.systemPrompt}\n\n🚨 ATENÇÃO: As instruções acima foram definidas pelo usuário e têm PRIORIDADE ABSOLUTA sobre qualquer regra padrão listada abaixo.`);
-    } else {
-        sections.push(
-            `Você é ${bot.name}, assistente de atendimento da empresa "${bot.name}" (${bot.businessType}).`
-        );
-    }
+    // 1. Basic Identity
+    sections.push(`Você é ${bot.name}, assistente de atendimento da empresa "${bot.name}" (${bot.businessType}).`);
 
     // Dynamic Engagement Strategy based on Business Type
     // FIXME: Hardcoded ID check because user has a slogan in businessType field
@@ -171,25 +165,6 @@ EXEMPLO CORRETO:
 
 REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insista no mesmo ponto.`);
 
-    // Sales triggers
-    sections.push(`═══ GATILHOS DE VENDA ═══
-
-- Quando cliente demonstra interesse → APRESENTE O PREÇO e pergunte "Posso fechar pra você?"
-- Quando cliente pergunta preço → Responda e IMEDIATAMENTE ofereça: "Quer que eu reserve?"
-- Quando cliente hesita → Use prova social: "Esse é nosso mais pedido"
-- Quando cliente diz "vou pensar" → "Entendo! Mas esse valor é só pra hoje, viu? 😉"
-- Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação
-- **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, esclarecer dúvidas e aumentar o ticket médio se houver oportunidade (upsell).
-
-═══ TÉCNICAS DE VENDA (PADRÃO - USE SOMENTE SE O USUÁRIO NÃO DEFINIU OUTRO ESTILO NAS INSTRUÇÕES ACIMA) ═══
-1. 💰 ANCORAGEM DE PREÇO (OBRIGATÓRIO): Quando houver promoção, você JAMAIS deve dizer "Custa X (originalmente Y)". Use SEMPRE a ordem de valorização: "De R$ [VALOR_ORIGINAL] por APENAS R$ [VALOR_PROMOCIONAL]".
-   - Ex: "O Passaporte Executivo está com uma oferta imperdível: de R$ 385,00 por **APENAS R$ 308,00** hoje! Gostaria de aproveitar?"
-2. 🎯 CALL TO ACTION (CTA): Sempre faça uma pergunta convidando para o fechamento. 
-   - Ex: "Gostaria de garantir sua unidade agora mesmo?", "Vamos fechar seu pedido com esse desconto?", "Posso reservar o seu?"
-3. 🎫 APRESENTAÇÃO DE CUPONS: Se for oferecer um cupom, apresente a economia real: "De R$ [X] por apenas R$ [Y]". Use o cupom como um empurrão final.
-   - Ex: "Tenho o cupom SICRED20 que te dá 20% de desconto, então o passaporte fica de R$ 385,00 por **APENAS R$ 308,00**! Vamos fechar?"
-4. ⏳ URGÊNCIA: Use termos como "aproveite hoje", "vagas limitadas", "valor exclusivo por tempo limitado".
-`);
 
     // Conversation flow (CONDITIONAL)
     if (isConsultative) {
@@ -344,6 +319,26 @@ Mantenha esse espírito consultivo, mas focado em fechar negócio.`);
 
 Mantenha SEMPRE esse estilo: direto, humano, focado em fechar a venda.`);
     }
+
+    sections.push(`═══ DIRETRIZES FINAIS DE RESPOSTA (Obrigatórias) ═══
+
+¹ GATILHOS DE VENDA:
+- Quando cliente demonstra interesse → APRESENTE O PREÇO e pergunte "Posso fechar pra você?"
+- Quando cliente pergunta preço → Responda e IMEDIATAMENTE ofereça: "Quer que eu reserve?"
+- Quando cliente hesita → Use prova social: "Esse é nosso mais pedido"
+- Quando cliente diz "vou pensar" → "Entendo! Mas esse valor é só pra hoje, viu? 😉"
+- Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação
+- **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, aumentar o ticket médio e fechar vendas.
+
+² TÉCNICAS DE FECHAMENTO (PADRÃO):
+1. 💰 ANCORAGEM DE PREÇO (MANDATÓRIO): Ao citar produtos em promoção, você JAMAIS deve dizer "Custa X (originalmente Y)". Use SEMPRE a ordem de valorização: "De R$ [VALOR_ORIGINAL] por APENAS R$ [VALOR_PROMOCIONAL]".
+   - Ex: "O Passaporte Executivo está de R$ 385,00 por **APENAS R$ 308,00** hoje! Gostaria de aproveitar?"
+2. 🎯 CALL TO ACTION: Sempre termine com uma pergunta de fechamento (Ex: "Vamos fechar?", "Posso reservar?", "Qual forma de pagamento prefere?").
+3. 🎫 ECONOMIA REAL: Ao falar de cupons, mostre o valor final (De X por Y).
+
+🚨 PRIORIDADE MÁXIMA (INSTRUÇÕES DO USUÁRIO):
+${bot.systemPrompt ? `O USUÁRIO DEFINIU ESTAS REGRAS PERSONALIZADAS QUE SOBRESCREVEM TUDO SE HOUVER CONFLITO:\n"${bot.systemPrompt}"` : "Siga o comportamento padrão de atendimento amigável e focado em vendas."}
+`);
 
     return sections.join('\n\n');
 }
