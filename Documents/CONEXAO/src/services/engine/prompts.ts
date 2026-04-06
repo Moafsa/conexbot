@@ -55,9 +55,9 @@ export function buildSystemPrompt(bot: BotContext): string {
 
     const sections: string[] = [];
 
-    // 1. Identity / Persona
+    // 1. Identity / Persona (USER PRIMACY)
     if (bot.systemPrompt) {
-        sections.push(bot.systemPrompt);
+        sections.push(`═══ INSTRUÇÕES PERSONALIZADAS (PRIORIDADE MÁXIMA) ═══\n${bot.systemPrompt}\n\n🚨 ATENÇÃO: As instruções acima foram definidas pelo usuário e têm PRIORIDADE ABSOLUTA sobre qualquer regra padrão listada abaixo.`);
     } else {
         sections.push(
             `Você é ${bot.name}, assistente de atendimento da empresa "${bot.name}" (${bot.businessType}).`
@@ -181,7 +181,7 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 - Quando cliente reclamar → Reconheça, resolva rápido, ofereça compensação
 - **OBJETIVO COMERCIAL**: Seu foco é sempre fazer bons negócios, esclarecer dúvidas e aumentar o ticket médio se houver oportunidade (upsell).
 
-═══ TÉCNICAS DE VENDA (PERSUASÃO E FECHAMENTO) ═══
+═══ TÉCNICAS DE VENDA (PADRÃO - USE SOMENTE SE O USUÁRIO NÃO DEFINIU OUTRO ESTILO NAS INSTRUÇÕES ACIMA) ═══
 1. 💰 ANCORAGEM DE PREÇO (OBRIGATÓRIO): Quando houver promoção, você JAMAIS deve dizer "Custa X (originalmente Y)". Use SEMPRE a ordem de valorização: "De R$ [VALOR_ORIGINAL] por APENAS R$ [VALOR_PROMOCIONAL]".
    - Ex: "O Passaporte Executivo está com uma oferta imperdível: de R$ 385,00 por **APENAS R$ 308,00** hoje! Gostaria de aproveitar?"
 2. 🎯 CALL TO ACTION (CTA): Sempre faça uma pergunta convidando para o fechamento. 
