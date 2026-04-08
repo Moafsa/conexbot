@@ -31,8 +31,7 @@ export default async function DashboardLayout({
             include: { 
                 subscriptions: {
                     where: { 
-                        type: { in: ['PRIMARY', 'WRITER_PLUGIN'] },
-                        status: { in: ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'] }
+                        type: { in: ['PRIMARY', 'WRITER_PLUGIN'] }
                     }
                 }, 
                 usageCounter: true 
@@ -40,16 +39,21 @@ export default async function DashboardLayout({
         });
         
         // Let SUPERADMIN and ADMIN pass. For normal users, require AT LEAST ONE valid subscription.
-        if (tenant && tenant.role === 'USER') {
-            const hasSub = tenant.subscriptions.length > 0;
+        const isAdmin = tenant && (tenant.role === 'ADMIN' || tenant.role === 'SUPERADMIN');
+        
+        if (tenant && tenant.role === 'USER' && !isAdmin) {
+            const activeSubscriptions = tenant.subscriptions.filter((s: any) => 
+                ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE', 'CONFIRMED', 'RECEIVED'].includes(s.status)
+            );
+            const hasSub = activeSubscriptions.length > 0;
             
             if (!hasSub) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
 
-            const primarySub = tenant.subscriptions.find((s: any) => s.type === 'PRIMARY');
-            const writerSub = tenant.subscriptions.find((s: any) => s.type === 'WRITER_PLUGIN');
+            const primarySub = activeSubscriptions.find((s: any) => s.type === 'PRIMARY');
+            const writerSub = activeSubscriptions.find((s: any) => s.type === 'WRITER_PLUGIN');
             const subscription = primarySub || writerSub; // For trial banner logic
 
             if (subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
