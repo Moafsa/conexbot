@@ -5,7 +5,24 @@ if (!defined('ABSPATH')) {
 
 class Conext_Licensing {
 
-    private static $api_url = 'https://dash.conexbot.com.br'; // URL da plataforma Conextbot
+    private static $api_url = 'https://app.conext.click'; // URL da plataforma Conext
+
+    /**
+     * Busca os planos disponíveis diretamente no SaaS
+     */
+    public static function get_available_plans() {
+        $response = wp_remote_get(self::$api_url . '/api/plans?type=WRITER_PLUGIN', [
+            'timeout' => 15,
+            'headers' => ['Content-Type' => 'application/json']
+        ]);
+
+        if (is_wp_error($response)) {
+            return [];
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($body['plans']) ? $body['plans'] : [];
+    }
 
     public static function get_tier_label() {
         return get_option('conext_writer_license_tier', 'Starter');

@@ -79,20 +79,59 @@ class Conext_Admin {
                     <div class="conex-ai-bar" style="width: <?php echo $percent; ?>%;"></div>
                 </div>
                 <p><strong><?php echo Conext_Licensing::get_credits_remaining(); ?></strong> créditos restantes de <?php echo $total; ?>.</p>
-                <?php if ($total <= 10): ?>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px;">
-                        <a href="https://conexbot.com/writer-plugin" class="upgrade-btn" target="_blank" style="background:#2271b1; color:#fff;">Assinar Plano Platinum (Yoast SEO)</a>
-                        <a href="https://conexbot.com/writer-plugin" class="upgrade-btn" target="_blank">Upgrade para Plano Gold (50 posts)</a>
-                    </div>
-                <?php endif; ?>
             </div>
 
             <h2 class="nav-tab-wrapper">
-                <a href="#settings" class="nav-tab nav-tab-active">Configurações</a>
-                <a href="#licensing" class="nav-tab">Licenciamento</a>
+                <a href="#licensing" class="nav-tab nav-tab-active">Licenciamento</a>
+                <a href="#settings" class="nav-tab">Configurações</a>
             </h2>
 
-            <div id="conex-settings-tab">
+            <div id="conex-licensing-tab">
+                <div class="conex-ai-card">
+                    <h3>Ativar Licença Premium</h3>
+                    <p>Controle total sobre a orquestração de 5 agentes e SEO Nível Yoast.</p>
+                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+                        <input type="hidden" name="action" value="conext_writer_activate_license">
+                        <?php wp_nonce_field('conext_writer_license_action', 'conext_writer_license_nonce'); ?>
+                        <input type="text" name="license_key" value="<?php echo esc_attr(get_option('conext_writer_license_key')); ?>" class="regular-text" placeholder="CNX-XXXX-XXXX" />
+                        <?php submit_button('Ativar Agora', 'primary', 'activate_license'); ?>
+                    </form>
+                    <hr>
+                    <h4>Não tem uma licença ou quer fazer Upgrade?</h4>
+                    <p>Os planos abaixo são sincronizados em tempo real com a plataforma Conext.</p>
+                    
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-top:20px;">
+                        <?php 
+                        $plans = Conext_Licensing::get_available_plans();
+                        if (!empty($plans)):
+                            foreach ($plans as $plan): 
+                                $checkout_url = "https://app.conext.click/checkout?planId=" . $plan['id'] . "&type=WRITER_PLUGIN";
+                                ?>
+                                <div style="border: 1px solid #e5e7eb; padding: 20px; border-radius: 12px; background: #fafafa; text-align: center;">
+                                    <h4 style="margin:0 0 10px 0;"><?php echo esc_html($plan['name']); ?></h4>
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
+                                        R$ <?php echo number_format($plan['price'], 2, ',', '.'); ?>
+                                        <span style="font-size: 12px; font-weight: normal; color: #666;">/mês</span>
+                                    </div>
+                                    <p style="font-size: 13px; color: #666; min-height: 40px;"><?php echo esc_html($plan['description']); ?></p>
+                                    <ul style="text-align: left; font-size: 12px; margin: 15px 0; padding: 0; list-style: none;">
+                                        <li>✅ <?php echo $plan['postLimit']; ?> Posts/mês</li>
+                                        <li>✅ <?php echo number_format($plan['wordLimit'], 0, ',', '.'); ?> Palavras</li>
+                                        <li>✅ Yoast SEO Nível Pro</li>
+                                    </ul>
+                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;">Assinar <?php echo esc_html($plan['name']); ?></a>
+                                </div>
+                            <?php endforeach; 
+                        else: ?>
+                            <p>Carregando planos da plataforma... Se não aparecerem, <a href="https://app.conext.click/writer-plugin" target="_blank">clique aqui</a>.</p>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <p style="font-size:10px; color:#666; margin-top:20px;">* O plugin utiliza o motor Conext para garantir 100% de aprovação no Yoast SEO.</p>
+                </div>
+            </div>
+
+            <div id="conex-settings-tab" style="display:none;">
                 <form method="post" action="options.php">
                 <?php settings_fields('conext_writer_settings'); ?>
                 <?php do_settings_sections('conext_writer_settings'); ?>
@@ -197,22 +236,6 @@ class Conext_Admin {
             </form>
             </div>
 
-            <div id="conex-licensing-tab" style="display:none;">
-                <div class="conex-ai-card">
-                    <h3>Ativar Licença Premium</h3>
-                    <p>Controle total sobre a orquestração de 5 agentes e SEO Nível Yoast.</p>
-                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                        <input type="hidden" name="action" value="conext_writer_activate_license">
-                        <?php wp_nonce_field('conext_writer_license_action', 'conext_writer_license_nonce'); ?>
-                        <input type="text" name="license_key" value="<?php echo esc_attr(get_option('conext_writer_license_key')); ?>" class="regular-text" placeholder="CNX-XXXX-XXXX" />
-                        <?php submit_button('Ativar Agora', 'primary', 'activate_license'); ?>
-                    </form>
-                    <hr>
-                    <h4>Não tem uma licença?</h4>
-                    <p>Assine diretamente na plataforma Conextbot para receber sua chave instantaneamente.</p>
-                    <a href="https://conexbot.com/writer-plugin" class="button button-secondary" target="_blank">Ver Planos e Assinar Agora</a>
-                    <p style="font-size:10px; color:#666; margin-top:10px;">* O plugin utiliza o motor Conextbot para garantir 100% de aprovação no Yoast SEO.</p>
-                </div>
             </div>
 
             <script>
@@ -223,12 +246,12 @@ class Conext_Admin {
                         $(this).addClass('nav-tab-active');
                         
                         var target = $(this).attr('href');
-                        if (target == '#settings') {
-                            $('#conex-settings-tab').show();
-                            $('#conex-licensing-tab').hide();
-                        } else {
-                            $('#conex-settings-tab').hide();
+                        if (target == '#licensing') {
                             $('#conex-licensing-tab').show();
+                            $('#conex-settings-tab').hide();
+                        } else {
+                            $('#conex-licensing-tab').hide();
+                            $('#conex-settings-tab').show();
                         }
                     });
                 });
