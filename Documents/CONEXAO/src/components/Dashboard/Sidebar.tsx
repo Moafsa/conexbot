@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool } from "lucide-react";
 
-export default function Sidebar({ branding }: { branding?: any }) {
+export default function Sidebar({ branding, userPlans }: { branding?: any, userPlans?: { hasPrimary: boolean, hasWriter: boolean } }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(true);
@@ -18,13 +18,25 @@ export default function Sidebar({ branding }: { branding?: any }) {
 
     const isAdmin = (session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'SUPERADMIN';
 
+    // Base menu items
     const menuItems = [
         { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
-        { icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" },
-        { icon: MessageSquare, label: "Meus Bots", href: "/dashboard/bots" },
-        { icon: CreditCard, label: "Financeiro", href: "/dashboard/finance" },
-        { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
     ];
+
+    // Primary Plan Items (Bots/CRM)
+    if (userPlans?.hasPrimary || isAdmin) {
+        menuItems.push({ icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" });
+        menuItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
+    }
+
+    // Writer Plan Items
+    if (userPlans?.hasWriter || isAdmin) {
+        menuItems.push({ icon: PenTool, label: "Escritor IA", href: "/dashboard/writer" });
+    }
+
+    // Settings and Finance (Common to everyone signed up)
+    menuItems.push({ icon: CreditCard, label: "Financeiro", href: "/dashboard/finance" });
+    menuItems.push({ icon: Settings, label: "Configurações", href: "/dashboard/settings" });
 
     if (isAdmin) {
         menuItems.push({ icon: Shield, label: "Administração", href: "/admin" });

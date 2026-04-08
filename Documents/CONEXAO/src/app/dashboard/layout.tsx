@@ -24,22 +24,29 @@ export default async function DashboardLayout({
         redirect('/auth/login?callbackUrl=/dashboard');
     }
 
+    let tenant = null;
     if (session?.user?.email) {
-
-        const tenant = await prisma.tenant.findUnique({
+        tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
-            include: { subscription: true, usageCounter: true }
+            include: { subscriptions: true, usageCounter: true }
         });
         
-        // Let SUPERADMIN and ADMIN pass. For normal users, require a subscription.
+        // Let SUPERADMIN and ADMIN pass. For normal users, require at least one subscription.
         if (tenant && tenant.role === 'USER') {
-            const hasSub = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(tenant.subscription.status);
+            const activeSubs = tenant.subscriptions.filter((s: any) => 
+                ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)
+            );
+            const hasSub = activeSubs.length > 0;
+
             if (!hasSub) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
 
-            if (tenant.subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
+            // Banner logic for first relevant subscription
+            const prioritizedSub = activeSubs.find((s: any) => s.status === 'TRIALING') || activeSubs.find((s: any) => s.status === 'PAST_DUE');
+
+            if (prioritizedSub?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
                 const diffTime = tenant.usageCounter.periodEnd.getTime() - new Date().getTime();
                 const trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
@@ -56,7 +63,7 @@ export default async function DashboardLayout({
                         </div>
                     );
                 }
-            } else if (tenant.subscription?.status === 'PAST_DUE') {
+            } else if (prioritizedSub?.status === 'PAST_DUE') {
                 trialBanner = (
                     <div className="bg-amber-600/90 text-white text-center py-2 px-4 shadow-md w-full relative z-50 animate-fade-in flex flex-col sm:flex-row items-center justify-center gap-2 group border-b border-amber-500/50">
                         <span className="flex items-center gap-2 font-semibold">
@@ -72,6 +79,11 @@ export default async function DashboardLayout({
 
         }
     }
+
+    const userPlans = {
+        hasPrimary: Boolean(session?.user && (session.user.role === 'SUPERADMIN' || session.user.role === 'ADMIN' || tenant?.subscriptions?.some((s: any) => s.type === 'PRIMARY' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)))),
+        hasWriter: Boolean(session?.user && (session.user.role === 'SUPERADMIN' || session.user.role === 'ADMIN' || tenant?.subscriptions?.some((s: any) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))))
+    };
     
-    return <Shell branding={config} alertBanner={trialBanner}>{children}</Shell>;
+    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans}>{children}</Shell>;
 }

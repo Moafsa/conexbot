@@ -15,7 +15,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, whatsapp, cpfCnpj, planId, trial } = parsed.data;
+        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type } = parsed.data;
 
         if (!planId) {
             return NextResponse.json(
@@ -64,11 +64,12 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
-                subscription: (trial === 'true' && plan) ? {
+                subscriptions: (trial === 'true' && plan) ? {
                     create: {
                         planId: plan.id,
                         status: 'TRIALING',
-                        gateway: 'SYSTEM'
+                        gateway: 'SYSTEM',
+                        type: type as any
                     }
                 } : undefined,
                 usageCounter: {

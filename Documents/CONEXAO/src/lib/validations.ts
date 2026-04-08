@@ -11,6 +11,7 @@ export const registerSchema = z.object({
     planId: z.string().nullable().optional(),
     interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).nullable().optional(),
     trial: z.string().nullable().optional(), // Comes as string boolean from URL
+    type: z.enum(['PRIMARY', 'WRITER_PLUGIN']).optional().default('PRIMARY'),
 });
 
 export const loginSchema = z.object({

@@ -70,9 +70,18 @@ class Conext_Orchestrator {
 
         // 3. Especialista SEO: Otimiza o texto JÁ GERADO (Evita o erro de Novo Artigo)
         $seo_agent = new Conext_Agent_SEO($this->get_active_provider());
+        
+        // Fetch real categories from WordPress to pass to AI
+        $wp_categories = get_categories(['hide_empty' => false]);
+        $categories_list = [];
+        foreach ($wp_categories as $cat) {
+            $categories_list[] = ['id' => $cat->term_id, 'name' => $cat->name];
+        }
+
         $draft_payload = [
             'raw_content' => $full_text,
-            'topic_data'  => $topic_data
+            'topic_data'  => $topic_data,
+            'available_categories' => $categories_list
         ];
         $seo_data = $seo_agent->optimize($draft_payload);
         
@@ -80,7 +89,8 @@ class Conext_Orchestrator {
             'title' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['title']),
             'content' => trim($full_text),
             'focus_keyword' => $seo_data['focus_keyword'],
-            'meta_desc' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['meta_desc'])
+            'meta_desc' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['meta_desc']),
+            'category_id' => $seo_data['category_id'] ?? null
         ];
 
         // 4. Visualist: Gera Imagem de Destaque e Imagens de Corpo
@@ -177,9 +187,16 @@ class Conext_Orchestrator {
 
         $post_id = wp_insert_post($post_arr);
 
-        if (!is_wp_error($post_id) && $image_id) {
-            set_post_thumbnail($post_id, $image_id);
+        if (!is_wp_error($post_id)) {
+            if ($image_id) {
+                set_post_thumbnail($post_id, $image_id);
+            }
             
+            // Assign Category if AI chose one
+            if (!empty($post_data['category_id'])) {
+                wp_set_post_categories($post_id, [ (int) $post_data['category_id'] ]);
+            }
+
             // Yoast SEO Meta tags
             update_post_meta($post_id, '_yoast_wpseo_focuskw', $post_data['focus_keyword']);
             update_post_meta($post_id, '_yoast_wpseo_title', $post_data['title']);
