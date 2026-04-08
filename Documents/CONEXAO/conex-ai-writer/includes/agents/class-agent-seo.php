@@ -1,0 +1,49 @@
+<?php
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class ConexAI_Agent_SEO {
+    
+    private $provider;
+
+    public function __construct($provider_config) {
+        $this->provider = $provider_config;
+    }
+
+    public function optimize($draft) {
+        
+        $prompt = "Você é um Especialista Sênior em SEO On-Page (Yoast). " .
+                  "Analise o rascunho: " . json_encode($draft['raw_content']) . " " .
+                  "1. Responda APENAS num JSON estruturado contendo as chaves: \n" .
+                  "'title' (Máximo 60 caracteres. A focus_keyword DEVE estar no início do título. PROIBIDO usar o nome do site/domínio), \n" .
+                  "'meta_desc' (Máximo 155 caracteres. A focus_keyword DEVE aparecer obrigatoriamente neste texto com um CTA forte), \n" .
+                  "'focus_keyword' (Termo exato, curto e forte que resuma o assunto. Deve aparecer identicamente no texto analizado). \n" .
+                  "Não use anos (2023, 2026) nos metadados.";
+
+        $optimized_json = $this->call_llm_api($prompt);
+        
+        // Limpar possíveis blocos de código markdown que a IA costuma adicionar
+        $clean_json = preg_replace('/^```json|```$/m', '', trim($optimized_json));
+        $decoded = json_decode($clean_json, true);
+
+        if (!$decoded) {
+             error_log('Conex AI SEO Error: Falha ao decodificar JSON.');
+             return [
+                'title' => $draft['topic_data']['raw_data']['title'] ?? 'Novo Artigo',
+                'meta_desc' => 'Confira nosso novo artigo sobre tendências e novidades do setor.',
+                'focus_keyword' => $draft['topic_data']['keywords'],
+                'content' => $draft['raw_content']
+            ];
+        }
+
+        $decoded['content'] = $draft['raw_content']; // Preservar o conteúdo massivo gerado pela esteira
+        return $decoded;
+    }
+
+    private function call_llm_api($prompt) {
+        if (!$this->provider) return "Error: No provider";
+        return ConexAI_API::call($prompt, $this->provider);
+    }
+}

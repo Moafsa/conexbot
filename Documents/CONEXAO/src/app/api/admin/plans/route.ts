@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         console.log('[API /admin/plans POST] Received body:', JSON.stringify(body, null, 2));
 
-        const { name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, active, externalId, platformSplitType, platformSplitValue, features } = body;
+        const { name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features } = body;
         
         const parseNum = (val: any) => {
             const num = Number(val);
@@ -57,6 +57,9 @@ export async function POST(request: Request) {
                 trialDays: parseInt(trialDays as string) || 0,
                 botLimit: parseInt(botLimit as string) || 0,
                 messageLimit: parseInt(messageLimit as string) || 0,
+                postLimit: parseInt(postLimit as string) || 0,
+                wordLimit: parseInt(wordLimit as string) || 0,
+                type: type || 'PRIMARY',
                 active: active !== undefined ? Boolean(active) : true,
                 externalId,
                 platformSplitType,
@@ -86,7 +89,7 @@ export async function PUT(request: Request) {
         const body = await request.json();
         console.log('[API /admin/plans PUT] Received body:', JSON.stringify(body, null, 2));
 
-        const { id, name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, active, externalId, platformSplitType, platformSplitValue, features } = body;
+        const { id, name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features } = body;
         
         if (!id) {
             return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
@@ -115,6 +118,9 @@ export async function PUT(request: Request) {
                 trialDays: parseInt(trialDays as string) || 0,
                 botLimit: parseInt(botLimit as string) || 0,
                 messageLimit: parseInt(messageLimit as string) || 0,
+                postLimit: parseInt(postLimit as string) || 0,
+                wordLimit: parseInt(wordLimit as string) || 0,
+                type: type || 'PRIMARY',
                 active: active !== undefined ? Boolean(active) : true,
                 externalId,
                 platformSplitType,

@@ -370,50 +370,76 @@ model Message {
 }
 
 model Plan {
-  id                 String         @id @default(uuid())
+  id                 String           @id @default(uuid())
   name               String
   description        String?
   price              Float
-  interval           PlanInterval   @default(MONTHLY)
-  botLimit           Int            @default(1)
-  messageLimit       Int            @default(5000)
-  active             Boolean        @default(true)
+  interval           PlanInterval     @default(MONTHLY)
+  botLimit           Int              @default(1)
+  messageLimit       Int              @default(5000)
+  postLimit          Int?             @default(0)
+  wordLimit          Int?             @default(0)
+  active             Boolean          @default(true)
   externalId         String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  platformSplitType  SplitType      @default(PERCENTAGE)
-  platformSplitValue Float          @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  platformSplitType  SplitType        @default(PERCENTAGE)
+  platformSplitValue Float            @default(0)
   priceQuarterly     Float?
   priceSemiannual    Float?
   priceYearly        Float?
-  trialDays          Int            @default(0)
-  features           Json?          @default("[]")
+  trialDays          Int              @default(0)
+  features           Json?            @default("[]")
+  type               SubscriptionType @default(PRIMARY)
   subscriptions      Subscription[]
 }
 
 model Subscription {
-  id         String             @id @default(uuid())
-  gateway    String             @default("ASAAS")
-  externalId String?            @unique
-  tenantId   String             @unique
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
-  planId     String?
-  status     SubscriptionStatus
-  plan       Plan?              @relation(fields: [planId], references: [id])
-  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id              String             @id @default(uuid())
+  gateway         String             @default("ASAAS")
+  externalId      String?            @unique
+  tenantId        String
+  type            SubscriptionType   @default(PRIMARY)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  planId          String?
+  status          SubscriptionStatus
+  writerPostsUsed Int                @default(0)
+  writerWordsUsed Int                @default(0)
+  plan            Plan?              @relation(fields: [planId], references: [id])
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  licenseKeys     LicenseKey[]
+
+  @@unique([tenantId, type])
 }
 
 model Payment {
-  id         String        @id @default(uuid())
+  id         String           @id @default(uuid())
   amount     Float
-  gateway    String        @default("ASAAS")
-  externalId String?       @unique
+  gateway    String           @default("ASAAS")
+  externalId String?          @unique
   invoiceUrl String?
   tenantId   String
-  createdAt  DateTime      @default(now())
+  type       SubscriptionType @default(PRIMARY)
+  createdAt  DateTime         @default(now())
   status     PaymentStatus
-  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model LicenseKey {
+  id             String       @id @default(uuid())
+  key            String       @unique
+  siteUrl        String?
+  status         String       @default("ACTIVE")
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum SubscriptionType {
+  PRIMARY
+  WRITER_PLUGIN
 }
 
 model UsageCounter {

@@ -27,31 +27,40 @@ export async function GET(req: Request) {
             };
         }
 
-        const [payments, total] = await Promise.all([
+        const [payments, total, stats] = await Promise.all([
             prisma.payment.findMany({
                 where: whereCondition,
                 include: {
-                tenant: {
-                    select: {
-                        name: true,
-                        email: true
+                    tenant: {
+                        select: {
+                            name: true,
+                            email: true
+                        }
                     }
-                }
-            },
-            orderBy: { createdAt: 'desc' },
-            skip,
-            take: limit
-        }),
-        prisma.payment.count({ where: whereCondition })
-    ]);
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            prisma.payment.count({ where: whereCondition }),
+            prisma.payment.groupBy({
+                by: ['type'],
+                where: { status: { in: ['RECEIVED', 'CONFIRMED', 'PAID'] } },
+                _sum: { amount: true }
+            })
+        ]);
 
-    return NextResponse.json({
-        data: payments,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-        limit
-    });
+        const totalRevenue = stats.reduce((acc, curr) => acc + (curr._sum.amount || 0), 0);
+
+        return NextResponse.json({
+            data: payments,
+            total,
+            stats: stats.map(s => ({ type: s.type, total: s._sum.amount })),
+            totalRevenue,
+            page,
+            totalPages: Math.ceil(total / limit),
+            limit
+        });
     } catch (error) {
         console.error('Error fetching payments:', error);
         return new NextResponse('Internal Error', { status: 500 });

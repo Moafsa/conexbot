@@ -1,0 +1,115 @@
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class ConexAI_Licensing {
+
+    private static $api_url = 'https://dash.conexbot.com.br'; // URL da plataforma Conextbot
+
+    public static function get_tier_label() {
+        return get_option('conex_ai_license_tier', 'Starter');
+    }
+
+    public static function get_credits_remaining() {
+        $limit = (int) get_option('conex_ai_post_limit', 0);
+        $used = (int) get_option('conex_ai_posts_used', 0);
+        return $limit > 0 ? max(0, $limit - $used) : 0;
+    }
+
+    public static function get_credits_total() {
+        return (int) get_option('conex_ai_post_limit', 0);
+    }
+
+    public static function is_valid() {
+        $key = get_option('conex_ai_license_key');
+        if (empty($key)) return false;
+        
+        // Em um sistema real, poderíamos validar o cache aqui ou forçar um sync
+        return !empty(get_option('conex_ai_license_tier'));
+    }
+
+    /**
+     * Sincroniza os limites do servidor com o plugin local
+     */
+    public static function sync_limits() {
+        $key = get_option('conex_ai_license_key');
+        if (empty($key)) return false;
+
+        $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
+            'body' => json_encode([
+                'licenseKey' => $key,
+                'siteUrl' => get_site_url()
+            ]),
+            'headers' => ['Content-Type' => 'application/json']
+        ]);
+
+        if (is_wp_error($response)) return false;
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (isset($body['success']) && $body['success']) {
+            update_option('conex_ai_license_tier', $body['tier']);
+            update_option('conex_ai_post_limit', $body['postLimit']);
+            update_option('conex_ai_word_limit', $body['wordLimit']);
+            update_option('conex_ai_posts_used', $body['postsUsed']);
+            update_option('conex_ai_words_used', $body['wordsUsed']);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Consome créditos no servidor central
+     */
+    public static function consume_credits($posts = 1, $words = 0) {
+        $key = get_option('conex_ai_license_key');
+        if (empty($key)) return false;
+
+        $response = wp_remote_post(self::$api_url . '/api/licensing/consume', [
+            'body' => json_encode([
+                'licenseKey' => $key,
+                'postsToConsume' => $posts,
+                'wordsToConsume' => $words
+            ]),
+            'headers' => ['Content-Type' => 'application/json']
+        ]);
+
+        if (is_wp_error($response)) return false;
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (isset($body['success']) && $body['success']) {
+            // Sincroniza localmente após consumo
+            self::sync_limits();
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function activate_key($key) {
+        $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
+            'body' => json_encode([
+                'licenseKey' => $key,
+                'siteUrl' => get_site_url()
+            ]),
+            'headers' => ['Content-Type' => 'application/json']
+        ]);
+
+        if (is_wp_error($response)) return false;
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if (isset($body['success']) && $body['success']) {
+            update_option('conex_ai_license_key', $key);
+            update_option('conex_ai_license_tier', $body['tier']);
+            update_option('conex_ai_post_limit', $body['postLimit']);
+            update_option('conex_ai_word_limit', $body['wordLimit']);
+            update_option('conex_ai_posts_used', $body['postsUsed']);
+            update_option('conex_ai_words_used', $body['wordsUsed']);
+            update_option('conex_ai_last_sync', time());
+            return true;
+        }
+
+        return false;
+    }
+}

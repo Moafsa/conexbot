@@ -28,7 +28,11 @@ export default async function DocsLayout({
                 <div className="flex items-center gap-6">
                     <Link href="/conexbot-wp.zip" download className="hidden lg:flex items-center gap-2 text-xs font-bold text-blue-400 bg-blue-500/10 px-4 py-2 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">
                         <Rocket size={14} />
-                        Download Plugin WP
+                        Download WP Connect
+                    </Link>
+                    <Link href="/conex-ai-writer.zip" download className="hidden lg:flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-xl border border-indigo-500/20 hover:bg-indigo-500/20 transition-all">
+                        <Rocket size={14} />
+                        Download AI Writer
                     </Link>
                     <Link href={session?.user ? "/dashboard" : "/"} className="hidden md:block text-sm font-medium text-gray-400 hover:text-white transition-colors">
                         Voltar para o App

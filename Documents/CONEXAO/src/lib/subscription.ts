@@ -1,8 +1,13 @@
 import prisma from "./prisma";
 
-export async function getSubscriptionStatus(tenantId: string) {
+export async function getSubscriptionStatus(tenantId: string, type: 'PRIMARY' | 'WRITER_PLUGIN' = 'PRIMARY') {
     const subscription = await prisma.subscription.findUnique({
-        where: { tenantId },
+        where: { 
+            tenantId_type: {
+                tenantId,
+                type
+            }
+        },
         include: { plan: true }
     });
 
@@ -10,7 +15,7 @@ export async function getSubscriptionStatus(tenantId: string) {
         return { status: 'FREE', trialEnds: null }; 
     }
 
-    return { status: subscription.status, plan: subscription.plan };
+    return { status: subscription.status, plan: subscription.plan, subscription };
 }
 
 export function isSubscriptionActive(status: string) {

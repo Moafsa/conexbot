@@ -45,6 +45,7 @@ export const docsNavSections: {
         items: [
             { title: "WhatsApp (Uzapi)", href: "/docs/whatsapp", iconKey: "Zap" },
             { title: "Plugin WordPress", href: "/docs/wordpress", iconKey: "Rocket" },
+            { title: "AI Writer (Auto-Posts)", href: "/docs/ai-writer", iconKey: "Rocket" },
         ],
     },
     {

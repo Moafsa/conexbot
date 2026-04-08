@@ -44,6 +44,34 @@ export async function POST(req: Request) {
                         where: { id: subscription.id },
                         data: { status: 'ACTIVE' }
                     });
+
+                    // SE for PLUGIN DE REDAÇÃO, gerar chave de licença caso não exista
+                    if (subscription.type === 'WRITER_PLUGIN') {
+                        const existingKey = await prisma.licenseKey.findFirst({
+                            where: { subscriptionId: subscription.id }
+                        });
+
+                        if (!existingKey) {
+                            const newKey = `CNX-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+                            await prisma.licenseKey.create({
+                                data: {
+                                    key: newKey,
+                                    subscriptionId: subscription.id,
+                                    status: 'ACTIVE'
+                                }
+                            });
+                            console.log(`[Webhook] License Key generated for WRITER_PLUGIN: ${newKey}`);
+                        }
+
+                        // Reset Contadores de Uso do Plugin
+                        await prisma.subscription.update({
+                            where: { id: subscription.id },
+                            data: {
+                                writerPostsUsed: 0,
+                                writerWordsUsed: 0
+                            }
+                        });
+                    }
                 }
 
                 // Record or Update payment (Upsert to handle CREATED -> PAID transitions without duplicates)
@@ -52,20 +80,22 @@ export async function POST(req: Request) {
                     update: {
                         status: newPaymentStatus,
                         amount: payment.value,
+                        type: subscription.type, // Salva o tipo no histórico financeiro
                         invoiceUrl: payment.invoiceUrl || payment.bankSlipUrl,
                     },
                     create: {
                         tenantId: subscription.tenantId,
                         amount: payment.value,
                         status: newPaymentStatus,
+                        type: subscription.type, // Salva o tipo no histórico financeiro
                         externalId: payment.id,
                         invoiceUrl: payment.invoiceUrl || payment.bankSlipUrl,
                         gateway: 'ASAAS'
                     }
                 });
 
-                // Update usage limits based on plan ONLY IF it was just paid
-                if (newPaymentStatus === 'PAID') {
+                // Update usage limits based on plan ONLY IF it was just paid and it's PRIMARY
+                if (newPaymentStatus === 'PAID' && subscription.type === 'PRIMARY') {
                     const nextMonth = new Date();
                     nextMonth.setMonth(nextMonth.getMonth() + 1);
 

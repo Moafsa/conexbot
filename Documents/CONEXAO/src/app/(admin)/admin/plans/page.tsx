@@ -97,7 +97,7 @@ export default function PlansAdminPage() {
                         <div key={plan.id} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-6 hover:border-emerald-500/30 transition-all duration-300 group">
                             <div className="flex justify-between items-start mb-6">
                                 <div className="p-3 bg-[#151515] rounded-xl group-hover:bg-emerald-500/10 transition-colors">
-                                    <Package className="text-emerald-400" size={24} />
+                                    <Package className={plan.type === 'WRITER_PLUGIN' ? 'text-blue-400' : 'text-emerald-400'} size={24} />
                                 </div>
                                 <div className="flex space-x-1">
                                     <button 
@@ -113,8 +113,13 @@ export default function PlansAdminPage() {
                             <div className="mb-6">
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-xl font-bold uppercase tracking-tight">{plan.name}</h3>
+                                    {plan.type === 'WRITER_PLUGIN' && (
+                                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
+                                            PLUGIN
+                                        </span>
+                                    )}
                                     {plan.trialDays > 0 && (
-                                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter shadow-lg shadow-blue-500/10">
+                                        <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter shadow-lg shadow-indigo-500/10">
                                             Trial
                                         </span>
                                     )}
@@ -124,15 +129,24 @@ export default function PlansAdminPage() {
                                     <span className="text-sm font-normal text-gray-500">/mês</span>
                                 </div>
                                 {plan.trialDays > 0 && (
-                                    <div className="text-xs text-blue-400 font-bold mt-1 uppercase tracking-wider">
+                                    <div className="text-xs text-indigo-400 font-bold mt-1 uppercase tracking-wider">
                                         {plan.trialDays} Dias de Trial Grátis
                                     </div>
                                 )}
                             </div>
 
                             <div className="space-y-3 mb-8">
-                                <FeatureItem label={`${plan.botLimit} Bots`} />
-                                <FeatureItem label={`${plan.messageLimit === 0 ? 'Mensagens Ilimitadas' : `${plan.messageLimit} Mensagens/mês`}`} />
+                                {plan.type === 'WRITER_PLUGIN' ? (
+                                    <>
+                                        <FeatureItem label={`${plan.postLimit || 0} Posts/mês`} />
+                                        <FeatureItem label={`${plan.wordLimit || 0} Palavras/mês`} />
+                                    </>
+                                ) : (
+                                    <>
+                                        <FeatureItem label={`${plan.botLimit} Bots`} />
+                                        <FeatureItem label={`${plan.messageLimit === 0 ? 'Mensagens Ilimitadas' : `${plan.messageLimit} Mensagens/mês`}`} />
+                                    </>
+                                )}
                                 {(plan.features || []).map((f: any, i: number) => (
                                     <FeatureItem key={i} label={f.text} inactive={!f.enabled} />
                                 ))}
@@ -158,6 +172,18 @@ export default function PlansAdminPage() {
                             </button>
                         </div>
                         <form onSubmit={handleSave} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar text-white">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Plano</label>
+                                <select 
+                                    value={editingPlan?.type || 'PRIMARY'}
+                                    onChange={e => setEditingPlan({...editingPlan, type: e.target.value})}
+                                    className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all text-white"
+                                >
+                                    <option value="PRIMARY">Conextbot Principal (Bots)</option>
+                                    <option value="WRITER_PLUGIN">AI Writer Plugin</option>
+                                </select>
+                            </div>
+
                             <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4">
                                 <h3 className="text-sm font-bold text-blue-400">Configuração de Trial (Teste Grátis)</h3>
                                 <div className="space-y-2">
@@ -306,26 +332,49 @@ export default function PlansAdminPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Limite de Bots</label>
-                                    <input 
-                                        type="number"
-                                        value={editingPlan?.botLimit || 0} 
-                                        onChange={e => setEditingPlan({...editingPlan, botLimit: parseInt(e.target.value)})}
-                                        className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all"
-                                    />
+                            {editingPlan?.type === 'WRITER_PLUGIN' ? (
+                                <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-blue-400 uppercase">Limite de Posts (Mensal)</label>
+                                        <input 
+                                            type="number"
+                                            value={editingPlan?.postLimit || 0} 
+                                            onChange={e => setEditingPlan({...editingPlan, postLimit: parseInt(e.target.value)})}
+                                            className="w-full bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 text-sm focus:border-blue-400 outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-blue-400 uppercase">Limite de Palavras (Mensal)</label>
+                                        <input 
+                                            type="number"
+                                            value={editingPlan?.wordLimit || 0} 
+                                            onChange={e => setEditingPlan({...editingPlan, wordLimit: parseInt(e.target.value)})}
+                                            className="w-full bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 text-sm focus:border-blue-400 outline-none transition-all"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Limite de Mensagens (0 = ilimitado)</label>
-                                    <input 
-                                        type="number"
-                                        value={editingPlan?.messageLimit || 0} 
-                                        onChange={e => setEditingPlan({...editingPlan, messageLimit: parseInt(e.target.value)})}
-                                        className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all"
-                                    />
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Limite de Bots</label>
+                                        <input 
+                                            type="number"
+                                            value={editingPlan?.botLimit || 0} 
+                                            onChange={e => setEditingPlan({...editingPlan, botLimit: parseInt(e.target.value)})}
+                                            className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Limite de Mensagens (0 = ilimitado)</label>
+                                        <input 
+                                            type="number"
+                                            value={editingPlan?.messageLimit || 0} 
+                                            onChange={e => setEditingPlan({...editingPlan, messageLimit: parseInt(e.target.value)})}
+                                            className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
                                 <div className="flex justify-between items-center mb-2">
