@@ -16,12 +16,17 @@ export default function RegisterPage() {
     const interval = searchParams.get("interval");
     const trial = searchParams.get("trial");
     const gateway = searchParams.get("gateway");
+    const type = searchParams.get("type");
 
     useEffect(() => {
         if (!planId) {
-            router.push("/pricing");
+            if (type === 'WRITER_PLUGIN') {
+                router.push("/writer-plugin");
+            } else {
+                router.push("/pricing");
+            }
         }
-    }, [planId, router]);
+    }, [planId, type, router]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -204,7 +209,7 @@ export default function RegisterPage() {
 
                     <p className="mt-6 text-center text-sm text-gray-400">
                         Já tem conta?{" "}
-                        <Link href="/auth/login" className="text-indigo-400 hover:text-indigo-300 font-medium">
+                        <Link href={`/auth/login${type ? `?type=${type}` : ''}`} className="text-indigo-400 hover:text-indigo-300 font-medium">
                             Fazer login
                         </Link>
                     </p>

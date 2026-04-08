@@ -106,7 +106,7 @@ export default function WriterDashboardPage() {
                                     </li>
                                 </ul>
                                 <button 
-                                    onClick={() => window.location.href = `/checkout?planId=${plan.id}&type=WRITER_PLUGIN`}
+                                    onClick={() => window.location.href = `/api/checkout/portal?planId=${plan.id}&interval=MONTHLY&gateway=asaas`}
                                     className="w-full py-4 bg-white text-black rounded-2xl font-bold hover:bg-blue-600 hover:text-white transition-all active:scale-95"
                                 >
                                     Assinar Plugin

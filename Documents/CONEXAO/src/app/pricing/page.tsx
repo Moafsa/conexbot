@@ -4,7 +4,7 @@ import { Check, Zap, CreditCard, Building, Globe, Loader2, Sparkles, ChevronRigh
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const GATEWAYS = [
     { id: 'asaas', name: 'Asaas', icon: Building, desc: "Pix e Boleto" },
@@ -19,6 +19,8 @@ export default function PricingPage() {
     const [interval, setInterval] = useState<'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'YEARLY'>('MONTHLY');
     const { data: session, status } = useSession();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const type = searchParams.get("type");
 
     const [availableGateways, setAvailableGateways] = useState<string[]>(['asaas']);
 
@@ -99,10 +101,12 @@ export default function PricingPage() {
                         ← {status === 'unauthenticated' ? "Voltar para Início" : "Voltar para Dashboard"}
                     </Link>
                     <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
-                        Escolha seu Plano
+                        {type === 'WRITER_PLUGIN' ? 'Planos Conext Writer' : 'Escolha seu Plano'}
                     </h1>
                     <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        Comece a automatizar seu negócio hoje. Cancele a qualquer momento.
+                        {type === 'WRITER_PLUGIN' 
+                            ? 'Automatize seus posts e domine o SEO com inteligência artificial.' 
+                            : 'Comece a automatizar seu negócio hoje. Cancele a qualquer momento.'}
                     </p>
 
                     <div className="flex justify-center mt-6">
@@ -143,7 +147,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {plans.filter(p => p.type === 'PRIMARY').map((plan) => {
+                    {plans.filter(p => type === 'WRITER_PLUGIN' ? p.type === 'WRITER_PLUGIN' : p.type === 'PRIMARY').map((plan) => {
                         const baseMonthPrice = Number(plan.price) || 0;
                         let currentPrice = baseMonthPrice;
                         let originalPrice = baseMonthPrice;

@@ -14,6 +14,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered");
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const type = searchParams.get("type");
 
   useEffect(() => {
     const urlError = searchParams.get("error");
@@ -150,7 +151,7 @@ function LoginContent() {
 
           <p className="mt-6 text-center text-sm text-gray-400">
             Não tem conta?{" "}
-            <Link href="/pricing" className="text-indigo-400 hover:text-indigo-300 font-medium">
+            <Link href={`/auth/register${type ? `?type=${type}` : ''}`} className="text-indigo-400 hover:text-indigo-300 font-medium">
               Criar conta
             </Link>
           </p>
