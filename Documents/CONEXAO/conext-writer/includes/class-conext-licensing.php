@@ -5,13 +5,24 @@ if (!defined('ABSPATH')) {
 
 class Conext_Licensing {
 
-    private static $api_url = 'https://app.conext.click'; // URL da plataforma Conext
+    private static $api_url = ''; 
+
+    private static function get_api_url() {
+        if (!empty(self::$api_url)) return self::$api_url;
+        
+        // Se estiver em localhost, usa o app local, senão usa produção
+        $host = parse_url(get_site_url(), PHP_URL_HOST);
+        if ($host === 'localhost' || $host === '127.0.0.1') {
+            return 'http://localhost:3000';
+        }
+        return 'https://app.conext.click';
+    }
 
     /**
      * Busca os planos disponíveis diretamente no SaaS
      */
     public static function get_available_plans() {
-        $response = wp_remote_get(self::$api_url . '/api/plans?type=WRITER_PLUGIN', [
+        $response = wp_remote_get(self::get_api_url() . '/api/plans?type=WRITER_PLUGIN', [
             'timeout' => 15,
             'headers' => ['Content-Type' => 'application/json']
         ]);

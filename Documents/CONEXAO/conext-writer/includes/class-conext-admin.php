@@ -98,7 +98,6 @@ class Conext_Admin {
                     </form>
                     <hr>
                     <h4>Não tem uma licença ou quer fazer Upgrade?</h4>
-                    <p>Os planos abaixo são sincronizados em tempo real com a plataforma Conext.</p>
                     
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-top:20px;">
                         <?php 
@@ -115,11 +114,20 @@ class Conext_Admin {
                                     </div>
                                     <p style="font-size: 13px; color: #666; min-height: 40px;"><?php echo esc_html($plan['description']); ?></p>
                                     <ul style="text-align: left; font-size: 12px; margin: 15px 0; padding: 0; list-style: none;">
-                                        <li>✅ <?php echo $plan['postLimit']; ?> Posts/mês</li>
-                                        <li>✅ <?php echo number_format($plan['wordLimit'], 0, ',', '.'); ?> Palavras</li>
-                                        <li>✅ Yoast SEO Nível Pro</li>
+                                        <?php 
+                                        if (!empty($plan['features']) && is_array($plan['features'])):
+                                            foreach ($plan['features'] as $feature):
+                                                if (isset($feature['enabled']) && $feature['enabled']): ?>
+                                                    <li>✅ <?php echo esc_html($feature['text']); ?></li>
+                                                <?php endif;
+                                            endforeach;
+                                        else: ?>
+                                            <li>✅ <?php echo $plan['postLimit']; ?> Posts/mês</li>
+                                            <li>✅ <?php echo number_format($plan['wordLimit'], 0, ',', '.'); ?> Palavras</li>
+                                            <li>✅ Yoast SEO Nível Pro</li>
+                                        <?php endif; ?>
                                     </ul>
-                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;">Assinar <?php echo esc_html($plan['name']); ?></a>
+                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;">Assinar Plano <?php echo esc_html($plan['name']); ?></a>
                                 </div>
                             <?php endforeach; 
                         else: ?>
