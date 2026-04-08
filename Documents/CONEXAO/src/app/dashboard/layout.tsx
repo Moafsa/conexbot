@@ -1,8 +1,9 @@
-export const dynamic = 'force-dynamic';
 import Shell from "@/components/Dashboard/Shell";
 
 import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({
     children,
@@ -23,40 +24,22 @@ export default async function DashboardLayout({
         redirect('/auth/login?callbackUrl=/dashboard');
     }
 
-    let tenant = null;
     if (session?.user?.email) {
 
-        tenant = await prisma.tenant.findUnique({
+        const tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
-            include: { 
-                subscriptions: {
-                    where: { 
-                        type: { in: ['PRIMARY', 'WRITER_PLUGIN'] }
-                    }
-                }, 
-                usageCounter: true 
-            }
+            include: { subscription: true, usageCounter: true }
         });
         
-        // Let SUPERADMIN and ADMIN pass. For normal users, require AT LEAST ONE valid subscription.
-        const isAdmin = tenant && (tenant.role === 'ADMIN' || tenant.role === 'SUPERADMIN');
-        
-        if (tenant && tenant.role === 'USER' && !isAdmin) {
-            const activeSubscriptions = tenant.subscriptions.filter((s: any) => 
-                ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE', 'CONFIRMED', 'RECEIVED'].includes(s.status)
-            );
-            const hasSub = activeSubscriptions.length > 0;
-            
+        // Let SUPERADMIN and ADMIN pass. For normal users, require a subscription.
+        if (tenant && tenant.role === 'USER') {
+            const hasSub = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(tenant.subscription.status);
             if (!hasSub) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
 
-            const primarySub = activeSubscriptions.find((s: any) => s.type === 'PRIMARY');
-            const writerSub = activeSubscriptions.find((s: any) => s.type === 'WRITER_PLUGIN');
-            const subscription = primarySub || writerSub; // For trial banner logic
-
-            if (subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
+            if (tenant.subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
                 const diffTime = tenant.usageCounter.periodEnd.getTime() - new Date().getTime();
                 const trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
@@ -73,7 +56,7 @@ export default async function DashboardLayout({
                         </div>
                     );
                 }
-            } else if (subscription?.status === 'PAST_DUE') {
+            } else if (tenant.subscription?.status === 'PAST_DUE') {
                 trialBanner = (
                     <div className="bg-amber-600/90 text-white text-center py-2 px-4 shadow-md w-full relative z-50 animate-fade-in flex flex-col sm:flex-row items-center justify-center gap-2 group border-b border-amber-500/50">
                         <span className="flex items-center gap-2 font-semibold">
@@ -86,13 +69,9 @@ export default async function DashboardLayout({
                     </div>
                 );
             }
+
         }
     }
     
-    const userPlans = {
-        hasPrimary: !!tenant?.subscriptions.find((s: any) => s.type === 'PRIMARY'),
-        hasWriter: !!tenant?.subscriptions.find((s: any) => s.type === 'WRITER_PLUGIN')
-    };
-    
-    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans}>{children}</Shell>;
+    return <Shell branding={config} alertBanner={trialBanner}>{children}</Shell>;
 }

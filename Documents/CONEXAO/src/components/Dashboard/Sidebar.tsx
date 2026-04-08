@@ -4,15 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, Sparkles } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download } from "lucide-react";
 
-export default function Sidebar({ 
-    branding,
-    userPlans 
-}: { 
-    branding?: any,
-    userPlans?: { hasPrimary: boolean, hasWriter: boolean }
-}) {
+export default function Sidebar({ branding }: { branding?: any }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(true);
@@ -26,11 +20,8 @@ export default function Sidebar({
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
-        ...(userPlans?.hasPrimary !== false ? [
-            { icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" },
-            { icon: MessageSquare, label: "Meus Bots", href: "/dashboard/bots" },
-        ] : []),
-        { icon: Sparkles, label: "AI Writer", href: "/dashboard/writer" },
+        { icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" },
+        { icon: MessageSquare, label: "Meus Bots", href: "/dashboard/bots" },
         { icon: CreditCard, label: "Financeiro", href: "/dashboard/finance" },
         { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
     ];
@@ -107,9 +98,7 @@ export default function Sidebar({
                     {!collapsed && (
                         <div className="text-left flex-1 overflow-hidden">
                             <p className="text-sm font-medium text-white truncate">Minha Conta</p>
-                            <p className="text-xs text-gray-500 truncate">
-                                {userPlans?.hasPrimary ? "Pro Plan" : "Writer Plan"}
-                            </p>
+                            <p className="text-xs text-gray-500 truncate">Pro Plan</p>
                         </div>
                     )}
                 </button>
