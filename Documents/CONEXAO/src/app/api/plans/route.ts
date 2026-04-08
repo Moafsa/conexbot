@@ -4,8 +4,11 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const type = searchParams.get('type') as any;
+
         const session = await getServerSession(authOptions);
         let activeBots = 0;
 
@@ -25,7 +28,10 @@ export async function GET() {
         if (gateways.length === 0) gateways.push('asaas'); // Fallback safe default
 
         const plans = await prisma.plan.findMany({
-            where: { active: true },
+            where: { 
+                active: true,
+                ...(type ? { type } : {})
+            },
             orderBy: { price: 'asc' }
         });
 

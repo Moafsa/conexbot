@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
@@ -12,7 +12,11 @@ export async function GET() {
     }
 
     try {
+        const { searchParams } = new URL(request.url);
+        const type = searchParams.get('type') as any;
+
         const plans = await prisma.plan.findMany({
+            where: type ? { type } : {},
             orderBy: { price: 'asc' }
         });
 

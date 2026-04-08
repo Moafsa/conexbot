@@ -10,6 +10,8 @@ export default function PlansAdminPage() {
     const [editingPlan, setEditingPlan] = useState<any>(null);
     const [saving, setSaving] = useState(false);
 
+    const [activeTab, setActiveTab] = useState<'PRIMARY' | 'WRITER_PLUGIN'>('PRIMARY');
+
     useEffect(() => {
         fetchPlans();
     }, []);
@@ -67,19 +69,56 @@ export default function PlansAdminPage() {
         setEditingPlan({ ...editingPlan, [field]: newPrice });
     };
 
+    const filteredPlans = plans.filter(p => p.type === activeTab);
+
     return (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-700">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold">Planos</h1>
-                    <p className="text-gray-400 mt-2">Crie e gerencie ofertas e limites para seus clientes.</p>
+                    <h1 className="text-3xl font-bold">Gestão de Planos</h1>
+                    <p className="text-gray-400 mt-2">Crie e gerencie ofertas para bots e plugins.</p>
                 </div>
                 <button 
-                    onClick={() => { setEditingPlan({ name: '', price: 0, priceQuarterly: 0, priceSemiannual: 0, priceYearly: 0, trialDays: 0, botLimit: 1, messageLimit: 500, active: true, platformSplitType: 'PERCENTAGE', platformSplitValue: 0 }); setIsModalOpen(true); }}
+                    onClick={() => { 
+                        setEditingPlan({ 
+                            name: '', 
+                            price: 0, 
+                            priceQuarterly: 0, 
+                            priceSemiannual: 0, 
+                            priceYearly: 0, 
+                            trialDays: 0, 
+                            botLimit: 1, 
+                            messageLimit: 500, 
+                            postLimit: 0, 
+                            wordLimit: 0,
+                            active: true, 
+                            type: activeTab,
+                            platformSplitType: 'PERCENTAGE', 
+                            platformSplitValue: 0,
+                            features: []
+                        }); 
+                        setIsModalOpen(true); 
+                    }}
                     className="bg-emerald-600 hover:bg-emerald-700 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center space-x-2 active:scale-95"
                 >
                     <Plus size={20} />
-                    <span>Novo Plano</span>
+                    <span>Novo Plano {activeTab === 'WRITER_PLUGIN' ? 'Writer' : ''}</span>
+                </button>
+            </div>
+
+            {/* Tabs Selector */}
+            <div className="flex p-1 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl w-fit">
+                <button
+                    onClick={() => setActiveTab('PRIMARY')}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'PRIMARY' ? 'bg-emerald-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                    Planos Conextbot (Bots)
+                </button>
+                <button
+                    onClick={() => setActiveTab('WRITER_PLUGIN')}
+                    className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'WRITER_PLUGIN' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                    Planos Writer Plugin
                 </button>
             </div>
 
@@ -88,15 +127,15 @@ export default function PlansAdminPage() {
                     <div className="col-span-full py-20 text-center text-gray-500">
                         Carregando planos...
                     </div>
-                ) : plans.length === 0 ? (
+                ) : filteredPlans.length === 0 ? (
                     <div className="col-span-full py-20 bg-[#0a0a0a] border border-dashed border-[#222] rounded-3xl text-center text-gray-500">
-                        Nenhum plano cadastrado ainda.
+                        Nenhum plano {activeTab === 'WRITER_PLUGIN' ? 'do plugin' : ''} cadastrado ainda.
                     </div>
                 ) : (
-                    plans.map((plan) => (
+                    filteredPlans.map((plan) => (
                         <div key={plan.id} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-6 hover:border-emerald-500/30 transition-all duration-300 group">
                             <div className="flex justify-between items-start mb-6">
-                                <div className="p-3 bg-[#151515] rounded-xl group-hover:bg-emerald-500/10 transition-colors">
+                                <div className={`p-3 bg-[#151515] rounded-xl transition-colors ${plan.type === 'WRITER_PLUGIN' ? 'group-hover:bg-blue-500/10' : 'group-hover:bg-emerald-500/10'}`}>
                                     <Package className={plan.type === 'WRITER_PLUGIN' ? 'text-blue-400' : 'text-emerald-400'} size={24} />
                                 </div>
                                 <div className="flex space-x-1">
@@ -118,21 +157,11 @@ export default function PlansAdminPage() {
                                             PLUGIN
                                         </span>
                                     )}
-                                    {plan.trialDays > 0 && (
-                                        <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter shadow-lg shadow-indigo-500/10">
-                                            Trial
-                                        </span>
-                                    )}
                                 </div>
                                 <div className="text-3xl font-bold mt-2">
                                     R$ {plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     <span className="text-sm font-normal text-gray-500">/mês</span>
                                 </div>
-                                {plan.trialDays > 0 && (
-                                    <div className="text-xs text-indigo-400 font-bold mt-1 uppercase tracking-wider">
-                                        {plan.trialDays} Dias de Trial Grátis
-                                    </div>
-                                )}
                             </div>
 
                             <div className="space-y-3 mb-8">

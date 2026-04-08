@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Zap, CreditCard, Building, Globe, Loader2 } from "lucide-react";
+import { Check, Zap, CreditCard, Building, Globe, Loader2, Sparkles, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
@@ -143,7 +143,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {plans.map((plan) => {
+                    {plans.filter(p => p.type === 'PRIMARY').map((plan) => {
                         const baseMonthPrice = Number(plan.price) || 0;
                         let currentPrice = baseMonthPrice;
                         let originalPrice = baseMonthPrice;
@@ -173,6 +173,11 @@ export default function PricingPage() {
                             key={plan.id}
                             className={`relative p-8 rounded-3xl border border-white/10 bg-white/5 transition-transform hover:-translate-y-2`}
                         >
+                            {plan.name.toLowerCase().includes('enterprise') && (
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20">
+                                    Mais Popular
+                                </div>
+                            )}
                             <h3 className="text-xl font-bold mb-2 uppercase">{plan.name}</h3>
                             <div className="flex flex-col gap-1 mb-6">
                                 {hasDiscount && (
@@ -218,6 +223,44 @@ export default function PricingPage() {
                             </button>
                         </div>
                     )})}
+                </div>
+
+                {/* Plugin Promotion Section */}
+                <div className="mt-20 p-1 rounded-[32px] bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-white/5">
+                    <div className="bg-[#050505] rounded-[31px] p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-10">
+                        <div className="space-y-6 flex-grow">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
+                                <Sparkles size={14} /> Plugin Adicional
+                            </div>
+                            <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Conex AI Writer Plugin</h2>
+                            <p className="text-gray-400 text-lg max-w-xl italic">
+                                O plugin definitivo para WordPress que utiliza toda a inteligência do Conextbot para automatizar seu SEO.
+                            </p>
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
+                                    <Check className="text-blue-500" size={16} /> Posts Automáticos
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
+                                    <Check className="text-blue-500" size={16} /> SEO Otimizado
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
+                                    <Check className="text-blue-500" size={16} /> Licença WordPress
+                                </div>
+                            </div>
+                        </div>
+                        <div className="shrink-0 flex flex-col items-center gap-4">
+                            <div className="text-center mb-2">
+                                <p className="text-xs text-gray-500 font-bold uppercase mb-1">A partir de</p>
+                                <p className="text-4xl font-black">R$ 59,90<span className="text-sm font-normal text-gray-500">/mês</span></p>
+                            </div>
+                            <Link 
+                                href="/writer-plugin"
+                                className="px-10 py-5 bg-blue-600 hover:bg-blue-700 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/20 flex items-center gap-3 active:scale-95 text-white"
+                            >
+                                VER PLANOS DO PLUGIN <ChevronRight size={20} />
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
