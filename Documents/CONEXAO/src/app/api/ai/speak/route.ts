@@ -1,4 +1,4 @@
-
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -41,9 +41,9 @@ export async function POST(req: Request) {
         // Use VoiceService to generate audio
         const audioPath = await VoiceService.speak(
             text,
-            openaiApiKey,
-            elevenLabsApiKey,
-            bot?.voiceId
+            openaiApiKey ?? undefined,
+            elevenLabsApiKey ?? undefined,
+            bot?.voiceId ?? undefined
         );
 
         // Read the file and return as audio/ogg

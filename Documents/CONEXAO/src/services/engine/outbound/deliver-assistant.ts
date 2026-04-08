@@ -60,8 +60,8 @@ async function deliverWhatsApp(
         try {
             const audioPath = await VoiceService.speak(
                 cleanResponse,
-                bot.tenant?.openaiApiKey,
-                (bot.tenant as any)?.elevenLabsApiKey,
+                bot.tenant?.openaiApiKey ?? undefined,
+                (bot.tenant as any)?.elevenLabsApiKey ?? undefined,
                 bot.voiceId
             );
 

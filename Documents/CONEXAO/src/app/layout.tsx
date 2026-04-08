@@ -1,8 +1,7 @@
+export const dynamic = 'force-dynamic';
 import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/components/Providers";
-
-export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   let logo = "/favicon.png";

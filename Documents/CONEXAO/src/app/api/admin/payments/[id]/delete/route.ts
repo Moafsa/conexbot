@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -8,7 +9,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-            return new NextResponse('Unauthorized', { status: 401 });
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
         const { id: paymentId } = await params;

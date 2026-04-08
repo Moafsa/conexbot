@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { google } from 'googleapis';
@@ -45,3 +46,4 @@ export async function GET(req: Request) {
         return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/dashboard?error=google_auth_failed`);
     }
 }
+

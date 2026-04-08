@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -72,7 +73,14 @@ export async function POST(req: Request) {
                 }
 
                 // 1. Cancel existing subscription in Asaas to prevent duplicate charges if user retries checkout
-                const existingSub = await prisma.subscription.findUnique({ where: { tenantId } });
+                const existingSub = await prisma.subscription.findUnique({ 
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    } 
+                });
                 if (existingSub?.externalId && existingSub.gateway === 'asaas') {
                     await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
                 }
@@ -91,7 +99,12 @@ export async function POST(req: Request) {
 
                 // Save subscription record
                 await prisma.subscription.upsert({
-                    where: { tenantId },
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    },
                     update: {
                         planId: plan.id,
                         status: 'PENDING',
@@ -100,6 +113,7 @@ export async function POST(req: Request) {
                     },
                     create: {
                         tenantId,
+                        type: plan.type,
                         planId: plan.id,
                         status: 'PENDING',
                         gateway: 'asaas',
@@ -132,7 +146,12 @@ export async function POST(req: Request) {
                 result = { invoiceUrl: mpPref.url };
 
                 await prisma.subscription.upsert({
-                    where: { tenantId },
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    },
                     update: {
                         planId: plan.id,
                         status: 'PENDING',
@@ -141,6 +160,7 @@ export async function POST(req: Request) {
                     },
                     create: {
                         tenantId,
+                        type: plan.type,
                         planId: plan.id,
                         status: 'PENDING',
                         gateway: 'mercadopago',
@@ -163,3 +183,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Falha no checkout' }, { status: 500 });
     }
 }
+

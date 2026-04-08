@@ -1,5 +1,5 @@
-import Navbar from "@/components/Landing/Navbar";
 export const dynamic = 'force-dynamic';
+import Navbar from "@/components/Landing/Navbar";
 import Hero from "@/components/Landing/Hero";
 import Features from "@/components/Landing/Features";
 import Pricing from "@/components/Landing/Pricing";

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { MessageProcessor } from '@/services/engine/processor';
@@ -89,3 +90,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Erro interno fatal', detail: error.message }, { status: 500 });
     }
 }
+

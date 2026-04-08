@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -25,14 +26,14 @@ export async function GET(request: Request) {
             ];
         }
 
-        const [users, total] = await Promise.all([
+        const [usersRaw, total] = await Promise.all([
             prisma.tenant.findMany({
                 where: whereCondition,
                 include: {
-                    subscription: {
-                        include: {
-                            plan: true
-                        }
+                    subscriptions: {
+                        where: { type: 'PRIMARY' },
+                        take: 1,
+                        include: { plan: true }
                     },
                     _count: {
                         select: { bots: true }
@@ -45,6 +46,12 @@ export async function GET(request: Request) {
             prisma.tenant.count({ where: whereCondition })
         ]);
 
+        // Mapear para manter compatibilidade com o frontend que espera "subscription" (objeto único)
+        const users = usersRaw.map(u => ({
+            ...u,
+            subscription: u.subscriptions[0] || null
+        }));
+
         return NextResponse.json({
             data: users,
             total,
@@ -54,7 +61,7 @@ export async function GET(request: Request) {
         });
     } catch (error) {
         console.error('Error fetching users:', error);
-        return new NextResponse('Internal Error', { status: 500 });
+        return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
     }
 }
 
@@ -62,7 +69,7 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -90,3 +97,4 @@ export async function POST(request: Request) {
         return new NextResponse('Internal Error', { status: 500 });
     }
 }
+

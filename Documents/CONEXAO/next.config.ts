@@ -5,9 +5,7 @@ const nextConfig: NextConfig = {
     serverExternalPackages: ['pdfjs-dist', '@napi-rs/canvas'],
     /* config options here */
     experimental: {
-        turbopack: {
-            root: '.',
-        },
+        // Remover turbopack daqui pois é inválido no next.config.ts para o build worker
     } as any,
     async headers() {
         return [

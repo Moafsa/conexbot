@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -39,7 +40,12 @@ export async function GET() {
                 },
             }),
             prisma.subscription.findUnique({
-                where: { tenantId },
+                where: { 
+                    tenantId_type: { 
+                        tenantId, 
+                        type: 'PRIMARY' 
+                    } 
+                },
                 include: { plan: true }
             }),
             prisma.usageCounter.findUnique({ where: { tenantId } }),
@@ -112,3 +118,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Falha ao buscar analytics' }, { status: 500 });
     }
 }
+

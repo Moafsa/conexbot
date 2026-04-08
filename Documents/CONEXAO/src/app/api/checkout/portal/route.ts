@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -75,7 +76,14 @@ export async function GET(req: Request) {
                 }
 
                 // 1. Cancel existing subscription in Asaas to prevent duplicate charges if user retries checkout
-                const existingSub = await prisma.subscription.findUnique({ where: { tenantId } });
+                const existingSub = await prisma.subscription.findUnique({ 
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    } 
+                });
                 if (existingSub?.externalId && existingSub.gateway === 'asaas') {
                     await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
                 }
@@ -94,7 +102,12 @@ export async function GET(req: Request) {
                 const result = await AsaasService.createSubscription(customer.id, plan.id, value, interval, plan.trialDays || 0);
 
                 await prisma.subscription.upsert({
-                    where: { tenantId },
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    },
                     update: {
                         planId: plan.id,
                         status: 'PENDING',
@@ -103,6 +116,7 @@ export async function GET(req: Request) {
                     },
                     create: {
                         tenantId,
+                        type: plan.type,
                         planId: plan.id,
                         status: 'PENDING',
                         gateway: 'asaas',
@@ -166,7 +180,12 @@ export async function GET(req: Request) {
                 const mpPref = await MercadoPagoService.createPreference(tenant, plan.id);
                 
                 await prisma.subscription.upsert({
-                    where: { tenantId },
+                    where: { 
+                        tenantId_type: { 
+                            tenantId, 
+                            type: plan.type 
+                        } 
+                    },
                     update: {
                         planId: plan.id,
                         status: 'PENDING',
@@ -175,6 +194,7 @@ export async function GET(req: Request) {
                     },
                     create: {
                         tenantId,
+                        type: plan.type,
                         planId: plan.id,
                         status: 'PENDING',
                         gateway: 'mercadopago',
@@ -193,3 +213,4 @@ export async function GET(req: Request) {
         return NextResponse.redirect(new URL('/dashboard/finance?error=checkout_failed', safeUrl));
     }
 }
+

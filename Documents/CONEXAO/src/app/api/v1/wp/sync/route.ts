@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyWpToken } from '@/lib/wp-token';
@@ -113,3 +114,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Erro interno ao sincronizar webhook do WordPress' }, { status: 500 });
     }
 }
+

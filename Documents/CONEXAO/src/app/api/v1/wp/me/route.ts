@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyWpToken } from '@/lib/wp-token';
@@ -28,7 +29,10 @@ export async function GET(req: Request) {
         const tenant = await prisma.tenant.findUnique({
             where: { id: decoded.id },
             include: {
-                subscription: true,
+                subscriptions: {
+                    where: { type: 'WRITER_PLUGIN' },
+                    take: 1
+                },
                 bots: {
                     select: { id: true, connectionStatus: true }
                 }
@@ -39,7 +43,8 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Conta não encontrada' }, { status: 404 });
         }
 
-        const subStatus = tenant.subscription?.status;
+        const subscription = tenant.subscriptions[0];
+        const subStatus = subscription?.status;
         const hasPlan = subStatus && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE', 'FREE'].includes(subStatus);
         const hasBot = tenant.bots.length > 0;
         const botConnected = tenant.bots.some(b => b.connectionStatus === 'CONNECTED');
@@ -65,3 +70,4 @@ export async function GET(req: Request) {
         }, { status: 500 });
     }
 }
+

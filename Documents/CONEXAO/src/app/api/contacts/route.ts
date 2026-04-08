@@ -1,4 +1,4 @@
-
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth'; // Adjust path if necessary
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             });
 
             // Extrair os telefones/IDs de conversas onde a palavra foi dita
-            const matchedPhones = matchedMessages.map(m => m.conversation.remoteId).filter(Boolean);
+            const matchedPhones = matchedMessages.map((m: any) => m.conversation.remoteId).filter(Boolean);
 
             whereCondition.OR = [
                 { id: { contains: search, mode: 'insensitive' } },

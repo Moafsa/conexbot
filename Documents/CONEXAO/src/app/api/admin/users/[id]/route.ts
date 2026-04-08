@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
@@ -10,7 +11,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -38,7 +39,7 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -75,7 +76,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {

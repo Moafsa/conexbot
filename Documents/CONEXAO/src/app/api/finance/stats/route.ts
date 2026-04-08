@@ -1,4 +1,4 @@
-
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -28,7 +28,12 @@ export async function GET() {
                 _sum: { totalAmount: true, commissionAmount: true }
             }),
             prisma.subscription.findUnique({ 
-                where: { tenantId },
+                where: { 
+                    tenantId_type: { 
+                        tenantId, 
+                        type: 'PRIMARY' 
+                    } 
+                },
                 include: { plan: true }
             }),
             prisma.tenant.findUnique({ where: { id: tenantId }, select: { asaasApiKey: true } })
@@ -106,3 +111,4 @@ export async function GET() {
         return NextResponse.json({ error: 'Falha ao buscar estatísticas financeiras' }, { status: 500 });
     }
 }
+

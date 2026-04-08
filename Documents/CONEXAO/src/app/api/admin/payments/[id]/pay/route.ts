@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -8,7 +9,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-            return new NextResponse('Unauthorized', { status: 401 });
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
         const { id: paymentId } = await params;
@@ -24,25 +25,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             where: { id: payment.id },
             data: { 
                 status: 'PAID',
-                invoiceUrl: null // Limpa a URL pois o recibo no Asaas pode confundir (só fica Liquidado)
+                invoiceUrl: null 
             }
         });
 
-        // Instant release: Update subscription status to ACTIVE if it exists
+        // Instant release: Update subscription status to ACTIVE (Filtered by payment type)
         await prisma.subscription.updateMany({
-            where: { tenantId: payment.tenantId },
+            where: { tenantId: payment.tenantId, type: payment.type },
             data: { status: 'ACTIVE' }
         });
 
         // Reset usage counter credits to renew access cycle
-        await prisma.usageCounter.updateMany({
-            where: { tenantId: payment.tenantId },
-            data: { 
-                messagesUsed: 0,
-                periodStart: new Date(),
-                periodEnd: new Date(new Date().setMonth(new Date().getMonth() + 1))
-            }
-        });
+        if (payment.type === 'PRIMARY') {
+            await prisma.usageCounter.update({
+                where: { tenantId: payment.tenantId },
+                data: { 
+                    messagesUsed: 0,
+                    botsUsed: 0,
+                    periodStart: new Date(),
+                    periodEnd: new Date(new Date().setMonth(new Date().getMonth() + 1))
+                }
+            });
+        }
 
 
 

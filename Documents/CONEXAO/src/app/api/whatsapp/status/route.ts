@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -62,3 +63,4 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Falha ao verificar status', details: error.message }, { status: 500 });
     }
 }
+

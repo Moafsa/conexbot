@@ -9,7 +9,9 @@ export async function checkBotLimit(tenantId: string): Promise<{ allowed: boolea
     }
 
     // Check subscription status
-    const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
+    const subscription = await prisma.subscription.findUnique({ 
+        where: { tenantId_type: { tenantId, type: 'PRIMARY' } } 
+    });
     if (subscription && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subscription.status)) {
         return { allowed: false, reason: 'Sua assinatura está vencida ou inativa. Regularize seu pagamento para criar novos agentes.' };
     }
@@ -31,7 +33,9 @@ export async function checkBotLimit(tenantId: string): Promise<{ allowed: boolea
 }
 
 export async function checkMessageLimit(tenantId: string): Promise<{ allowed: boolean; remaining: number }> {
-    const subscription = await prisma.subscription.findUnique({ where: { tenantId } });
+    const subscription = await prisma.subscription.findUnique({ 
+        where: { tenantId_type: { tenantId, type: 'PRIMARY' } } 
+    });
     if (subscription && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subscription.status)) {
         return { allowed: false, remaining: 0 };
     }

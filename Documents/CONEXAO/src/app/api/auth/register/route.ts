@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
@@ -64,9 +65,10 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
-                subscription: (trial === 'true' && plan) ? {
+                subscriptions: (trial === 'true' && plan) ? {
                     create: {
                         planId: plan.id,
+                        type: 'PRIMARY',
                         status: 'TRIALING',
                         gateway: 'SYSTEM'
                     }
@@ -95,3 +97,4 @@ export async function POST(req: Request) {
         );
     }
 }
+

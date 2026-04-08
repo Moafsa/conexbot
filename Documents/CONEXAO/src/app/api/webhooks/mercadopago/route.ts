@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
@@ -52,10 +53,16 @@ export async function POST(req: Request) {
 
                     // Create/update subscription
                     await prisma.subscription.upsert({
-                        where: { tenantId: tenant.id },
+                        where: { 
+                            tenantId_type: { 
+                                tenantId: tenant.id, 
+                                type: 'PRIMARY' 
+                            } 
+                        },
                         update: { status: 'ACTIVE', planId: dbPlan?.id, gateway: 'mercadopago', externalId: String(paymentId) },
                         create: {
                             tenantId: tenant.id,
+                            type: 'PRIMARY',
                             planId: dbPlan?.id,
                             status: 'ACTIVE',
                             gateway: 'mercadopago',
@@ -104,3 +111,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ received: true }, { status: 200 });
     }
 }
+

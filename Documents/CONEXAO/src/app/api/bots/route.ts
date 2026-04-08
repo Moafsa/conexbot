@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -162,18 +163,18 @@ export async function GET() {
             },
         });
 
-        console.log('[API /bots GET] Found', bots.length, 'bots:', bots.map(b => ({ id: b.id, name: b.name, createdAt: b.createdAt })));
+        console.log('[API /bots GET] Found', bots.length, 'bots:', bots.map((b: any) => ({ id: b.id, name: b.name, createdAt: b.createdAt })));
 
         // Enrich with live connection status from WuzAPI so UI shows real state
         const botsWithLiveStatus = await Promise.all(
-            bots.map(async (bot) => {
+            bots.map(async (bot: any) => {
                 // Auto-fix missing tokens
                 if (!bot.connectToken) {
                     const newToken = crypto.randomUUID();
                     await prisma.bot.update({
                         where: { id: bot.id },
                         data: { connectToken: newToken }
-                    }).catch(e => console.error(`Failed to auto-fix token for ${bot.id}:`, e));
+                    }).catch((e: any) => console.error(`Failed to auto-fix token for ${bot.id}:`, e));
                     bot.connectToken = newToken;
                 }
 
@@ -188,7 +189,7 @@ export async function GET() {
                         prisma.bot.update({
                             where: { id: bot.id },
                             data: { connectionStatus: liveStatus }
-                        }).catch(e => console.error(`Failed to sync status for ${bot.sessionName}:`, e));
+                        }).catch((e: any) => console.error(`Failed to sync status for ${bot.sessionName}:`, e));
                     }
 
                     return { ...bot, connectionStatus: liveStatus };

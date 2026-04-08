@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CreditCard, ExternalLink, Calendar, User, Search } from 'lucide-react';
+import { CreditCard, ExternalLink, Calendar, User, Search, Package, CheckCircle2, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function PaymentsAdminPage() {
     const [payments, setPayments] = useState<any[]>([]);
@@ -40,7 +41,39 @@ export default function PaymentsAdminPage() {
         }
     };
 
-    // ... (rest of the handlers)
+    const handlePayPayment = async (id: string) => {
+        if (!confirm('Deseja realmente dar baixa manual nesta fatura? O plano do cliente será ativado imediatamente.')) return;
+        
+        try {
+            const res = await fetch(`/api/admin/payments/${id}/pay`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success('Fatura liquidada com sucesso!');
+                fetchPayments(search, page);
+            } else {
+                toast.error(data.error || 'Falha ao processar pagamento');
+            }
+        } catch (error) {
+            toast.error('Erro de conexão');
+        }
+    };
+
+    const handleCancelPayment = async (id: string) => {
+        if (!confirm('Deseja cancelar esta fatura?')) return;
+        
+        try {
+            const res = await fetch(`/api/admin/payments/${id}/cancel`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success('Fatura cancelada com sucesso!');
+                fetchPayments(search, page);
+            } else {
+                toast.error(data.error || 'Falha ao cancelar fatura');
+            }
+        } catch (error) {
+            toast.error('Erro de conexão');
+        }
+    };
 
     return (
         <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">

@@ -16,7 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
 # Build limpo: evita cache corrompido que pode quebrar rotas (ex.: /admin) em produção
-RUN rm -rf .next && NODE_ENV=production npm run build
+RUN rm -rf .next && NODE_OPTIONS="--max-old-space-size=4096" NODE_ENV=production npm run build
 
 # 3. Production runner
 FROM node:20-alpine AS runner

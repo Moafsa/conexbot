@@ -1,8 +1,7 @@
+export const dynamic = 'force-dynamic';
 import prisma from "@/lib/prisma";
 import { MessageSquare, Mail, ChevronLeft, Headphones } from "lucide-react";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
     const config = await prisma.globalConfig.findUnique({

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import {
     Users, DollarSign, MessageCircle, MoreHorizontal,
-    TrendingUp, Phone, Mail, User, Settings2, Search
+    TrendingUp, Phone, Mail, User, Settings2, Search,
+    ShieldAlert
 } from "lucide-react";
 import CRMContactPanel from "./CRMContactPanel";
 import { toast } from "sonner";

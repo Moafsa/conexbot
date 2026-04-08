@@ -99,7 +99,7 @@ export default function FollowUpDocsPage() {
                     <Bot size={24} />
                 </div>
                 <p className="text-sm text-gray-500 leading-relaxed italic">
-                    "Ative o follow-up no menu **Editar Bot > Automações**. Use as variáveis dinâmicas e deixe a IA cuidar da persuasão final."
+                    "Ative o follow-up no menu **Editar Bot &gt; Automações**. Use as variáveis dinâmicas e deixe a IA cuidar da persuasão final."
                 </p>
             </section>
         </div>

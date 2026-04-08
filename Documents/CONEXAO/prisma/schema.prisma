@@ -71,7 +71,7 @@ model Tenant {
   payments                Payment[]
   sessions                Session[]
   smtpConfigs             SmtpConfig[]
-  subscription            Subscription?
+  subscriptions           Subscription[]
   usageCounter            UsageCounter?
   notifications           Notification[]
 }

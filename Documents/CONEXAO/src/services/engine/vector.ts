@@ -1,9 +1,15 @@
 import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+let _openai: OpenAI | null = null;
+function getOpenAIClient() {
+    if (!_openai) {
+        _openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY || 'no-key-build',
+        });
+    }
+    return _openai;
+}
 
 export const VectorService = {
     /**
@@ -15,7 +21,7 @@ export const VectorService = {
             const cleanText = text.replace(/\n/g, ' ').trim();
             if (!cleanText) return [];
 
-            const response = await openai.embeddings.create({
+            const response = await getOpenAIClient().embeddings.create({
                 model: "text-embedding-3-small",
                 input: cleanText,
                 dimensions: 1536,

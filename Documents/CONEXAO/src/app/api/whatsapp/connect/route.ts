@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
@@ -128,3 +129,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Falha ao conectar WhatsApp', details: error.message }, { status: 500 });
     }
 }
+

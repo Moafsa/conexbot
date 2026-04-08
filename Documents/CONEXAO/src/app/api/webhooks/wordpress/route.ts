@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { MessageProcessor } from '@/services/engine/processor';
 import prisma from '@/lib/prisma';
@@ -93,3 +94,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ status: 'error' }, { status: 500 });
     }
 }
+

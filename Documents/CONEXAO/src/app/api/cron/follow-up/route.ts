@@ -1,8 +1,9 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { FollowUpService } from '@/services/engine/follow-up';
 
-export const dynamic = 'force-dynamic'; // Ensure it's not cached
+// Ensure it's not cached
 
 export async function GET(req: Request) {
     try {

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
@@ -7,7 +8,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -18,7 +19,7 @@ export async function GET() {
         return NextResponse.json(plans);
     } catch (error) {
         console.error('Error fetching plans:', error);
-        return new NextResponse('Internal Error', { status: 500 });
+        return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
     }
 }
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -82,7 +83,7 @@ export async function PUT(request: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user || (session.user as any).role !== 'SUPERADMIN') {
-        return new NextResponse('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
     try {
@@ -139,3 +140,4 @@ export async function PUT(request: Request) {
         }, { status: 500 });
     }
 }
+

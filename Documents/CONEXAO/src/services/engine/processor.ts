@@ -103,7 +103,16 @@ export const MessageProcessor = {
             const bot = await prisma.bot.findUnique({
                 where: whereClause as any,
                 include: {
-                    tenant: { include: { subscription: { include: { plan: true } }, usageCounter: true } },
+                    tenant: { 
+                        include: { 
+                            subscriptions: {
+                                where: { type: 'PRIMARY' },
+                                take: 1,
+                                include: { plan: true }
+                            }, 
+                            usageCounter: true 
+                        } 
+                    },
                     media: true,
                     products: { where: { active: true } }
                 },
@@ -114,7 +123,8 @@ export const MessageProcessor = {
                 return null;
             }
 
-            const subStatus = bot.tenant.subscription?.status;
+            const subscription = bot.tenant.subscriptions[0];
+            const subStatus = subscription?.status;
             if (subStatus && ['PAST_DUE', 'INACTIVE', 'CANCELED'].includes(subStatus)) {
                 logToFile(`[Processor] Subscription PAST_DUE or inactive for tenant ${bot.tenantId}`);
                 return { text: "⚠️ O serviço deste atendente está temporariamente suspenso devido a pendências financeiras. Por favor, acesse o painel para regularizar." };
@@ -125,7 +135,7 @@ export const MessageProcessor = {
             let counter = bot.tenant.usageCounter;
             
             // Auto-sync limits if there is an active/trialing subscription that has a plan
-            const sub = bot.tenant.subscription;
+            const sub = subscription;
             if (counter && sub && (sub.status === 'ACTIVE' || sub.status === 'TRIALING' || sub.plan?.price === 0) && sub.plan) {
                 if (counter.messagesLimit !== sub.plan.messageLimit) {
                     await prisma.usageCounter.update({

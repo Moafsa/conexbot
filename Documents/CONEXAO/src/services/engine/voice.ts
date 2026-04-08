@@ -20,9 +20,16 @@ if (process.platform === 'win32') {
 }
 // On Linux/Docker, we rely on 'apk add ffmpeg' providing it in PATH
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy init to avoid build errors if env is missing
+let defaultOpenai: OpenAI | null = null;
+function getOpenAI() {
+    if (!defaultOpenai) {
+        defaultOpenai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY || 'no-key-at-build-time',
+        });
+    }
+    return defaultOpenai;
+}
 
 export const VoiceService = {
     async transcribe(audioPath: string, openaiApiKey?: string, geminiApiKey?: string): Promise<string> {
@@ -128,7 +135,7 @@ export const VoiceService = {
                 buffer = Buffer.from(arrayBuffer);
             } else {
                 console.log(`[VoiceService] ElevenLabs skipped (missing API key or Voice ID). Using OpenAI TTS fallback.`);
-                const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : openai;
+                const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : getOpenAI();
                 const mp3 = await client.audio.speech.create({
                     model: "tts-1",
                     voice: "alloy", // 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'

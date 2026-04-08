@@ -1,9 +1,8 @@
+export const dynamic = 'force-dynamic';
 import Shell from "@/components/Dashboard/Shell";
 
 import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
-
-export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({
     children,
@@ -28,18 +27,26 @@ export default async function DashboardLayout({
 
         const tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
-            include: { subscription: true, usageCounter: true }
+            include: { 
+                subscriptions: {
+                    where: { type: 'PRIMARY' },
+                    take: 1
+                }, 
+                usageCounter: true 
+            }
         });
         
-        // Let SUPERADMIN and ADMIN pass. For normal users, require a subscription.
+        // Let SUPERADMIN and ADMIN pass. For normal users, require a PRIMARY subscription.
         if (tenant && tenant.role === 'USER') {
-            const hasSub = tenant.subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(tenant.subscription.status);
+            const subscription = tenant.subscriptions[0];
+            const hasSub = subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(subscription.status);
+            
             if (!hasSub) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
 
-            if (tenant.subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
+            if (subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
                 const diffTime = tenant.usageCounter.periodEnd.getTime() - new Date().getTime();
                 const trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
@@ -56,7 +63,7 @@ export default async function DashboardLayout({
                         </div>
                     );
                 }
-            } else if (tenant.subscription?.status === 'PAST_DUE') {
+            } else if (subscription?.status === 'PAST_DUE') {
                 trialBanner = (
                     <div className="bg-amber-600/90 text-white text-center py-2 px-4 shadow-md w-full relative z-50 animate-fade-in flex flex-col sm:flex-row items-center justify-center gap-2 group border-b border-amber-500/50">
                         <span className="flex items-center gap-2 font-semibold">
@@ -69,7 +76,6 @@ export default async function DashboardLayout({
                     </div>
                 );
             }
-
         }
     }
     

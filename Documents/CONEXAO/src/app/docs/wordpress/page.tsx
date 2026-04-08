@@ -52,7 +52,7 @@ export default function WordPressDocsPage() {
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-black text-white text-xs border-4 border-white/5 shadow-2xl">01.</div>
                         <div>
                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-2">Upload e Ativação</h4>
-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Baixe o `.zip` acima e instale via **Plugins > Novo** no seu painel WordPress.</p>
+                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Baixe o `.zip` acima e instale via **Plugins &gt; Novo** no seu painel WordPress.</p>
                         </div>
                     </div>
 
@@ -60,7 +60,7 @@ export default function WordPressDocsPage() {
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-black text-white text-xs border-4 border-white/5 shadow-2xl">02.</div>
                         <div>
                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-2">Chave de API (Token)</h4>
-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Em **ConextBot > Configurações**, insira seu Token de API pessoal para validar a conexão segura com nosso servidor.</p>
+                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Em **ConextBot &gt; Configurações**, insira seu Token de API pessoal para validar a conexão segura com nosso servidor.</p>
                         </div>
                     </div>
 
