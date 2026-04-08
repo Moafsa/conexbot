@@ -3,14 +3,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Orchestrator {
+class Conext_Orchestrator {
     
     private $openai_key;
     private $gemini_key;
 
     public function __construct() {
-        $this->openai_key = get_option('conex_ai_openai_key');
-        $this->gemini_key = get_option('conex_ai_gemini_key');
+        $this->openai_key = get_option('conext_writer_openai_key');
+        $this->gemini_key = get_option('conext_writer_gemini_key');
     }
 
     /**
@@ -23,34 +23,34 @@ class ConexAI_Orchestrator {
         @ini_set('memory_limit', '256M');
 
         if (!$this->has_valid_keys()) {
-            error_log('Conex AI Writer: Nenhuma chave de API configurada. Processo abortado.');
+            error_log('Conext Writer: Nenhuma chave de API configurada. Processo abortado.');
             return false;
         }
 
         // 0. Verificação de Licença e Créditos
-        ConexAI_Licensing::sync_limits();
-        if (!ConexAI_Licensing::is_valid()) {
-            error_log('Conex AI Writer: Licença inválida ou expirada.');
+        Conext_Licensing::sync_limits();
+        if (!Conext_Licensing::is_valid()) {
+            error_log('Conext Writer: Licença inválida ou expirada.');
             return 'no_license';
         }
 
-        if (ConexAI_Licensing::get_credits_remaining() <= 0) {
-            error_log('Conex AI Writer: Créditos insuficientes.');
+        if (Conext_Licensing::get_credits_remaining() <= 0) {
+            error_log('Conext Writer: Créditos insuficientes.');
             return 'no_credits';
         }
 
         // 1. Pesquisador: Busca as Pautas
-        $researcher = new ConexAI_Agent_Researcher($this->get_active_provider());
+        $researcher = new Conext_Agent_Researcher($this->get_active_provider());
         $topic_data = $researcher->gather_topics();
 
         if (!$topic_data) return false;
 
         // 2. Redatores Encadeados (Cascade Engine) - Voltando para a forma que estava perfeita
-        $writer = new ConexAI_Agent_Writer($this->get_active_provider());
+        $writer = new Conext_Agent_Writer($this->get_active_provider());
         $outline = $writer->draft_outline($topic_data);
         
         if (empty($outline)) {
-            error_log('Conex AI Writer: Falha ao gerar Esboço (Outline). Abortando.');
+            error_log('Conext Writer: Falha ao gerar Esboço (Outline). Abortando.');
             return false;
         }
 
@@ -69,7 +69,7 @@ class ConexAI_Orchestrator {
         $full_text = preg_replace('/\b(202[3456]|2022)\b/', '', $full_text);
 
         // 3. Especialista SEO: Otimiza o texto JÁ GERADO (Evita o erro de Novo Artigo)
-        $seo_agent = new ConexAI_Agent_SEO($this->get_active_provider());
+        $seo_agent = new Conext_Agent_SEO($this->get_active_provider());
         $draft_payload = [
             'raw_content' => $full_text,
             'topic_data'  => $topic_data
@@ -84,8 +84,8 @@ class ConexAI_Orchestrator {
         ];
 
         // 4. Visualist: Gera Imagem de Destaque e Imagens de Corpo
-        $image_count = (int) get_option('conex_ai_image_count', 1);
-        $visualist = new ConexAI_Agent_Visualist($this->get_active_provider());
+        $image_count = (int) get_option('conext_writer_image_count', 1);
+        $visualist = new Conext_Agent_Visualist($this->get_active_provider());
         $images_ids = $visualist->generate_images($topic_data['keywords'], $image_count);
         
         $featured_image_id = !empty($images_ids) ? $images_ids[0] : 0;
@@ -100,7 +100,7 @@ class ConexAI_Orchestrator {
         
         if ($result && !is_wp_error($result)) {
             $word_count = str_word_count(strip_tags($optimized_post['content']));
-            ConexAI_Licensing::consume_credits(1, $word_count);
+            Conext_Licensing::consume_credits(1, $word_count);
         }
         
         return $result;

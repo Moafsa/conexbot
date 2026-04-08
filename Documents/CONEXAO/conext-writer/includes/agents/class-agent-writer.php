@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Agent_Writer {
+class Conext_Agent_Writer {
     
     private $provider;
 
@@ -13,7 +13,7 @@ class ConexAI_Agent_Writer {
     }
 
     public function draft_outline($topic_data) {
-        $word_count_raw = get_option('conex_ai_word_count', '1500-3000');
+        $word_count_raw = get_option('conext_writer_word_count', '1500-3000');
         $site_context = isset($topic_data['site_context']) ? $topic_data['site_context'] : 'Um portal de nicho geral.';
         
         $prompt = "Missão Arquitetural: Analise a pauta [" . json_encode($topic_data['raw_data']) . "]. " .
@@ -45,7 +45,7 @@ class ConexAI_Agent_Writer {
     }
 
     public function expand_content($topic_data, $current_h2_list, $texto_anterior, $focus_keyword = '') {
-        $tone = get_option('conex_ai_tone', 'Persuasivo');
+        $tone = get_option('conext_writer_tone', 'Persuasivo');
         $site_context = isset($topic_data['site_context']) ? $topic_data['site_context'] : 'Portal Genérico';
 
         $prompt = "Missão de Redação Profunda baseada na pauta: " . json_encode($topic_data['raw_data']) . " \n\n" .
@@ -69,6 +69,6 @@ class ConexAI_Agent_Writer {
 
     private function call_llm_api($prompt) {
         if (!$this->provider) return "Error: No provider";
-        return ConexAI_API::call($prompt, $this->provider);
+        return Conext_API::call($prompt, $this->provider);
     }
 }

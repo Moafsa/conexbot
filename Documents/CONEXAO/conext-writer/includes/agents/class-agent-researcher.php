@@ -4,20 +4,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Agent_Researcher {
+class Conext_Agent_Researcher {
     
     private $provider;
     private $sources;
 
     public function __construct($provider_config) {
         $this->provider = $provider_config;
-        $this->sources = get_option('conex_ai_news_source');
+        $this->sources = get_option('conext_writer_news_source');
     }
 
     public function gather_topics() {
-        $do_random = get_option('conex_ai_topic_random');
-        $do_products = get_option('conex_ai_topic_products');
-        $search_terms = get_option('conex_ai_search_terms', '');
+        $do_random = get_option('conext_writer_topic_random');
+        $do_products = get_option('conext_writer_topic_products');
+        $search_terms = get_option('conext_writer_search_terms', '');
         
         // Evitar artigos duplicados injetando o contexto recente
         $site_name = get_bloginfo('name');
@@ -60,7 +60,7 @@ class ConexAI_Agent_Researcher {
                 'orderby' => 'rand',
                 'meta_query' => [
                     [
-                        'key' => '_conex_ai_posted',
+                        'key' => '_conext_writer_posted',
                         'compare' => 'NOT EXISTS'
                     ]
                 ]
@@ -74,7 +74,7 @@ class ConexAI_Agent_Researcher {
                 
                 $prompt .= "Sua missão AGORA é planejar um artigo inteiro focado em atrair clientes para este produto: NOME: $p_name | SOBRE: $p_desc. Crie 1 Título clicável, 1 focus keyword e o resumo dos tópicos. ";
                 $keywords_out = $p_name;
-                update_post_meta($p->ID, '_conex_ai_posted', 1);
+                update_post_meta($p->ID, '_conext_writer_posted', 1);
             } else {
                 $prompt .= "Nenhum produto novo encontrado. Gere uma pauta vibrante sobre novidades, dicas ou estratégias 100% voltadas ao propósito e nicho original do nosso site. ";
             }
@@ -96,6 +96,6 @@ class ConexAI_Agent_Researcher {
 
     private function call_llm_api($prompt) {
         if (!$this->provider) return "Error: No provider";
-        return ConexAI_API::call($prompt, $this->provider);
+        return Conext_API::call($prompt, $this->provider);
     }
 }

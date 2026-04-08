@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Agent_SEO {
+class Conext_Agent_SEO {
     
     private $provider;
 
@@ -29,7 +29,7 @@ class ConexAI_Agent_SEO {
         $decoded = json_decode($clean_json, true);
 
         if (!$decoded) {
-             error_log('Conex AI SEO Error: Falha ao decodificar JSON.');
+             error_log('Conext Writer SEO Error: Falha ao decodificar JSON.');
              return [
                 'title' => $draft['topic_data']['raw_data']['title'] ?? 'Novo Artigo',
                 'meta_desc' => 'Confira nosso novo artigo sobre tendências e novidades do setor.',
@@ -44,6 +44,6 @@ class ConexAI_Agent_SEO {
 
     private function call_llm_api($prompt) {
         if (!$this->provider) return "Error: No provider";
-        return ConexAI_API::call($prompt, $this->provider);
+        return Conext_API::call($prompt, $this->provider);
     }
 }

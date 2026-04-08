@@ -3,24 +3,24 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Admin {
+class Conext_Admin {
     public function init() {
         add_action('admin_menu', [$this, 'add_menu_page']);
         add_action('admin_init', [$this, 'register_settings']);
-        add_action('admin_post_conex_ai_generate', [$this, 'handle_manual_generate']);
-        add_action('admin_post_conex_ai_activate_license', [$this, 'handle_activate_license']);
+        add_action('admin_post_conext_writer_generate', [$this, 'handle_manual_generate']);
+        add_action('admin_post_conext_writer_activate_license', [$this, 'handle_activate_license']);
         
         // Resetar créditos se necessário
-        add_action('update_option_conex_ai_frequency_num', [$this, 'reschedule_cron']);
-        add_action('update_option_conex_ai_frequency_unit', [$this, 'reschedule_cron']);
+        add_action('update_option_conext_writer_frequency_num', [$this, 'reschedule_cron']);
+        add_action('update_option_conext_writer_frequency_unit', [$this, 'reschedule_cron']);
     }
 
     public function add_menu_page() {
         add_menu_page(
-            'Conex AI Writer',
-            'Conex AI Writer',
+            'Conext Writer',
+            'Conext Writer',
             'manage_options',
-            'conex-ai-writer',
+            'conext-writer',
             [$this, 'render_admin_page'],
             'dashicons-superhero',
             65
@@ -28,36 +28,36 @@ class ConexAI_Admin {
     }
 
     public function register_settings() {
-        register_setting('conex_ai_settings', 'conex_ai_openai_key');
-        register_setting('conex_ai_settings', 'conex_ai_gemini_key');
-        register_setting('conex_ai_settings', 'conex_ai_news_source');
+        register_setting('conext_writer_settings', 'conext_writer_openai_key');
+        register_setting('conext_writer_settings', 'conext_writer_gemini_key');
+        register_setting('conext_writer_settings', 'conext_writer_news_source');
         
-        register_setting('conex_ai_settings', 'conex_ai_frequency_num');
-        register_setting('conex_ai_settings', 'conex_ai_frequency_unit');
-        register_setting('conex_ai_settings', 'conex_ai_topic_random');
-        register_setting('conex_ai_settings', 'conex_ai_topic_products');
-        register_setting('conex_ai_settings', 'conex_ai_search_terms');
-        register_setting('conex_ai_settings', 'conex_ai_custom_topics');
-        register_setting('conex_ai_settings', 'conex_ai_tone');
-        register_setting('conex_ai_settings', 'conex_ai_word_count');
-        register_setting('conex_ai_settings', 'conex_ai_image_count', ['default' => 1]);
+        register_setting('conext_writer_settings', 'conext_writer_frequency_num');
+        register_setting('conext_writer_settings', 'conext_writer_frequency_unit');
+        register_setting('conext_writer_settings', 'conext_writer_topic_random');
+        register_setting('conext_writer_settings', 'conext_writer_topic_products');
+        register_setting('conext_writer_settings', 'conext_writer_search_terms');
+        register_setting('conext_writer_settings', 'conext_writer_custom_topics');
+        register_setting('conext_writer_settings', 'conext_writer_tone');
+        register_setting('conext_writer_settings', 'conext_writer_word_count');
+        register_setting('conext_writer_settings', 'conext_writer_image_count', ['default' => 1]);
     }
 
     public function reschedule_cron() {
         // Triggered when the frequency interval changes. We will wait for both updates to finish, 
         // the actual clear/schedule relies on the main plugin file detecting the change or we handle it here.
-        wp_clear_scheduled_hook('conex_ai_cron_generation');
-        $num = (int) get_option('conex_ai_frequency_num', 24);
-        $unit = get_option('conex_ai_frequency_unit', 'hours');
+        wp_clear_scheduled_hook('conext_writer_cron_generation');
+        $num = (int) get_option('conext_writer_frequency_num', 24);
+        $unit = get_option('conext_writer_frequency_unit', 'hours');
         if ($num > 0) {
-            // "conex_ai_custom_interval" will be registered in cron_schedules
-            wp_schedule_event(time(), 'conex_ai_custom_interval', 'conex_ai_cron_generation');
+            // "conext_writer_custom_interval" will be registered in cron_schedules
+            wp_schedule_event(time(), 'conext_writer_custom_interval', 'conext_writer_cron_generation');
         }
     }
 
     public function render_admin_page() {
-        $credits_used = ConexAI_Licensing::get_credits_total() - ConexAI_Licensing::get_credits_remaining();
-        $total = ConexAI_Licensing::get_credits_total();
+        $credits_used = Conext_Licensing::get_credits_total() - Conext_Licensing::get_credits_remaining();
+        $total = Conext_Licensing::get_credits_total();
         $percent = ($total > 0) ? ($credits_used / $total) * 100 : 100;
         $status_color = ($percent > 80) ? '#d63638' : '#2271b1';
         ?>
@@ -71,16 +71,19 @@ class ConexAI_Admin {
                 .upgrade-btn:hover { background: #2271b1; color: #fff; }
             </style>
 
-            <h1>Conex AI Writer <span class="tier-badge"><?php echo ConexAI_Licensing::get_tier_label(); ?></span></h1>
+            <h1>Conext Writer <span class="tier-badge"><?php echo Conext_Licensing::get_tier_label(); ?></span></h1>
             
             <div class="conex-ai-card">
                 <h3>Uso de Créditos Mensais</h3>
                 <div class="conex-ai-progress">
                     <div class="conex-ai-bar" style="width: <?php echo $percent; ?>%;"></div>
                 </div>
-                <p><strong><?php echo ConexAI_Licensing::get_credits_remaining(); ?></strong> créditos restantes de <?php echo $total; ?>.</p>
+                <p><strong><?php echo Conext_Licensing::get_credits_remaining(); ?></strong> créditos restantes de <?php echo $total; ?>.</p>
                 <?php if ($total <= 10): ?>
-                    <a href="https://conexbot.com/precos" class="upgrade-btn" target="_blank">Upgrade para Plano Gold (50 posts)</a>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:15px;">
+                        <a href="https://conexbot.com/writer-plugin" class="upgrade-btn" target="_blank" style="background:#2271b1; color:#fff;">Assinar Plano Platinum (Yoast SEO)</a>
+                        <a href="https://conexbot.com/writer-plugin" class="upgrade-btn" target="_blank">Upgrade para Plano Gold (50 posts)</a>
+                    </div>
                 <?php endif; ?>
             </div>
 
@@ -91,24 +94,24 @@ class ConexAI_Admin {
 
             <div id="conex-settings-tab">
                 <form method="post" action="options.php">
-                <?php settings_fields('conex_ai_settings'); ?>
-                <?php do_settings_sections('conex_ai_settings'); ?>
+                <?php settings_fields('conext_writer_settings'); ?>
+                <?php do_settings_sections('conext_writer_settings'); ?>
                 <table class="form-table">
                     <tr valign="top">
                         <th scope="row">OpenAI API Key</th>
-                        <td><input type="password" name="conex_ai_openai_key" value="<?php echo esc_attr(get_option('conex_ai_openai_key')); ?>" class="regular-text" /></td>
+                        <td><input type="password" name="conext_writer_openai_key" value="<?php echo esc_attr(get_option('conext_writer_openai_key')); ?>" class="regular-text" /></td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Google Gemini API Key</th>
-                        <td><input type="password" name="conex_ai_gemini_key" value="<?php echo esc_attr(get_option('conex_ai_gemini_key')); ?>" class="regular-text" /></td>
+                        <td><input type="password" name="conext_writer_gemini_key" value="<?php echo esc_attr(get_option('conext_writer_gemini_key')); ?>" class="regular-text" /></td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Frequência de Postagens</th>
                         <td>
-                            A cada <input type="number" name="conex_ai_frequency_num" value="<?php echo esc_attr(get_option('conex_ai_frequency_num', 24)); ?>" class="small-text" min="1" />
-                            <select name="conex_ai_frequency_unit">
-                                <option value="hours" <?php selected(get_option('conex_ai_frequency_unit', 'hours'), 'hours'); ?>>Hora(s)</option>
-                                <option value="days" <?php selected(get_option('conex_ai_frequency_unit', 'hours'), 'days'); ?>>Dia(s)</option>
+                            A cada <input type="number" name="conext_writer_frequency_num" value="<?php echo esc_attr(get_option('conext_writer_frequency_num', 24)); ?>" class="small-text" min="1" />
+                            <select name="conext_writer_frequency_unit">
+                                <option value="hours" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'hours'); ?>>Hora(s)</option>
+                                <option value="days" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'days'); ?>>Dia(s)</option>
                             </select>
                             <p class="description">Define quando a IA deve gerar um novo post automaticamente.</p>
                         </td>
@@ -118,11 +121,11 @@ class ConexAI_Admin {
                         <td>
                             <fieldset>
                                 <label>
-                                    <input type="checkbox" name="conex_ai_topic_random" value="1" <?php checked(get_option('conex_ai_topic_random'), 1); ?> />
+                                    <input type="checkbox" name="conext_writer_topic_random" value="1" <?php checked(get_option('conext_writer_topic_random'), 1); ?> />
                                     Notícias, Tendências e Dicas (Aleatórias)
                                 </label><br>
                                 <label>
-                                    <input type="checkbox" name="conex_ai_topic_products" value="1" <?php checked(get_option('conex_ai_topic_products'), 1); ?> />
+                                    <input type="checkbox" name="conext_writer_topic_products" value="1" <?php checked(get_option('conext_writer_topic_products'), 1); ?> />
                                     Meus Produtos / Serviços (Via WooCommerce e Lista)
                                 </label>
                                 <p class="description">Marque ambas para a IA sortear (50/50) a cada postagem.</p>
@@ -132,50 +135,50 @@ class ConexAI_Admin {
                     <tr valign="top">
                         <th scope="row">Termos de Pesquisa Extras</th>
                         <td>
-                            <input type="text" name="conex_ai_search_terms" value="<?php echo esc_attr(get_option('conex_ai_search_terms')); ?>" class="large-text" placeholder="Ex: RPG, Ação, Playstation, Jogos de Tabuleiro, Poker..." />
+                            <input type="text" name="conext_writer_search_terms" value="<?php echo esc_attr(get_option('conext_writer_search_terms')); ?>" class="large-text" placeholder="Ex: RPG, Ação, Playstation, Jogos de Tabuleiro, Poker..." />
                             <p class="description">Obriga a IA a focar nesses nichos durante a criação dos posts e das imagens.</p>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Meus Produtos/Serviços</th>
                         <td>
-                            <textarea name="conex_ai_custom_topics" rows="3" class="large-text" placeholder="Se você escolheu 'Meus Produtos/Serviços', descreva aqui os produtos ou temas que quer abordar..."><?php echo esc_textarea(get_option('conex_ai_custom_topics')); ?></textarea>
+                            <textarea name="conext_writer_custom_topics" rows="3" class="large-text" placeholder="Se você escolheu 'Meus Produtos/Serviços', descreva aqui os produtos ou temas que quer abordar..."><?php echo esc_textarea(get_option('conext_writer_custom_topics')); ?></textarea>
                             <p class="description">Explique o que você vende ou os assuntos específicos que deseja tratar. A IA focará neles.</p>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Tom de Escrita</th>
                         <td>
-                            <select name="conex_ai_tone">
-                                <option value="Persuasivo e Vendedor" <?php selected(get_option('conex_ai_tone', 'Persuasivo e Vendedor'), 'Persuasivo e Vendedor'); ?>>Persuasivo e Vendedor</option>
-                                <option value="Informativo e Direto" <?php selected(get_option('conex_ai_tone'), 'Informativo e Direto'); ?>>Informativo e Direto</option>
-                                <option value="Descontraído e Casual" <?php selected(get_option('conex_ai_tone'), 'Descontraído e Casual'); ?>>Descontraído e Casual</option>
-                                <option value="Agressivo (Gatilhos Mentais)" <?php selected(get_option('conex_ai_tone'), 'Agressivo (Gatilhos Mentais)'); ?>>Agressivo (Gatilhos Mentais)</option>
+                            <select name="conext_writer_tone">
+                                <option value="Persuasivo e Vendedor" <?php selected(get_option('conext_writer_tone', 'Persuasivo e Vendedor'), 'Persuasivo e Vendedor'); ?>>Persuasivo e Vendedor</option>
+                                <option value="Informativo e Direto" <?php selected(get_option('conext_writer_tone'), 'Informativo e Direto'); ?>>Informativo e Direto</option>
+                                <option value="Descontraído e Casual" <?php selected(get_option('conext_writer_tone'), 'Descontraído e Casual'); ?>>Descontraído e Casual</option>
+                                <option value="Agressivo (Gatilhos Mentais)" <?php selected(get_option('conext_writer_tone'), 'Agressivo (Gatilhos Mentais)'); ?>>Agressivo (Gatilhos Mentais)</option>
                             </select>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Tamanho Médio (Palavras)</th>
                         <td>
-                            <select name="conex_ai_word_count">
-                                <option value="500-1000" <?php selected(get_option('conex_ai_word_count'), '500-1000'); ?>>Curto (500-1000 palavras)</option>
-                                <option value="1500-3000" <?php selected(get_option('conex_ai_word_count', '1500-3000'), '1500-3000'); ?>>Médio/Longo (1500-3000 palavras)</option>
-                                <option value="3000-5000" <?php selected(get_option('conex_ai_word_count'), '3000-5000'); ?>>Muito Longo (3000-5000 palavras)</option>
+                            <select name="conext_writer_word_count">
+                                <option value="500-1000" <?php selected(get_option('conext_writer_word_count'), '500-1000'); ?>>Curto (500-1000 palavras)</option>
+                                <option value="1500-3000" <?php selected(get_option('conext_writer_word_count', '1500-3000'), '1500-3000'); ?>>Médio/Longo (1500-3000 palavras)</option>
+                                <option value="3000-5000" <?php selected(get_option('conext_writer_word_count'), '3000-5000'); ?>>Muito Longo (3000-5000 palavras)</option>
                             </select>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Número de Imagens</th>
                         <td>
-                            <input type="number" name="conex_ai_image_count" value="<?php echo esc_attr(get_option('conex_ai_image_count', 1)); ?>" class="small-text" min="1" max="3" />
+                            <input type="number" name="conext_writer_image_count" value="<?php echo esc_attr(get_option('conext_writer_image_count', 1)); ?>" class="small-text" min="1" max="3" />
                             <p class="description">Máximo recomendado: 3 imagens (Evita limites de API).</p>
                         </td>
                     </tr>
                     <tr valign="top">
                         <th scope="row">Fontes de Notícias ou RSS</th>
                         <td>
-                            <textarea name="conex_ai_news_source" rows="5" class="large-text code" placeholder="Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática">
-<?php echo esc_textarea(get_option('conex_ai_news_source')); ?>
+                            <textarea name="conext_writer_news_source" rows="5" class="large-text code" placeholder="Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática">
+<?php echo esc_textarea(get_option('conext_writer_news_source')); ?>
                             </textarea>
                             <p class="description">Insira a URL de um feed RSS, o link direto de um site/domínio, ou deixe em branco para o Agente pesquisar na Web livremente sobre os assuntos.</p>
                         </td>
@@ -188,8 +191,8 @@ class ConexAI_Admin {
             <h2>Teste de Geração</h2>
             <p>Clique no botão abaixo para forçar o Orquestrador a pesquisar, escrever e publicar um post agora.</p>
             <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                <input type="hidden" name="action" value="conex_ai_generate">
-                <?php wp_nonce_field('conex_ai_generate_action', 'conex_ai_nonce'); ?>
+                <input type="hidden" name="action" value="conext_writer_generate">
+                <?php wp_nonce_field('conext_writer_generate_action', 'conext_writer_nonce'); ?>
                 <?php submit_button('Gerar Post AGORA (Manual)', 'secondary', 'generate_post'); ?>
             </form>
             </div>
@@ -197,16 +200,18 @@ class ConexAI_Admin {
             <div id="conex-licensing-tab" style="display:none;">
                 <div class="conex-ai-card">
                     <h3>Ativar Licença Premium</h3>
-                    <p>Insira sua licença recebida após a compra para liberar mais créditos e funções.</p>
+                    <p>Controle total sobre a orquestração de 5 agentes e SEO Nível Yoast.</p>
                     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-                        <input type="hidden" name="action" value="conex_ai_activate_license">
-                        <?php wp_nonce_field('conex_ai_license_action', 'conex_ai_license_nonce'); ?>
-                        <input type="text" name="license_key" value="<?php echo esc_attr(get_option('conex_ai_license_key')); ?>" class="regular-text" placeholder="PRO-XXXX-XXXX" />
+                        <input type="hidden" name="action" value="conext_writer_activate_license">
+                        <?php wp_nonce_field('conext_writer_license_action', 'conext_writer_license_nonce'); ?>
+                        <input type="text" name="license_key" value="<?php echo esc_attr(get_option('conext_writer_license_key')); ?>" class="regular-text" placeholder="CNX-XXXX-XXXX" />
                         <?php submit_button('Ativar Agora', 'primary', 'activate_license'); ?>
                     </form>
                     <hr>
-                    <h4>Onde comprar?</h4>
-                    <p>Visite <a href="https://conexbot.com" target="_blank">conexbot.com</a> para assinar um plano mensal.</p>
+                    <h4>Não tem uma licença?</h4>
+                    <p>Assine diretamente na plataforma Conextbot para receber sua chave instantaneamente.</p>
+                    <a href="https://conexbot.com/writer-plugin" class="button button-secondary" target="_blank">Ver Planos e Assinar Agora</a>
+                    <p style="font-size:10px; color:#666; margin-top:10px;">* O plugin utiliza o motor Conextbot para garantir 100% de aprovação no Yoast SEO.</p>
                 </div>
             </div>
 
@@ -251,30 +256,30 @@ class ConexAI_Admin {
             wp_die('Sem permissão.');
         }
 
-        check_admin_referer('conex_ai_generate_action', 'conex_ai_nonce');
+        check_admin_referer('conext_writer_generate_action', 'conext_writer_nonce');
 
-        $orchestrator = new ConexAI_Orchestrator();
+        $orchestrator = new Conext_Orchestrator();
         $result = $orchestrator->execute_daily_generation();
 
         if ($result) {
-            wp_redirect(admin_url('admin.php?page=conex-ai-writer&status=success'));
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=success'));
         } else {
-            wp_redirect(admin_url('admin.php?page=conex-ai-writer&status=error'));
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=error'));
         }
         exit;
     }
 
     public function handle_activate_license() {
         if (!current_user_can('manage_options')) wp_die('Sem permissão.');
-        check_admin_referer('conex_ai_license_action', 'conex_ai_license_nonce');
+        check_admin_referer('conext_writer_license_action', 'conext_writer_license_nonce');
 
         $key = sanitize_text_field($_POST['license_key']);
-        $success = ConexAI_Licensing::activate_key($key);
+        $success = Conext_Licensing::activate_key($key);
 
         if ($success) {
-            wp_redirect(admin_url('admin.php?page=conex-ai-writer&status=license_ok'));
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=license_ok'));
         } else {
-            wp_redirect(admin_url('admin.php?page=conex-ai-writer&status=license_error'));
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=license_error'));
         }
         exit;
     }

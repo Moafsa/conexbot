@@ -1,47 +1,48 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Zap, Sparkles, Layout, BarChart, Rocket, Globe, Building, CreditCard, ChevronRight, Play, Download, ShieldCheck, Mail } from "lucide-react";
+import { Check, Zap, Sparkles, Layout, BarChart, Rocket, Globe, Building, CreditCard, ChevronRight, Play, Download, ShieldCheck, Mail, Shield, Search, PenTool, Image as LucideImage, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
-const FEATURES = [
+const AGENTS = [
     {
-        title: "SEO Automatizado",
-        desc: "Geração de posts otimizados para mecanismos de busca com zero esforço manual.",
-        icon: Sparkles,
-        color: "text-blue-400",
-        bg: "bg-blue-400/10"
+        name: "Supervisor",
+        role: "Orquestrador",
+        desc: "Coordena a linha de montagem e garante que o contexto do seu site seja respeitado.",
+        icon: Shield
     },
     {
-        title: "Integração WordPress",
-        desc: "Publique diretamente em qualquer site WordPress via licença nativa.",
-        icon: Globe,
-        color: "text-emerald-400",
-        bg: "bg-emerald-400/10"
+        name: "Researcher",
+        role: "Analista de Dados",
+        desc: "Busca tendências em tempo real e fatos atualizados para enriquecer o conteúdo.",
+        icon: Search
     },
     {
-        title: "Conteúdo Ilimitado",
-        desc: "Produza centenas de artigos mensais com consistência e qualidade profissional.",
-        icon: Layout,
-        color: "text-purple-400",
-        bg: "bg-purple-400/10"
+        name: "Writer",
+        role: "Redator Criativo",
+        desc: "Gera textos humanizados (até 5000 palavras) sem nomes de seções clichês.",
+        icon: PenTool
     },
     {
-        title: "Dashboards de Uso",
-        desc: "Acompanhe o consumo de palavras e posts ativos em tempo real.",
-        icon: BarChart,
-        color: "text-orange-400",
-        bg: "bg-orange-400/10"
+        name: "SEO Expert",
+        role: "Otimizador Yoast",
+        desc: "Configura Títulos, Meta Descrições e Focus Keywords com rigor matemático.",
+        icon: BarChart
+    },
+    {
+        name: "Visualist",
+        role: "Gestor de Mídia",
+        desc: "Cria e otimiza imagens com alt-tags inteligentes e relacionadas ao assunto.",
+        icon: LucideImage
     }
 ];
 
 export default function WriterPluginLP() {
     const { data: session, status } = useSession();
     const [plans, setPlans] = useState<any[]>([]);
-    const [interval, setInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
-    const [loading, setLoading] = useState(false);
+    const [interval, setInterval] = useState<'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'YEARLY'>('MONTHLY');
     const router = useRouter();
 
     useEffect(() => {
@@ -61,188 +62,254 @@ export default function WriterPluginLP() {
         if (status === 'unauthenticated') {
             router.push(`/auth/register?planId=${planId}&type=WRITER_PLUGIN`);
         } else {
-            router.push(`/dashboard/writer`); // Central de compra no dashboard
+            router.push(`/checkout?planId=${planId}&type=WRITER_PLUGIN`);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#020202] text-white selection:bg-blue-500/30">
+        <div className="min-h-screen bg-[#020202] text-white selection:bg-blue-500/30 font-sans">
             {/* Dark Gradient Overlay */}
-            <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,#1a1a2e_0%,transparent_50%)] pointer-events-none" />
+            <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,#090915_0%,transparent_50%)] pointer-events-none" />
 
             {/* Navigation */}
             <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
                 <Link href="/" className="text-2xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
-                    CONEX AI WRITER
+                    CONEXT WRITER
                 </Link>
                 <div className="flex items-center gap-6">
+                    <Link href="#features" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Tecnologia</Link>
                     <Link href="#pricing" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Preços</Link>
-                    <Link href="/pricing" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Conextbot</Link>
                     <Link 
                         href={status === 'authenticated' ? "/dashboard/writer" : "/auth/login"} 
-                        className="bg-white text-black px-6 py-2 rounded-full font-bold text-sm hover:bg-gray-200 transition-all active:scale-95"
+                        className="bg-white text-black px-6 py-2 rounded-full font-bold text-sm hover:bg-gray-200 transition-all active:scale-95 shadow-lg shadow-white/5"
                     >
-                        {status === 'authenticated' ? "Meu Plugin" : "Entrar"}
+                        {status === 'authenticated' ? "Meu Painel" : "Entrar"}
                     </Link>
                 </div>
             </nav>
 
             {/* Hero Section */}
             <section className="relative z-10 pt-20 pb-32 px-6 overflow-hidden">
-                <div className="max-w-5xl mx-auto text-center space-y-8">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest animate-bounce">
-                        <Sparkles size={14} /> NOVO PLUGIN DISPONÍVEL
+                <div className="max-w-6xl mx-auto text-center space-y-10">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-black uppercase tracking-[0.2em] animate-fade-in">
+                        <Sparkles size={14} /> 5 AGENTES TRABALHANDO PARA VOCÊ
                     </div>
-                    <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none">
-                        Domine o Google com <br />
-                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-600">
-                            IA de Redação
-                        </span>
+                    <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] max-w-4xl mx-auto">
+                        A IA que escreve como um <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-indigo-600">Especialista</span>
                     </h1>
-                    <p className="text-gray-400 text-xl max-w-2xl mx-auto font-medium leading-relaxed">
-                        O primeiro plugin WordPress que utiliza o motor Conextbot para criar, otimizar e publicar artigos em massa. Escala total para o seu SEO.
+                    <p className="text-gray-400 text-xl max-w-2xl mx-auto font-medium leading-relaxed italic">
+                        O primeiro plugin WordPress que utiliza uma linha de montagem de agentes para criar conteúdos densos, humanizados e otimizados para o **Yoast SEO**.
                     </p>
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 pt-4">
-                        <Link href="#pricing" className="w-full md:w-auto px-10 py-5 bg-blue-600 hover:bg-blue-700 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 group">
-                            COMEÇAR AGORA <ChevronRight className="group-hover:translate-x-1 transition-transform" />
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 pt-6">
+                        <Link href="#pricing" className="w-full md:w-auto px-12 py-5 bg-blue-600 hover:bg-blue-700 rounded-[22px] font-black text-lg transition-all shadow-2xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-95 group">
+                            ASSINAR AGORA <ChevronRight className="group-hover:translate-x-1 transition-transform" />
                         </Link>
-                        <button className="w-full md:w-auto px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3">
-                            <Play size={20} fill="currentColor" /> VER DEMO
+                        <button className="w-full md:w-auto px-12 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[22px] font-black text-lg transition-all flex items-center justify-center gap-3">
+                             ASSISTIR DEMO
                         </button>
                     </div>
                 </div>
 
-                {/* Floating Elements / Decoration */}
-                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-96 h-96 bg-blue-600/10 blur-[120px] rounded-full" />
-                <div className="absolute top-1/2 right-0 -translate-y-1/2 w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full" />
+                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-96 h-96 bg-blue-600/5 blur-[120px] rounded-full" />
             </section>
 
-            {/* Features Grid */}
+            {/* The 5-Agent Architecture Section */}
+            <section id="features" className="relative z-10 py-32 bg-black/40 border-y border-white/5">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="flex flex-col md:flex-row gap-20 items-center">
+                        <div className="flex-1 space-y-8">
+                            <h2 className="text-5xl font-black tracking-tighter leading-tight">
+                                Uma <span className="text-blue-500">Esteira Digital</span> de Produção de Elite.
+                            </h2>
+                            <p className="text-gray-400 text-lg">
+                                Esqueça textos genéricos. O Conext Writer orquestra 5 IAs especialistas simultaneamente para garantir que cada parágrafo tenha profundidade técnica e autoridade.
+                            </p>
+                            <div className="grid grid-cols-1 gap-4">
+                                {AGENTS.map((agent, i) => (
+                                    <div key={i} className="flex gap-4 p-5 rounded-3xl bg-white/5 border border-white/5 hover:border-blue-500/20 transition-colors group">
+                                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 group-hover:scale-110 transition-transform">
+                                            <agent.icon size={24} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-white flex items-center gap-2">
+                                                {agent.name} <span className="text-[10px] text-gray-500 uppercase tracking-widest">{agent.role}</span>
+                                            </h4>
+                                            <p className="text-sm text-gray-500 mt-1">{agent.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex-1 relative">
+                            <div className="relative z-10 rounded-[40px] border border-white/10 overflow-hidden shadow-3xl bg-black">
+                                <div className="p-4 border-b border-white/5 bg-white/5 flex gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                                </div>
+                                <div className="p-8 space-y-6">
+                                    <div className="h-4 w-3/4 bg-blue-500/20 rounded-full animate-pulse" />
+                                    <div className="space-y-3">
+                                        <div className="h-3 w-full bg-white/5 rounded-full" />
+                                        <div className="h-3 w-full bg-white/5 rounded-full" />
+                                        <div className="h-3 w-5/6 bg-white/5 rounded-full" />
+                                    </div>
+                                    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-400 space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-black uppercase tracking-widest">Yoast SEO Score</span>
+                                            <span className="text-lg font-black italic">100% OK</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="h-1.5 bg-emerald-500 rounded-full" />
+                                            <div className="h-1.5 bg-emerald-500 rounded-full" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="absolute -inset-10 bg-blue-600/10 blur-[100px] -z-10" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* SEO Features Grid */}
             <section className="relative z-10 py-32 bg-[#050505]">
                 <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-20 space-y-4">
-                        <h2 className="text-4xl font-black uppercase tracking-tighter">Por que o Conex Writer?</h2>
-                        <p className="text-gray-500 max-w-xl mx-auto">Tecnologia avançada para quem busca performance orgânica sem depender de redatores humanos.</p>
+                    <div className="text-center mb-24 space-y-6">
+                        <div className="inline-block px-4 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest mb-4">
+                            SEO DE ALTA PERFORMANCE
+                        </div>
+                        <h2 className="text-5xl md:text-7xl font-black tracking-tighter leading-[0.8]">Domine a <span className="text-blue-500">Primeira Página</span></h2>
+                        <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+                            Nossa linha de montagem de agentes não apenas escreve; ela constrói autoridade semântica inquestionável para o seu domínio.
+                        </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {FEATURES.map((feat, i) => (
-                            <div key={i} className="group p-8 bg-[#0a0a0a] border border-white/5 rounded-3xl hover:border-blue-500/30 transition-all duration-500 hover:-translate-y-2">
-                                <div className={`w-14 h-14 rounded-2xl ${feat.bg} ${feat.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-                                    <feat.icon size={28} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        {[
+                            {
+                                title: "Indexação Prioritária",
+                                desc: "Estrutura técnica impecável com dados estruturados (Schema) e metadados que forçam o Google a priorizar seu conteúdo.",
+                                icon: BarChart
+                            },
+                            {
+                                title: "Humanização Indetectável",
+                                desc: "Nossa IA de terceira geração remove padrões robóticos, garantindo 99% de aprovação em detectores de IA e maior retenção do usuário.",
+                                icon: Sparkles
+                            },
+                            {
+                                title: "Autoridade de Especialista",
+                                desc: "Análise profunda de intenção de busca (Search Intent) que cobre loops de informação que IAs genéricas ignoram.",
+                                icon: Globe
+                            }
+                        ].map((stat, i) => (
+                            <div key={i} className="group p-12 rounded-[45px] bg-[#0a0a0a] border border-white/5 hover:border-blue-500/30 transition-all duration-700 hover:-translate-y-2">
+                                <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-8 group-hover:scale-110 transition-transform">
+                                    <stat.icon size={32} />
                                 </div>
-                                <h3 className="text-xl font-bold mb-3">{feat.title}</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">{feat.desc}</p>
+                                <h3 className="text-2xl font-black mb-6 tracking-tight">{stat.title}</h3>
+                                <p className="text-gray-500 leading-relaxed font-medium">{stat.desc}</p>
                             </div>
                         ))}
                     </div>
                 </div>
             </section>
 
-            {/* CTA Plugin Image Section */}
-            <section className="relative z-10 py-32 overflow-hidden">
-                <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-20">
-                    <div className="flex-1 space-y-8">
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 w-fit rounded-2xl">
-                            <ShieldCheck size={32} />
-                        </div>
-                        <h2 className="text-5xl font-black tracking-tighter leading-tight">
-                            Seguro, Rápido e <br />
-                            Pronto para Brilhar.
-                        </h2>
-                        <div className="space-y-6">
-                            {[
-                                "Geração baseada em GPT-4o e Claude 3.5 Sonnet",
-                                "Otimização automática de imagens (Alt tags)",
-                                "Estrutura de Heading Tags Perfeita",
-                                "Suporte a múltiplos idiomas"
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center gap-4 text-gray-300 font-medium italic">
-                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-black">
-                                        <Check size={14} strokeWidth={4} />
-                                    </div>
-                                    {item}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex-1 relative">
-                        <div className="relative z-10 bg-gradient-to-br from-[#111] to-black p-4 rounded-[40px] border border-white/10 shadow-2xl">
-                            <img 
-                                src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2426" 
-                                alt="Dashboard Interface" 
-                                className="rounded-[30px] opacity-80"
-                            />
-                        </div>
-                        <div className="absolute -inset-4 bg-blue-500/10 blur-3xl -z-10 rounded-full" />
-                    </div>
-                </div>
-            </section>
-
             {/* Pricing Section */}
-            <section id="pricing" className="relative z-10 py-32 bg-[#030303]">
+            <section id="pricing" className="relative z-10 py-32">
                 <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16 space-y-4">
-                        <h2 className="text-5xl font-black uppercase tracking-tighter">Escolha seu Poder</h2>
-                        <p className="text-gray-500 italic">Planos pensados para escalas individuais até agências de SEO.</p>
+                    <div className="text-center mb-20 space-y-4">
+                        <h2 className="text-6xl font-black uppercase tracking-tighter">Escolha seu Poder</h2>
+                        <p className="text-gray-400 text-lg italic">Planos dimensionados para quem leva SEO a sério.</p>
                         
-                        <div className="flex justify-center mt-10">
-                            <div className="bg-white/5 p-1 flex rounded-xl border border-white/10 self-center">
-                                <button
-                                    onClick={() => setInterval('MONTHLY')}
-                                    className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${interval === 'MONTHLY' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-white'}`}
-                                >
-                                    MENSAL
-                                </button>
-                                <button
-                                    onClick={() => setInterval('YEARLY')}
-                                    className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all ${interval === 'YEARLY' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-white'}`}
-                                >
-                                    ANUAL (Economize 20%)
-                                </button>
+                        <div className="flex justify-center mt-12 overflow-x-auto no-scrollbar pb-4">
+                            <div className="bg-white/5 p-1.5 flex rounded-3xl border border-white/10 shrink-0">
+                                {[
+                                    { id: 'MONTHLY', label: 'MENSAL' },
+                                    { id: 'QUARTERLY', label: 'TRIMESTRAL' },
+                                    { id: 'SEMIANNUAL', label: 'SEMESTRAL' },
+                                    { id: 'YEARLY', label: 'ANUAL' }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setInterval(opt.id as any)}
+                                        className={`px-6 md:px-10 py-3.5 rounded-2xl text-[10px] md:text-xs font-black transition-all whitespace-nowrap ${interval === opt.id ? 'bg-blue-600 text-white shadow-2xl shadow-blue-500/40' : 'text-gray-500 hover:text-white'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {plans.map((plan) => {
-                            const price = interval === 'YEARLY' ? (plan.priceYearly || plan.price * 12 * 0.8) : plan.price;
-                            const period = interval === 'YEARLY' ? '/ano' : '/mês';
-                            
+                            let price = plan.price;
+                            let period = '/mês';
+                            let discount = 0;
+
+                            if (interval === 'QUARTERLY') {
+                                price = plan.priceQuarterly || plan.price * 3 * 0.9;
+                                period = '/tri';
+                                discount = Math.round(100 - ((price / (plan.price * 3)) * 100));
+                            } else if (interval === 'SEMIANNUAL') {
+                                price = plan.priceSemiannual || plan.price * 6 * 0.85;
+                                period = '/sem';
+                                discount = Math.round(100 - ((price / (plan.price * 6)) * 100));
+                            } else if (interval === 'YEARLY') {
+                                price = plan.priceYearly || plan.price * 12 * 0.8;
+                                period = '/ano';
+                                discount = Math.round(100 - ((price / (plan.price * 12)) * 100));
+                            }
+
+                            const features = plan.features ? (typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features) : [];
+
                             return (
-                                <div key={plan.id} className="relative group p-1 rounded-[35px] bg-white/5 hover:bg-gradient-to-br hover:from-blue-600/50 hover:to-purple-600/50 transition-all duration-500">
-                                    <div className="h-full bg-[#080808] rounded-[34px] p-10 flex flex-col">
-                                        <div className="mb-8">
-                                            <h3 className="text-2xl font-black uppercase tracking-tight text-blue-400">{plan.name}</h3>
-                                            <div className="flex items-baseline gap-1 mt-4">
-                                                <span className="text-5xl font-black tracking-tighter">R$ {price.toLocaleString('pt-BR')}</span>
-                                                <span className="text-sm text-gray-500 uppercase font-bold">{period}</span>
-                                            </div>
+                                <div key={plan.id} className="group h-full bg-[#0a0a0a] rounded-[50px] p-12 border border-white/5 hover:border-blue-600/40 transition-all duration-700 flex flex-col relative overflow-hidden">
+                                    {discount > 0 && (
+                                        <div className="absolute top-8 right-[-35px] bg-emerald-500 text-black text-[10px] font-black py-1 w-32 text-center rotate-45 shadow-xl">
+                                            {discount}% OFF
                                         </div>
+                                    )}
 
-                                        <ul className="space-y-5 mb-12 flex-grow">
-                                            <li className="flex items-center gap-3 text-gray-300 font-medium">
-                                                <Check className="text-blue-500 shrink-0" size={20} />
-                                                <span>{plan.postLimit} Posts Mensais</span>
-                                            </li>
-                                            <li className="flex items-center gap-3 text-gray-300 font-medium">
-                                                <Check className="text-blue-500 shrink-0" size={20} />
-                                                <span>{plan.wordLimit.toLocaleString()} Palavras</span>
-                                            </li>
-                                            {(plan.features || []).filter((f:any)=>f.enabled).map((feat: any, i: number) => (
-                                                <li key={i} className="flex items-center gap-3 text-gray-300 font-medium italic">
-                                                    <Check className="text-blue-500 shrink-0" size={20} />
-                                                    <span>{feat.text}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-
-                                        <button 
-                                            onClick={() => handlePurchase(plan.id)}
-                                            className="w-full py-5 rounded-2xl bg-white text-black font-black text-lg hover:bg-blue-600 hover:text-white transition-all duration-300 active:scale-95 shadow-xl shadow-white/5"
-                                        >
-                                            CONTRATAR AGORA
-                                        </button>
+                                    <div className="mb-12">
+                                        <h3 className="text-3xl font-black uppercase tracking-tight text-blue-500">{plan.name}</h3>
+                                        <div className="flex items-baseline gap-1 mt-6">
+                                            <span className="text-sm text-gray-500 font-bold">R$</span>
+                                            <span className="text-6xl font-black tracking-tighter">
+                                                {price.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                                            </span>
+                                            <span className="text-xs text-gray-500 uppercase font-black italic ml-2">{period}</span>
+                                        </div>
+                                        <p className="text-gray-500 text-sm mt-4 font-medium italic">{plan.description}</p>
                                     </div>
+
+                                    <ul className="space-y-6 mb-16 flex-grow">
+                                        <li className="flex items-center gap-4 text-gray-200 font-black border-b border-white/5 pb-5">
+                                            <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                                <CheckCircle2 className="text-blue-500" size={14} />
+                                            </div>
+                                            <span>{plan.postLimit} Posts de Especialista /mês</span>
+                                        </li>
+                                        <li className="flex items-center gap-4 text-gray-200 font-black border-b border-white/5 pb-5">
+                                            <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                                <CheckCircle2 className="text-blue-500" size={14} />
+                                            </div>
+                                            <span>Até {plan.wordLimit.toLocaleString()} Palavras /mês</span>
+                                        </li>
+                                        {features.filter((f: any) => f.enabled).map((feat: any, i: number) => (
+                                            <li key={i} className="flex items-center gap-4 text-gray-400 text-sm font-medium">
+                                                <Check className="text-blue-500/40 shrink-0" size={18} />
+                                                <span>{feat.text}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    <button 
+                                        onClick={() => handlePurchase(plan.id)}
+                                        className="w-full py-6 rounded-[25px] bg-blue-600 text-white font-black text-xl hover:bg-blue-500 transition-all duration-300 active:scale-95 shadow-2xl shadow-blue-600/20"
+                                    >
+                                        ATIVAR PLUGIN
+                                    </button>
                                 </div>
                             );
                         })}
@@ -251,34 +318,17 @@ export default function WriterPluginLP() {
             </section>
 
             {/* Footer */}
-            <footer className="relative z-10 py-20 border-t border-white/5 bg-[#010101]">
-                <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-10">
-                    <div className="space-y-4">
-                        <Link href="/" className="text-2xl font-black tracking-tighter">
-                            CONEX AI <span className="text-blue-500">WRITER</span>
-                        </Link>
-                        <p className="text-gray-600 text-sm italic max-w-xs">A revolução da escrita automatizada integrada ao motor do Conextbot.</p>
+            <footer className="relative z-10 py-20 border-t border-white/5 bg-black">
+                <div className="max-w-7xl mx-auto px-6 text-center space-y-8">
+                    <Link href="/" className="text-2xl font-black tracking-tighter">
+                        CONEXT <span className="text-blue-500">WRITER</span>
+                    </Link>
+                    <p className="text-gray-600 text-sm uppercase tracking-widest font-bold">A inteligência que seu WordPress merece.</p>
+                    <div className="flex justify-center gap-10 text-xs font-black text-gray-500 uppercase tracking-widest">
+                        <Link href="/privacy" className="hover:text-white">Privacidade</Link>
+                        <Link href="/terms" className="hover:text-white">Termos</Link>
+                        <Link href="/support" className="hover:text-white">Suporte</Link>
                     </div>
-                    <div className="flex gap-10">
-                        <div className="space-y-4">
-                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Produto</h4>
-                            <ul className="space-y-2 text-sm text-gray-400">
-                                <li><Link href="#pricing">Preços</Link></li>
-                                <li><Link href="/pricing">Robôs IA</Link></li>
-                                <li><a href="#">Documentação</a></li>
-                            </ul>
-                        </div>
-                        <div className="space-y-4">
-                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Suporte</h4>
-                            <ul className="space-y-2 text-sm text-gray-400 flex flex-col">
-                                <Link href="/support" className="flex items-center gap-2">Central de Ajuda <ChevronRight size={12} /></Link>
-                                <a href="mailto:contato@conexbot.com">Email</a>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div className="text-center mt-20 text-[10px] text-gray-700 uppercase tracking-[0.2em]">
-                    &copy; 2024 CONEXTBOT - TODOS OS DIREITOS RESERVADOS
                 </div>
             </footer>
         </div>

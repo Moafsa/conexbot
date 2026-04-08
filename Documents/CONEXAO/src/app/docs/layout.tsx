@@ -30,9 +30,9 @@ export default async function DocsLayout({
                         <Rocket size={14} />
                         Download WP Connect
                     </Link>
-                    <Link href="/conex-ai-writer.zip" download className="hidden lg:flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-xl border border-indigo-500/20 hover:bg-indigo-500/20 transition-all">
+                    <Link href="/conext-writer.zip" download className="hidden lg:flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-xl border border-indigo-500/20 hover:bg-indigo-500/20 transition-all">
                         <Rocket size={14} />
-                        Download AI Writer
+                        Download Conext Writer
                     </Link>
                     <Link href={session?.user ? "/dashboard" : "/"} className="hidden md:block text-sm font-medium text-gray-400 hover:text-white transition-colors">
                         Voltar para o App

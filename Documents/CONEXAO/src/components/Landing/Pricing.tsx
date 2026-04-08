@@ -82,7 +82,7 @@ export default function Pricing() {
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-8 items-start">
-                    {plans.map((plan, idx) => {
+                    {plans.filter((p: any) => p.type === 'PRIMARY').map((plan, idx) => {
                         const baseMonthPrice = Number(plan.price) || 0;
                         let currentPrice = baseMonthPrice;
                         let originalPrice = baseMonthPrice * 1.25; 

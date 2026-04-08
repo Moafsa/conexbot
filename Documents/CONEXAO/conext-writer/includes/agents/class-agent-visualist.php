@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Agent_Visualist {
+class Conext_Agent_Visualist {
     
     private $provider;
 
@@ -13,7 +13,7 @@ class ConexAI_Agent_Visualist {
     }
 
     public function generate_images($keywords, $count = 1) {
-        $search_terms = get_option('conex_ai_search_terms', '');
+        $search_terms = get_option('conext_writer_search_terms', '');
 
         $prompt = "Professional high-conversion featured image for a blog post about: " . $keywords . ". ";
         if (!empty($search_terms)) {
@@ -24,10 +24,10 @@ class ConexAI_Agent_Visualist {
 
         $ids = [];
         for ($i = 0; $i < $count; $i++) {
-            $image_url = ConexAI_API::generate_image($prompt, $this->provider);
+            $image_url = Conext_API::generate_image($prompt, $this->provider);
             
             if (!$image_url) {
-                error_log('Conex AI Visualist Error: Falha ao gerar URL da imagem ' . ($i + 1));
+                error_log('Conext Writer Visualist Error: Falha ao gerar URL da imagem ' . ($i + 1));
                 continue;
             }
 
@@ -53,7 +53,7 @@ class ConexAI_Agent_Visualist {
         $file_array['tmp_name'] = download_url($url);
 
         if (is_wp_error($file_array['tmp_name'])) {
-            error_log('Conex AI Visualist Error: Falha no download da imagem IA.');
+            error_log('Conext Writer Visualist Error: Falha no download da imagem IA.');
             return 0;
         }
 
@@ -62,7 +62,7 @@ class ConexAI_Agent_Visualist {
 
         if (is_wp_error($id)) {
             @unlink($file_array['tmp_name']);
-            error_log('Conex AI Visualist Error: Falha ao inserir imagem na galeria.');
+            error_log('Conext Writer Visualist Error: Falha ao inserir imagem na galeria.');
             return 0;
         }
 

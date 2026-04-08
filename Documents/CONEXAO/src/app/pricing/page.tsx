@@ -232,7 +232,7 @@ export default function PricingPage() {
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
                                 <Sparkles size={14} /> Plugin Adicional
                             </div>
-                            <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Conex AI Writer Plugin</h2>
+                            <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Conext Writer Plugin</h2>
                             <p className="text-gray-400 text-lg max-w-xl italic">
                                 O plugin definitivo para WordPress que utiliza toda a inteligência do Conextbot para automatizar seu SEO.
                             </p>

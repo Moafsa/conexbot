@@ -59,7 +59,7 @@ export default function WriterDashboardPage() {
                             <Sparkles size={14} /> Plugin Adicional
                         </div>
                         <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase leading-tight">
-                            Ative o <span className="text-blue-500">Conex AI Writer</span> <br /> e Escalone seu SEO
+                            Ative o <span className="text-blue-500">Conext Writer</span> <br /> e Escalone seu SEO
                         </h1>
                         <p className="text-gray-400 text-lg leading-relaxed italic">
                             O melhor plugin para WordPress para quem quer dominar o Google com artigos otimizados sem esforço manual.
@@ -130,7 +130,7 @@ export default function WriterDashboardPage() {
                 </div>
                 <div className="flex gap-3">
                     <a 
-                        href="/conexbot-wp.zip" 
+                        href="/conext-writer.zip" 
                         download
                         className="bg-emerald-600 hover:bg-emerald-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
                     >
@@ -224,7 +224,7 @@ export default function WriterDashboardPage() {
                             {[
                                 { step: "1", text: "Baixe o arquivo .zip acima" },
                                 { step: "2", text: "Instale no menu 'Plugins' do WordPress" },
-                                { step: "3", text: "Ative o plugin e procure pela aba Conex Writer" },
+                                { step: "3", text: "Ative o plugin e procure pela aba Conext Writer" },
                                 { step: "4", text: "Cole sua Chave de Licença e comece a criar!" }
                             ].map((s, i) => (
                                 <div key={i} className="flex gap-4">

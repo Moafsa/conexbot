@@ -9,14 +9,14 @@ export default function AIWriterDocsPage() {
                 <div className="flex items-center gap-3 mb-6 relative z-10">
                     <PenTool className="text-indigo-400 animate-pulse" size={32} />
                     <h1 className="text-4xl font-black bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
-                        Conex AI Writer
+                        Conext Writer
                     </h1>
                 </div>
                 <p className="text-gray-400 leading-relaxed text-lg mb-8 max-w-xl relative z-10">
                     Transforme seu blog WordPress em uma máquina de conteúdo orgânico. Pesquisa, escrita e publicação automática com SEO de alto nível.
                 </p>
                 <Link 
-                    href="/conex-ai-writer.zip"
+                    href="/conext-writer.zip"
                     download
                     className="inline-flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black transition-all shadow-2xl shadow-indigo-600/30 group relative z-10"
                 >

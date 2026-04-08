@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_API {
+class Conext_API {
     
     public static function call($prompt, $provider) {
         if ($provider['provider'] === 'openai') {
@@ -32,7 +32,7 @@ class ConexAI_API {
         ]);
 
         if (is_wp_error($response)) {
-            error_log('Conex AI OpenAI API Error: ' . $response->get_error_message());
+            error_log('Conext Writer OpenAI API Error: ' . $response->get_error_message());
             return false;
         }
 
@@ -60,7 +60,7 @@ class ConexAI_API {
         ]);
 
         if (is_wp_error($response)) {
-            error_log('Conex AI Gemini API Error: ' . $response->get_error_message());
+            error_log('Conext Writer Gemini API Error: ' . $response->get_error_message());
             return false;
         }
 
@@ -90,7 +90,7 @@ class ConexAI_API {
         ]);
 
         if (is_wp_error($response)) {
-            error_log('Conex AI DALL-E API Error: ' . $response->get_error_message());
+            error_log('Conext Writer DALL-E API Error: ' . $response->get_error_message());
             return false;
         }
 

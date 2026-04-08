@@ -3,37 +3,37 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Licensing {
+class Conext_Licensing {
 
     private static $api_url = 'https://dash.conexbot.com.br'; // URL da plataforma Conextbot
 
     public static function get_tier_label() {
-        return get_option('conex_ai_license_tier', 'Starter');
+        return get_option('conext_writer_license_tier', 'Starter');
     }
 
     public static function get_credits_remaining() {
-        $limit = (int) get_option('conex_ai_post_limit', 0);
-        $used = (int) get_option('conex_ai_posts_used', 0);
+        $limit = (int) get_option('conext_writer_post_limit', 0);
+        $used = (int) get_option('conext_writer_posts_used', 0);
         return $limit > 0 ? max(0, $limit - $used) : 0;
     }
 
     public static function get_credits_total() {
-        return (int) get_option('conex_ai_post_limit', 0);
+        return (int) get_option('conext_writer_post_limit', 0);
     }
 
     public static function is_valid() {
-        $key = get_option('conex_ai_license_key');
+        $key = get_option('conext_writer_license_key');
         if (empty($key)) return false;
         
         // Em um sistema real, poderíamos validar o cache aqui ou forçar um sync
-        return !empty(get_option('conex_ai_license_tier'));
+        return !empty(get_option('conext_writer_license_tier'));
     }
 
     /**
      * Sincroniza os limites do servidor com o plugin local
      */
     public static function sync_limits() {
-        $key = get_option('conex_ai_license_key');
+        $key = get_option('conext_writer_license_key');
         if (empty($key)) return false;
 
         $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
@@ -48,11 +48,11 @@ class ConexAI_Licensing {
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if (isset($body['success']) && $body['success']) {
-            update_option('conex_ai_license_tier', $body['tier']);
-            update_option('conex_ai_post_limit', $body['postLimit']);
-            update_option('conex_ai_word_limit', $body['wordLimit']);
-            update_option('conex_ai_posts_used', $body['postsUsed']);
-            update_option('conex_ai_words_used', $body['wordsUsed']);
+            update_option('conext_writer_license_tier', $body['tier']);
+            update_option('conext_writer_post_limit', $body['postLimit']);
+            update_option('conext_writer_word_limit', $body['wordLimit']);
+            update_option('conext_writer_posts_used', $body['postsUsed']);
+            update_option('conext_writer_words_used', $body['wordsUsed']);
             return true;
         }
 
@@ -63,7 +63,7 @@ class ConexAI_Licensing {
      * Consome créditos no servidor central
      */
     public static function consume_credits($posts = 1, $words = 0) {
-        $key = get_option('conex_ai_license_key');
+        $key = get_option('conext_writer_license_key');
         if (empty($key)) return false;
 
         $response = wp_remote_post(self::$api_url . '/api/licensing/consume', [
@@ -100,13 +100,13 @@ class ConexAI_Licensing {
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if (isset($body['success']) && $body['success']) {
-            update_option('conex_ai_license_key', $key);
-            update_option('conex_ai_license_tier', $body['tier']);
-            update_option('conex_ai_post_limit', $body['postLimit']);
-            update_option('conex_ai_word_limit', $body['wordLimit']);
-            update_option('conex_ai_posts_used', $body['postsUsed']);
-            update_option('conex_ai_words_used', $body['wordsUsed']);
-            update_option('conex_ai_last_sync', time());
+            update_option('conext_writer_license_key', $key);
+            update_option('conext_writer_license_tier', $body['tier']);
+            update_option('conext_writer_post_limit', $body['postLimit']);
+            update_option('conext_writer_word_limit', $body['wordLimit']);
+            update_option('conext_writer_posts_used', $body['postsUsed']);
+            update_option('conext_writer_words_used', $body['wordsUsed']);
+            update_option('conext_writer_last_sync', time());
             return true;
         }
 

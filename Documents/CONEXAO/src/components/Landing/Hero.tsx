@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Zap } from "lucide-react";
 
 export default function Hero({ branding }: { branding?: any }) {
     const systemName = branding?.systemName || "Conext Bot";
@@ -33,6 +34,13 @@ export default function Hero({ branding }: { branding?: any }) {
                 <Link href="/conexbot-wp.zip" download className="btn-outline flex items-center justify-center gap-3 w-full sm:w-auto text-base md:text-lg px-6 md:px-8 py-3 md:py-3 border-white/10 text-white hover:bg-white/5 group">
                     <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" className="w-6 h-6 md:w-7 md:h-7 group-hover:scale-110 transition-all duration-300" />
                     Baixar Plugin WordPress
+                </Link>
+            </div>
+
+            <div className="mb-10 animate-fade-in delay-500">
+                <Link href="/writer-plugin" className="text-sm font-medium text-gray-500 hover:text-indigo-400 transition-colors flex items-center gap-2">
+                    <Zap size={14} className="text-yellow-500" />
+                    Conheça o novo Conext Writer: IA para Posts e SEO no WordPress
                 </Link>
             </div>
 

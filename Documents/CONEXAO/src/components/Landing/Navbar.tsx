@@ -38,6 +38,7 @@ export default function Navbar({ branding }: { branding?: any }) {
                         {[
                             { label: 'Funcionalidades', href: '#features' },
                             { label: 'Planos', href: '#pricing' },
+                            { label: 'Conext Writer', href: '/writer-plugin' },
                             { label: 'Documentação', href: '/docs' }
                         ].map((link) => (
                             <Link 
@@ -85,6 +86,7 @@ export default function Navbar({ branding }: { branding?: any }) {
                         {[
                             { label: 'Funcionalidades', href: '#features' },
                             { label: 'Planos', href: '#pricing' },
+                            { label: 'Conext Writer', href: '/writer-plugin' },
                             { label: 'Documentação', href: '/docs' }
                         ].map((link) => (
                             <Link 

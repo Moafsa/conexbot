@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class ConexAI_Agent_Supervisor {
+class Conext_Agent_Supervisor {
     
     private $provider;
 
