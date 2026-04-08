@@ -104,7 +104,7 @@ class Conext_Admin {
                         $plans = Conext_Licensing::get_available_plans();
                         if (!empty($plans)):
                             foreach ($plans as $plan): 
-                                $checkout_url = "https://app.conext.click/checkout?planId=" . $plan['id'] . "&type=WRITER_PLUGIN";
+                                $checkout_url = "https://app.conext.click/auth/register?planId=" . $plan['id'] . "&type=WRITER_PLUGIN";
                                 ?>
                                 <div style="border: 1px solid #e5e7eb; padding: 20px; border-radius: 12px; background: #fafafa; text-align: center;">
                                     <h4 style="margin:0 0 10px 0;"><?php echo esc_html($plan['name']); ?></h4>
