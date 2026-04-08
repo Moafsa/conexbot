@@ -23,28 +23,34 @@ export default async function DashboardLayout({
         redirect('/auth/login?callbackUrl=/dashboard');
     }
 
+    let tenant = null;
     if (session?.user?.email) {
 
-        const tenant = await prisma.tenant.findUnique({
+        tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
             include: { 
                 subscriptions: {
-                    where: { type: 'PRIMARY' },
-                    take: 1
+                    where: { 
+                        type: { in: ['PRIMARY', 'WRITER_PLUGIN'] },
+                        status: { in: ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'] }
+                    }
                 }, 
                 usageCounter: true 
             }
         });
         
-        // Let SUPERADMIN and ADMIN pass. For normal users, require a PRIMARY subscription.
+        // Let SUPERADMIN and ADMIN pass. For normal users, require AT LEAST ONE valid subscription.
         if (tenant && tenant.role === 'USER') {
-            const subscription = tenant.subscriptions[0];
-            const hasSub = subscription && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(subscription.status);
+            const hasSub = tenant.subscriptions.length > 0;
             
             if (!hasSub) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
+
+            const primarySub = tenant.subscriptions.find((s: any) => s.type === 'PRIMARY');
+            const writerSub = tenant.subscriptions.find((s: any) => s.type === 'WRITER_PLUGIN');
+            const subscription = primarySub || writerSub; // For trial banner logic
 
             if (subscription?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
                 const diffTime = tenant.usageCounter.periodEnd.getTime() - new Date().getTime();
@@ -79,5 +85,10 @@ export default async function DashboardLayout({
         }
     }
     
-    return <Shell branding={config} alertBanner={trialBanner}>{children}</Shell>;
+    const userPlans = {
+        hasPrimary: !!tenant?.subscriptions.find((s: any) => s.type === 'PRIMARY'),
+        hasWriter: !!tenant?.subscriptions.find((s: any) => s.type === 'WRITER_PLUGIN')
+    };
+    
+    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans}>{children}</Shell>;
 }

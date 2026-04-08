@@ -16,7 +16,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, whatsapp, cpfCnpj, planId, trial } = parsed.data;
+        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type } = parsed.data;
 
         if (!planId) {
             return NextResponse.json(
@@ -58,6 +58,8 @@ export async function POST(req: Request) {
             }
         }
 
+        const subType = type || (plan?.type as string) || 'PRIMARY';
+
         const tenant = await prisma.tenant.create({
             data: {
                 name,
@@ -68,15 +70,15 @@ export async function POST(req: Request) {
                 subscriptions: (trial === 'true' && plan) ? {
                     create: {
                         planId: plan.id,
-                        type: 'PRIMARY',
+                        type: subType as any,
                         status: 'TRIALING',
                         gateway: 'SYSTEM'
                     }
                 } : undefined,
                 usageCounter: {
                     create: {
-                        messagesLimit: plan?.messageLimit || 5000,
-                        botsLimit: plan?.botLimit || 1,
+                        messagesLimit: subType === 'PRIMARY' ? (plan?.messageLimit || 5000) : 0,
+                        botsLimit: subType === 'PRIMARY' ? (plan?.botLimit || 1) : 0,
                         periodEnd: new Date(Date.now() + (trial === 'true' && plan ? plan.trialDays : 30) * 24 * 60 * 60 * 1000)
                     }
                 }

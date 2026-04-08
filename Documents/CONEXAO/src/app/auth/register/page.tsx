@@ -45,7 +45,8 @@ export default function RegisterPage() {
                     ...form,
                     planId,
                     interval,
-                    trial
+                    trial,
+                    type
                 }),
             });
 

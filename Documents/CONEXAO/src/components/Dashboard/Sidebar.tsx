@@ -6,7 +6,13 @@ import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
 import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, Sparkles } from "lucide-react";
 
-export default function Sidebar({ branding }: { branding?: any }) {
+export default function Sidebar({ 
+    branding,
+    userPlans 
+}: { 
+    branding?: any,
+    userPlans?: { hasPrimary: boolean, hasWriter: boolean }
+}) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(true);
@@ -20,8 +26,10 @@ export default function Sidebar({ branding }: { branding?: any }) {
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
-        { icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" },
-        { icon: MessageSquare, label: "Meus Bots", href: "/dashboard/bots" },
+        ...(userPlans?.hasPrimary !== false ? [
+            { icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" },
+            { icon: MessageSquare, label: "Meus Bots", href: "/dashboard/bots" },
+        ] : []),
         { icon: Sparkles, label: "AI Writer", href: "/dashboard/writer" },
         { icon: CreditCard, label: "Financeiro", href: "/dashboard/finance" },
         { icon: Settings, label: "Configurações", href: "/dashboard/settings" },
@@ -99,7 +107,9 @@ export default function Sidebar({ branding }: { branding?: any }) {
                     {!collapsed && (
                         <div className="text-left flex-1 overflow-hidden">
                             <p className="text-sm font-medium text-white truncate">Minha Conta</p>
-                            <p className="text-xs text-gray-500 truncate">Pro Plan</p>
+                            <p className="text-xs text-gray-500 truncate">
+                                {userPlans?.hasPrimary ? "Pro Plan" : "Writer Plan"}
+                            </p>
                         </div>
                     )}
                 </button>

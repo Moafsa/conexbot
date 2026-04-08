@@ -9,6 +9,7 @@ export const registerSchema = z.object({
     whatsapp: z.string().nullable().optional(),
     cpfCnpj: z.string().nullable().optional(),
     planId: z.string().nullable().optional(),
+    type: z.string().nullable().optional(),
     interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).nullable().optional(),
     trial: z.string().nullable().optional(), // Comes as string boolean from URL
 });
