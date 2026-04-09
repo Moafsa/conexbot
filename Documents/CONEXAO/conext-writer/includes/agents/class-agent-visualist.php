@@ -23,6 +23,7 @@ class Conext_Agent_Visualist {
         ];
         
         $style_prompt = isset($styles[$style_key]) ? $styles[$style_key] : $styles['3d_render'];
+        $search_terms = get_option('conext_writer_search_terms');
 
         $prompt = "Professional high-conversion featured image for a blog post about: " . $keywords . ". ";
         if (!empty($search_terms)) {

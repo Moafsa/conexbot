@@ -48,16 +48,21 @@ class Conext_Orchestrator {
         $researcher = new Conext_Agent_Researcher($this->get_active_provider());
         $topic_data = $researcher->gather_topics();
 
-        if (!$topic_data) return false;
+        if (!$topic_data) {
+            error_log('Conext Writer: Falha no Agente Pesquisador (Researcher). Verifique as chaves de API.');
+            return false;
+        }
+        error_log('Conext Writer: Pauta definida: ' . $topic_data['title']);
 
         // 2. Redatores Encadeados (Cascade Engine) - Voltando para a forma que estava perfeita
         $writer = new Conext_Agent_Writer($this->get_active_provider());
         $outline = $writer->draft_outline($topic_data);
         
         if (empty($outline)) {
-            error_log('Conext Writer: Falha ao gerar Esboço (Outline). Abortando.');
+            error_log('Conext Writer: Falha no Agente Redator (Writer - Esboço).');
             return false;
         }
+        error_log('Conext Writer: Esboço gerado com sucesso.');
 
         $full_text = "";
         $outline_chunks = array_chunk($outline, 2);
@@ -65,6 +70,7 @@ class Conext_Orchestrator {
         foreach ($outline_chunks as $chunk) {
             $full_text .= $writer->expand_content($topic_data, $chunk, $full_text, $topic_data['keywords']);
         }
+        error_log('Conext Writer: Conteúdo expandido. Tamanho: ' . strlen($full_text) . ' caracteres.');
 
         // Injeção de Links (Internos e Externos) para Yoast
         $full_text = $this->inject_links_into_content($full_text, $topic_data['keywords']);
@@ -89,6 +95,7 @@ class Conext_Orchestrator {
             'available_categories' => $categories_list
         ];
         $seo_data = $seo_agent->optimize($draft_payload);
+        error_log('Conext Writer: Otimização SEO concluída.');
         
         $optimized_post = [
             'title' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['title']),

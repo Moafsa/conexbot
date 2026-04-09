@@ -315,6 +315,8 @@ class Conext_Admin {
 
         if (is_numeric($result) || $result === true) {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=success'));
+        } elseif ($result === 'trial_limit') {
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=trial_limit'));
         } elseif ($result === 'no_credits') {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=no_credits'));
         } elseif ($result === 'no_license') {

@@ -31,6 +31,13 @@ class Conext_Licensing {
     public static function get_credits_remaining() {
         $limit = (int) get_option('conext_writer_post_limit', 0);
         $used = (int) get_option('conext_writer_posts_used', 0);
+        
+        // Se o limite for 0 mas houver um status especial (ex: TRIAL), permitimos saldo virtual
+        $status = get_option('conext_writer_license_status');
+        if ($limit <= 0 && $status === 'TRIALING') {
+            return max(0, 5 - $used);
+        }
+
         return $limit > 0 ? max(0, $limit - $used) : 0;
     }
 
