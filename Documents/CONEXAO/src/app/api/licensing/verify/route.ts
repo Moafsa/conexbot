@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
         }
 
         const subscription = keyRecord.subscription;
+        const isTrial = subscription.status === 'TRIALING' || (subscription.plan?.trialDays || 0) > 0;
+        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
 
         // Permitimos PENDING para integração, mas avisamos o status
         const isActive = isSubscriptionActive(subscription.status);
@@ -39,10 +41,6 @@ export async function POST(req: NextRequest) {
                 status: subscription.status 
             }, { status: 403 });
         }
-
-        // Se for TRIALING, o limite é forçado para 5 posts
-        const isTrial = subscription.status === 'TRIALING';
-        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
 
         // Se o siteUrl for enviado, registramos ou validamos
         if (siteUrl) {

@@ -16,6 +16,7 @@ export default function RegisterPage() {
     const interval = searchParams.get("interval");
     const trial = searchParams.get("trial");
     const gateway = searchParams.get("gateway");
+    const type = searchParams.get("type");
 
     useEffect(() => {
         if (!planId) {
@@ -40,7 +41,8 @@ export default function RegisterPage() {
                     ...form,
                     planId,
                     interval,
-                    trial
+                    trial,
+                    type
                 }),
             });
 

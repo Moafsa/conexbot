@@ -8,6 +8,36 @@ import { MercadoPagoService } from '@/services/payment/mercadopago';
 
 const baseUrl = () => process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
 
+function generateRedirectPage(absoluteUrl: string, safeUrl: string) {
+    return new NextResponse(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Redirecionando para o Pagamento...</title>
+            <meta charset="utf-8">
+            <style>
+                body { background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
+                a { color: #6366f1; text-decoration: none; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div>
+                <h2>Processando seu pagamento...</h2>
+                <p>Se a nova aba não abrir automaticamente, <a href="${absoluteUrl}" target="_blank" onclick="window.location.href='/dashboard/finance'">clique aqui para pagar</a>.</p>
+                <script>
+                    setTimeout(() => {
+                        window.open("${absoluteUrl}", "_blank");
+                        window.location.href = "/dashboard/finance";
+                    }, 500);
+                </script>
+            </div>
+        </body>
+        </html>
+    `, {
+        headers: { 'Content-Type': 'text/html' }
+    });
+}
+
 
 export async function GET(req: Request) {
     const safeUrl = baseUrl();
@@ -75,16 +105,37 @@ export async function GET(req: Request) {
                     return NextResponse.redirect(new URL(`/checkout/complete-profile?callbackUrl=${encodeURIComponent(`/api/checkout/portal?planId=${plan.id}&interval=${interval}&gateway=${gateway}`)}`, safeUrl));
                 }
 
-                // 1. Cancel existing subscription in Asaas to prevent duplicate charges if user retries checkout
+                // 1. Idempotency Check: Prevent duplicate billing if a recent PENDING invoice already exists
                 const existingSub = await prisma.subscription.findUnique({ 
                     where: { 
                         tenantId_type: { 
                             tenantId, 
                             type: plan.type 
                         } 
-                    } 
+                    },
+                    include: { plan: true }
                 });
-                if (existingSub?.externalId && existingSub.gateway === 'asaas') {
+
+                if (existingSub?.status === 'PENDING' && existingSub.externalId && existingSub.gateway === 'asaas') {
+                    // Check for a recent PENDING payment for this tenant
+                    const lastPayment = await prisma.payment.findFirst({
+                        where: { 
+                            tenantId, 
+                            status: 'PENDING',
+                            gateway: 'asaas'
+                        },
+                        orderBy: { createdAt: 'desc' }
+                    });
+
+                    // If we have a payment with an invoiceUrl created in the last 30 minutes, reuse it
+                    if (lastPayment?.invoiceUrl && lastPayment.externalId && (Date.now() - lastPayment.createdAt.getTime() < 30 * 60 * 1000)) {
+                        return generateRedirectPage(lastPayment.invoiceUrl, safeUrl);
+                    }
+
+                    // If it's old or missing, or if it belongs to a DIFFERENT plan/interval, we should cancel and recreate
+                    await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
+                } else if (existingSub?.externalId && existingSub.gateway === 'asaas') {
+                    // It's not pending (maybe overdue or active), cancel before upgrade/change
                     await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
                 }
 
@@ -110,7 +161,7 @@ export async function GET(req: Request) {
                     },
                     update: {
                         planId: plan.id,
-                        status: 'PENDING',
+                        status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,
                     },
@@ -118,7 +169,7 @@ export async function GET(req: Request) {
                         tenantId,
                         type: plan.type,
                         planId: plan.id,
-                        status: 'PENDING',
+                        status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,
                     },
@@ -147,34 +198,7 @@ export async function GET(req: Request) {
                     ? result.invoiceUrl 
                     : new URL(result.invoiceUrl, safeUrl).toString();
                 
-                // Return an HTML page that opens the invoice in a new tab and redirects the main window to the dashboard.
-                return new NextResponse(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>Redirecionando para o Pagamento...</title>
-                        <meta charset="utf-8">
-                        <style>
-                            body { background: #000; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
-                            a { color: #6366f1; text-decoration: none; font-weight: bold; }
-                        </style>
-                    </head>
-                    <body>
-                        <div>
-                            <h2>Processando seu pagamento...</h2>
-                            <p>Se a nova aba não abrir automaticamente, <a href="${absoluteUrl}" target="_blank" onclick="window.location.href='/dashboard/finance'">clique aqui para pagar</a>.</p>
-                            <script>
-                                setTimeout(() => {
-                                    window.open("${absoluteUrl}", "_blank");
-                                    window.location.href = "/dashboard/finance";
-                                }, 500);
-                            </script>
-                        </div>
-                    </body>
-                    </html>
-                `, {
-                    headers: { 'Content-Type': 'text/html' }
-                });
+                return generateRedirectPage(absoluteUrl, safeUrl);
             }
             case 'mercadopago': {
                 const mpPref = await MercadoPagoService.createPreference(tenant, plan.id);
@@ -188,7 +212,7 @@ export async function GET(req: Request) {
                     },
                     update: {
                         planId: plan.id,
-                        status: 'PENDING',
+                        status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'mercadopago',
                         externalId: mpPref.id,
                     },
@@ -196,7 +220,7 @@ export async function GET(req: Request) {
                         tenantId,
                         type: plan.type,
                         planId: plan.id,
-                        status: 'PENDING',
+                        status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'mercadopago',
                         externalId: mpPref.id,
                     },

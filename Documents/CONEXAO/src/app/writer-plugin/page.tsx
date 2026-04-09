@@ -60,9 +60,9 @@ export default function WriterPluginLP() {
 
     const handlePurchase = (planId: string) => {
         if (status === 'unauthenticated') {
-            router.push(`/auth/register?planId=${planId}&type=WRITER_PLUGIN`);
+            router.push(`/auth/register?planId=${planId}&type=WRITER_PLUGIN&interval=${interval}`);
         } else {
-            router.push(`/checkout?planId=${planId}&type=WRITER_PLUGIN`);
+            router.push(`/api/checkout/portal?planId=${planId}&type=WRITER_PLUGIN&interval=${interval}`);
         }
     };
 

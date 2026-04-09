@@ -27,21 +27,25 @@ export async function POST(req: NextRequest) {
         }
 
         const subscription = keyRecord.subscription;
+        const isTrial = subscription.status === 'TRIALING' || (subscription.plan?.trialDays || 0) > 0;
+        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
 
-        // Se estiver PENDING, bloqueamos consumo real
+        // Se estiver PENDING, bloqueamos consumo real A MENOS que seja trial e tenha créditos
         if (subscription.status === 'PENDING') {
-            return NextResponse.json({ 
-                error: 'Sua assinatura está aguardando pagamento. Aproveite para terminar as configurações, mas a geração de posts será liberada após a liquidação da fatura.' 
-            }, { status: 403 });
+            const hasTrialCredits = isTrial && subscription.writerPostsUsed < 5;
+            
+            if (!hasTrialCredits) {
+                return NextResponse.json({ 
+                    error: 'Sua assinatura está aguardando pagamento. Aproveite para terminar as configurações, mas a geração de posts será liberada após a liquidação da fatura.' 
+                }, { status: 403 });
+            }
         }
 
-        if (!isSubscriptionActive(subscription.status)) {
+        if (!isSubscriptionActive(subscription.status) && subscription.status !== 'PENDING') {
             return NextResponse.json({ error: 'Subscription is inactive' }, { status: 403 });
         }
 
         // Validar limites
-        const isTrial = subscription.status === 'TRIALING';
-        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
         const wordLimit = subscription.plan?.wordLimit || 0;
 
         if (postLimit > 0 && subscription.writerPostsUsed + (postsToConsume || 1) > postLimit) {
