@@ -59,13 +59,20 @@ class Conext_API {
             ]),
         ]);
 
-        if (is_wp_error($response)) {
-            error_log('Conext Writer Gemini API Error: ' . $response->get_error_message());
+        $http_code = wp_remote_retrieve_response_code($response);
+        if ($http_code !== 200) {
+            error_log('Conext Writer Gemini API Error: HTTP ' . $http_code . ' - ' . wp_remote_retrieve_body($response));
             return false;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['candidates'][0]['content']['parts'][0]['text']) ? $body['candidates'][0]['content']['parts'][0]['text'] : false;
+        
+        if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
+            return $body['candidates'][0]['content']['parts'][0]['text'];
+        }
+
+        error_log('Conext Writer Gemini API Error: Unexpected response structure - ' . json_encode($body));
+        return false;
     }
     public static function generate_image($prompt, $provider) {
         if ($provider['provider'] === 'openai') {

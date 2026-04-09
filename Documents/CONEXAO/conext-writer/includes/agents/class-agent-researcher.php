@@ -14,7 +14,7 @@ class Conext_Agent_Researcher {
         $this->sources = get_option('conext_writer_news_source');
     }
 
-    public function gather_topics() {
+    public function gather_topics($recent_titles = []) {
         $do_random = get_option('conext_writer_topic_random');
         $do_products = get_option('conext_writer_topic_products');
         $search_terms = get_option('conext_writer_search_terms', '');
@@ -29,6 +29,8 @@ class Conext_Agent_Researcher {
                   "PROIBIÇÃO ABSOLUTA: Você NÃO PODE gerar um post sobre o site em si, nem sobre promoções dele, nem bônus ou avaliações da marca '{$site_name}'. O seu dever é ser 'invisível'. \n" .
                   "MISSÃO: Basado no nicho acima, sugira um TEMA DE CAUDA LONGA que seja interessante para os leitores desse nicho. Se o usuário enviou termos de pesquisa, use um deles. Se não enviou, invente uma pauta profunda. \n" .
                   "Sua saída deve conter: 1 Título atraente, 1 Keyword principal e o resumo do que o post vai tratar (ESQUEÇA O SITE, FOQUE NO ASSUNTO).";
+        
+        $chosen_term = '';
         if (!empty($search_terms)) {
             $terms_array = array_map('trim', preg_split('/[,;\n]+/', $search_terms));
             $terms_array = array_filter($terms_array); // remove empty
@@ -41,7 +43,7 @@ class Conext_Agent_Researcher {
         }
 
         if (!empty($recent_titles)) {
-            $prompt .= "AVISO ANTI-DUPLICAÇÃO: Os últimos posts foram: [" . implode(" | ", $recent_titles) . "]. Escolha abordagens INÉDITAS. Não repita esses assuntos. ";
+            $prompt .= "AVISO ANTI-DUPLICAÇÃO: Os últimos posts publicados foram: [" . implode(" | ", $recent_titles) . "]. Escolha abordagens INÉDITAS. Não repita esses assuntos de forma alguma. ";
         }
 
         $use_products = false;
@@ -87,6 +89,15 @@ class Conext_Agent_Researcher {
 
         $response = $this->call_llm_api($prompt);
         
+        // Se não houver termo escolhido via admin nem produto, tenta extrair a Keyword da resposta da IA
+        if (empty($chosen_term) && $keywords_out === "novidades do nicho") {
+            if (preg_match('/Keyword principal:\s*(.*)/i', $response, $matches)) {
+                $keywords_out = trim($matches[1]);
+            } elseif (preg_match('/Keyword:\s*(.*)/i', $response, $matches)) {
+                $keywords_out = trim($matches[1]);
+            }
+        }
+
         return [
             'raw_data' => $response,
             'keywords' => $keywords_out,

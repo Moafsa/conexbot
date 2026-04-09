@@ -100,7 +100,10 @@ class Conext_Licensing {
             'headers' => ['Content-Type' => 'application/json']
         ]);
 
-        if (is_wp_error($response)) return false;
+        if (is_wp_error($response)) {
+            error_log('Conext Writer Error (Consume Connection): ' . $response->get_error_message());
+            return false;
+        }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
         
@@ -108,12 +111,18 @@ class Conext_Licensing {
         update_option('conext_writer_last_api_response', $body);
 
         if (isset($body['success']) && $body['success']) {
-            // Sincroniza localmente após consumo
+            error_log('Conext Writer: Créditos consumidos com sucesso no SaaS.');
+            
+            // Incremento manual local para garantir atualização imediata mesmo se o sync_limits falhar
+            $current_used = (int) get_option('conext_writer_posts_used', 0);
+            update_option('conext_writer_posts_used', $current_used + 1);
+            
             self::sync_limits();
             return true;
         }
 
-        return $body; // Retorna o corpo do erro (contendo a chave 'error')
+        error_log('Conext Writer Error (Consume Response): ' . (isset($body['error']) ? $body['error'] : 'Erro desconhecido ao consumir créditos.'));
+        return $body; 
     }
 
     public static function activate_key($key) {

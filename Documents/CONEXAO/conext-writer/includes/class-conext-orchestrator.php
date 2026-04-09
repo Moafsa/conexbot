@@ -45,8 +45,11 @@ class Conext_Orchestrator {
         }
 
         // 1. Pesquisador: Busca as Pautas
+        $recent_posts = wp_get_recent_posts(['numberposts' => 10, 'post_status' => 'publish']);
+        $recent_titles = array_column($recent_posts, 'post_title');
+
         $researcher = new Conext_Agent_Researcher($this->get_active_provider());
-        $topic_data = $researcher->gather_topics();
+        $topic_data = $researcher->gather_topics($recent_titles);
 
         if (!$topic_data) {
             error_log('Conext Writer: Falha no Agente Pesquisador (Researcher). Verifique as chaves de API.');
