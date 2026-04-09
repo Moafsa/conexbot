@@ -28,16 +28,28 @@ export async function POST(req: NextRequest) {
 
         const subscription = keyRecord.subscription;
 
+        // Se estiver PENDING, bloqueamos consumo real
+        if (subscription.status === 'PENDING') {
+            return NextResponse.json({ 
+                error: 'Sua assinatura está aguardando pagamento. Aproveite para terminar as configurações, mas a geração de posts será liberada após a liquidação da fatura.' 
+            }, { status: 403 });
+        }
+
         if (!isSubscriptionActive(subscription.status)) {
             return NextResponse.json({ error: 'Subscription is inactive' }, { status: 403 });
         }
 
         // Validar limites
-        const postLimit = subscription.plan?.postLimit || 0;
+        const isTrial = subscription.status === 'TRIALING';
+        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
         const wordLimit = subscription.plan?.wordLimit || 0;
 
         if (postLimit > 0 && subscription.writerPostsUsed + (postsToConsume || 1) > postLimit) {
-            return NextResponse.json({ error: 'Post limit reached' }, { status: 403 });
+            const errorMsg = isTrial 
+                ? 'Você atingiu o limite máximo de 5 posts no período de teste (trial). É necessário pagar a sua fatura para liberar o restante dos posts do seu plano e continuar gerando conteúdo.'
+                : 'Você atingiu o limite de posts do seu plano.';
+            
+            return NextResponse.json({ error: errorMsg }, { status: 403 });
         }
 
         if (wordLimit > 0 && subscription.writerWordsUsed + (wordsToConsume || 0) > wordLimit) {

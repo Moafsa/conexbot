@@ -35,6 +35,11 @@ class Conext_Orchestrator {
         }
 
         if (Conext_Licensing::get_credits_remaining() <= 0) {
+            $status = get_option('conext_writer_license_status');
+            if ($status === 'TRIALING') {
+                error_log('Conext Writer: Limite de Trial atingido.');
+                return 'trial_limit';
+            }
             error_log('Conext Writer: Créditos insuficientes.');
             return 'no_credits';
         }

@@ -30,10 +30,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
 
         // Instant release: Update subscription status to ACTIVE (Filtered by payment type)
-        await prisma.subscription.updateMany({
-            where: { tenantId: payment.tenantId, type: payment.type },
-            data: { status: 'ACTIVE' }
+        const subscriptions = await prisma.subscription.findMany({
+            where: { tenantId: payment.tenantId, type: payment.type }
         });
+
+        for (const sub of subscriptions) {
+            await prisma.subscription.update({
+                where: { id: sub.id },
+                data: { status: 'ACTIVE' }
+            });
+
+            // Gerar chave de licença caso seja plugin e não tenha
+            if (sub.type === 'WRITER_PLUGIN') {
+                const existingKey = await prisma.licenseKey.findFirst({
+                    where: { subscriptionId: sub.id }
+                });
+
+                if (!existingKey) {
+                    const newKey = `CNX-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+                    await prisma.licenseKey.create({
+                        data: {
+                            key: newKey,
+                            subscriptionId: sub.id,
+                            status: 'ACTIVE'
+                        }
+                    });
+                }
+            }
+        }
 
         // Reset usage counter credits to renew access cycle
         if (payment.type === 'PRIMARY') {

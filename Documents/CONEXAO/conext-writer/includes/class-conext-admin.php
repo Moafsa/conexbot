@@ -45,6 +45,7 @@ class Conext_Admin {
         register_setting('conext_writer_settings', 'conext_writer_tone');
         register_setting('conext_writer_settings', 'conext_writer_word_count');
         register_setting('conext_writer_settings', 'conext_writer_image_count', ['default' => 1]);
+        register_setting('conext_writer_settings', 'conext_writer_image_style', ['default' => '3d_render']);
     }
 
     public function reschedule_cron() {
@@ -227,6 +228,19 @@ class Conext_Admin {
                         </td>
                     </tr>
                     <tr valign="top">
+                        <th scope="row">Estilo das Imagens</th>
+                        <td>
+                            <select name="conext_writer_image_style">
+                                <option value="3d_render" <?php selected(get_option('conext_writer_image_style', '3d_render'), '3d_render'); ?>>3D Render (Moderno e Vibrante)</option>
+                                <option value="photorealistic" <?php selected(get_option('conext_writer_image_style'), 'photorealistic'); ?>>Fotorealista (Alta Qualidade)</option>
+                                <option value="flat_illustration" <?php selected(get_option('conext_writer_image_style'), 'flat_illustration'); ?>>Ilustração Flat (Minimalista)</option>
+                                <option value="cyberpunk" <?php selected(get_option('conext_writer_image_style'), 'cyberpunk'); ?>>Futurista / Cyberpunk (Neon)</option>
+                                <option value="isometric" <?php selected(get_option('conext_writer_image_style'), 'isometric'); ?>>Isométrico (Limpo e Técnico)</option>
+                            </select>
+                            <p class="description">Escolha como a IA deve "desenhar" as imagens do seu post.</p>
+                        </td>
+                    </tr>
+                    <tr valign="top">
                         <th scope="row">Fontes de Notícias ou RSS</th>
                         <td>
                             <textarea name="conext_writer_news_source" rows="5" class="large-text code" placeholder="Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática">
@@ -279,6 +293,7 @@ class Conext_Admin {
                             elseif ($_GET['status'] == 'error_keys') echo 'Erro: Chaves de API não configuradas ou inválidas.';
                             elseif ($_GET['status'] == 'license_ok') echo 'Licença ativada com sucesso!';
                             elseif ($_GET['status'] == 'license_error') echo 'Chave de licença inválida.';
+                            elseif ($_GET['status'] == 'trial_limit') echo 'Você atingiu o limite máximo de 5 posts no período de teste (trial). É necessário pagar a sua fatura para liberar o restante dos posts do seu plano.';
                             elseif ($_GET['status'] == 'no_credits') echo 'Você não possui mais créditos este mês. Faça um upgrade!';
                         ?>
                     </p>

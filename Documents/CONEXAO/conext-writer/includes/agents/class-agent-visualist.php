@@ -13,14 +13,22 @@ class Conext_Agent_Visualist {
     }
 
     public function generate_images($keywords, $count = 1) {
-        $search_terms = get_option('conext_writer_search_terms', '');
+        $style_key = get_option('conext_writer_image_style', '3d_render');
+        $styles = [
+            '3d_render' => 'Style: 3D Render, Vibrant Colors, 4k, Clean design, no text. Theme: Gaming, Modern E-commerce UI, Premium feel.',
+            'photorealistic' => 'Style: Photorealistic, high quality, 8k, professional photography, cinematic lighting, sharp focus, natural colors, realistic textures, no text.',
+            'flat_illustration' => 'Style: Flat illustration, minimalist, vector art, clean lines, corporate colors, modern branding style, no text.',
+            'cyberpunk' => 'Style: Cyberpunk, neon lights, futuristic city vibes, dark background, synthwave colors, digital art, high contrast, no text.',
+            'isometric' => 'Style: Isometric 3D perspective, clean geometry, soft lighting, minimalist scene, pastel colors, professional digital art, no text.'
+        ];
+        
+        $style_prompt = isset($styles[$style_key]) ? $styles[$style_key] : $styles['3d_render'];
 
         $prompt = "Professional high-conversion featured image for a blog post about: " . $keywords . ". ";
         if (!empty($search_terms)) {
             $prompt .= "Thematic inspiration: " . $search_terms . ". ";
         }
-        $prompt .= "Style: 3D Render, Vibrant Colors, 4k, Clean design, no text. " .
-                   "Theme: Gaming, Modern E-commerce UI, Premium feel.";
+        $prompt .= $style_prompt;
 
         $ids = [];
         for ($i = 0; $i < $count; $i++) {

@@ -16,7 +16,7 @@ export default async function WriterDashboardPage() {
         where: { email: session.user.email },
         include: { 
             subscriptions: {
-                include: { licenseKeys: true }
+                include: { licenseKeys: true, plan: true }
             }, 
             usageCounter: true 
         }
@@ -25,7 +25,22 @@ export default async function WriterDashboardPage() {
     if (!tenant) return <div className="p-8 text-white">Tenant não encontrado.</div>;
 
     const writerSub = tenant.subscriptions.find((s: any) => s.type === "WRITER_PLUGIN");
-    const licenseKey = writerSub?.licenseKeys?.[0]?.key || "Pendente de geração...";
+    
+    // Lazy Generation of License Key
+    let licenseKey = writerSub?.licenseKeys?.[0]?.key;
+    if (writerSub && (writerSub.status === 'ACTIVE' || writerSub.status === 'PENDING' || writerSub.status === 'TRIALING') && !licenseKey) {
+        licenseKey = `CNX-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        await prisma.licenseKey.create({
+            data: {
+                key: licenseKey,
+                subscriptionId: writerSub.id,
+                status: 'ACTIVE'
+            }
+        });
+        console.log(`[Dashboard] Lazy generated key for ${session.user.email}: ${licenseKey}`);
+    }
+
+    if (!licenseKey) licenseKey = "Pendente de geração...";
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-10 animate-fade-in relative z-10">

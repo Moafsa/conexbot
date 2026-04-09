@@ -29,12 +29,20 @@ export async function POST(req: NextRequest) {
 
         const subscription = keyRecord.subscription;
 
-        if (!isSubscriptionActive(subscription.status)) {
+        // Permitimos PENDING para integração, mas avisamos o status
+        const isActive = isSubscriptionActive(subscription.status);
+        const isPending = subscription.status === 'PENDING';
+
+        if (!isActive && !isPending) {
             return NextResponse.json({ 
                 error: 'Subscription is inactive',
                 status: subscription.status 
             }, { status: 403 });
         }
+
+        // Se for TRIALING, o limite é forçado para 5 posts
+        const isTrial = subscription.status === 'TRIALING';
+        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
 
         // Se o siteUrl for enviado, registramos ou validamos
         if (siteUrl) {
@@ -56,12 +64,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             tier: subscription.plan?.name || 'Starter',
-            postLimit: subscription.plan?.postLimit || 0,
+            postLimit: postLimit,
             wordLimit: subscription.plan?.wordLimit || 0,
             postsUsed: subscription.writerPostsUsed,
             wordsUsed: subscription.writerWordsUsed,
             status: subscription.status,
-            customer: subscription.tenant.name
+            customer: subscription.tenant.name,
+            isTrial: isTrial,
+            isPending: isPending
         });
 
     } catch (error) {
