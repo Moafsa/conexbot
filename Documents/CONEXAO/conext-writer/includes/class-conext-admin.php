@@ -10,6 +10,10 @@ class Conext_Admin {
         add_action('admin_post_conext_writer_generate', [$this, 'handle_manual_generate']);
         add_action('admin_post_conext_writer_activate_license', [$this, 'handle_activate_license']);
         
+        // Remove footer on plugin page
+        add_filter('admin_footer_text', [$this, 'remove_admin_footer_text'], 99);
+        add_filter('update_footer', [$this, 'remove_admin_footer_version'], 99);
+        
         // Resetar créditos se necessário
         add_action('update_option_conext_writer_frequency_num', [$this, 'reschedule_cron']);
         add_action('update_option_conext_writer_frequency_unit', [$this, 'reschedule_cron']);
@@ -69,6 +73,7 @@ class Conext_Admin {
                 .tier-badge { background: #3c434a; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; text-transform: uppercase; float: right; }
                 .upgrade-btn { background: #f6f7f7; color: #2271b1; border: 1px solid #2271b1; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px; }
                 .upgrade-btn:hover { background: #2271b1; color: #fff; }
+                #wpfooter { display: none; }
             </style>
 
             <h1>Conext Writer <span class="tier-badge"><?php echo Conext_Licensing::get_tier_label(); ?></span></h1>
@@ -271,6 +276,7 @@ class Conext_Admin {
                         <?php 
                             if ($_GET['status'] == 'success') echo 'Post gerado e publicado com sucesso!'; 
                             elseif ($_GET['status'] == 'error') echo 'Erro na geração do post. Verifique os logs.';
+                            elseif ($_GET['status'] == 'error_keys') echo 'Erro: Chaves de API não configuradas ou inválidas.';
                             elseif ($_GET['status'] == 'license_ok') echo 'Licença ativada com sucesso!';
                             elseif ($_GET['status'] == 'license_error') echo 'Chave de licença inválida.';
                             elseif ($_GET['status'] == 'no_credits') echo 'Você não possui mais créditos este mês. Faça um upgrade!';
@@ -292,8 +298,14 @@ class Conext_Admin {
         $orchestrator = new Conext_Orchestrator();
         $result = $orchestrator->execute_daily_generation();
 
-        if ($result) {
+        if (is_numeric($result) || $result === true) {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=success'));
+        } elseif ($result === 'no_credits') {
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=no_credits'));
+        } elseif ($result === 'no_license') {
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=license_error'));
+        } elseif ($result === 'no_keys') {
+            wp_redirect(admin_url('admin.php?page=conext-writer&status=error_keys'));
         } else {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=error'));
         }
@@ -313,5 +325,19 @@ class Conext_Admin {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=license_error'));
         }
         exit;
+    }
+
+    public function remove_admin_footer_text($text) {
+        if (isset($_GET['page']) && $_GET['page'] === 'conext-writer') {
+            return '';
+        }
+        return $text;
+    }
+
+    public function remove_admin_footer_version($text) {
+        if (isset($_GET['page']) && $_GET['page'] === 'conext-writer') {
+            return '';
+        }
+        return $text;
     }
 }

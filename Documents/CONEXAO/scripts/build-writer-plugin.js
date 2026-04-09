@@ -23,6 +23,18 @@ archive.on('error', function(err) {
 
 archive.pipe(output);
 
-// Adiciona os arquivos principais
-archive.directory(sourceDir, 'conext-writer');
+// Adiciona os arquivos principais, excluindo arquivos sensíveis ou de desenvolvimento
+archive.glob('**/*', {
+    cwd: sourceDir,
+    ignore: [
+        'activate_keys.php',
+        'check_keys.php',
+        '*.zip',
+        '.git/**',
+        '.github/**',
+        '.vscode/**',
+        '.DS_Store'
+    ]
+}, { prefix: 'conext-writer' });
+
 archive.finalize();

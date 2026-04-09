@@ -24,7 +24,7 @@ class Conext_Orchestrator {
 
         if (!$this->has_valid_keys()) {
             error_log('Conext Writer: Nenhuma chave de API configurada. Processo abortado.');
-            return false;
+            return 'no_keys';
         }
 
         // 0. Verificação de Licença e Créditos
