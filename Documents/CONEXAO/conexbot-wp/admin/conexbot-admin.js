@@ -88,7 +88,7 @@
 
         // 4. Onboarding Message Listener
         window.addEventListener('message', function(event) {
-            if (event.origin !== "https://app.conext.click" && event.origin !== "http://localhost:3000") return;
+            if (event.origin !== "https://app.conext.click") return;
             
             if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
                 var data = new FormData();

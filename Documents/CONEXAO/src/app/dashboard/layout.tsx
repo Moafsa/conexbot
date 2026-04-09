@@ -28,7 +28,12 @@ export default async function DashboardLayout({
     if (session?.user?.email) {
         tenant = await prisma.tenant.findUnique({
             where: { email: session.user.email },
-            include: { subscriptions: true, usageCounter: true }
+            include: { 
+                subscriptions: {
+                    include: { licenseKeys: true }
+                }, 
+                usageCounter: true 
+            }
         });
         
         // Let SUPERADMIN and ADMIN pass. For normal users, require at least one subscription.
@@ -38,7 +43,17 @@ export default async function DashboardLayout({
             );
             const hasSub = activeSubs.length > 0;
 
+            console.log('DEBUG DASHBOARD ACCESS:', {
+                email: session.user.email,
+                role: tenant.role,
+                subsCount: tenant.subscriptions.length,
+                activeSubsCount: activeSubs.length,
+                statuses: tenant.subscriptions.map((s: any) => s.status),
+                hasSub
+            });
+
             if (!hasSub) {
+                console.log('REDIRECTING TO PRICING - NO ACTIVE SUB FOUND');
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }

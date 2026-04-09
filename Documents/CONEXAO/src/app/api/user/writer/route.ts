@@ -30,7 +30,7 @@ export async function GET() {
         const activeLicense = subscription?.licenseKeys?.find(k => k.status === 'ACTIVE');
 
         return NextResponse.json({
-            hasPlugin: !!subscription && subscription.status === 'ACTIVE',
+            hasPlugin: !!subscription && ['ACTIVE', 'TRIALING', 'PENDING'].includes(subscription.status),
             subscription: subscription,
             licenseKey: activeLicense?.key || null,
             usage: {

@@ -290,9 +290,6 @@ function conexbot_render_admin_page() {
             <div class="conexbot-card">
                 <div class="conexbot-logo">
                     <img src="https://app.conext.click/logo-colored.png" alt="ConextBot" style="width: 100%; height: auto;">
-                </div>
-                <h1 class="conexbot-h1">Turbine seu WordPress com IA</h1>
-                <p class="conexbot-p">O Conext.click integra a inteligência artificial mais avançada diretamente ao seu WooCommerce e WhatsApp. Automatize vendas e gerencie leads sem sair do painel.</p>
                 
                 <div class="conexbot-steps">
                     <div class="conexbot-step">

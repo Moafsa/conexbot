@@ -57,6 +57,14 @@ export async function POST(req: Request) {
             }
         }
 
+        // New hard fallback for Writer Plugin registration
+        if (!plan && type === 'WRITER_PLUGIN') {
+            plan = await prisma.plan.findFirst({
+                where: { type: 'WRITER_PLUGIN', active: true }
+            });
+            console.log('FALLBACK TO FIRST WRITER PLAN:', plan?.id);
+        }
+
         const tenant = await prisma.tenant.create({
             data: {
                 name,
@@ -64,12 +72,17 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
-                subscriptions: (trial === 'true' && plan) ? {
+                subscriptions: plan ? {
                     create: {
                         planId: plan.id,
-                        status: 'TRIALING',
-                        gateway: 'SYSTEM',
-                        type: type as any
+                        status: trial === 'true' ? 'TRIALING' : 'PENDING',
+                        gateway: trial === 'true' ? 'SYSTEM' : 'ASAAS',
+                        type: type as any,
+                        licenseKeys: type === 'WRITER_PLUGIN' ? {
+                            create: {
+                                key: `CNX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+                            }
+                        } : undefined
                     }
                 } : undefined,
                 usageCounter: {

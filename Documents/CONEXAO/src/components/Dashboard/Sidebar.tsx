@@ -19,8 +19,10 @@ export default function Sidebar({ branding, userPlans }: { branding?: any, userP
     const isAdmin = (session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'SUPERADMIN';
 
     // Base menu items
+    const overviewLink = (userPlans?.hasWriter && !userPlans?.hasPrimary && !isAdmin) ? "/dashboard/writer" : "/dashboard";
+    
     const menuItems = [
-        { icon: LayoutDashboard, label: "Visão Geral", href: "/dashboard" },
+        { icon: LayoutDashboard, label: "Visão Geral", href: overviewLink },
     ];
 
     // Primary Plan Items (Bots/CRM)
