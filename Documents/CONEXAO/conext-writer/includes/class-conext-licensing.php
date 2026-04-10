@@ -97,32 +97,44 @@ class Conext_Licensing {
                 'postsToConsume' => $posts,
                 'wordsToConsume' => $words
             ]),
-            'headers' => ['Content-Type' => 'application/json']
+            'headers' => ['Content-Type' => 'application/json'],
+            'timeout' => 20
         ]);
 
         if (is_wp_error($response)) {
             error_log('Conext Writer Error (Consume Connection): ' . $response->get_error_message());
+            
+            // Fallback para TRIAL: Se a API falhar, descontamos localmente para manter a segurança
+            $status = get_option('conext_writer_license_status');
+            if ($status === 'TRIALING') {
+                $used = (int) get_option('conext_writer_posts_used', 0);
+                update_option('conext_writer_posts_used', $used + $posts);
+                return true; 
+            }
             return false;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        
-        // Armazena a resposta para consulta posterior caso necessário
         update_option('conext_writer_last_api_response', $body);
 
         if (isset($body['success']) && $body['success']) {
-            error_log('Conext Writer: Créditos consumidos com sucesso no SaaS.');
-            
-            // Incremento manual local para garantir atualização imediata mesmo se o sync_limits falhar
-            $current_used = (int) get_option('conext_writer_posts_used', 0);
-            update_option('conext_writer_posts_used', $current_used + 1);
-            
-            self::sync_limits();
+            if (isset($body['postsUsed'])) {
+                update_option('conext_writer_posts_used', (int) $body['postsUsed']);
+            }
+            if (isset($body['wordsUsed'])) {
+                update_option('conext_writer_words_used', (int) $body['wordsUsed']);
+            }
             return true;
         }
 
-        error_log('Conext Writer Error (Consume Response): ' . (isset($body['error']) ? $body['error'] : 'Erro desconhecido ao consumir créditos.'));
-        return $body; 
+        // Se o servidor retornar erro de saldo, garantimos que o local reflita isso
+        if (isset($body['error']) && strpos($body['error'], 'limit') !== false) {
+             // Força sincronização para bloquear próximas tentativas
+             self::sync_limits();
+        }
+
+        error_log('Conext Writer Error (Consume Response): ' . (isset($body['error']) ? $body['error'] : 'Erro desconhecido.'));
+        return false; 
     }
 
     public static function activate_key($key) {

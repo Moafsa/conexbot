@@ -4,20 +4,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Conext_Agent_Researcher {
+class ConexAI_Agent_Researcher {
     
     private $provider;
     private $sources;
 
     public function __construct($provider_config) {
         $this->provider = $provider_config;
-        $this->sources = get_option('conext_writer_news_source');
+        $this->sources = get_option('conex_ai_news_source');
     }
 
-    public function gather_topics($recent_titles = []) {
-        $do_random = get_option('conext_writer_topic_random');
-        $do_products = get_option('conext_writer_topic_products');
-        $search_terms = get_option('conext_writer_search_terms', '');
+    public function gather_topics() {
+        $do_random = get_option('conex_ai_topic_random');
+        $do_products = get_option('conex_ai_topic_products');
+        $search_terms = get_option('conex_ai_search_terms', '');
         
         // Evitar artigos duplicados injetando o contexto recente
         $site_name = get_bloginfo('name');
@@ -29,7 +29,6 @@ class Conext_Agent_Researcher {
                   "PROIBIÇÃO ABSOLUTA: Você NÃO PODE gerar um post sobre o site em si, nem sobre promoções dele, nem bônus ou avaliações da marca '{$site_name}'. O seu dever é ser 'invisível'. \n" .
                   "MISSÃO: Basado no nicho acima, sugira um TEMA DE CAUDA LONGA que seja interessante para os leitores desse nicho. Se o usuário enviou termos de pesquisa, use um deles. Se não enviou, invente uma pauta profunda. \n" .
                   "Sua saída deve conter: 1 Título atraente, 1 Keyword principal e o resumo do que o post vai tratar (ESQUEÇA O SITE, FOQUE NO ASSUNTO).";
-
         if (!empty($search_terms)) {
             $terms_array = array_map('trim', preg_split('/[,;\n]+/', $search_terms));
             $terms_array = array_filter($terms_array); // remove empty
@@ -61,7 +60,7 @@ class Conext_Agent_Researcher {
                 'orderby' => 'rand',
                 'meta_query' => [
                     [
-                        'key' => '_conext_writer_posted',
+                        'key' => '_conex_ai_posted',
                         'compare' => 'NOT EXISTS'
                     ]
                 ]
@@ -75,7 +74,7 @@ class Conext_Agent_Researcher {
                 
                 $prompt .= "Sua missão AGORA é planejar um artigo inteiro focado em atrair clientes para este produto: NOME: $p_name | SOBRE: $p_desc. Crie 1 Título clicável, 1 focus keyword e o resumo dos tópicos. ";
                 $keywords_out = $p_name;
-                update_post_meta($p->ID, '_conext_writer_posted', 1);
+                update_post_meta($p->ID, '_conex_ai_posted', 1);
             } else {
                 $prompt .= "Nenhum produto novo encontrado. Gere uma pauta vibrante sobre novidades, dicas ou estratégias 100% voltadas ao propósito e nicho original do nosso site. ";
             }
@@ -88,15 +87,6 @@ class Conext_Agent_Researcher {
 
         $response = $this->call_llm_api($prompt);
         
-        // Se não houver termo escolhido via admin nem produto, tenta extrair a Keyword da resposta da IA
-        if (empty($chosen_term) && $keywords_out === "novidades do nicho") {
-            if (preg_match('/Keyword principal:\s*(.*)/i', $response, $matches)) {
-                $keywords_out = trim($matches[1]);
-            } elseif (preg_match('/Keyword:\s*(.*)/i', $response, $matches)) {
-                $keywords_out = trim($matches[1]);
-            }
-        }
-
         return [
             'raw_data' => $response,
             'keywords' => $keywords_out,
@@ -106,6 +96,6 @@ class Conext_Agent_Researcher {
 
     private function call_llm_api($prompt) {
         if (!$this->provider) return "Error: No provider";
-        return Conext_API::call($prompt, $this->provider);
+        return ConexAI_API::call($prompt, $this->provider);
     }
 }

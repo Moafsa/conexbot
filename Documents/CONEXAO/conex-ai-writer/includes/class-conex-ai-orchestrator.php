@@ -3,14 +3,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Conext_Orchestrator {
+class ConexAI_Orchestrator {
     
     private $openai_key;
     private $gemini_key;
 
     public function __construct() {
-        $this->openai_key = get_option('conext_writer_openai_key');
-        $this->gemini_key = get_option('conext_writer_gemini_key');
+        $this->openai_key = get_option('conex_ai_openai_key');
+        $this->gemini_key = get_option('conex_ai_gemini_key');
     }
 
     /**
@@ -23,58 +23,36 @@ class Conext_Orchestrator {
         @ini_set('memory_limit', '256M');
 
         if (!$this->has_valid_keys()) {
-            error_log('Conext Writer: Nenhuma chave de API configurada. Processo abortado.');
-            return 'no_keys';
+            error_log('Conex AI Writer: Nenhuma chave de API configurada. Processo abortado.');
+            return false;
         }
 
         // 0. Verificação de Licença e Créditos
-        Conext_Licensing::sync_limits();
-        if (!Conext_Licensing::is_valid()) {
-            error_log('Conext Writer: Licença inválida ou expirada.');
+        ConexAI_Licensing::check_and_reset_credits();
+        if (!ConexAI_Licensing::is_valid()) {
+            error_log('Conex AI Writer: Licença inválida ou expirada.');
             return 'no_license';
         }
 
-        if (Conext_Licensing::get_credits_remaining() <= 0) {
-            $status = get_option('conext_writer_license_status');
-            if ($status === 'TRIALING') {
-                error_log('Conext Writer: Limite de Trial atingido.');
-                return 'trial_limit';
-            }
-            error_log('Conext Writer: Créditos insuficientes.');
+        if (ConexAI_Licensing::get_credits_remaining() <= 0 && get_option('conex_ai_license_tier') !== 'unlimited') {
+            error_log('Conex AI Writer: Créditos insuficientes.');
             return 'no_credits';
         }
 
-        // 1. Pesquisador: Busca as Pautas (Ação rápida)
-        $recent_posts = wp_get_recent_posts(['numberposts' => 10, 'post_status' => 'publish']);
-        $recent_titles = array_column($recent_posts, 'post_title');
+        // 1. Pesquisador: Busca as Pautas
+        $researcher = new ConexAI_Agent_Researcher($this->get_active_provider());
+        $topic_data = $researcher->gather_topics();
 
-        $researcher = new Conext_Agent_Researcher($this->get_active_provider());
-        $topic_data = $researcher->gather_topics($recent_titles);
+        if (!$topic_data) return false;
 
-        if (!$topic_data) {
-            error_log('Conext Writer: Falha no Agente Pesquisador (Researcher). Verifique as chaves de API.');
-            return false;
-        }
-
-        // 2. SEGURANÇA: Consumir crédito ANTES da geração pesada
-        // Isso garante que o usuário não gere conteúdo sem pagar
-        $consumption = Conext_Licensing::consume_credits(1);
-        if (!$consumption) {
-            error_log('Conext Writer: Falha ao consumir créditos. Geração abortada por segurança.');
-            return 'no_credits';
-        }
-        
-        error_log('Conext Writer: Pauta definida e crédito consumido: ' . ($topic_data['title'] ?? $topic_data['keywords']));
-
-        // 3. Redatores Encadeados (Cascade Engine) - Voltando para a forma que estava perfeita
-        $writer = new Conext_Agent_Writer($this->get_active_provider());
+        // 2. Redatores Encadeados (Cascade Engine) - Voltando para a forma que estava perfeita
+        $writer = new ConexAI_Agent_Writer($this->get_active_provider());
         $outline = $writer->draft_outline($topic_data);
         
         if (empty($outline)) {
-            error_log('Conext Writer: Falha no Agente Redator (Writer - Esboço).');
+            error_log('Conex AI Writer: Falha ao gerar Esboço (Outline). Abortando.');
             return false;
         }
-        error_log('Conext Writer: Esboço gerado com sucesso.');
 
         $full_text = "";
         $outline_chunks = array_chunk($outline, 2);
@@ -82,7 +60,6 @@ class Conext_Orchestrator {
         foreach ($outline_chunks as $chunk) {
             $full_text .= $writer->expand_content($topic_data, $chunk, $full_text, $topic_data['keywords']);
         }
-        error_log('Conext Writer: Conteúdo expandido. Tamanho: ' . strlen($full_text) . ' caracteres.');
 
         // Injeção de Links (Internos e Externos) para Yoast
         $full_text = $this->inject_links_into_content($full_text, $topic_data['keywords']);
@@ -91,35 +68,24 @@ class Conext_Orchestrator {
         $full_text = preg_replace('/```html|```/', '', $full_text);
         $full_text = preg_replace('/\b(202[3456]|2022)\b/', '', $full_text);
 
-        // 4. Especialista SEO: Otimiza o texto JÁ GERADO (Evita o erro de Novo Artigo)
-        $seo_agent = new Conext_Agent_SEO($this->get_active_provider());
-        
-        // Fetch real categories from WordPress to pass to AI
-        $wp_categories = get_categories(['hide_empty' => false]);
-        $categories_list = [];
-        foreach ($wp_categories as $cat) {
-            $categories_list[] = ['id' => $cat->term_id, 'name' => $cat->name];
-        }
-
+        // 3. Especialista SEO: Otimiza o texto JÁ GERADO (Evita o erro de Novo Artigo)
+        $seo_agent = new ConexAI_Agent_SEO($this->get_active_provider());
         $draft_payload = [
             'raw_content' => $full_text,
-            'topic_data'  => $topic_data,
-            'available_categories' => $categories_list
+            'topic_data'  => $topic_data
         ];
         $seo_data = $seo_agent->optimize($draft_payload);
-        error_log('Conext Writer: Otimização SEO concluída.');
         
         $optimized_post = [
             'title' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['title']),
             'content' => trim($full_text),
             'focus_keyword' => $seo_data['focus_keyword'],
-            'meta_desc' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['meta_desc']),
-            'category_id' => $seo_data['category_id'] ?? null
+            'meta_desc' => preg_replace('/\b(202[3456]|2022)\b/', '', $seo_data['meta_desc'])
         ];
 
-        // 5. Visualist: Gera Imagem de Destaque e Imagens de Corpo
-        $image_count = (int) get_option('conext_writer_image_count', 1);
-        $visualist = new Conext_Agent_Visualist($this->get_active_provider());
+        // 4. Visualist: Gera Imagem de Destaque e Imagens de Corpo
+        $image_count = (int) get_option('conex_ai_image_count', 1);
+        $visualist = new ConexAI_Agent_Visualist($this->get_active_provider());
         $images_ids = $visualist->generate_images($topic_data['keywords'], $image_count);
         
         $featured_image_id = !empty($images_ids) ? $images_ids[0] : 0;
@@ -129,13 +95,11 @@ class Conext_Orchestrator {
             $optimized_post['content'] = $this->inject_images_into_content($optimized_post['content'], $body_images, $optimized_post['focus_keyword']);
         }
 
-        // 6. Publicação Final via wp_insert_post
+        // 5. Publicação Final via wp_insert_post
         $result = $this->publish_post($optimized_post, $featured_image_id);
         
         if ($result && !is_wp_error($result)) {
-            $word_count = str_word_count(strip_tags($optimized_post['content']));
-            // Atualiza apenas a contagem de palavras, o crédito de post já foi consumido no início
-            update_option('conext_writer_words_used', (int) get_option('conext_writer_words_used', 0) + $word_count);
+            ConexAI_Licensing::consume_credit();
         }
         
         return $result;
@@ -212,16 +176,9 @@ class Conext_Orchestrator {
 
         $post_id = wp_insert_post($post_arr);
 
-        if (!is_wp_error($post_id)) {
-            if ($image_id) {
-                set_post_thumbnail($post_id, $image_id);
-            }
+        if (!is_wp_error($post_id) && $image_id) {
+            set_post_thumbnail($post_id, $image_id);
             
-            // Assign Category if AI chose one
-            if (!empty($post_data['category_id'])) {
-                wp_set_post_categories($post_id, [ (int) $post_data['category_id'] ]);
-            }
-
             // Yoast SEO Meta tags
             update_post_meta($post_id, '_yoast_wpseo_focuskw', $post_data['focus_keyword']);
             update_post_meta($post_id, '_yoast_wpseo_title', $post_data['title']);

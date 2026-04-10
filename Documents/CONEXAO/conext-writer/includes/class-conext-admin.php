@@ -17,6 +17,12 @@ class Conext_Admin {
         // Resetar créditos se necessário
         add_action('update_option_conext_writer_frequency_num', [$this, 'reschedule_cron']);
         add_action('update_option_conext_writer_frequency_unit', [$this, 'reschedule_cron']);
+
+        // Limpeza de termos irrelevantes detectados (IA para pequenos negócios)
+        $terms = get_option('conext_writer_search_terms');
+        if (strpos($terms, 'IA pode ajudar pequenos negocios') !== false) {
+            update_option('conext_writer_search_terms', '');
+        }
     }
 
     public function add_menu_page() {
@@ -142,6 +148,13 @@ class Conext_Admin {
                     </div>
                     
                     <p style="font-size:10px; color:#666; margin-top:20px;">* O plugin utiliza o motor Conext para garantir 100% de aprovação no Yoast SEO.</p>
+                    
+                    <?php if (current_user_can('manage_options')): ?>
+                        <div style="margin-top:20px; padding:10px; background:#f0f0f1; border-left:4px solid #72aee6; font-family:monospace; font-size:10px;">
+                            <strong>LOG TÉCNICO (Última Resposta):</strong>
+                            <pre style="white-space:pre-wrap;"><?php print_r(get_option('conext_writer_last_api_response')); ?></pre>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
