@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
         }
 
         const subscription = keyRecord.subscription;
-        const isTrial = subscription.status === 'TRIALING' || (subscription.plan?.trialDays || 0) > 0;
-        const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
+        const isTrial = subscription.status === 'TRIALING';
+        const postLimit = (isTrial || subscription.status === 'FREE') ? 5 : (subscription.plan?.postLimit || 0);
 
         // Permitimos PENDING para integração, mas avisamos o status
         const isActive = isSubscriptionActive(subscription.status);

@@ -12,6 +12,16 @@ class Conext_Agent_Visualist {
         $this->provider = $provider_config;
     }
 
+    private function translate_to_english($text) {
+        if (empty($text)) return '';
+        
+        $prompt = "Translate the following keyword/topic to a short, descriptive English phrase optimized for AI Image Generation (DALL-E): \"$text\". " .
+                  "Respond ONLY with the English translation.";
+        
+        $translated = Conext_API::call($prompt, $this->provider);
+        return trim(str_replace('"', '', $translated));
+    }
+
     public function generate_images($keywords, $count = 1) {
         $style_key = get_option('conext_writer_image_style', '3d_render');
         $styles = [
@@ -25,9 +35,13 @@ class Conext_Agent_Visualist {
         $style_prompt = isset($styles[$style_key]) ? $styles[$style_key] : $styles['3d_render'];
         $search_terms = get_option('conext_writer_search_terms');
 
-        $prompt = "Professional high-conversion featured image for a blog post about: " . $keywords . ". ";
-        if (!empty($search_terms)) {
-            $prompt .= "Thematic inspiration: " . $search_terms . ". ";
+        // Traduzir palavras-chave e termos para inglês para melhor performance na IA de imagem
+        $keywords_en = $this->translate_to_english($keywords);
+        $search_terms_en = $this->translate_to_english($search_terms);
+
+        $prompt = "Professional high-conversion featured image for a blog post about: " . $keywords_en . ". ";
+        if (!empty($search_terms_en)) {
+            $prompt .= "Thematic inspiration: " . $search_terms_en . ". ";
         }
         $prompt .= $style_prompt;
 

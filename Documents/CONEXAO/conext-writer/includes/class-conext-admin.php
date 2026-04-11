@@ -49,6 +49,7 @@ class Conext_Admin {
         register_setting('conext_writer_settings', 'conext_writer_search_terms');
         register_setting('conext_writer_settings', 'conext_writer_custom_topics');
         register_setting('conext_writer_settings', 'conext_writer_tone');
+        register_setting('conext_writer_settings', 'conext_writer_language');
         register_setting('conext_writer_settings', 'conext_writer_word_count');
         register_setting('conext_writer_settings', 'conext_writer_image_count', ['default' => 1]);
         register_setting('conext_writer_settings', 'conext_writer_image_style', ['default' => '3d_render']);
@@ -81,35 +82,33 @@ class Conext_Admin {
                 .upgrade-btn { background: #f6f7f7; color: #2271b1; border: 1px solid #2271b1; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 10px; }
                 .upgrade-btn:hover { background: #2271b1; color: #fff; }
                 #wpfooter { display: none; }
-            </style>
-
-            <h1>Conext Writer <span class="tier-badge"><?php echo Conext_Licensing::get_tier_label(); ?></span></h1>
+            </style>            <h1>Conext Writer <span class="tier-badge"><?php echo Conext_Licensing::get_tier_label(); ?></span></h1>
             
             <div class="conex-ai-card">
-                <h3>Uso de Créditos Mensais</h3>
+                <h3><?php _e('Uso de Créditos Mensais', 'conext-writer'); ?></h3>
                 <div class="conex-ai-progress">
                     <div class="conex-ai-bar" style="width: <?php echo $percent; ?>%;"></div>
                 </div>
-                <p><strong><?php echo Conext_Licensing::get_credits_remaining(); ?></strong> créditos restantes de <?php echo $total; ?>.</p>
+                <p><strong><?php echo Conext_Licensing::get_credits_remaining(); ?></strong> <?php _e('créditos restantes de', 'conext-writer'); ?> <?php echo $total; ?>.</p>
             </div>
 
             <h2 class="nav-tab-wrapper">
-                <a href="#licensing" class="nav-tab nav-tab-active">Licenciamento</a>
-                <a href="#settings" class="nav-tab">Configurações</a>
+                <a href="#licensing" class="nav-tab nav-tab-active"><?php _e('Licenciamento', 'conext-writer'); ?></a>
+                <a href="#settings" class="nav-tab"><?php _e('Configurações', 'conext-writer'); ?></a>
             </h2>
 
             <div id="conex-licensing-tab">
                 <div class="conex-ai-card">
-                    <h3>Ativar Licença Premium</h3>
-                    <p>Controle total sobre a orquestração de 5 agentes e SEO Nível Yoast.</p>
+                    <h3><?php _e('Ativar Licença Premium', 'conext-writer'); ?></h3>
+                    <p><?php _e('Controle total sobre a orquestração de 5 agentes e SEO Nível Yoast.', 'conext-writer'); ?></p>
                     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
                         <input type="hidden" name="action" value="conext_writer_activate_license">
                         <?php wp_nonce_field('conext_writer_license_action', 'conext_writer_license_nonce'); ?>
                         <input type="text" name="license_key" value="<?php echo esc_attr(get_option('conext_writer_license_key')); ?>" class="regular-text" placeholder="CNX-XXXX-XXXX" />
-                        <?php submit_button('Ativar Agora', 'primary', 'activate_license'); ?>
+                        <?php submit_button(__('Ativar Agora', 'conext-writer'), 'primary', 'activate_license'); ?>
                     </form>
                     <hr>
-                    <h4>Não tem uma licença ou quer fazer Upgrade?</h4>
+                    <h4><?php _e('Não tem uma licença ou quer fazer Upgrade?', 'conext-writer'); ?></h4>
                     
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-top:20px;">
                         <?php 
@@ -121,10 +120,10 @@ class Conext_Admin {
                                 <div style="border: 1px solid #e5e7eb; padding: 20px; border-radius: 12px; background: #fafafa; text-align: center;">
                                     <h4 style="margin:0 0 10px 0;"><?php echo esc_html($plan['name']); ?></h4>
                                     <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
-                                        R$ <?php echo number_format($plan['price'], 2, ',', '.'); ?>
-                                        <span style="font-size: 12px; font-weight: normal; color: #666;">/mês</span>
+                                        R$ <?php echo number_format((float)($plan['price'] ?? 0), 2, ',', '.'); ?>
+                                        <span style="font-size: 12px; font-weight: normal; color: #666;">/<?php _e('mês', 'conext-writer'); ?></span>
                                     </div>
-                                    <p style="font-size: 13px; color: #666; min-height: 40px;"><?php echo esc_html($plan['description']); ?></p>
+                                    <p style="font-size: 13px; color: #666; min-height: 40px;"><?php echo esc_html($plan['description'] ?? ''); ?></p>
                                     <ul style="text-align: left; font-size: 12px; margin: 15px 0; padding: 0; list-style: none;">
                                         <?php 
                                         if (!empty($plan['features']) && is_array($plan['features'])):
@@ -134,16 +133,16 @@ class Conext_Admin {
                                                 <?php endif;
                                             endforeach;
                                         else: ?>
-                                            <li>✅ <?php echo $plan['postLimit']; ?> Posts/mês</li>
-                                            <li>✅ <?php echo number_format($plan['wordLimit'], 0, ',', '.'); ?> Palavras</li>
-                                            <li>✅ Yoast SEO Nível Pro</li>
+                                            <li>✅ <?php echo esc_html($plan['postLimit'] ?? 0); ?> <?php _e('Posts/mês', 'conext-writer'); ?></li>
+                                            <li>✅ <?php echo number_format((float)($plan['wordLimit'] ?? 0), 0, ',', '.'); ?> <?php _e('Palavras', 'conext-writer'); ?></li>
+                                            <li>✅ <?php _e('Yoast SEO Nível Pro', 'conext-writer'); ?></li>
                                         <?php endif; ?>
                                     </ul>
-                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;">Assinar Plano <?php echo esc_html($plan['name']); ?></a>
+                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;"><?php _e('Assinar Plano', 'conext-writer'); ?> <?php echo esc_html($plan['name']); ?></a>
                                 </div>
                             <?php endforeach; 
                         else: ?>
-                            <p>Carregando planos da plataforma... Se não aparecerem, <a href="https://app.conext.click/writer-plugin" target="_blank">clique aqui</a>.</p>
+                            <p><?php _e('Carregando planos da plataforma... Se não aparecerem,', 'conext-writer'); ?> <a href="https://app.conext.click/writer-plugin" target="_blank"><?php _e('clique aqui', 'conext-writer'); ?></a>.</p>
                         <?php endif; ?>
                     </div>
                     
@@ -164,102 +163,115 @@ class Conext_Admin {
                 <?php do_settings_sections('conext_writer_settings'); ?>
                 <table class="form-table">
                     <tr valign="top">
-                        <th scope="row">OpenAI API Key</th>
+                        <th scope="row"><?php _e('OpenAI API Key', 'conext-writer'); ?></th>
                         <td><input type="password" name="conext_writer_openai_key" value="<?php echo esc_attr(get_option('conext_writer_openai_key')); ?>" class="regular-text" /></td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Google Gemini API Key</th>
+                        <th scope="row"><?php _e('Google Gemini API Key', 'conext-writer'); ?></th>
                         <td><input type="password" name="conext_writer_gemini_key" value="<?php echo esc_attr(get_option('conext_writer_gemini_key')); ?>" class="regular-text" /></td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Frequência de Postagens</th>
+                        <th scope="row"><?php _e('Frequência de Postagens', 'conext-writer'); ?></th>
                         <td>
-                            A cada <input type="number" name="conext_writer_frequency_num" value="<?php echo esc_attr(get_option('conext_writer_frequency_num', 24)); ?>" class="small-text" min="1" />
+                            <?php _e('A cada', 'conext-writer'); ?> <input type="number" name="conext_writer_frequency_num" value="<?php echo esc_attr(get_option('conext_writer_frequency_num', 24)); ?>" class="small-text" min="1" />
                             <select name="conext_writer_frequency_unit">
-                                <option value="hours" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'hours'); ?>>Hora(s)</option>
-                                <option value="days" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'days'); ?>>Dia(s)</option>
+                                <option value="hours" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'hours'); ?>><?php _e('Hora(s)', 'conext-writer'); ?></option>
+                                <option value="days" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'days'); ?>><?php _e('Dia(s)', 'conext-writer'); ?></option>
                             </select>
-                            <p class="description">Define quando a IA deve gerar um novo post automaticamente.</p>
+                            <p class="description"><?php _e('Define quando a IA deve gerar um novo post automaticamente.', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Assunto Principal</th>
+                        <th scope="row"><?php _e('Assunto Principal', 'conext-writer'); ?></th>
                         <td>
                             <fieldset>
                                 <label>
                                     <input type="checkbox" name="conext_writer_topic_random" value="1" <?php checked(get_option('conext_writer_topic_random'), 1); ?> />
-                                    Notícias, Tendências e Dicas (Aleatórias)
+                                    <?php _e('Notícias, Tendências e Dicas (Aleatórias)', 'conext-writer'); ?>
                                 </label><br>
                                 <label>
                                     <input type="checkbox" name="conext_writer_topic_products" value="1" <?php checked(get_option('conext_writer_topic_products'), 1); ?> />
-                                    Meus Produtos / Serviços (Via WooCommerce e Lista)
+                                    <?php _e('Meus Produtos / Serviços (Via WooCommerce e Lista)', 'conext-writer'); ?>
                                 </label>
-                                <p class="description">Marque ambas para a IA sortear (50/50) a cada postagem.</p>
+                                <p class="description"><?php _e('Marque ambas para a IA sortear (50/50) a cada postagem.', 'conext-writer'); ?></p>
                             </fieldset>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Termos de Pesquisa Extras</th>
+                        <th scope="row"><?php _e('Termos de Pesquisa Extras', 'conext-writer'); ?></th>
                         <td>
-                            <input type="text" name="conext_writer_search_terms" value="<?php echo esc_attr(get_option('conext_writer_search_terms')); ?>" class="large-text" placeholder="Ex: RPG, Ação, Playstation, Jogos de Tabuleiro, Poker..." />
-                            <p class="description">Obriga a IA a focar nesses nichos durante a criação dos posts e das imagens.</p>
+                            <input type="text" name="conext_writer_search_terms" value="<?php echo esc_attr(get_option('conext_writer_search_terms')); ?>" class="large-text" placeholder="<?php _e('Ex: RPG, Ação, Playstation, Jogos de Tabuleiro, Poker...', 'conext-writer'); ?>" />
+                            <p class="description"><?php _e('Obriga a IA a focar nesses nichos durante a criação dos posts e das imagens.', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Meus Produtos/Serviços</th>
+                        <th scope="row"><?php _e('Meus Produtos/Serviços', 'conext-writer'); ?></th>
                         <td>
-                            <textarea name="conext_writer_custom_topics" rows="3" class="large-text" placeholder="Se você escolheu 'Meus Produtos/Serviços', descreva aqui os produtos ou temas que quer abordar..."><?php echo esc_textarea(get_option('conext_writer_custom_topics')); ?></textarea>
-                            <p class="description">Explique o que você vende ou os assuntos específicos que deseja tratar. A IA focará neles.</p>
+                            <textarea name="conext_writer_custom_topics" rows="3" class="large-text" placeholder="<?php _e('Se você escolheu \'Meus Produtos/Serviços\', descreva aqui os produtos ou temas que quer abordar...', 'conext-writer'); ?>"><?php echo esc_textarea(get_option('conext_writer_custom_topics')); ?></textarea>
+                            <p class="description"><?php _e('Explique o que você vende ou os assuntos específicos que deseja tratar. A IA focará neles.', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Tom de Escrita</th>
+                        <th scope="row"><?php _e('Tom de Escrita', 'conext-writer'); ?></th>
                         <td>
                             <select name="conext_writer_tone">
-                                <option value="Persuasivo e Vendedor" <?php selected(get_option('conext_writer_tone', 'Persuasivo e Vendedor'), 'Persuasivo e Vendedor'); ?>>Persuasivo e Vendedor</option>
-                                <option value="Informativo e Direto" <?php selected(get_option('conext_writer_tone'), 'Informativo e Direto'); ?>>Informativo e Direto</option>
-                                <option value="Descontraído e Casual" <?php selected(get_option('conext_writer_tone'), 'Descontraído e Casual'); ?>>Descontraído e Casual</option>
-                                <option value="Agressivo (Gatilhos Mentais)" <?php selected(get_option('conext_writer_tone'), 'Agressivo (Gatilhos Mentais)'); ?>>Agressivo (Gatilhos Mentais)</option>
+                                <option value="Persuasivo e Vendedor" <?php selected(get_option('conext_writer_tone', 'Persuasivo e Vendedor'), 'Persuasivo e Vendedor'); ?>><?php _e('Persuasivo e Vendedor', 'conext-writer'); ?></option>
+                                <option value="Informativo e Direto" <?php selected(get_option('conext_writer_tone'), 'Informativo e Direto'); ?>><?php _e('Informativo e Direto', 'conext-writer'); ?></option>
+                                <option value="Descontraído e Casual" <?php selected(get_option('conext_writer_tone'), 'Descontraído e Casual'); ?>><?php _e('Descontraído e Casual', 'conext-writer'); ?></option>
+                                <option value="Agressivo (Gatilhos Mentais)" <?php selected(get_option('conext_writer_tone'), 'Agressivo (Gatilhos Mentais)'); ?>><?php _e('Agressivo (Gatilhos Mentais)', 'conext-writer'); ?></option>
                             </select>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Tamanho Médio (Palavras)</th>
+                        <th scope="row"><?php _e('Idioma de Geração', 'conext-writer'); ?></th>
+                        <td>
+                            <?php $selected_lang = get_option('conext_writer_language', 'auto'); ?>
+                            <select name="conext_writer_language">
+                                <option value="auto" <?php selected($selected_lang, 'auto'); ?>><?php _e('Automático (Idioma do Site)', 'conext-writer'); ?></option>
+                                <option value="pt" <?php selected($selected_lang, 'pt'); ?>><?php _e('Português', 'conext-writer'); ?></option>
+                                <option value="es" <?php selected($selected_lang, 'es'); ?>><?php _e('Espanhol', 'conext-writer'); ?></option>
+                                <option value="en" <?php selected($selected_lang, 'en'); ?>><?php _e('Inglês', 'conext-writer'); ?></option>
+                            </select>
+                            <p class="description"><?php _e('O Agente escreverá e otimizará o SEO baseado nesta escolha.', 'conext-writer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row"><?php _e('Tamanho Médio (Palavras)', 'conext-writer'); ?></th>
                         <td>
                             <select name="conext_writer_word_count">
-                                <option value="500-1000" <?php selected(get_option('conext_writer_word_count'), '500-1000'); ?>>Curto (500-1000 palavras)</option>
-                                <option value="1500-3000" <?php selected(get_option('conext_writer_word_count', '1500-3000'), '1500-3000'); ?>>Médio/Longo (1500-3000 palavras)</option>
-                                <option value="3000-5000" <?php selected(get_option('conext_writer_word_count'), '3000-5000'); ?>>Muito Longo (3000-5000 palavras)</option>
+                                <option value="500-1000" <?php selected(get_option('conext_writer_word_count'), '500-1000'); ?>><?php _e('Curto (500-1000 palavras)', 'conext-writer'); ?></option>
+                                <option value="1500-3000" <?php selected(get_option('conext_writer_word_count', '1500-3000'), '1500-3000'); ?>><?php _e('Médio/Longo (1500-3000 palavras)', 'conext-writer'); ?></option>
+                                <option value="3000-5000" <?php selected(get_option('conext_writer_word_count'), '3000-5000'); ?>><?php _e('Muito Longo (3000-5000 palavras)', 'conext-writer'); ?></option>
                             </select>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Número de Imagens</th>
+                        <th scope="row"><?php _e('Número de Imagens', 'conext-writer'); ?></th>
                         <td>
                             <input type="number" name="conext_writer_image_count" value="<?php echo esc_attr(get_option('conext_writer_image_count', 1)); ?>" class="small-text" min="1" max="3" />
-                            <p class="description">Máximo recomendado: 3 imagens (Evita limites de API).</p>
+                            <p class="description"><?php _e('Máximo recomendado: 3 imagens (Evita limites de API).', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Estilo das Imagens</th>
+                        <th scope="row"><?php _e('Estilo das Imagens', 'conext-writer'); ?></th>
                         <td>
                             <select name="conext_writer_image_style">
-                                <option value="3d_render" <?php selected(get_option('conext_writer_image_style', '3d_render'), '3d_render'); ?>>3D Render (Moderno e Vibrante)</option>
-                                <option value="photorealistic" <?php selected(get_option('conext_writer_image_style'), 'photorealistic'); ?>>Fotorealista (Alta Qualidade)</option>
-                                <option value="flat_illustration" <?php selected(get_option('conext_writer_image_style'), 'flat_illustration'); ?>>Ilustração Flat (Minimalista)</option>
-                                <option value="cyberpunk" <?php selected(get_option('conext_writer_image_style'), 'cyberpunk'); ?>>Futurista / Cyberpunk (Neon)</option>
-                                <option value="isometric" <?php selected(get_option('conext_writer_image_style'), 'isometric'); ?>>Isométrico (Limpo e Técnico)</option>
+                                <option value="3d_render" <?php selected(get_option('conext_writer_image_style', '3d_render'), '3d_render'); ?>><?php _e('3D Render (Moderno e Vibrante)', 'conext-writer'); ?></option>
+                                <option value="photorealistic" <?php selected(get_option('conext_writer_image_style'), 'photorealistic'); ?>><?php _e('Fotorealista (Alta Qualidade)', 'conext-writer'); ?></option>
+                                <option value="flat_illustration" <?php selected(get_option('conext_writer_image_style'), 'flat_illustration'); ?>><?php _e('Ilustração Flat (Minimalista)', 'conext-writer'); ?></option>
+                                <option value="cyberpunk" <?php selected(get_option('conext_writer_image_style'), 'cyberpunk'); ?>><?php _e('Futurista / Cyberpunk (Neon)', 'conext-writer'); ?></option>
+                                <option value="isometric" <?php selected(get_option('conext_writer_image_style'), 'isometric'); ?>><?php _e('Isométrico (Limpo e Técnico)', 'conext-writer'); ?></option>
                             </select>
-                            <p class="description">Escolha como a IA deve "desenhar" as imagens do seu post.</p>
+                            <p class="description"><?php _e('Escolha como a IA deve "desenhar" as imagens do seu post.', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                     <tr valign="top">
-                        <th scope="row">Fontes de Notícias ou RSS</th>
+                        <th scope="row"><?php _e('Fontes de Notícias ou RSS', 'conext-writer'); ?></th>
                         <td>
-                            <textarea name="conext_writer_news_source" rows="5" class="large-text code" placeholder="Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática">
+                            <textarea name="conext_writer_news_source" rows="5" class="large-text code" placeholder="<?php _e('Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática', 'conext-writer'); ?>">
 <?php echo esc_textarea(get_option('conext_writer_news_source')); ?>
                             </textarea>
-                            <p class="description">Insira a URL de um feed RSS, o link direto de um site/domínio, ou deixe em branco para o Agente pesquisar na Web livremente sobre os assuntos.</p>
+                            <p class="description"><?php _e('Insira a URL de um feed RSS, o link direto de um site/domínio, ou deixe em branco para o Agente pesquisar na Web livremente sobre os assuntos.', 'conext-writer'); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -267,15 +279,13 @@ class Conext_Admin {
             </form>
 
             <hr />
-            <h2>Teste de Geração</h2>
-            <p>Clique no botão abaixo para forçar o Orquestrador a pesquisar, escrever e publicar um post agora.</p>
+            <h2><?php _e('Teste de Geração', 'conext-writer'); ?></h2>
+            <p><?php _e('Clique no botão abaixo para forçar o Orquestrador a pesquisar, escrever e publicar um post agora.', 'conext-writer'); ?></p>
             <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
                 <input type="hidden" name="action" value="conext_writer_generate">
                 <?php wp_nonce_field('conext_writer_generate_action', 'conext_writer_nonce'); ?>
-                <?php submit_button('Gerar Post AGORA (Manual)', 'secondary', 'generate_post'); ?>
+                <?php submit_button(__('Gerar Post AGORA (Manual)', 'conext-writer'), 'secondary', 'generate_post'); ?>
             </form>
-            </div>
-
             </div>
 
             <script>
@@ -301,13 +311,13 @@ class Conext_Admin {
                 <div id="message" class="updated notice is-dismissible">
                     <p>
                         <?php 
-                            if ($_GET['status'] == 'success') echo 'Post gerado e publicado com sucesso!'; 
-                            elseif ($_GET['status'] == 'error') echo 'Erro na geração do post. Verifique os logs.';
-                            elseif ($_GET['status'] == 'error_keys') echo 'Erro: Chaves de API não configuradas ou inválidas.';
-                            elseif ($_GET['status'] == 'license_ok') echo 'Licença ativada com sucesso!';
-                            elseif ($_GET['status'] == 'license_error') echo 'Chave de licença inválida.';
-                            elseif ($_GET['status'] == 'trial_limit') echo 'Você atingiu o limite máximo de 5 posts no período de teste (trial). É necessário pagar a sua fatura para liberar o restante dos posts do seu plano.';
-                            elseif ($_GET['status'] == 'no_credits') echo 'Você não possui mais créditos este mês. Faça um upgrade!';
+                            if ($_GET['status'] == 'success') _e('Post gerado e publicado com sucesso!', 'conext-writer'); 
+                            elseif ($_GET['status'] == 'error') _e('Erro na geração do post. Verifique os logs.', 'conext-writer');
+                            elseif ($_GET['status'] == 'error_keys') _e('Erro: Chaves de API não configuradas ou inválidas.', 'conext-writer');
+                            elseif ($_GET['status'] == 'license_ok') _e('Licença ativada com sucesso!', 'conext-writer');
+                            elseif ($_GET['status'] == 'license_error') _e('Chave de licença inválida.', 'conext-writer');
+                            elseif ($_GET['status'] == 'trial_limit') _e('Você atingiu o limite máximo de 5 posts no período de teste (trial). É necessário pagar a sua fatura para liberar o restante dos posts do seu plano.', 'conext-writer');
+                            elseif ($_GET['status'] == 'no_credits') _e('Você não possui mais créditos este mês. Faça um upgrade!', 'conext-writer');
                         ?>
                     </p>
                 </div>

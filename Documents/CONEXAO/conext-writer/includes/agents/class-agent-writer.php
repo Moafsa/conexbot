@@ -12,11 +12,44 @@ class Conext_Agent_Writer {
         $this->provider = $provider_config;
     }
 
+    private function get_language_name() {
+        $setting = get_option('conext_writer_language', 'auto');
+        
+        if ($setting !== 'auto') {
+            switch ($setting) {
+                case 'pt': return 'Portuguese (Brazil)';
+                case 'es': return 'Spanish';
+                case 'en': return 'English';
+            }
+        }
+
+        $locale = get_locale();
+        $map = [
+            'pt_BR' => 'Portuguese (Brazil)',
+            'pt_PT' => 'Portuguese (Portugal)',
+            'es_ES' => 'Spanish (Spain)',
+            'es_MX' => 'Spanish (Mexico)',
+            'en_US' => 'English (US)',
+            'en_GB' => 'English (UK)',
+        ];
+        
+        if (isset($map[$locale])) return $map[$locale];
+        
+        $base = substr($locale, 0, 2);
+        if ($base === 'es') return 'Spanish';
+        if ($base === 'pt') return 'Portuguese';
+        if ($base === 'en') return 'English';
+        
+        return 'Portuguese (Brazil)'; // Default
+    }
+
     public function draft_outline($topic_data) {
         $word_count_raw = get_option('conext_writer_word_count', '1500-3000');
         $site_context = isset($topic_data['site_context']) ? $topic_data['site_context'] : 'Um portal de nicho geral.';
         
+        $language = $this->get_language_name();
         $prompt = "Missão Arquitetural: Analise a pauta [" . json_encode($topic_data['raw_data']) . "]. " .
+                  "IDIOMA OBRIGATÓRIO: Você DEVE produzir este esboço em **$language**. \n" .
                   "Este post deve atingir a meta de " . $word_count_raw . " palavras. \n" .
                   "Sua única resposta deve ser o fornecimento de um ESBOÇO (Outline) fragmentado com VÁRIOS Títulos. \n" .
                   "REGRA VITAL DE HUMANIZAÇÃO: É ESTREITAMENTE PROIBIU usar as palavras 'Introdução', 'Conclusão', 'Resumo' ou 'Considerações Finais'. " .
@@ -48,7 +81,9 @@ class Conext_Agent_Writer {
         $tone = get_option('conext_writer_tone', 'Persuasivo');
         $site_context = isset($topic_data['site_context']) ? $topic_data['site_context'] : 'Portal Genérico';
 
+        $language = $this->get_language_name();
         $prompt = "Missão de Redação Profunda baseada na pauta: " . json_encode($topic_data['raw_data']) . " \n\n" .
+                  "IDIOMA OBRIGATÓRIO: Você DEVE escrever este post em **$language**. \n" .
                   "PALAVRA-CHAVE FOCO (OBRIGATÓRIA): **$focus_keyword** \n\n" .
                   "Estamos escrevendo um artigo GIGANTESCO através de uma Linha de Montagem de Redatores.\n" . 
                   "----------------------\n" .
@@ -62,7 +97,8 @@ class Conext_Agent_Writer {
                   "4. SUBTÍTULOS SEO: Você DEVE incluir a palavra-chave foco '**$focus_keyword**' em pelo menos 50% dos subtítulos (H2 ou H3) que você criar ou expandir. \n" .
                   "5. INTRODUÇÃO: Se você for o primeiro agente, a palavra-chave foco DEVE estar obrigatoriamente no primeiro parágrafo do texto. \n" .
                   "6. É PROIBIDO usar 'Além disso', 'Adicionalmente' ou citar o ano atual. \n" .
-                  "7. Escreva de 4 a 5 parágrafos MUITO longos e ricos para cada título exigido. Linguagem: " . $tone . ". Formato HTML.";
+                  "7. Escreva de 4 a 5 parágrafos MUITO longos e ricos para cada título exigido. Linguagem: " . $tone . ". Formato HTML. \n" .
+                  "8. CRÍTICO: Todo o conteúdo e tags HTML devem estar em **$language**.";
 
         return $this->call_llm_api($prompt) . "\n\n";
     }

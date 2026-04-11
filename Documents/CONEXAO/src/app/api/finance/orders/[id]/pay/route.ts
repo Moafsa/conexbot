@@ -28,7 +28,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             data: { status: 'PAID' }
         });
 
-        return NextResponse.json({ success: true, message: 'Fatura quitada com sucesso' });
+        // Tentar encontrar a assinatura relacionada ao tenant e tipo (se houver metadados ou se for o padrão)
+        // Como o sistema busca faturas de assinaturas, vamos garantir que a assinatura do usuário mije para ACTIVE
+        await prisma.subscription.updateMany({
+            where: { tenantId: tenantId },
+            data: { status: 'ACTIVE' }
+        });
+
+        return NextResponse.json({ success: true, message: 'Fatura quitada e assinatura ativada com sucesso' });
     } catch (error: any) {
         console.error('[Finance Orders Pay API] Error:', error);
         return NextResponse.json({ error: 'Falha ao quitar a fatura' }, { status: 500 });

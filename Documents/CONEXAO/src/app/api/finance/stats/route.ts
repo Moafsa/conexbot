@@ -93,13 +93,27 @@ export async function GET() {
                 isLinked: !!tenant?.asaasApiKey,
                 error: asaasError
             },
-            subscriptions: subscription.map((s: any) => ({
-                id: s.id,
-                type: s.type,
-                plan: s.plan,
-                status: s.status,
-                periodEnd: s.updatedAt // Or another field for renewal
-            })),
+            subscriptions: subscription.map((s: any) => {
+                let expiresAt = new Date(s.updatedAt);
+                const interval = s.plan?.interval || 'MONTHLY';
+
+                if (s.status === 'ACTIVE') {
+                    if (interval === 'YEARLY') expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+                    else if (interval === 'SEMIANNUAL') expiresAt.setMonth(expiresAt.getMonth() + 6);
+                    else if (interval === 'QUARTERLY') expiresAt.setMonth(expiresAt.getMonth() + 3);
+                    else expiresAt.setMonth(expiresAt.getMonth() + 1); // DEFAULT MONTHLY
+                } else if (s.status === 'TRIALING') {
+                    expiresAt.setDate(expiresAt.getDate() + (s.plan?.trialDays || 7));
+                }
+
+                return {
+                    id: s.id,
+                    type: s.type,
+                    plan: s.plan,
+                    status: s.status,
+                    periodEnd: expiresAt.toISOString()
+                };
+            }),
             chartData: dailyChartData,
             invoices: invoices
         });

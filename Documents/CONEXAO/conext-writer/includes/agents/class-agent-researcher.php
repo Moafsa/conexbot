@@ -14,6 +14,37 @@ class Conext_Agent_Researcher {
         $this->sources = get_option('conext_writer_news_source');
     }
 
+    private function get_language_name() {
+        $setting = get_option('conext_writer_language', 'auto');
+        
+        if ($setting !== 'auto') {
+            switch ($setting) {
+                case 'pt': return 'Portuguese (Brazil)';
+                case 'es': return 'Spanish';
+                case 'en': return 'English';
+            }
+        }
+
+        $locale = get_locale();
+        $map = [
+            'pt_BR' => 'Portuguese (Brazil)',
+            'pt_PT' => 'Portuguese (Portugal)',
+            'es_ES' => 'Spanish (Spain)',
+            'es_MX' => 'Spanish (Mexico)',
+            'en_US' => 'English (US)',
+            'en_GB' => 'English (UK)',
+        ];
+        
+        if (isset($map[$locale])) return $map[$locale];
+        
+        $base = substr($locale, 0, 2);
+        if ($base === 'es') return 'Spanish';
+        if ($base === 'pt') return 'Portuguese';
+        if ($base === 'en') return 'English';
+        
+        return 'Portuguese (Brazil)'; // Default
+    }
+
     public function gather_topics($recent_titles = []) {
         $do_random = get_option('conext_writer_topic_random');
         $do_products = get_option('conext_writer_topic_products');
@@ -24,10 +55,12 @@ class Conext_Agent_Researcher {
         $site_desc = get_bloginfo('description');
         $site_context = "CONTEXTO DO SITE (APENAS PARA REFERÊNCIA DE NICHO): O portal se chama '{$site_name}' e fala sobre '{$site_desc}'.";
 
-        $prompt = "Você é um Estrategista de Pautas SEO. \n" .
+        $language = $this->get_language_name();
+        $prompt = "Você é um Estrategista de Pautas SEO especializado no idioma **$language**. \n" .
                   "{$site_context} \n\n" .
                   "PROIBIÇÃO ABSOLUTA: Você NÃO PODE gerar um post sobre o site em si, nem sobre promoções dele, nem bônus ou avaliações da marca '{$site_name}'. O seu dever é ser 'invisível'. \n" .
-                  "MISSÃO: Basado no nicho acima, sugira um TEMA DE CAUDA LONGA que seja interessante para os leitores desse nicho. Se o usuário enviou termos de pesquisa, use um deles. Se não enviou, invente uma pauta profunda. \n" .
+                  "MISSÃO: Baseado no nicho acima, sugira um TEMA DE CAUDA LONGA que seja interessante para os leitores desse nicho. Se o usuário enviou termos de pesquisa, use um deles. Se não enviou, invente uma pauta profunda. \n" .
+                  "IDIOMA OBRIGATÓRIO: Toda a sua resposta deve estar em **$language**. \n" .
                   "Sua saída deve conter: 1 Título atraente, 1 Keyword principal e o resumo do que o post vai tratar (ESQUEÇA O SITE, FOQUE NO ASSUNTO).";
 
         if (!empty($search_terms)) {
@@ -35,8 +68,8 @@ class Conext_Agent_Researcher {
             $terms_array = array_filter($terms_array); // remove empty
             if (!empty($terms_array)) {
                 $chosen_term = $terms_array[array_rand($terms_array)];
-                $prompt .= "ATUE COMO UM ESPECIALISTA EM SEO. O tema EXIGIDO para o post é: '" . $chosen_term . "'. " . 
-                           "PESQUISE no seu banco de dados as 5 PALAVRAS OU FRASES DE CAUDA LONGA (Long-tail Keywords) com maior rankeamento e volume de busca de mercado relacionadas a '$chosen_term'. " .
+                $prompt .= "ATUE COMO UM ESPECIALISTA EM SEO PARA O IDIOMA **$language**. O tema EXIGIDO para o post é: '" . $chosen_term . "'. " . 
+                           "PESQUISE no seu banco de dados as 5 PALAVRAS OU FRASES DE CAUDA LONGA (Long-tail Keywords) com maior rankeamento e volume de busca de mercado relacionadas a '$chosen_term' no idioma **$language**. " .
                            "Construa a pauta e o título DO ARTIGO se baseando ESTRITAMENTE em alavancar essas palavras que você acabou de descobrir para dominar o Google! ";
             }
         }

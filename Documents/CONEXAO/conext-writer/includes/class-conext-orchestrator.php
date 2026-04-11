@@ -23,7 +23,7 @@ class Conext_Orchestrator {
         @ini_set('memory_limit', '256M');
 
         if (!$this->has_valid_keys()) {
-            error_log('Conext Writer: Nenhuma chave de API configurada. Processo abortado.');
+            error_log(__('Conext Writer: Nenhuma chave de API configurada. Processo abortado.', 'conext-writer'));
             return 'no_keys';
         }
 
@@ -149,7 +149,8 @@ class Conext_Orchestrator {
 
         // 1. Link Interno (Página Inicial)
         $home_url = home_url('/');
-        $internal_link = " <a href='{$home_url}'>confira mais novidades em nossa página inicial</a>";
+        $internal_link_text = __('confira mais novidades em nossa página inicial', 'conext-writer');
+        $internal_link = " <a href='{$home_url}'>$internal_link_text</a>";
         
         // 2. Link Externo (Autoridade)
         $external_links = [
@@ -158,7 +159,8 @@ class Conext_Orchestrator {
             "https://www.google.com/search?q=" . urlencode($keyword)
         ];
         $chosen_ext = $external_links[array_rand($external_links)];
-        $external_link = " <a href='{$chosen_ext}' target='_blank' rel='nofollow'>saiba mais sobre este assunto em fontes oficiais</a>";
+        $external_link_text = __('saiba mais sobre este assunto em fontes oficiais', 'conext-writer');
+        $external_link = " <a href='{$chosen_ext}' target='_blank' rel='nofollow'>$external_link_text</a>";
 
         // Injetar no meio do texto
         $mid_point = floor($total_p / 2);

@@ -27,9 +27,16 @@ require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-researcher.
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-writer.php';
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-seo.php';
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-visualist.php';
+require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/class-conext-i18n-fallback.php';
 
 // Initialize Plugin
 function conext_writer_init() {
+    // Load Text Domain
+    load_plugin_textdomain('conext-writer', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
+    // i18n Fallback for missing MO files
+    Conext_i18n_Fallback::init();
+
     // Initialize Admin
     if (is_admin()) {
         $admin = new Conext_Admin();
