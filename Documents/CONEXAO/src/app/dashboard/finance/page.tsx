@@ -159,6 +159,7 @@ export default function FinancePage() {
     }
 
     const { summary, asaas, subscriptions, invoices } = stats || {};
+    const subscription = subscriptions?.find((s: any) => s.type !== 'WRITER_PLUGIN') || subscriptions?.[0];
 
     return (
         <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
@@ -301,6 +302,7 @@ export default function FinancePage() {
                             >
                                 Alterar Plano / Upgrade
                             </button>
+                        </div>
                         </div>
                     </div>
 
