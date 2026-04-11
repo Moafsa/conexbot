@@ -158,7 +158,7 @@ export default function FinancePage() {
         );
     }
 
-    const { summary, asaas, subscription, invoices } = stats || {};
+    const { summary, asaas, subscriptions, invoices } = stats || {};
 
     return (
         <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
@@ -255,35 +255,52 @@ export default function FinancePage() {
                                 <Receipt size={20} className="text-purple-400" />
                                 Assinatura
                             </h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
-                                    <span className="text-gray-400 text-sm">Plano Atual</span>
-                                    <div className="text-right">
-                                        <span className="font-bold text-indigo-400 uppercase tracking-wider block">{subscription?.plan?.name || "Gratuito"}</span>
-                                        {subscription?.status === 'TRIALING' && (
-                                            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Período de Teste</span>
-                                        )}
+                        <div className="space-y-6">
+                            {(subscriptions && subscriptions.length > 0) ? (
+                                subscriptions.map((sub: any) => (
+                                    <div key={sub.id} className="glass p-5 rounded-2xl border border-white/5 space-y-4">
+                                        <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl">
+                                            <div>
+                                                <span className="text-[9px] text-gray-500 uppercase tracking-widest block mb-0.5">
+                                                    {sub.type === 'WRITER_PLUGIN' ? 'Plugin de Redação' : 'Assinatura Principal'}
+                                                </span>
+                                                <span className="font-bold text-indigo-400 uppercase tracking-wider block">
+                                                    {sub.plan?.name || "Plano Indisponível"}
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${sub.status === 'ACTIVE' || sub.status === 'TRIALING' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                    {sub.status === 'TRIALING' ? 'TRIAL' : (sub.status || "INATIVO")}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex justify-between items-center px-1">
+                                            <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                                                {sub.periodEnd ? `Expira em: ${new Date(sub.periodEnd).toLocaleDateString('pt-BR')}` : "Renovação: N/A"}
+                                            </p>
+                                            {sub.type === 'WRITER_PLUGIN' && sub.status === 'ACTIVE' && (
+                                                <a href="/conext-writer.zip" download className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                                                    <Download size={10} />
+                                                    BAIXAR PLUGIN
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
+                                ))
+                            ) : (
+                                <div className="glass p-6 rounded-2xl border border-white/5 text-center">
+                                    <p className="text-gray-400 text-sm">Nenhuma assinatura ativa</p>
+                                    <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest">STATUS: INATIVO</span>
                                 </div>
-                                <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
-                                    <span className="text-gray-400 text-sm">Status</span>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${subscription?.status === 'ACTIVE' || subscription?.status === 'TRIALING' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                        {subscription?.status === 'TRIALING' ? 'TRIAL' : (subscription?.status || "INATIVO")}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                            )}
 
-                        <div className="mt-8 space-y-3">
                             <button 
                                 onClick={() => setIsUpgradeModalOpen(true)}
-                                className="w-full btn-primary bg-indigo-600 hover:bg-indigo-500 py-4 font-bold shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
+                                className="w-full btn-primary bg-indigo-600 hover:bg-indigo-500 py-4 font-bold shadow-xl shadow-indigo-500/20 active:scale-95 transition-all rounded-2xl mt-2"
                             >
                                 Alterar Plano / Upgrade
                             </button>
-                            <p className="text-[10px] text-center text-gray-500 uppercase tracking-widest">
-                                {subscription?.periodEnd ? `Renovação: ${new Date(subscription.periodEnd).toLocaleDateString('pt-BR')}` : "Renovação: N/A"}
-                            </p>
                         </div>
                     </div>
 

@@ -27,13 +27,8 @@ export async function GET() {
                 where: { bot: { tenantId }, status: 'PAID' },
                 _sum: { totalAmount: true, commissionAmount: true }
             }),
-            prisma.subscription.findUnique({ 
-                where: { 
-                    tenantId_type: { 
-                        tenantId, 
-                        type: 'PRIMARY' 
-                    } 
-                },
+            prisma.subscription.findMany({ 
+                where: { tenantId },
                 include: { plan: true }
             }),
             prisma.tenant.findUnique({ where: { id: tenantId }, select: { asaasApiKey: true } })
@@ -98,10 +93,13 @@ export async function GET() {
                 isLinked: !!tenant?.asaasApiKey,
                 error: asaasError
             },
-            subscription: subscription ? {
-                plan: subscription.plan,
-                status: subscription.status
-            } : null,
+            subscriptions: subscription.map((s: any) => ({
+                id: s.id,
+                type: s.type,
+                plan: s.plan,
+                status: s.status,
+                periodEnd: s.updatedAt // Or another field for renewal
+            })),
             chartData: dailyChartData,
             invoices: invoices
         });
