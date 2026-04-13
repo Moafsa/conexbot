@@ -97,6 +97,15 @@ export async function POST(req: Request) {
                 });
                 result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0);
 
+                // 2.5 Clear any old PENDING local payments for this type again, just in case a race occurred during createSubscription
+                await prisma.payment.deleteMany({
+                    where: { 
+                        tenantId, 
+                        status: 'PENDING',
+                        type: plan.type
+                    }
+                });
+
                 // Save subscription record
                 await prisma.subscription.upsert({
                     where: { 
@@ -128,6 +137,7 @@ export async function POST(req: Request) {
                             amount: result.amount || value,
                             status: 'PENDING',
                             invoiceUrl: result.invoiceUrl,
+                            type: plan.type,
                         },
                         create: {
                             amount: result.amount || value,
@@ -136,6 +146,7 @@ export async function POST(req: Request) {
                             externalId: result.paymentId,
                             invoiceUrl: result.invoiceUrl,
                             tenantId: tenantId,
+                            type: plan.type,
                         }
                     });
                 }

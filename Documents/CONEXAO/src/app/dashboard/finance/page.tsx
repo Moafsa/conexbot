@@ -316,6 +316,9 @@ export default function FinancePage() {
                                 invoices.map((inv: any) => (
                                     <div key={inv.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl text-xs hover:bg-white/10 transition">
                                         <div>
+                                            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest block">
+                                                {inv.type === 'WRITER_PLUGIN' ? 'Plugin de Redação' : 'Chatbot / Sistema'}
+                                            </span>
                                             <p className="font-bold text-gray-300">R$ {inv.amount.toFixed(2)}</p>
                                             <p className="text-[10px] text-gray-500">{new Date(inv.createdAt).toLocaleDateString('pt-BR')}</p>
                                         </div>

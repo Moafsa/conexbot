@@ -161,6 +161,22 @@ export const AsaasService = {
 
     async cancelSubscription(subscriptionId: string) {
         try {
+            // 1. Fetch pending payments for this subscription to clean up Asaas dashboard
+            const paymentRes = await asaasFetch(`/payments?subscription=${subscriptionId}&status=PENDING`, {
+                method: 'GET'
+            });
+            
+            if (paymentRes.ok) {
+                const payments = await paymentRes.json();
+                if (payments.data && payments.data.length > 0) {
+                    for (const p of payments.data) {
+                        console.log(`[Asaas] Canceling orphan pending payment ${p.id} from subscription ${subscriptionId}`);
+                        await this.cancelPayment(p.id);
+                    }
+                }
+            }
+
+            // 2. Delete the subscription itself
             const res = await asaasFetch(`/subscriptions/${subscriptionId}`, {
                 method: 'DELETE'
             });

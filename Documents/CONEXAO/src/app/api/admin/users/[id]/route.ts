@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { AsaasService } from '@/services/payment/asaas';
 
 export async function GET(
     request: Request,
@@ -80,10 +81,52 @@ export async function DELETE(
     }
 
     try {
-        const { id } = await params;
+        const { id: tenantId } = await params;
 
+        // 1. Fetch relations to cleanup in Asaas before deleting from DB
+        const [subscriptions, pendingPayments, orders] = await Promise.all([
+            prisma.subscription.findMany({ where: { tenantId } }),
+            prisma.payment.findMany({ where: { tenantId, status: 'PENDING' } }),
+            prisma.order.findMany({ where: { bot: { tenantId }, status: 'PENDING' } })
+        ]);
+
+        console.log(`[Admin User Delete] Cleaning up Asaas for tenant ${tenantId}`);
+
+        // 2. Perform Asaas Cleanups (Sequential to avoid hitting rate limits too hard, but still async)
+        
+        // Cancel Active/Pending Subscriptions
+        for (const sub of subscriptions) {
+            if (sub.externalId) {
+                console.log(`[Admin User Delete] Canceling sub ${sub.externalId}`);
+                await AsaasService.cancelSubscription(sub.externalId).catch(err => 
+                    console.error(`[Admin User Delete] Error canceling sub ${sub.externalId}:`, err)
+                );
+            }
+        }
+
+        // Cancel Pending Payments (Invoices)
+        for (const payment of pendingPayments) {
+            if (payment.externalId && !payment.externalId.startsWith('sub_')) {
+                console.log(`[Admin User Delete] Canceling payment ${payment.externalId}`);
+                await AsaasService.cancelPayment(payment.externalId).catch(err => 
+                    console.error(`[Admin User Delete] Error canceling payment ${payment.externalId}:`, err)
+                );
+            }
+        }
+
+        // Cancel Pending Orders (Bot Sales)
+        for (const order of orders) {
+            if (order.externalId) {
+                console.log(`[Admin User Delete] Canceling order payment ${order.externalId}`);
+                await AsaasService.cancelPayment(order.externalId).catch(err => 
+                    console.error(`[Admin User Delete] Error canceling order ${order.externalId}:`, err)
+                );
+            }
+        }
+
+        // 3. Finally, delete the tenant (relations will cascade delete)
         await prisma.tenant.delete({
-            where: { id }
+            where: { id: tenantId }
         });
 
         return new NextResponse(null, { status: 204 });
