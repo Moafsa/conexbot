@@ -27,12 +27,11 @@ export async function GET(request: Request) {
         }
 
         const [usersRaw, total] = await Promise.all([
+        const [usersRaw, total] = await Promise.all([
             prisma.tenant.findMany({
                 where: whereCondition,
                 include: {
                     subscriptions: {
-                        where: { type: 'PRIMARY' },
-                        take: 1,
                         include: { plan: true }
                     },
                     _count: {
@@ -47,10 +46,18 @@ export async function GET(request: Request) {
         ]);
 
         // Mapear para manter compatibilidade com o frontend que espera "subscription" (objeto único)
-        const users = usersRaw.map(u => ({
-            ...u,
-            subscription: u.subscriptions[0] || null
-        }));
+        // Priorizando assinaturas ATIVAS ou em TRIAL para visualização no admin
+        const users = usersRaw.map(u => {
+            const activeSub = u.subscriptions.find(s => s.status === 'ACTIVE') 
+                           || u.subscriptions.find(s => s.status === 'TRIALING')
+                           || u.subscriptions.find(s => s.status === 'PENDING')
+                           || u.subscriptions[0];
+            
+            return {
+                ...u,
+                subscription: activeSub || null
+            };
+        });
 
         return NextResponse.json({
             data: users,

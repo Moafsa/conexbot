@@ -95,15 +95,43 @@ export default function Sidebar({ branding, userPlans }: { branding?: any, userP
 
             {/* User / Footer */}
             <div className="p-4 border-t border-white/5 space-y-2 bg-[#0f172a]">
-                <a 
-                    href="/conexbot-wp.zip" 
-                    download
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl bg-[#00a884]/10 hover:bg-[#00a884]/20 text-[#00a884] transition-colors border border-[#00a884]/20 ${collapsed ? 'justify-center' : ''}`}
-                    title="Baixar Plugin WP"
-                >
-                    <Download size={20} />
-                    {!collapsed && <span className="text-[10px] font-black uppercase tracking-widest">Plugin WordPress</span>}
-                </a>
+                {/* Plugin Downloads based on plan */}
+                {userPlans?.hasPrimary && (
+                    <a 
+                        href="/conexbot-wp.zip" 
+                        download
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl bg-[#00a884]/10 hover:bg-[#00a884]/20 text-[#00a884] transition-colors border border-[#00a884]/20 ${collapsed ? 'justify-center' : ''}`}
+                        title="Baixar Conext Bot"
+                    >
+                        <Download size={20} />
+                        {!collapsed && <span className="text-[10px] font-black uppercase tracking-widest text-[#00a884]">Conext Bot (WP)</span>}
+                    </a>
+                )}
+
+                {userPlans?.hasWriter && (
+                    <a 
+                        href="/conext-writer.zip" 
+                        download
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-colors border border-indigo-500/20 ${collapsed ? 'justify-center' : ''}`}
+                        title="Baixar Escritor IA"
+                    >
+                        <Download size={20} />
+                        {!collapsed && <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Escritor IA (WP)</span>}
+                    </a>
+                )}
+
+                {/* Fallback if no specific plan is detected yet but user is active (or for admins) */}
+                {(!userPlans?.hasPrimary && !userPlans?.hasWriter) && (
+                    <a 
+                        href="/conexbot-wp.zip" 
+                        download
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 transition-colors border border-white/5 ${collapsed ? 'justify-center' : ''}`}
+                        title="Baixar Plugin WP"
+                    >
+                        <Download size={20} />
+                        {!collapsed && <span className="text-[10px] font-black uppercase tracking-widest">Plugin (WP)</span>}
+                    </a>
+                )}
 
                 <button className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors ${collapsed ? 'justify-center' : ''}`}>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#00a884] to-emerald-600 flex items-center justify-center text-sm font-bold text-white shrink-0">

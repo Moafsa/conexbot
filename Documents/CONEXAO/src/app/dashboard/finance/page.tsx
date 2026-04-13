@@ -280,8 +280,12 @@ export default function FinancePage() {
                                             <p className="text-[10px] text-gray-500 uppercase tracking-widest">
                                                 {sub.periodEnd ? `Expira em: ${new Date(sub.periodEnd).toLocaleDateString('pt-BR')}` : "Renovação: N/A"}
                                             </p>
-                                            {sub.type === 'WRITER_PLUGIN' && sub.status === 'ACTIVE' && (
-                                                <a href="/conext-writer.zip" download className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+                                            {sub.status === 'ACTIVE' && (
+                                                <a 
+                                                    href={sub.type === 'WRITER_PLUGIN' ? "/conext-writer.zip" : "/conexbot-wp.zip"} 
+                                                    download 
+                                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                                                >
                                                     <Download size={10} />
                                                     BAIXAR PLUGIN
                                                 </a>

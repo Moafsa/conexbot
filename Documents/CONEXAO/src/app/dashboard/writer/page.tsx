@@ -93,7 +93,7 @@ export default async function WriterDashboardPage() {
                             <p className="text-gray-400 text-sm">Versão atualizada com orquestração de 5 agentes IA.</p>
                             <div className="pt-2">
                                 <Link 
-                                    href="/conexbot-wp.zip" 
+                                    href="/conext-writer.zip" 
                                     className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20 active:scale-95 text-sm"
                                 >
                                     Fazer Download Agora <ChevronRight size={16} />
