@@ -313,20 +313,32 @@ class Conext_Admin {
             </script>
 
             <?php if (isset($_GET['status'])): ?>
-                <div id="message" class="updated notice is-dismissible">
+                <div id="message" class="<?php echo ($_GET['status'] == 'license_ok' || $_GET['status'] == 'success') ? 'updated' : 'error'; ?> notice is-dismissible">
                     <p>
                         <?php 
                             if ($_GET['status'] == 'success') _e('Post gerado e publicado com sucesso!', 'conext-writer'); 
                             elseif ($_GET['status'] == 'error') _e('Erro na geração do post. Verifique os logs.', 'conext-writer');
                             elseif ($_GET['status'] == 'error_keys') _e('Erro: Chaves de API não configuradas ou inválidas.', 'conext-writer');
                             elseif ($_GET['status'] == 'license_ok') _e('Licença ativada com sucesso!', 'conext-writer');
-                            elseif ($_GET['status'] == 'license_error') _e('Chave de licença inválida.', 'conext-writer');
+                            elseif ($_GET['status'] == 'license_error') {
+                                $last_resp = get_option('conext_writer_last_api_response');
+                                $err_msg = isset($last_resp['error']) ? $last_resp['error'] : __('Chave de licença inválida.', 'conext-writer');
+                                echo esc_html($err_msg);
+                            }
                             elseif ($_GET['status'] == 'trial_limit') _e('Você atingiu o limite máximo de 5 posts no período de teste (trial). É necessário pagar a sua fatura para liberar o restante dos posts do seu plano.', 'conext-writer');
                             elseif ($_GET['status'] == 'no_credits') _e('Você não possui mais créditos este mês. Faça um upgrade!', 'conext-writer');
                         ?>
                     </p>
                 </div>
             <?php endif; ?>
+
+            <div style="margin-top:20px; padding:15px; border:1px solid #ccd0d4; background:#fff; border-radius:8px;">
+                <h4 style="margin-top:0;"><?php _e('Informações do Sistema', 'conext-writer'); ?></h4>
+                <p style="font-size:12px; color:#666;">
+                    <strong><?php _e('URL Detectada para Licença:', 'conext-writer'); ?></strong> <code><?php echo esc_url(get_site_url()); ?></code><br>
+                    <small><?php _e('Se esta URL estiver errada (ex: localhost em site online), ajuste suas configurações do WordPress.', 'conext-writer'); ?></small>
+                </p>
+            </div>
         </div>
         <?php
     }

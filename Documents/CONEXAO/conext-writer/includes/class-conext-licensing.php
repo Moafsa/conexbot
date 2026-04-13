@@ -73,14 +73,16 @@ class Conext_Licensing {
         $body = json_decode(wp_remote_retrieve_body($response), true);
         if (isset($body['success']) && $body['success']) {
             update_option('conext_writer_license_tier', $body['tier']);
-            update_option('conext_writer_license_status', $body['status']); // Salva se é ACTIVE, TRIALING, PENDING, etc.
+            update_option('conext_writer_license_status', $body['status']); 
             update_option('conext_writer_post_limit', $body['postLimit']);
             update_option('conext_writer_word_limit', $body['wordLimit']);
             update_option('conext_writer_posts_used', $body['postsUsed']);
             update_option('conext_writer_words_used', $body['wordsUsed']);
+            update_option('conext_writer_last_api_response', $body);
             return true;
         }
 
+        update_option('conext_writer_last_api_response', $body);
         return false;
     }
 
@@ -149,9 +151,12 @@ class Conext_Licensing {
         if (is_wp_error($response)) return false;
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
+        update_option('conext_writer_last_api_response', $body);
+
         if (isset($body['success']) && $body['success']) {
             update_option('conext_writer_license_key', $key);
             update_option('conext_writer_license_tier', $body['tier']);
+            update_option('conext_writer_license_status', $body['status']);
             update_option('conext_writer_post_limit', $body['postLimit']);
             update_option('conext_writer_word_limit', $body['wordLimit']);
             update_option('conext_writer_posts_used', $body['postsUsed']);

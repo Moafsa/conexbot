@@ -42,21 +42,14 @@ export async function POST(req: NextRequest) {
             }, { status: 403 });
         }
 
-        // Se o siteUrl for enviado, registramos ou validamos
-        if (siteUrl) {
-            if (!keyRecord.siteUrl) {
-                // Primeira ativação
-                await prisma.licenseKey.update({
-                    where: { id: keyRecord.id },
-                    data: { siteUrl }
-                });
-            } else if (keyRecord.siteUrl !== siteUrl) {
-                // Chave já usada em outro site
-                return NextResponse.json({ 
-                    error: 'License key already active on another site',
-                    activeSite: keyRecord.siteUrl 
-                }, { status: 403 });
-            }
+        // Multi-Site Support: We update the siteUrl to the current one, but we don't block.
+        // Consumption is tracked at the subscription level, not per site.
+        if (siteUrl && keyRecord.siteUrl !== siteUrl) {
+            console.log(`[Licensing] Updating siteUrl for key ${licenseKey}: ${keyRecord.siteUrl || 'none'} -> ${siteUrl}`);
+            await prisma.licenseKey.update({
+                where: { id: keyRecord.id },
+                data: { siteUrl }
+            });
         }
 
         return NextResponse.json({
