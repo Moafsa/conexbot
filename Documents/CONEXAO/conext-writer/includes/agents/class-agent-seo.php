@@ -53,6 +53,7 @@ class Conext_Agent_SEO {
                   "'title' (Máximo 60 caracteres no idioma **$language**. A focus_keyword DEVE estar no início do título. PROIBIDO usar o nome do site/domínio), \n" .
                   "'meta_desc' (Máximo 155 caracteres no idioma **$language**. A focus_keyword DEVE aparecer obrigatoriamente neste texto com um CTA forte), \n" .
                   "'focus_keyword' (Termo exato, curto e forte que resuma o assunto em **$language**. Deve aparecer identicamente no texto analizado). \n" .
+                  "4. REVISÃO DE LEGIBILIDADE (YOAST): Verifique se o texto possui subtítulos a cada 300 palavras e se as frases são curtas e profissionais. " .
                   "Não use anos (2023, 2026) nos metadados.";
 
         $optimized_json = $this->call_llm_api($prompt);
