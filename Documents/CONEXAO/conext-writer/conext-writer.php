@@ -42,6 +42,9 @@ function conext_writer_init() {
         $admin = new Conext_Admin();
         $admin->init();
     }
+
+    // Ensure cron is scheduled
+    conext_writer_maybe_schedule_cron();
 }
 add_action('plugins_loaded', 'conext_writer_init');
 
@@ -66,5 +69,30 @@ add_action('conext_writer_cron_generation', 'conext_writer_run_scheduled_generat
 function conext_writer_run_scheduled_generation() {
     $orchestrator = new Conext_Orchestrator();
     $orchestrator->execute_daily_generation();
+}
+
+/**
+ * Ensures the cron is scheduled if not already present.
+ * Called on init and plugin activation.
+ */
+function conext_writer_maybe_schedule_cron() {
+    if (!wp_next_scheduled('conext_writer_cron_generation')) {
+        $num = (int) get_option('conext_writer_frequency_num', 24);
+        if ($num > 0) {
+            wp_schedule_event(time(), 'conext_writer_custom_interval', 'conext_writer_cron_generation');
+        }
+    }
+}
+
+// Activation hook to schedule cron immediately
+register_activation_hook(__FILE__, 'conext_writer_activation');
+function conext_writer_activation() {
+    conext_writer_maybe_schedule_cron();
+}
+
+// Deactivation hook to clean up
+register_deactivation_hook(__FILE__, 'conext_writer_deactivation');
+function conext_writer_deactivation() {
+    wp_clear_scheduled_hook('conext_writer_cron_generation');
 }
 

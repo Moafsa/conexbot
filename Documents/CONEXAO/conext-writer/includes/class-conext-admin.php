@@ -197,6 +197,19 @@ class Conext_Admin {
                                 <option value="days" <?php selected(get_option('conext_writer_frequency_unit', 'hours'), 'days'); ?>><?php _e('Dia(s)', 'conext-writer'); ?></option>
                             </select>
                             <p class="description"><?php _e('Define quando a IA deve gerar um novo post automaticamente.', 'conext-writer'); ?></p>
+                            <div style="margin-top:5px; font-size:11px; color:#2271b1;">
+                                <?php 
+                                $next_run = wp_next_scheduled('conext_writer_cron_generation');
+                                if ($next_run) {
+                                    printf(
+                                        __('🕒 Próxima execução agendada para: %s', 'conext-writer'),
+                                        '<strong>' . date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $next_run) . '</strong>'
+                                    );
+                                } else {
+                                    echo '⚠️ ' . __('A geração automática não está agendada. Verifique se a frequência é maior que zero.', 'conext-writer');
+                                }
+                                ?>
+                            </div>
                         </td>
                     </tr>
                     <tr valign="top">
