@@ -9,6 +9,7 @@ class Conext_Admin {
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_post_conext_writer_generate', [$this, 'handle_manual_generate']);
         add_action('admin_post_conext_writer_activate_license', [$this, 'handle_activate_license']);
+        add_action('admin_post_conext_writer_update_language', [$this, 'handle_update_language']);
         
         // Remove footer on plugin page
         add_filter('admin_footer_text', [$this, 'remove_admin_footer_text'], 99);
@@ -87,8 +88,9 @@ class Conext_Admin {
             <div class="conext-global-lang-selector" style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2271b1; display: flex; align-items: center; justify-content: space-between;">
                 <div>
                     <strong style="margin-right: 10px;"><?php _e('Preferred Language / Idioma Preferido:', 'conext-writer'); ?></strong>
-                    <form method="post" action="options.php" style="display: inline-block;">
-                        <?php settings_fields('conext_writer_settings'); ?>
+                    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="display: inline-block;">
+                        <input type="hidden" name="action" value="conext_writer_update_language">
+                        <?php wp_nonce_field('conext_writer_lang_action', 'conext_writer_lang_nonce'); ?>
                         <?php $selected_lang = get_option('conext_writer_language', 'auto'); ?>
                         <select name="conext_writer_language" onchange="this.form.submit()" style="padding: 5px 10px; border-radius: 4px;">
                             <option value="auto" <?php selected($selected_lang, 'auto'); ?>>🌐 Automatic (Site Default)</option>
@@ -394,6 +396,19 @@ class Conext_Admin {
         } else {
             wp_redirect(admin_url('admin.php?page=conext-writer&status=license_error'));
         }
+        exit;
+    }
+
+    public function handle_update_language() {
+        if (!current_user_can('manage_options')) wp_die('Sem permissão.');
+        check_admin_referer('conext_writer_lang_action', 'conext_writer_lang_nonce');
+
+        $lang = sanitize_text_field($_POST['conext_writer_language']);
+        if (in_array($lang, ['auto', 'pt', 'es', 'en'])) {
+            update_option('conext_writer_language', $lang);
+        }
+
+        wp_redirect(admin_url('admin.php?page=conext-writer'));
         exit;
     }
 
