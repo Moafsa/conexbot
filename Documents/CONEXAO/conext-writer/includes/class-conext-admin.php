@@ -130,18 +130,54 @@ class Conext_Admin {
                     <hr>
                     <h4><?php _e('Não tem uma licença ou quer fazer Upgrade?', 'conext-writer'); ?></h4>
                     
+                    <?php 
+                    $plans = Conext_Licensing::get_available_plans(); 
+                    
+                    $pct_quarterly = 0;
+                    $pct_semiannual = 0;
+                    $pct_yearly = 0;
+
+                    if (!empty($plans)) {
+                        foreach ($plans as $p) {
+                            $price = isset($p['price']) ? (float)$p['price'] : 0;
+                            if ($price > 0) {
+                                if (isset($p['priceQuarterly']) && (float)$p['priceQuarterly'] > 0) {
+                                    $desc = 100 - (((float)$p['priceQuarterly'] / ($price * 3)) * 100);
+                                    if ($desc > $pct_quarterly) $pct_quarterly = $desc;
+                                }
+                                if (isset($p['priceSemiannual']) && (float)$p['priceSemiannual'] > 0) {
+                                    $desc = 100 - (((float)$p['priceSemiannual'] / ($price * 6)) * 100);
+                                    if ($desc > $pct_semiannual) $pct_semiannual = $desc;
+                                }
+                                if (isset($p['priceYearly']) && (float)$p['priceYearly'] > 0) {
+                                    $desc = 100 - (((float)$p['priceYearly'] / ($price * 12)) * 100);
+                                    if ($desc > $pct_yearly) $pct_yearly = $desc;
+                                }
+                            }
+                        }
+                    }
+                    ?>
+                    
+                    <?php if (!empty($plans)): ?>
+                    <div style="display:flex; flex-wrap:wrap; justify-content:center; gap: 10px; margin-top: 20px;">
+                        <button type="button" class="plan-toggle button button-primary" data-interval="MONTHLY"><?php _e('Mensal', 'conext-writer'); ?></button>
+                        <button type="button" class="plan-toggle button" data-interval="QUARTERLY"><?php _e('Trimestral', 'conext-writer'); ?><?php echo $pct_quarterly > 0 ? " (-" . round($pct_quarterly) . "%)" : ""; ?></button>
+                        <button type="button" class="plan-toggle button" data-interval="SEMIANNUAL"><?php _e('Semestral', 'conext-writer'); ?><?php echo $pct_semiannual > 0 ? " (-" . round($pct_semiannual) . "%)" : ""; ?></button>
+                        <button type="button" class="plan-toggle button" data-interval="YEARLY"><?php _e('Anual', 'conext-writer'); ?><?php echo $pct_yearly > 0 ? " (-" . round($pct_yearly) . "%)" : ""; ?></button>
+                    </div>
+                    <?php endif; ?>
+
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-top:20px;">
                         <?php 
-                        $plans = Conext_Licensing::get_available_plans();
                         if (!empty($plans)):
                             foreach ($plans as $plan): 
-                                $checkout_url = "https://app.conext.click/auth/register?planId=" . $plan['id'] . "&type=WRITER_PLUGIN";
+                                $checkout_url = "https://app.conext.click/auth/register?planId=" . $plan['id'] . "&type=WRITER_PLUGIN&interval=MONTHLY";
                                 ?>
-                                <div style="border: 1px solid #e5e7eb; padding: 20px; border-radius: 12px; background: #fafafa; text-align: center;">
+                                <div class="plan-card" data-id="<?php echo esc_attr($plan['id']); ?>" style="border: 1px solid #e5e7eb; padding: 20px; border-radius: 12px; background: #fafafa; text-align: center;">
                                     <h4 style="margin:0 0 10px 0;"><?php echo esc_html($plan['name']); ?></h4>
                                     <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">
-                                        R$ <?php echo number_format((float)($plan['price'] ?? 0), 2, ',', '.'); ?>
-                                        <span style="font-size: 12px; font-weight: normal; color: #666;">/<?php _e('mês', 'conext-writer'); ?></span>
+                                        <span class="plan-price-value">R$ <?php echo number_format((float)($plan['price'] ?? 0), 2, ',', '.'); ?></span>
+                                        <span class="plan-price-suffix" style="font-size: 12px; font-weight: normal; color: #666;">/<?php _e('mês', 'conext-writer'); ?></span>
                                     </div>
                                     <p style="font-size: 13px; color: #666; min-height: 40px;"><?php echo esc_html($plan['description'] ?? ''); ?></p>
                                     <ul style="text-align: left; font-size: 12px; margin: 15px 0; padding: 0; list-style: none;">
@@ -149,16 +185,16 @@ class Conext_Admin {
                                         if (!empty($plan['features']) && is_array($plan['features'])):
                                             foreach ($plan['features'] as $feature):
                                                 if (isset($feature['enabled']) && $feature['enabled']): ?>
-                                                    <li>✅ <?php echo esc_html($feature['text']); ?></li>
+                                                    <li>✅ <span class="feature-text"><?php echo esc_html(str_replace(' por mês', ' por período', $feature['text'])); ?></span></li>
                                                 <?php endif;
                                             endforeach;
                                         else: ?>
-                                            <li>✅ <?php echo esc_html($plan['postLimit'] ?? 0); ?> <?php _e('Posts/mês', 'conext-writer'); ?></li>
-                                            <li>✅ <?php echo number_format((float)($plan['wordLimit'] ?? 0), 0, ',', '.'); ?> <?php _e('Palavras', 'conext-writer'); ?></li>
+                                            <li>✅ <span class="plan-posts"><?php echo esc_html($plan['postLimit'] ?? 0); ?></span> <?php _e('Posts por período', 'conext-writer'); ?></li>
+                                            <li>✅ <span class="plan-words"><?php echo number_format((float)($plan['wordLimit'] ?? 0), 0, ',', '.'); ?></span> <?php _e('Palavras', 'conext-writer'); ?></li>
                                             <li>✅ <?php _e('Yoast SEO Nível Pro', 'conext-writer'); ?></li>
                                         <?php endif; ?>
                                     </ul>
-                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn" target="_blank" style="width: 100%; box-sizing: border-box;"><?php _e('Assinar Plano', 'conext-writer'); ?> <?php echo esc_html($plan['name']); ?></a>
+                                    <a href="<?php echo esc_url($checkout_url); ?>" class="upgrade-btn btn-plan-<?php echo esc_attr($plan['id']); ?>" target="_blank" style="width: 100%; box-sizing: border-box;"><?php _e('Assinar Plano', 'conext-writer'); ?> <?php echo esc_html($plan['name']); ?></a>
                                 </div>
                             <?php endforeach; 
                         else: ?>
@@ -309,7 +345,55 @@ class Conext_Admin {
             </div>
 
             <script>
+                var conextPlansData = <?php echo !empty($plans) ? json_encode($plans) : '[]'; ?>;
+                var langSuffix = {
+                    'MONTHLY': '<?php echo esc_js(__('mês', 'conext-writer')); ?>',
+                    'QUARTERLY': '<?php echo esc_js(__('trimestre', 'conext-writer')); ?>',
+                    'SEMIANNUAL': '<?php echo esc_js(__('semestre', 'conext-writer')); ?>',
+                    'YEARLY': '<?php echo esc_js(__('ano', 'conext-writer')); ?>'
+                };
+
                 jQuery(document).ready(function($) {
+                    $('.plan-toggle').click(function() {
+                        $('.plan-toggle').removeClass('button-primary');
+                        $(this).addClass('button-primary');
+                        var interval = $(this).data('interval');
+                        var suffix = langSuffix[interval] || langSuffix['MONTHLY'];
+
+                        $('.plan-card').each(function() {
+                            var planId = $(this).data('id');
+                            var plan = conextPlansData.find(function(p) { return p.id === planId; });
+                            if (!plan) return;
+
+                            var price = parseFloat(plan.price) || 0;
+                            var multiplier = 1;
+
+                            if (interval === 'QUARTERLY') {
+                                price = plan.priceQuarterly !== null && plan.priceQuarterly !== undefined ? parseFloat(plan.priceQuarterly) : (price * 3);
+                                multiplier = 3;
+                            } else if (interval === 'SEMIANNUAL') {
+                                price = plan.priceSemiannual !== null && plan.priceSemiannual !== undefined ? parseFloat(plan.priceSemiannual) : (price * 6);
+                                multiplier = 6;
+                            } else if (interval === 'YEARLY') {
+                                price = plan.priceYearly !== null && plan.priceYearly !== undefined ? parseFloat(plan.priceYearly) : (price * 12);
+                                multiplier = 12;
+                            }
+
+                            var formattedPrice = price.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            $(this).find('.plan-price-value').text('R$ ' + formattedPrice);
+                            $(this).find('.plan-price-suffix').text('/' + suffix);
+
+                            // Atualiza os posts
+                            if ($(this).find('.plan-posts').length > 0) {
+                                var basePosts = parseInt(plan.postLimit) || 0;
+                                $(this).find('.plan-posts').text(basePosts * multiplier);
+                            }
+
+                            var url = "https://app.conext.click/auth/register?planId=" + planId + "&type=WRITER_PLUGIN&interval=" + interval;
+                            $(this).find('.upgrade-btn').attr('href', url);
+                        });
+                    });
+
                     $('.nav-tab').click(function(e) {
                         e.preventDefault();
                         $('.nav-tab').removeClass('nav-tab-active');

@@ -8,8 +8,9 @@ import path from 'path';
 function logToFile(msg: string) {
     const timestamp = new Date().toISOString();
     const line = `[${timestamp}] ${msg}\n`;
+    const logPath = process.platform === 'win32' ? path.join(process.cwd(), 'debug-today.log') : '/tmp/debug-today.log';
     try {
-        fs.appendFileSync(path.join(process.cwd(), 'debug-today.log'), line);
+        fs.appendFileSync(logPath, line);
     } catch (e) {
         console.error('Failed to log to file:', e);
     }

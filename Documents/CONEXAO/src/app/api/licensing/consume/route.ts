@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
         }
 
         const subscription = keyRecord.subscription;
-        const isTrial = subscription.status === 'TRIALING' || (subscription.plan?.trialDays || 0) > 0;
+        const isTrial = subscription.status === 'TRIALING';
         const postLimit = isTrial ? 5 : (subscription.plan?.postLimit || 0);
 
         // Se estiver PENDING, bloqueamos consumo real A MENOS que seja trial e tenha créditos

@@ -60,6 +60,10 @@ class Conext_Orchestrator {
         // Isso garante que o usuário não gere conteúdo sem pagar
         $consumption = Conext_Licensing::consume_credits(1);
         if (!$consumption) {
+            $last_response = get_option('conext_writer_last_api_response');
+            if (isset($last_response['error']) && strpos($last_response['error'], 'trial') !== false) {
+                return 'trial_limit';
+            }
             error_log('Conext Writer: Falha ao consumir créditos. Geração abortada por segurança.');
             return 'no_credits';
         }

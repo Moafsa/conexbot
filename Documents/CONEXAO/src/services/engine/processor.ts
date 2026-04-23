@@ -169,11 +169,19 @@ export const MessageProcessor = {
             });
 
             // 3.1. Check if conversation is PAUSED (handoff para humano)
-            // No simulador: ignora pausa para permitir continuar testando
-            if (channel !== 'simulator' && (conversation as any).pausedUntil && (conversation as any).pausedUntil > new Date()) {
-                logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()} (Silent Mode)`);
-                // SILENT MODE: Return null instead of the "atendimento humano" message to avoid bot competition
-                return null;
+            if ((conversation as any).pausedUntil) {
+                if ((conversation as any).pausedUntil > new Date() && channel !== 'simulator') {
+                    logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()} (Silent Mode)`);
+                    // SILENT MODE: Return null instead of the "atendimento humano" message to avoid bot competition
+                    return null;
+                } else if ((conversation as any).pausedUntil <= new Date()) {
+                    logToFile(`[Processor] Conversation pausedUntil expired for ${senderPhone}. Clearing pause limit.`);
+                    await prisma.conversation.update({
+                        where: { id: conversation.id },
+                        data: { pausedUntil: null } as any
+                    });
+                    (conversation as any).pausedUntil = null;
+                }
             }
 
             // 3.5. Specialized input processing
@@ -587,12 +595,12 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                                             stageId: humanStage?.id || undefined
                                         }
                                     });
-                                    // 24-HOUR SILENCER (Exactly 24h from now)
-                                    const pauseMinutes = (bot as any).handoffPause || 1440;
-                                    const pausedUntil = addHours(new Date(), 24);
+                                    // SILENCER
+                                    const pauseMinutes = typeof (bot as any).handoffPause === 'number' ? (bot as any).handoffPause : 1440;
+                                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
                                     await prisma.conversation.update({
                                         where: { id: conversation.id },
-                                        data: { pausedUntil }
+                                        data: { pausedUntil } as any
                                     });
                                     const title = `🚨 Atendimento Humano Solicitado`;
                                     const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
