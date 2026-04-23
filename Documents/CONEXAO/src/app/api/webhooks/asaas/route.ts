@@ -97,8 +97,18 @@ export async function POST(req: Request) {
 
                 // Update usage limits based on plan ONLY IF it was just paid and it's PRIMARY
                 if (newPaymentStatus === 'PAID' && subscription.type === 'PRIMARY') {
-                    const nextMonth = new Date();
-                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    const periodEnd = new Date();
+                    
+                    // Calculate period based on interval
+                    if (subscription.interval === 'QUARTERLY') {
+                        periodEnd.setMonth(periodEnd.getMonth() + 3);
+                    } else if (subscription.interval === 'SEMIANNUAL') {
+                        periodEnd.setMonth(periodEnd.getMonth() + 6);
+                    } else if (subscription.interval === 'YEARLY') {
+                        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+                    } else {
+                        periodEnd.setMonth(periodEnd.getMonth() + 1); // Default MONTHLY
+                    }
 
                     const messagesLimit = subscription.plan?.messageLimit || 5000;
                     const botsLimit = subscription.plan?.botLimit || 1;
@@ -110,7 +120,7 @@ export async function POST(req: Request) {
                             messagesLimit: messagesLimit,
                             botsLimit: botsLimit,
                             periodStart: new Date(),
-                            periodEnd: nextMonth,
+                            periodEnd: periodEnd,
                         },
                         create: {
                             tenantId: subscription.tenantId,
@@ -119,7 +129,7 @@ export async function POST(req: Request) {
                             botsUsed: 0,
                             botsLimit: botsLimit,
                             periodStart: new Date(),
-                            periodEnd: nextMonth,
+                            periodEnd: periodEnd,
                         },
                     });
                     console.log(`[Webhook] System Subscription ${subscription.id} usage updated for new payment`);

@@ -81,13 +81,26 @@ export async function POST(req: Request) {
                         } 
                     } 
                 });
+
                 if (existingSub?.externalId && existingSub.gateway === 'asaas') {
+                    // IF it's the SAME PLAN and it's already ACTIVE, don't recreate.
+                    if (existingSub.planId === plan.id && existingSub.status === 'ACTIVE') {
+                         return NextResponse.json({ 
+                            success: true, 
+                            info: 'already_active',
+                            redirect: '/dashboard/finance' 
+                         });
+                    }
                     await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
                 }
 
-                // 2. Clear any old PENDING local payments so they don't clutter the "Minhas Faturas" dashboard
+                // 2. Clear any old PENDING local payments for this type so they don't clutter the dashboard
                 await prisma.payment.deleteMany({
-                    where: { tenantId, status: 'PENDING' }
+                    where: { 
+                        tenantId, 
+                        status: 'PENDING',
+                        type: plan.type
+                    }
                 });
 
                 const customer = await AsaasService.createCustomer({
@@ -96,15 +109,6 @@ export async function POST(req: Request) {
                     cpfCnpj: tenant.cpfCnpj,
                 });
                 result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0);
-
-                // 2.5 Clear any old PENDING local payments for this type again, just in case a race occurred during createSubscription
-                await prisma.payment.deleteMany({
-                    where: { 
-                        tenantId, 
-                        status: 'PENDING',
-                        type: plan.type
-                    }
-                });
 
                 // Save subscription record
                 await prisma.subscription.upsert({
@@ -116,6 +120,7 @@ export async function POST(req: Request) {
                     },
                     update: {
                         planId: plan.id,
+                        interval: interval,
                         status: 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,
@@ -124,6 +129,7 @@ export async function POST(req: Request) {
                         tenantId,
                         type: plan.type,
                         planId: plan.id,
+                        interval: interval,
                         status: 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,

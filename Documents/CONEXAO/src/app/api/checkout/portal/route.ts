@@ -116,26 +116,31 @@ export async function GET(req: Request) {
                     include: { plan: true }
                 });
 
-                if (existingSub?.status === 'PENDING' && existingSub.externalId && existingSub.gateway === 'asaas') {
-                    // Check for a recent PENDING payment for this tenant
-                    const lastPayment = await prisma.payment.findFirst({
-                        where: { 
-                            tenantId, 
-                            status: 'PENDING',
-                            gateway: 'asaas'
-                        },
-                        orderBy: { createdAt: 'desc' }
-                    });
-
-                    // If we have a payment with an invoiceUrl created in the last 30 minutes, reuse it
-                    if (lastPayment?.invoiceUrl && lastPayment.externalId && (Date.now() - lastPayment.createdAt.getTime() < 30 * 60 * 1000)) {
-                        return generateRedirectPage(lastPayment.invoiceUrl, safeUrl);
+                if (existingSub?.externalId && existingSub.gateway === 'asaas') {
+                    // IF it's the SAME PLAN and it's already ACTIVE, don't recreate. Just redirect to dashboard.
+                    if (existingSub.planId === plan.id && existingSub.status === 'ACTIVE') {
+                        return NextResponse.redirect(new URL('/dashboard/finance?info=already_active', safeUrl));
                     }
 
-                    // If it's old or missing, or if it belongs to a DIFFERENT plan/interval, we should cancel and recreate
-                    await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
-                } else if (existingSub?.externalId && existingSub.gateway === 'asaas') {
-                    // It's not pending (maybe overdue or active), cancel before upgrade/change
+                    if (existingSub.status === 'PENDING') {
+                        // Check for a recent PENDING payment for this tenant
+                        const lastPayment = await prisma.payment.findFirst({
+                            where: { 
+                                tenantId, 
+                                status: 'PENDING',
+                                gateway: 'asaas',
+                                type: plan.type
+                            },
+                            orderBy: { createdAt: 'desc' }
+                        });
+
+                        // If we have a payment with an invoiceUrl created in the last 30 minutes, reuse it
+                        if (lastPayment?.invoiceUrl && lastPayment.externalId && (Date.now() - lastPayment.createdAt.getTime() < 30 * 60 * 1000)) {
+                            return generateRedirectPage(lastPayment.invoiceUrl, safeUrl);
+                        }
+                    }
+
+                    // If it's old, missing, or a different plan, cancel and recreate
                     await AsaasService.cancelSubscription(existingSub.externalId).catch(console.error);
                 }
 
@@ -161,6 +166,7 @@ export async function GET(req: Request) {
                     },
                     update: {
                         planId: plan.id,
+                        interval: interval as any,
                         status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,
@@ -169,6 +175,7 @@ export async function GET(req: Request) {
                         tenantId,
                         type: plan.type,
                         planId: plan.id,
+                        interval: interval as any,
                         status: (plan.trialDays || 0) > 0 ? 'TRIALING' : 'PENDING',
                         gateway: 'asaas',
                         externalId: result.id,

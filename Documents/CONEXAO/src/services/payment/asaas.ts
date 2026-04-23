@@ -98,7 +98,9 @@ export const AsaasService = {
             if (trialDays > 0) {
                 nextDueDate.setDate(nextDueDate.getDate() + trialDays);
             } else {
-                nextDueDate.setDate(nextDueDate.getDate() + 1); 
+                // If no trial, the first payment is due TODAY.
+                // This ensures the next cycle is correctly scheduled in 30/90 days.
+                // Asaas will generate the first invoice for today.
             }
 
             
