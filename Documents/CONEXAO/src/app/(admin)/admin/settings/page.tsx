@@ -24,7 +24,10 @@ export default function AdminSettingsPage() {
         smtpUser: '',
         smtpPass: '',
         smtpFrom: '',
-        systemBotId: ''
+        systemBotId: '',
+        metaAppId: '',
+        metaAppSecret: '',
+        metaVerifyToken: ''
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -295,6 +298,36 @@ export default function AdminSettingsPage() {
                                     <SettingInput label="Usuário" value={settings.smtpUser} onChange={v => setSettings({ ...settings, smtpUser: v })} />
                                     <SettingInput label="Senha" value={settings.smtpPass} onChange={v => setSettings({ ...settings, smtpPass: v })} />
                                     <SettingInput label="E-mail Remetente" value={settings.smtpFrom} onChange={v => setSettings({ ...settings, smtpFrom: v })} placeholder="alertas@conexbot.com" />
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-[#1a1a1a]">
+                                <h3 className="text-xl font-bold flex items-center space-x-2 mb-6">
+                                    <Globe size={20} className="text-blue-500" />
+                                    <span>Meta / Facebook Global</span>
+                                </h3>
+                                <div className="space-y-4">
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                        Configurações globais para uso da API Oficial do WhatsApp e Instagram (Opção C). O Verify Token será usado no webhook oficial (`/api/webhooks/meta`).
+                                    </p>
+                                    <SettingInput 
+                                        label="Verify Token (Para Webhook)" 
+                                        value={settings.metaVerifyToken} 
+                                        onChange={v => setSettings({ ...settings, metaVerifyToken: v })} 
+                                        placeholder="CONEXT_META_VERIFY" 
+                                    />
+                                    <SettingInput 
+                                        label="Meta App ID" 
+                                        value={settings.metaAppId} 
+                                        onChange={v => setSettings({ ...settings, metaAppId: v })} 
+                                        placeholder="Ex: 123456789" 
+                                    />
+                                    <SettingInput 
+                                        label="Meta App Secret" 
+                                        value={settings.metaAppSecret} 
+                                        onChange={v => setSettings({ ...settings, metaAppSecret: v })} 
+                                        placeholder="Ex: a1b2c3d4..." 
+                                    />
                                 </div>
                             </div>
 

@@ -27,7 +27,6 @@ export async function GET(request: Request) {
         }
 
         const [usersRaw, total] = await Promise.all([
-        const [usersRaw, total] = await Promise.all([
             prisma.tenant.findMany({
                 where: whereCondition,
                 include: {

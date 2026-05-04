@@ -20,6 +20,7 @@ class Conext_Agent_Writer {
                 case 'pt': return 'Portuguese (Brazil)';
                 case 'es': return 'Spanish';
                 case 'en': return 'English';
+                case 'bn': return 'Bengali';
             }
         }
 
@@ -39,6 +40,7 @@ class Conext_Agent_Writer {
         if ($base === 'es') return 'Spanish';
         if ($base === 'pt') return 'Portuguese';
         if ($base === 'en') return 'English';
+        if ($base === 'bn') return 'Bengali';
         
         return 'Portuguese (Brazil)'; // Default
     }
@@ -49,7 +51,8 @@ class Conext_Agent_Writer {
         
         $language = $this->get_language_name();
         $prompt = "Missão Arquitetural: Analise a pauta [" . json_encode($topic_data['raw_data']) . "]. " .
-                  "IDIOMA OBRIGATÓRIO: Você DEVE produzir este esboço em **$language**. \n" .
+                  "IDIOMA OBRIGATÓRIO: Você DEVE produzir este esboço em **$language**. " .
+                  ($language === 'Bengali' ? "Escreva com a fluidez e vocabulário de um falante nativo, evitando traduções literais." : "") . " \n" .
                   "Este post deve atingir a meta de " . $word_count_raw . " palavras. \n" .
                   "Sua única resposta deve ser o fornecimento de um ESBOÇO (Outline) fragmentado com VÁRIOS Títulos. \n" .
                   "REGRA VITAL DE HUMANIZAÇÃO: É ESTREITAMENTE PROIBIU usar as palavras 'Introdução', 'Conclusão', 'Resumo' ou 'Considerações Finais'. " .
@@ -96,10 +99,11 @@ class Conext_Agent_Writer {
                   "3. REGRA DE OURO SEO: Você DEVE inserir a palavra-chave foco '**$focus_keyword**' (ou sinônimos muito próximos) pelo menos 3 a 4 vezes em cada subtópico. \n" .
                   "4. SUBTÍTULOS SEO: Você DEVE incluir a palavra-chave foco '**$focus_keyword**' em pelo menos 50% dos subtítulos (H2 ou H3) que você criar ou expandir. \n" .
                   "5. INTRODUÇÃO: Se você for o primeiro agente, a palavra-chave foco DEVE estar obrigatoriamente no primeiro parágrafo do texto. \n" .
-                   "6. É PROIBIDO usar 'Além disso', 'Adicionalmente' ou citar o ano atual. \n" .
-                   "7. MÉTRICA YOAST (VITAL): Escreva parágrafos ricos e profissionais (Linguagem: $tone). Use sentenças de no máximo 25 palavras. Se uma seção (H2) passar de 300 palavras, use um H3 para subdividir.\n" .
+                   "6. PALAVRAS DE TRANSIÇÃO (REGRA YOAST): Para atingir nota máxima no Yoast SEO, pelo menos 40% das suas sentenças DEVEM conter palavras de transição ricas e variadas (Ex: Portanto, Contudo, Sendo assim, Dessa forma, Como resultado, Logo, Entretanto, Consequentemente, De fato). É PROIBIDO repetir a mesma transição em frases consecutivas. É ESTRITAMENTE PROIBIDO citar anos específicos no texto (ex: 2023, 2024, 2025, 2026).\n" .
+                   "7. MÉTRICA YOAST (VITAL): Escreva parágrafos ricos e profissionais (Linguagem: $tone). Para garantir a pontuação verde no Yoast, use sentenças curtas (máximo de 25 palavras por frase). No entanto, o texto de cada seção deve ser EXTREMAMENTE LONGO. Para bater a meta de palavras, você DEVE escrever pelo menos 5 a 6 parágrafos detalhados por seção e DEVE obrigatoriamente criar pelo menos um subtítulo H3 dentro de cada seção para expandir o conteúdo.\n" .
                    "8. FORMATO OBRIGATÓRIO: Use apenas tags HTML (H2, H3, P, STRONG). É PROIBIDO usar Markdown (como ### ou **).\n" .
-                   "9. CRÍTICO: Todo o conteúdo e tags HTML devem estar em **$language**.";
+                   "9. CRÍTICO: Todo o conteúdo e tags HTML devem estar em **$language**. " . 
+                   ($language === 'Bengali' ? "IMPORTANTE: Atue como um jornalista sênior renomado de Dhaka (Bangladesh). Use vocabulário rico, coloquialismos locais apropriados e varie o ritmo do texto. REGRA CRÍTICA DE SINTAXE: NUNCA comece duas frases seguidas com pronomes como 'এই' (Este) ou 'এটি' (Isto). Alterne o início das frases começando ora por advérbios de tempo (Hoje, Frequentemente), ora pelo sujeito direto. Em Bengali, a IA tende a escrever textos curtos e com frases muito longas. Para resolver: 1) USE MUITOS PONTOS FINAIS (।) para garantir frases curtas (máximo 15 a 20 palavras por frase). 2) Seja extremamente prolixo, detalhista e gigantesco nas explicações. Escreva como um nativo (Bangladesh/West Bengal)." : "");
 
         return $this->call_llm_api($prompt) . "\n\n";
     }

@@ -22,6 +22,7 @@ class Conext_Agent_Researcher {
                 case 'pt': return 'Portuguese (Brazil)';
                 case 'es': return 'Spanish';
                 case 'en': return 'English';
+                case 'bn': return 'Bengali';
             }
         }
 
@@ -41,6 +42,7 @@ class Conext_Agent_Researcher {
         if ($base === 'es') return 'Spanish';
         if ($base === 'pt') return 'Portuguese';
         if ($base === 'en') return 'English';
+        if ($base === 'bn') return 'Bengali';
         
         return 'Portuguese (Brazil)'; // Default
     }
@@ -61,6 +63,7 @@ class Conext_Agent_Researcher {
                   "PROIBIÇÃO ABSOLUTA: Você NÃO PODE gerar um post sobre o site em si, nem sobre promoções dele, nem bônus ou avaliações da marca '{$site_name}'. O seu dever é ser 'invisível'. \n" .
                   "MISSÃO: Baseado no nicho acima, sugira um TEMA DE CAUDA LONGA que seja interessante para os leitores desse nicho. Se o usuário enviou termos de pesquisa, use um deles. Se não enviou, invente uma pauta profunda. \n" .
                   "IDIOMA OBRIGATÓRIO: Toda a sua resposta deve estar em **$language**. \n" .
+                  "REQUISITO VITAL: O Título, a Focus Keyword e o Resumo DEVEM estar em **$language**. Se eu te passar um termo em outro idioma, TRADUZA-O para **$language** antes de criar a pauta.\n" .
                   "Sua saída deve conter: 1 Título atraente, 1 Keyword principal e o resumo do que o post vai tratar (ESQUEÇA O SITE, FOQUE NO ASSUNTO).";
 
         if (!empty($search_terms)) {

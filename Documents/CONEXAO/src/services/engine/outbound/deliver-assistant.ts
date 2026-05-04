@@ -8,7 +8,7 @@ import fs from 'fs';
 import { UzapiService } from '../uzapi';
 import { logToFile } from '../logger';
 
-export type OutboundDeliveryChannel = 'whatsapp' | 'simulator' | 'generic' | 'wordpress';
+export type OutboundDeliveryChannel = 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram';
 
 export async function deliverAssistantOutbound(params: {
     channel: OutboundDeliveryChannel;

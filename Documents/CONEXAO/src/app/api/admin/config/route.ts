@@ -34,7 +34,10 @@ export async function GET() {
             logoWhiteUrl: "",
             stripeSecretKey: "",
             stripePublishableKey: "",
-            mercadoPagoAccessToken: ""
+            mercadoPagoAccessToken: "",
+            metaAppId: "",
+            metaAppSecret: "",
+            metaVerifyToken: ""
         });
     } catch (error) {
         return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
@@ -79,7 +82,10 @@ export async function PUT(req: Request) {
             smtpFrom: body.smtpFrom || null,
             systemBotId: body.systemBotId || null,
             logoColoredUrl: body.logoColoredUrl || null,
-            logoWhiteUrl: body.logoWhiteUrl || null
+            logoWhiteUrl: body.logoWhiteUrl || null,
+            metaAppId: body.metaAppId || null,
+            metaAppSecret: body.metaAppSecret || null,
+            metaVerifyToken: body.metaVerifyToken || null
         };
 
         console.log(`[AdminConfig] [${timestamp}] Attempting upsert...`);

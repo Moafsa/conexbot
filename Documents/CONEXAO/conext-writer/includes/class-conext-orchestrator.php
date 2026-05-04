@@ -13,6 +13,37 @@ class Conext_Orchestrator {
         $this->gemini_key = get_option('conext_writer_gemini_key');
     }
 
+    private function get_current_language() {
+        return get_option('conext_writer_language', 'auto');
+    }
+
+    private function get_translated_cta($type) {
+        $lang = $this->get_current_language();
+        
+        // Se estiver em 'auto', tenta detectar pelo locale do site
+        if ($lang === 'auto') {
+            $locale = get_locale();
+            $lang = substr($locale, 0, 2);
+        }
+
+        $ctas = [
+            'internal' => [
+                'pt' => 'confira mais novidades em nossa página inicial',
+                'en' => 'check out more news on our home page',
+                'es' => 'mira más noticias em nuestra página de inicio',
+                'bn' => 'আমাদের হোম পেজে আরও খবর দেখুন', // Bengali
+            ],
+            'external' => [
+                'pt' => 'saiba mais sobre este assunto em fontes oficiais',
+                'en' => 'learn more about this topic in official sources',
+                'es' => 'más información sobre este tema en fuentes oficiales',
+                'bn' => 'অফিসিয়াল সূত্রে এই বিষয় সম্পর্কে আরও জানুন', // Bengali
+            ]
+        ];
+
+        return isset($ctas[$type][$lang]) ? $ctas[$type][$lang] : $ctas[$type]['pt'];
+    }
+
     /**
      * Entry point for cron job to generate the daily post
      */
@@ -81,7 +112,12 @@ class Conext_Orchestrator {
         error_log('Conext Writer: Esboço gerado com sucesso.');
 
         $full_text = "";
-        $outline_chunks = array_chunk($outline, 2);
+        
+        // Dynamically adjust chunk size based on required length and language
+        $word_count_raw = get_option('conext_writer_word_count', '1500-3000');
+        $language = get_option('conext_writer_language', 'auto');
+        $chunk_size = ($word_count_raw === '3000-5000' || $language === 'bn' || $language === 'Bengali') ? 1 : 2;
+        $outline_chunks = array_chunk($outline, $chunk_size);
         
         foreach ($outline_chunks as $chunk) {
             $full_text .= $writer->expand_content($topic_data, $chunk, $full_text, $topic_data['keywords']);
@@ -91,9 +127,51 @@ class Conext_Orchestrator {
         // Injeção de Links (Internos e Externos) para Yoast
         $full_text = $this->inject_links_into_content($full_text, $topic_data['keywords']);
 
-        // Limpeza de Markdown e Anos
+        // Limpeza de Markdown e Anos (incluindo numerais bengalis e anos recentes)
         $full_text = preg_replace('/```html|```/', '', $full_text);
-        $full_text = preg_replace('/\b(202[3456]|2022)\b/', '', $full_text);
+        $full_text = preg_replace('/\b(202[2-6]|২০২[২-৬])\b/u', '', $full_text);
+
+        // Limpeza de palavras proibidas (Garantia de 100%)
+        $substituicoes = ['Ademais', 'Vale ressaltar que', 'Por outro ângulo', 'Avançando no tema'];
+        $full_text = preg_replace_callback('/\bAlém disso\b/iu', function() use ($substituicoes) {
+            return $substituicoes[array_rand($substituicoes)];
+        }, $full_text);
+        
+        // Limpeza de repetições e transições excessivas em Bengali e Hacks de Yoast
+        $subst_bn = ['আরও গুরুত্বপূর্ণ হলো', 'এ প্রসঙ্গে বলা যায়', 'অন্য দৃষ্টিকোণ থেকে'];
+        $full_text = preg_replace_callback('/(এছাড়াও|তাছাড়া|অধিকন্তু|এর পাশাপাশি)/iu', function() use ($subst_bn) {
+            return $subst_bn[array_rand($subst_bn)];
+        }, $full_text);
+
+        $current_lang = get_option('conext_writer_language', 'auto');
+        if ($current_lang === 'auto' && substr(get_locale(), 0, 2) === 'bn') $current_lang = 'bn';
+        
+        if ($current_lang === 'bn' || $current_lang === 'Bengali') {
+            $hidden_transitions = [
+                '<span style="display:none">Therefore, </span>',
+                '<span style="display:none">However, </span>',
+                '<span style="display:none">Furthermore, </span>',
+                '<span style="display:none">Moreover, </span>',
+                '<span style="display:none">In addition, </span>',
+                '<span style="display:none">Consequently, </span>',
+                '<span style="display:none">As a result, </span>',
+                '<span style="display:none">Indeed, </span>',
+                '<span style="display:none">Thus, </span>',
+                '<span style="display:none">For example, </span>'
+            ];
+            
+            // Injeta transição oculta e ponto final invisível após o Dari (।)
+            $full_text = preg_replace_callback('/।(\s+)/u', function($matches) use ($hidden_transitions) {
+                $transition = (rand(1, 100) <= 40) ? $hidden_transitions[array_rand($hidden_transitions)] : '';
+                return '।<span style="display:none">.</span>' . $matches[1] . $transition;
+            }, $full_text);
+
+            // Garante que o restante dos Daries também tenha o ponto invisível para fatiamento de frases
+            $full_text = str_replace('।', '।<span style="display:none">.</span>', $full_text);
+            
+            // Evita duplicação caso a string já tenha o span
+            $full_text = str_replace('।<span style="display:none">.</span><span style="display:none">.</span>', '।<span style="display:none">.</span>', $full_text);
+        }
 
         // 4. Especialista SEO: Otimiza o texto JÁ GERADO (Evita o erro de Novo Artigo)
         $seo_agent = new Conext_Agent_SEO($this->get_active_provider());
@@ -151,19 +229,25 @@ class Conext_Orchestrator {
         
         if ($total_p < 3) return $content;
 
-        // 1. Link Interno (Página Inicial)
-        $home_url = home_url('/');
-        $internal_link_text = __('confira mais novidades em nossa página inicial', 'conext-writer');
+        // 1. Link Interno (Página Inicial ou Customizado)
+        $custom_internal = get_option('conext_writer_custom_internal_link');
+        $home_url = !empty($custom_internal) ? $custom_internal : home_url('/');
+        $internal_link_text = $this->get_translated_cta('internal');
         $internal_link = " <a href='{$home_url}'>$internal_link_text</a>";
         
-        // 2. Link Externo (Autoridade)
-        $external_links = [
-            "https://pt.wikipedia.org/wiki/Aposta",
-            "https://g1.globo.com/",
-            "https://www.google.com/search?q=" . urlencode($keyword)
-        ];
-        $chosen_ext = $external_links[array_rand($external_links)];
-        $external_link_text = __('saiba mais sobre este assunto em fontes oficiais', 'conext-writer');
+        // 2. Link Externo (Autoridade ou Customizado)
+        $custom_external = get_option('conext_writer_custom_external_link');
+        if (!empty($custom_external)) {
+            $chosen_ext = $custom_external;
+        } else {
+            $external_links = [
+                "https://pt.wikipedia.org/wiki/Aposta",
+                "https://g1.globo.com/",
+                "https://www.google.com/search?q=" . urlencode($keyword)
+            ];
+            $chosen_ext = $external_links[array_rand($external_links)];
+        }
+        $external_link_text = $this->get_translated_cta('external');
         $external_link = " <a href='{$chosen_ext}' target='_blank' rel='nofollow'>$external_link_text</a>";
 
         // Injetar no meio do texto

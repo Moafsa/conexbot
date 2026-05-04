@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp } from "lucide-react";
 
 export default function Sidebar({ branding, userPlans }: { branding?: any, userPlans?: { hasPrimary: boolean, hasWriter: boolean } }) {
     const pathname = usePathname();
@@ -34,6 +34,7 @@ export default function Sidebar({ branding, userPlans }: { branding?: any, userP
     // Writer Plan Items
     if (userPlans?.hasWriter || isAdmin) {
         menuItems.push({ icon: PenTool, label: "Escritor IA", href: "/dashboard/writer" });
+        menuItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
     }
 
     // Settings and Finance (Common to everyone signed up)

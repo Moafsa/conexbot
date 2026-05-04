@@ -1,11 +1,9 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider   = "postgresql"
-  extensions = [vector]
 }
 
 model Account {
@@ -58,6 +56,11 @@ model Tenant {
   openaiApiKey            String?
   openrouterApiKey        String?
   elevenLabsApiKey        String?
+  googleAdsDeveloperToken String?
+  googleAdsCustomerId     String?
+  semrushApiKey           String?
+  dataForSeoApiKey        String?
+  metaAdsPixelId          String?
   role                    UserRole       @default(USER)
   asaasWalletId           String?
   resetToken              String?        @unique
@@ -74,6 +77,51 @@ model Tenant {
   subscriptions           Subscription[]
   usageCounter            UsageCounter?
   notifications           Notification[]
+  marketingPosts          MarketingPost[]
+  marketingCampaigns      MarketingCampaign[]
+}
+
+model MarketingPost {
+  id          String    @id @default(uuid())
+  title       String?
+  content     String
+  imageUrl    String?
+  platform    String    // "INSTAGRAM", "FACEBOOK"
+  status      String    @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHED
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  metaMediaId String?
+  metaAdId    String?
+  botId       String
+  tenantId    String
+  createdAt   DateTime  @default(now())
+  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model MarketingCampaign {
+  id          String    @id @default(uuid())
+  name        String
+  objective   String
+  budget      Float?
+  status      String    @default("ACTIVE")
+  externalId  String?   @unique
+  botId       String
+  tenantId    String
+  createdAt   DateTime  @default(now())
+  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model KeywordResearch {
+  id         String   @id @default(uuid())
+  keyword    String
+  volume     Int?
+  cpc        Float?
+  difficulty Int?
+  provider   String   // "GOOGLE", "SEMRUSH", "DATAFORSEO"
+  tenantId   String
+  createdAt  DateTime @default(now())
 }
 
 model Bot {
@@ -136,14 +184,33 @@ model Bot {
   orders              Order[]
   products            Product[]
   smtpConfigs         SmtpConfig[]
-  vectors             VectorStore[]
+// vectors             VectorStore[]
   coupons             Coupon[]
   isWordpress         Boolean            @default(false)
+  channels            BotChannel[]
+  marketingPosts      MarketingPost[]
+  marketingCampaigns  MarketingCampaign[]
 
   // Hierarchy for Agent Isolation
   masterId            String?
   master              Bot?               @relation("BotAgents", fields: [masterId], references: [id])
   agents              Bot[]              @relation("BotAgents")
+}
+
+model BotChannel {
+  id             String   @id @default(uuid())
+  botId          String
+  provider       String   // "WUZAPI", "META_WHATSAPP", "INSTAGRAM", "WORDPRESS", etc.
+  status         String   @default("DISCONNECTED")
+  identifier     String?  // Wuzapi SessionName, Meta Phone ID, Insta Account ID
+  credentials    Json?    // Guarda o Access Token da Meta ou outras senhas
+  webhookToken   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  bot            Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, identifier])
+  @@index([botId])
 }
 
 model Appointment {
@@ -457,15 +524,15 @@ model UsageCounter {
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model VectorStore {
-  id        String                 @id @default(uuid())
-  content   String
-  metadata  Json?
-  embedding Unsupported("vector")?
-  botId     String
-  createdAt DateTime               @default(now())
-  bot       Bot                    @relation(fields: [botId], references: [id], onDelete: Cascade)
-}
+// model VectorStore {
+//   id        String                 @id @default(uuid())
+//   content   String
+//   metadata  Json?
+//   embedding Unsupported("vector")?
+//   botId     String
+//   createdAt DateTime               @default(now())
+//   bot       Bot                    @relation(fields: [botId], references: [id], onDelete: Cascade)
+// }
 
 model GlobalConfig {
   id                     String   @id @default("system")
@@ -493,6 +560,9 @@ model GlobalConfig {
   mercadoPagoAccessToken String?
   stripePublishableKey   String?
   stripeSecretKey        String?
+  metaAppId              String?
+  metaAppSecret          String?
+  metaVerifyToken        String?
 }
 
 enum UserRole {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail, Globe, Download } from "lucide-react";
+import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail, Globe, Download, TrendingUp, Target } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function SettingsContent() {
@@ -19,6 +19,8 @@ function SettingsContent() {
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
     const [finance, setFinance] = useState({ asaasApiKey: "", asaasWalletId: "" });
     const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "" });
+    const [marketingSettings, setMarketingSettings] = useState({ googleAdsDeveloperToken: "", googleAdsCustomerId: "", semrushApiKey: "", dataForSeoApiKey: "" });
+
     const [smtpConfigs, setSmtpConfigs] = useState<any[]>([]);
     const [newSmtp, setNewSmtp] = useState({ host: "", port: 587, user: "", pass: "", fromEmail: "" });
     const [bots, setBots] = useState<any[]>([]);
@@ -61,6 +63,17 @@ function SettingsContent() {
                     const res = await fetch("/api/settings/smtp");
                     const data = await res.json();
                     if (res.ok) setSmtpConfigs(Array.isArray(data) ? data : []);
+                } else if (activeTab === "marketing") {
+                    const res = await fetch("/api/settings/marketing");
+                    const data = await res.json();
+                    if (res.ok) {
+                        setMarketingSettings({
+                            googleAdsDeveloperToken: data.googleAdsDeveloperToken || "",
+                            googleAdsCustomerId: data.googleAdsCustomerId || "",
+                            semrushApiKey: data.semrushApiKey || "",
+                            dataForSeoApiKey: data.dataForSeoApiKey || ""
+                        });
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -208,6 +221,24 @@ function SettingsContent() {
         }
     };
 
+    const handleSaveMarketingSettings = async () => {
+        setSaving(true);
+        setMessage(null);
+        try {
+            const res = await fetch("/api/settings/marketing", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(marketingSettings)
+            });
+            if (!res.ok) throw new Error("Erro ao salvar configurações de marketing");
+            setMessage({ type: 'success', text: "Configurações de Marketing salvas!" });
+        } catch (err) {
+            setMessage({ type: 'error', text: "Erro ao salvar configurações." });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const TabButton = ({ id, label, icon: Icon }: any) => (
         <button
             onClick={() => setActiveTab(id)}
@@ -235,6 +266,7 @@ function SettingsContent() {
                     <TabButton id="smtp" label="Servidores E-mail (SMTP)" icon={Mail} />
                     <TabButton id="notifications" label="Notificações" icon={Bell} />
                     <TabButton id="security" label="Segurança" icon={Shield} />
+                    <TabButton id="marketing" label="Marketing IA" icon={TrendingUp} />
                     <TabButton id="wordpress" label="WordPress" icon={Globe} />
                 </div>
 
@@ -624,6 +656,78 @@ function SettingsContent() {
                                     >
                                         {saving ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
                                         Atualizar Senha
+                                    </button>
+                                </div>
+                            )}
+
+                            {activeTab === "marketing" && (
+                                <div className="space-y-6 max-w-md animate-fade-in">
+                                    <h3 className="text-xl font-semibold text-emerald-400">Marketing & SEO</h3>
+                                    <p className="text-gray-400 text-sm">
+                                        Configure suas chaves de API para habilitar as ferramentas de pesquisa de palavras-chave e automação de anúncios.
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-4">
+                                            <h4 className="text-sm font-bold flex items-center gap-2"><Globe size={16} /> Google Ads</h4>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">Developer Token</label>
+                                                <input
+                                                    type="password"
+                                                    value={marketingSettings.googleAdsDeveloperToken}
+                                                    onChange={e => setMarketingSettings({ ...marketingSettings, googleAdsDeveloperToken: e.target.value })}
+                                                    placeholder="Seu token do Google Ads..."
+                                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">Customer ID</label>
+                                                <input
+                                                    type="text"
+                                                    value={marketingSettings.googleAdsCustomerId}
+                                                    onChange={e => setMarketingSettings({ ...marketingSettings, googleAdsCustomerId: e.target.value })}
+                                                    placeholder="000-000-0000"
+                                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-4">
+                                            <h4 className="text-sm font-bold flex items-center gap-2"><Target size={16} /> Semrush</h4>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">API Key</label>
+                                                <input
+                                                    type="password"
+                                                    value={marketingSettings.semrushApiKey}
+                                                    onChange={e => setMarketingSettings({ ...marketingSettings, semrushApiKey: e.target.value })}
+                                                    placeholder="Sua chave Semrush..."
+                                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-4">
+                                            <h4 className="text-sm font-bold flex items-center gap-2"><Zap size={16} /> DataForSEO</h4>
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">API Key / Login</label>
+                                                <input
+                                                    type="password"
+                                                    value={marketingSettings.dataForSeoApiKey}
+                                                    onChange={e => setMarketingSettings({ ...marketingSettings, dataForSeoApiKey: e.target.value })}
+                                                    placeholder="Sua chave DataForSEO..."
+                                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={handleSaveMarketingSettings}
+                                        disabled={saving}
+                                        className="btn-primary flex items-center gap-2 mt-4 bg-emerald-600 hover:bg-emerald-700 border-none"
+                                    >
+                                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                        Salvar Integrações
                                     </button>
                                 </div>
                             )}

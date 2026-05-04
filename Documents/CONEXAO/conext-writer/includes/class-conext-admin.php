@@ -54,6 +54,8 @@ class Conext_Admin {
         register_setting('conext_writer_settings', 'conext_writer_word_count');
         register_setting('conext_writer_settings', 'conext_writer_image_count', ['default' => 1]);
         register_setting('conext_writer_settings', 'conext_writer_image_style', ['default' => '3d_render']);
+        register_setting('conext_writer_settings', 'conext_writer_custom_internal_link');
+        register_setting('conext_writer_settings', 'conext_writer_custom_external_link');
     }
 
     public function reschedule_cron() {
@@ -97,6 +99,7 @@ class Conext_Admin {
                             <option value="pt" <?php selected($selected_lang, 'pt'); ?>>🇧🇷 Português</option>
                             <option value="es" <?php selected($selected_lang, 'es'); ?>>🇪🇸 Español</option>
                             <option value="en" <?php selected($selected_lang, 'en'); ?>>🇺🇸 English</option>
+                            <option value="bn" <?php selected($selected_lang, 'bn'); ?>>🇧🇩 Bengali</option>
                         </select>
                         <noscript><input type="submit" value="Change" /></noscript>
                     </form>
@@ -217,6 +220,10 @@ class Conext_Admin {
                 <form method="post" action="options.php">
                 <?php settings_fields('conext_writer_settings'); ?>
                 <?php do_settings_sections('conext_writer_settings'); ?>
+                
+                <?php /* Campo oculto para evitar que o idioma seja resetado ao salvar as configurações gerais */ ?>
+                <input type="hidden" name="conext_writer_language" value="<?php echo esc_attr(get_option('conext_writer_language', 'auto')); ?>">
+
                 <table class="form-table">
                     <tr valign="top">
                         <th scope="row"><?php _e('OpenAI API Key', 'conext-writer'); ?></th>
@@ -322,6 +329,20 @@ class Conext_Admin {
                         </td>
                     </tr>
                     <tr valign="top">
+                        <th scope="row"><?php _e('Link Interno Customizado', 'conext-writer'); ?></th>
+                        <td>
+                            <input type="url" name="conext_writer_custom_internal_link" value="<?php echo esc_attr(get_option('conext_writer_custom_internal_link')); ?>" class="regular-text" placeholder="<?php _e('Ex: https://meusite.com/categoria/apostas', 'conext-writer'); ?>" />
+                            <p class="description"><?php _e('Deixe em branco para usar a Página Inicial do site.', 'conext-writer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr valign="top">
+                        <th scope="row"><?php _e('Link Externo Customizado', 'conext-writer'); ?></th>
+                        <td>
+                            <input type="url" name="conext_writer_custom_external_link" value="<?php echo esc_attr(get_option('conext_writer_custom_external_link')); ?>" class="regular-text" placeholder="<?php _e('Ex: https://pt.wikipedia.org/wiki/Cassino', 'conext-writer'); ?>" />
+                            <p class="description"><?php _e('Deixe em branco para o plugin escolher links de autoridade aleatórios.', 'conext-writer'); ?></p>
+                        </td>
+                    </tr>
+                    <tr valign="top">
                         <th scope="row"><?php _e('Fontes de Notícias ou RSS', 'conext-writer'); ?></th>
                         <td>
                             <textarea name="conext_writer_news_source" rows="5" class="large-text code" placeholder="<?php _e('Cole URLs de fontes (uma por linha) ou deixe em branco para busca 100% automática', 'conext-writer'); ?>">
@@ -354,6 +375,33 @@ class Conext_Admin {
                 };
 
                 jQuery(document).ready(function($) {
+                    // --- Persistência de Abas ---
+                    var activeTab = localStorage.getItem('conext_writer_active_tab') || '#licensing';
+                    
+                    function switchTab(target) {
+                        $('.nav-tab').removeClass('nav-tab-active');
+                        $('.nav-tab[href="' + target + '"]').addClass('nav-tab-active');
+                        
+                        if (target === '#settings') {
+                            $('#conex-settings-tab').show();
+                            $('#conex-licensing-tab').hide();
+                        } else {
+                            $('#conex-settings-tab').hide();
+                            $('#conex-licensing-tab').show();
+                        }
+                        localStorage.setItem('conext_writer_active_tab', target);
+                    }
+
+                    // Inicializar aba
+                    switchTab(activeTab);
+
+                    $('.nav-tab').click(function(e) {
+                        e.preventDefault();
+                        var target = $(this).attr('href');
+                        switchTab(target);
+                    });
+
+                    // --- Lógica de Planos ---
                     $('.plan-toggle').click(function() {
                         $('.plan-toggle').removeClass('button-primary');
                         $(this).addClass('button-primary');
@@ -392,21 +440,6 @@ class Conext_Admin {
                             var url = "https://app.conext.click/auth/register?planId=" + planId + "&type=WRITER_PLUGIN&interval=" + interval;
                             $(this).find('.upgrade-btn').attr('href', url);
                         });
-                    });
-
-                    $('.nav-tab').click(function(e) {
-                        e.preventDefault();
-                        $('.nav-tab').removeClass('nav-tab-active');
-                        $(this).addClass('nav-tab-active');
-                        
-                        var target = $(this).attr('href');
-                        if (target == '#licensing') {
-                            $('#conex-licensing-tab').show();
-                            $('#conex-settings-tab').hide();
-                        } else {
-                            $('#conex-licensing-tab').hide();
-                            $('#conex-settings-tab').show();
-                        }
                     });
                 });
             </script>
@@ -488,7 +521,7 @@ class Conext_Admin {
         check_admin_referer('conext_writer_lang_action', 'conext_writer_lang_nonce');
 
         $lang = sanitize_text_field($_POST['conext_writer_language']);
-        if (in_array($lang, ['auto', 'pt', 'es', 'en'])) {
+        if (in_array($lang, ['auto', 'pt', 'es', 'en', 'bn'])) {
             update_option('conext_writer_language', $lang);
         }
 

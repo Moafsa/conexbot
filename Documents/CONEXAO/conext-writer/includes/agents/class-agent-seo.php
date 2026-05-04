@@ -20,6 +20,7 @@ class Conext_Agent_SEO {
                 case 'pt': return 'Portuguese (Brazil)';
                 case 'es': return 'Spanish';
                 case 'en': return 'English';
+                case 'bn': return 'Bengali';
             }
         }
 
@@ -39,6 +40,7 @@ class Conext_Agent_SEO {
         if ($base === 'es') return 'Spanish';
         if ($base === 'pt') return 'Portuguese';
         if ($base === 'en') return 'English';
+        if ($base === 'bn') return 'Bengali';
         
         return 'Portuguese (Brazil)'; // Default
     }
