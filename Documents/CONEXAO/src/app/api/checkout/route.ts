@@ -57,9 +57,47 @@ export async function POST(req: Request) {
         }
 
         let value = plan.price;
-        if (interval === 'QUARTERLY') value = plan.priceQuarterly || plan.price * 3;
-        if (interval === 'SEMIANNUAL') value = plan.priceSemiannual || plan.price * 6;
-        if (interval === 'YEARLY') value = plan.priceYearly || plan.price * 12;
+        let setupFee = 0;
+
+        // --- Agency Pricing Override ---
+        if (tenant.agencyId && plan.productCatalogId) {
+            const agencyPricing = await prisma.agencyPricing.findUnique({
+                where: {
+                    agencyId_productId: {
+                        agencyId: tenant.agencyId,
+                        productId: plan.productCatalogId
+                    }
+                }
+            });
+            
+            if (agencyPricing) {
+                const markupFactor = 1 + (agencyPricing.markupPercent / 100);
+                setupFee = agencyPricing.setupPrice || 0;
+
+                // Base price for the interval
+                let baseValue = plan.price;
+                if (interval === 'QUARTERLY') baseValue = plan.priceQuarterly || (plan.price * 3);
+                if (interval === 'SEMIANNUAL') baseValue = plan.priceSemiannual || (plan.price * 6);
+                if (interval === 'YEARLY') baseValue = plan.priceYearly || (plan.price * 12);
+
+                // Final value is base * markup
+                value = baseValue * markupFactor;
+            } else {
+                // No agency pricing, use standard intervals
+                if (interval === 'QUARTERLY') value = plan.priceQuarterly || (plan.price * 3);
+                if (interval === 'SEMIANNUAL') value = plan.priceSemiannual || (plan.price * 6);
+                if (interval === 'YEARLY') value = plan.priceYearly || (plan.price * 12);
+            }
+        } else {
+            // No agency, standard plan logic
+            if (interval === 'QUARTERLY') value = plan.priceQuarterly || (plan.price * 3);
+            if (interval === 'SEMIANNUAL') value = plan.priceSemiannual || (plan.price * 6);
+            if (interval === 'YEARLY') value = plan.priceYearly || (plan.price * 12);
+        }
+
+        // Add setup fee to the first payment
+        const finalValue = value + setupFee;
+        // ------------------------------
 
         let result;
 
@@ -108,7 +146,7 @@ export async function POST(req: Request) {
                     email: tenant.email,
                     cpfCnpj: tenant.cpfCnpj,
                 });
-                result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0);
+                result = await AsaasService.createSubscription(customer.id, planId, value, interval, plan.trialDays || 0, setupFee);
 
                 // Save subscription record
                 await prisma.subscription.upsert({
@@ -140,13 +178,13 @@ export async function POST(req: Request) {
                     await prisma.payment.upsert({
                         where: { externalId: result.paymentId },
                         update: {
-                            amount: result.amount || value,
+                            amount: result.amount || (value + setupFee),
                             status: 'PENDING',
                             invoiceUrl: result.invoiceUrl,
                             type: plan.type,
                         },
                         create: {
-                            amount: result.amount || value,
+                            amount: result.amount || (value + setupFee),
                             status: 'PENDING',
                             gateway: 'asaas',
                             externalId: result.paymentId,
@@ -159,7 +197,7 @@ export async function POST(req: Request) {
                 break;
             }
             case 'mercadopago': {
-                const mpPref = await MercadoPagoService.createPreference(tenant, plan.id); // Pass string ID
+                const mpPref = await MercadoPagoService.createPreference(tenant, plan.id, finalValue); // Pass string ID and calculated amount
                 result = { invoiceUrl: mpPref.url };
 
                 await prisma.subscription.upsert({

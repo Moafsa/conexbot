@@ -5,7 +5,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { KnowledgeService } from '@/services/engine/knowledge';
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -49,7 +49,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {

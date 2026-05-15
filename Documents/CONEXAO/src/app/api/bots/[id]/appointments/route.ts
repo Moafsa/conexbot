@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: any }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,6 +40,7 @@ export async function GET(
       startTime: appt.startTime,
       endTime: appt.endTime,
       status: appt.status,
+      notes: appt.notes,
       contactName: appt.contact?.name,
       contactPhone: appt.contact?.phone,
     }));

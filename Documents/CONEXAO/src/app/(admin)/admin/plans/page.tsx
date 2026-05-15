@@ -9,18 +9,35 @@ export default function PlansAdminPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState<any>(null);
     const [saving, setSaving] = useState(false);
+    const [marketplaceProducts, setMarketplaceProducts] = useState<any[]>([]);
 
     const [activeTab, setActiveTab] = useState<'PRIMARY' | 'WRITER_PLUGIN'>('PRIMARY');
 
     useEffect(() => {
         fetchPlans();
+        fetchMarketplaceProducts();
     }, []);
+
+    const fetchMarketplaceProducts = async () => {
+        try {
+            const res = await fetch('/api/admin/marketplace/products');
+            const data = await res.json();
+            if (Array.isArray(data)) setMarketplaceProducts(data);
+        } catch (error) {
+            console.error('Failed to fetch marketplace products');
+        }
+    };
 
     const fetchPlans = async () => {
         try {
             const res = await fetch('/api/admin/plans');
             const data = await res.json();
-            setPlans(data);
+            if (Array.isArray(data)) {
+                setPlans(data);
+            } else {
+                console.error('Expected array from /api/admin/plans, got:', data);
+                setPlans([]);
+            }
         } catch (error) {
             console.error('Failed to fetch plans');
         } finally {
@@ -211,6 +228,23 @@ export default function PlansAdminPage() {
                                     <option value="PRIMARY">Conextbot Principal (Bots)</option>
                                     <option value="WRITER_PLUGIN">AI Writer Plugin</option>
                                 </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Vincular ao Produto do Marketplace</label>
+                                <select 
+                                    value={editingPlan?.productId || ''}
+                                    onChange={e => setEditingPlan({...editingPlan, productId: e.target.value || null})}
+                                    className="w-full bg-[#151515] border border-[#222] rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition-all text-white"
+                                >
+                                    <option value="">Nenhum (Plano Avulso)</option>
+                                    {marketplaceProducts.map(prod => (
+                                        <option key={prod.id} value={prod.id}>{prod.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-gray-500 italic">
+                                    * Vincule ao produto correto (ex: CONEXT_BOT) para que as agências possam configurar suas margens.
+                                </p>
                             </div>
 
                             <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4">

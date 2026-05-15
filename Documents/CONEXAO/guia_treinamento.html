@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bíblia de Vendas | Conext AI Infrastructure</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --dark: #050505;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --text: #f8fafc;
+            --accent: #10b981;
+            --gold: #fbbf24;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3 { font-family: 'Outfit', sans-serif; font-weight: 800; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+
+        header {
+            text-align: center;
+            padding: 120px 0;
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        header h1 {
+            font-size: 4.5rem;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-style: italic;
+            tracking-tighter;
+        }
+
+        .badge {
+            background: var(--primary);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-weight: 900;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 25px;
+            display: inline-block;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        section { margin-bottom: 120px; }
+        .section-title { font-size: 3rem; margin-bottom: 60px; text-align: center; color: #fff; font-style: italic; }
+
+        .tier-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 40px;
+            padding: 50px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(20px);
+        }
+
+        .tier-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            margin-top: 40px;
+        }
+
+        .tier-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 30px;
+            border-radius: 30px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: 0.3s;
+        }
+
+        .tier-item:hover { border-color: var(--primary); transform: translateY(-5px); }
+        .tier-item h4 { color: var(--primary); font-size: 1.4rem; margin-bottom: 10px; font-style: italic; }
+        .tier-item p { font-size: 1.2rem; font-weight: 800; margin-bottom: 5px; }
+        .tier-item span { font-size: 0.8rem; color: #64748b; font-weight: 600; }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .product-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 35px;
+            padding: 35px;
+            transition: 0.4s;
+        }
+
+        .product-card:hover { border-color: var(--secondary); background: rgba(255, 255, 255, 0.05); }
+        .product-card h3 { font-size: 1.5rem; margin-bottom: 15px; color: #fff; font-style: italic; }
+        .product-card p { font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px; }
+        .product-card .tag { font-size: 0.7rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 30px;
+            overflow: hidden;
+            margin-top: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        th, td { padding: 25px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        th { background: rgba(99, 102, 241, 0.1); color: var(--primary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .highlight-money { color: var(--accent); font-weight: 800; font-size: 1.2rem; }
+
+        .playbook-step {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 40px;
+            border-radius: 35px;
+            margin-bottom: 30px;
+            border-left: 6px solid var(--primary);
+        }
+
+        .script-box {
+            background: #000;
+            padding: 25px;
+            border-radius: 20px;
+            font-style: italic;
+            color: #94a3b8;
+            margin-top: 20px;
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            font-size: 0.95rem;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 100px 50px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            padding: 18px 50px;
+            border-radius: 100px;
+            text-decoration: none;
+            font-weight: 900;
+            display: inline-block;
+            margin-top: 40px;
+            transition: 0.4s;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.8rem;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 15px 40px rgba(99, 102, 241, 0.5); }
+
+        .footer {
+            text-align: center;
+            padding: 60px 0;
+            font-size: 0.7rem;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        @media (max-width: 900px) {
+            header h1 { font-size: 3rem; }
+            .section-title { font-size: 2.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <span class="badge">Internal Training // V2.0</span>
+            <h1>Bíblia de Vendas</h1>
+            <p>Infraestrutura Conext AI: O Caminho para o Domínio do Mercado de Agências.</p>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- SEÇÃO 1: ESCALA REVERSA -->
+        <section>
+            <h2 class="section-title">1. Parceria de Crescimento: Escala Reversa</h2>
+            <div class="tier-card">
+                <h3>O Conceito</h3>
+                <p>Nós não somos seus fornecedores, somos seus <strong>parceiros de infraestrutura</strong>. No modelo Conext, quanto mais sua agência escala o faturamento (MRR), menor é a nossa taxa de tecnologia. O lucro fica onde deve estar: na sua mão.</p>
+                
+                <div class="tier-grid">
+                    <div class="tier-item">
+                        <span class="tag">Tier 01</span>
+                        <h4>Bronze</h4>
+                        <p>20%</p>
+                        <span>Até R$ 5k/mês MRR</span>
+                    </div>
+                    <div class="tier-item">
+                        <span class="tag">Tier 02</span>
+                        <h4>Prata</h4>
+                        <p>15%</p>
+                        <span>R$ 5k - R$ 15k MRR</span>
+                    </div>
+                    <div class="tier-item" style="border-color: var(--primary); background: rgba(99, 102, 241, 0.05);">
+                        <span class="tag">Tier 03</span>
+                        <h4>Ouro</h4>
+                        <p>10%</p>
+                        <span>R$ 15k - R$ 50k MRR</span>
+                    </div>
+                    <div class="tier-item">
+                        <span class="tag">Tier 04</span>
+                        <h4>Diamante</h4>
+                        <p>5%</p>
+                        <span>Acima de R$ 50k MRR</span>
+                    </div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cenário de Faturamento</th>
+                        <th>MRR da Agência</th>
+                        <th>Taxa Conext</th>
+                        <th>Seu Lucro Real Est.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Iniciante (Bronze)</td>
+                        <td>R$ 4.000,00</td>
+                        <td>20% (R$ 800)</td>
+                        <td class="highlight-money">R$ 3.200,00</td>
+                    </tr>
+                    <tr>
+                        <td>Escalando (Ouro)</td>
+                        <td>R$ 35.000,00</td>
+                        <td>10% (R$ 3.500)</td>
+                        <td class="highlight-money">R$ 31.500,00</td>
+                    </tr>
+                    <tr>
+                        <td>Império (Diamante)</td>
+                        <td>R$ 120.000,00</td>
+                        <td>5% (R$ 6.000)</td>
+                        <td class="highlight-money">R$ 114.000,00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- SEÇÃO 2: ARSENAL DE SOLUÇÕES -->
+        <section>
+            <h2 class="section-title">2. Para seus Clientes: O Arsenal</h2>
+            
+            <div class="product-grid">
+                <div class="product-card">
+                    <span class="tag">Conectividade</span>
+                    <h3>WhatsApp de Elite</h3>
+                    <p>Uzapi de latência zero. Centenas de conversas simultâneas com estabilidade bancária e segurança total.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Conversão</span>
+                    <h3>Voz Humana Real</h3>
+                    <p>Powered by ElevenLabs. Áudios com tonação neural que transmitem confiança e fecham vendas de alto ticket.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Inteligência</span>
+                    <h3>Treinamento Rápido</h3>
+                    <p>Treine a IA com URLs, PDFs ou Manuais em segundos. Conhecimento infinito para responder qualquer dúvida.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Automação</span>
+                    <h3>Agendamento IA</h3>
+                    <p>Conexão nativa com Google Calendar. A IA marca reuniões, consultas e exames sem erro humano 24/7.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Gestão</span>
+                    <h3>CRM Visual</h3>
+                    <p>Movimentação automática de leads baseado no sentimento e intenção real de compra detectada pela IA.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Finanças</span>
+                    <h3>Split de Pagamentos</h3>
+                    <p>Recebimentos via Asaas com divisão automática de comissões. Transparência total para agência e cliente.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Auditoria</span>
+                    <h3>Supervisor AI</h3>
+                    <p>Monitoramento tático em tempo real. A IA audita as conversas e sugere melhorias táticas contínuas.</p>
+                </div>
+                <div class="product-card">
+                    <span class="tag">Conteúdo</span>
+                    <h3>Conext Writer</h3>
+                    <p>Geração de posts de alta conversão e SEO otimizado direto no WordPress do seu cliente.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO 3: O PLAYBOOK -->
+        <section>
+            <h2 class="section-title">3. Playbook de Abordagem</h2>
+
+            <div class="playbook-step">
+                <h3>O Gatilho da Dor</h3>
+                <p>Ninguém compra "IA". Eles compram o tempo e o dinheiro que estão perdendo.</p>
+                <div class="script-box">
+                    "Você já parou para calcular quanto custa um lead que te chama no sábado à noite e só recebe resposta na segunda de manhã? Ele já comprou do seu concorrente. A Conext resolve isso em milissegundos."
+                </div>
+            </div>
+
+            <div class="playbook-step">
+                <h3>A Autoridade White-Label</h3>
+                <p>Posicione-se como o dono da tecnologia. Você é a infraestrutura.</p>
+                <div class="script-box">
+                    "Nós fornecemos a inteligência por trás do atendimento. Minha agência entrega o cérebro que vende e agenda para você 24 horas por dia, com a sua marca e o seu tom de voz."
+                </div>
+            </div>
+        </section>
+
+        <div class="cta-section">
+            <h2>Pronto para o Próximo Nível?</h2>
+            <p>O mercado de IA está apenas começando. Sua agência é o veículo, nós somos o motor.</p>
+            <a href="#" class="btn">Acessar Dashboard de Infraestrutura</a>
+        </div>
+
+        <div class="footer">
+            &copy; 2025 Conext AI Infrastructure — Conectando Ideias. Gerando Futuro.
+        </div>
+    </div>
+
+</body>
+</html>

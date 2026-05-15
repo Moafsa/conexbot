@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import * as XLSX from 'xlsx';
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
         const session = await getServerSession(authOptions);

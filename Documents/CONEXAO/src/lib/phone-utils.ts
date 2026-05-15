@@ -22,44 +22,38 @@ function digitsOnlyBrazil(raw: string): string {
 export function normalizeBrazilWhatsAppE164(raw: string): string {
     let d = digitsOnlyBrazil(raw);
     if (!d) return d;
+
+    // Remove leading zeros
     while (d.startsWith('0')) d = d.slice(1);
 
-    // 5555... no início (erro de digitação)
-    while (d.length > 13 && d.startsWith('5555')) {
+    // Handle 55 prefix duplication
+    if (d.length > 13 && d.startsWith('5555')) {
         d = '55' + d.slice(4);
     }
 
+    // If it starts with 55, process the rest
     if (d.startsWith('55')) {
         const rest = d.slice(2);
-        // 14 dígitos: 55 + DDD + "99" + 8 (9º dígito duplicado no celular)
-        if (d.length === 14 && rest.length === 12) {
-            const ddd = rest.slice(0, 2);
-            const sub = rest.slice(2);
-            if (sub.length === 10 && sub[0] === '9' && sub[1] === '9') {
-                d = `55${ddd}9${sub.slice(1)}`;
-            }
-        }
-        // 12 dígitos: 55 + DDD + 8 (celular antigo sem 9 após DDD)
-        else if (d.length === 12 && rest.length === 10) {
-            const ddd = rest.slice(0, 2);
-            const afterDdd = rest.slice(2);
-            if (afterDdd.length === 8) {
-                d = `55${ddd}9${afterDdd}`;
-            }
-        }
+        const ddd = rest.slice(0, 2);
+        const number = rest.slice(2);
+
+        // If it already has 11 digits (55 + 2 DDD + 9 number), it's perfect
+        if (rest.length === 11) return d;
+
+        // If it has 10 digits (55 + 2 DDD + 8 number), DO NOT force the 9th digit 
+        // unless it's a known requirement. For now, preserve 8-digit accounts.
+        if (rest.length === 10) return d;
+
         return d;
     }
 
-    // Sem DDI: 11 dígitos = DDD + celular (9 dígitos)
-    if (d.length === 11) {
-        return `55${d}`;
-    }
+    // If it has 11 digits (DDD + 9 + number), add 55
+    if (d.length === 11) return `55${d}`;
 
-    // Sem DDI: 10 dígitos = DDD + 8 (insere 9 após DDD para padrão de celular BR)
-    if (d.length === 10) {
-        return `55${d.slice(0, 2)}9${d.slice(2)}`;
-    }
+    // If it has 10 digits (DDD + number), add 55 but DO NOT force 9
+    if (d.length === 10) return `55${d}`;
 
+    // Fallback
     return d;
 }
 
@@ -80,17 +74,10 @@ export const PhoneUtils = {
         // 3. Remove all non-digits
         clean = clean.replace(/\D/g, '');
 
-        // 4. Handle Brazilian 55 prefix normalization
-        // If it starts with 55, keep it but ensure it's not duplicated
-        // If it doesn't have 55 but has 10-11 digits, it might need 55 for external tools, 
-        // but for INTERNAL lookup we just want a unique string.
-        // DECISION: Keep the 55 if present, but remove it if it's the ONLY thing that changed.
-        
-        // Strategy: We want "5551987654321" and "51987654321" to potentially match?
-        // Actually, it's safer to ENSURE a prefix or REMOVE it.
-        // Let's strip the 55 from Brazilian numbers for internal indexing to avoid the "55" vs "sem 55" confusion.
-        if (clean.length >= 12 && clean.startsWith('55')) {
-            clean = clean.substring(2);
+        // 4. Handle Brazilian numbers
+        // Use the specialized Brazil normalization which ensures 55 and correct digits
+        if (clean.length >= 10 && (clean.startsWith('55') || clean.length <= 11)) {
+            return normalizeBrazilWhatsAppE164(clean);
         }
 
         // Remove leading 0

@@ -57,6 +57,13 @@ export default function FinancePage() {
         return () => clearTimeout(timeout);
     }, [ordersPage, ordersSearch]);
 
+    useEffect(() => {
+        const clientEmail = searchParams.get('clientEmail');
+        if (clientEmail) {
+            setOrdersSearch(clientEmail);
+        }
+    }, [searchParams]);
+
     const fetchOrders = async (page = 1, search = '') => {
         setTableLoading(true);
         try {

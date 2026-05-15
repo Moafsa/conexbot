@@ -81,6 +81,7 @@ services:
     volumes:
       - wuzapi_data:/app/data
       - wuzapi_sessions:/app/sessions
+      - wuzapi_db:/app/dbdata
 
   minio:
     image: minio/minio
@@ -111,9 +112,18 @@ services:
       exit 0;
       "
 
+  cron-worker:
+    image: alpine:latest
+    container_name: conext-cron
+    depends_on:
+      - app
+    command: sh -c "while true; do wget -qO- http://app:3000/api/cron/follow-up; sleep 60; done"
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
   wuzapi_data:
   wuzapi_sessions:
+  wuzapi_db:
   miniodata:

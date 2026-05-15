@@ -58,7 +58,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         groupResponseMode: "ALL",
         allowedGroups: [] as string[],
         fallbackContact: "",
-        status: "active",
+        status: "ACTIVE",
     });
 
     const [materials, setMaterials] = useState<any[]>([]);
@@ -88,7 +88,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                 groupResponseMode: botData.groupResponseMode || "ALL",
                 allowedGroups: botData.allowedGroups || [],
                 fallbackContact: botData.fallbackContact || "",
-                status: botData.status || "active",
+                status: botData.status || "ACTIVE",
             });
             fetchExtraData();
         }
@@ -132,26 +132,18 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
         }
     };
 
-    const handleAddFollowup = async () => {
-        const name = prompt("Nome da regra (ex: Pós-venda 1 dia):");
-        if (!name) return;
-        const msg = prompt("Mensagem que o bot deve enviar:");
-        if (!msg) return;
-        const days = prompt("Dias após o gatilho (número):", "1");
-        const type = prompt("Tipo de gatilho (SALES, POST_SALE, EVENT_REMINDER):", "SALES");
-
+    const handleDeleteFollowup = async (ruleId: string) => {
+        if (!confirm("Remover esta automação?")) return;
         try {
-            const res = await fetch(`/api/bots/${botData.id}/followup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, message: msg, triggerDays: days, triggerType: type })
+            const res = await fetch(`/api/bots/${botData.id}/followup?ruleId=${ruleId}`, {
+                method: 'DELETE'
             });
             if (res.ok) {
-                toast.success("Regra criada!");
+                toast.success("Regra removida!");
                 fetchExtraData();
             }
         } catch (error) {
-            toast.error("Erro ao criar regra");
+            toast.error("Erro ao excluir");
         }
     };
 
@@ -164,8 +156,8 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="bg-gray-950 border border-white/10 rounded-3xl w-full max-w-4xl h-[85vh] flex flex-col shadow-[0_0_50px_-12px_rgba(79,70,229,0.5)] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-gray-950 border-0 sm:border sm:border-white/10 rounded-none sm:rounded-3xl w-full max-w-4xl h-full sm:h-[85vh] flex flex-col shadow-[0_0_50px_-12px_rgba(79,70,229,0.5)] overflow-hidden">
 
                 {/* Header */}
                 <div className="flex justify-between items-center p-6 border-b border-white/5 bg-gray-900/50">
@@ -180,24 +172,24 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                     </button>
                 </div>
 
-                <div className="flex flex-1 overflow-hidden">
+                <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
                     {/* Sidebar Tabs */}
-                    <div className="w-64 bg-black/40 border-r border-white/5 p-4 flex flex-col gap-2">
+                    <div className="w-full sm:w-64 bg-black/40 border-b sm:border-b-0 sm:border-r border-white/5 p-2 sm:p-4 flex flex-row sm:flex-col gap-1 sm:gap-2 overflow-x-auto sm:overflow-x-visible custom-scrollbar">
                         <TabButton id="identity" label="Identidade" icon={<Book size={18} />} active={activeTab === 'identity'} onClick={() => setActiveTab('identity')} />
                         <TabButton id="ai" label="Inteligências" icon={<Zap size={18} />} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} />
-                        <TabButton id="materials" label="Materiais do Bot" icon={<Upload size={18} />} active={activeTab === 'materials'} onClick={() => setActiveTab('materials')} />
-                        <TabButton id="followup" label="Follow-up Automático" icon={<Bell size={18} />} active={activeTab === 'followup'} onClick={() => setActiveTab('followup')} />
-                        <TabButton id="payments" label="Pagamentos & CRM" icon={<DollarSign size={18} />} active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} />
+                        <TabButton id="materials" label="Materiais" icon={<Upload size={18} />} active={activeTab === 'materials'} onClick={() => setActiveTab('materials')} />
+                        <TabButton id="followup" label="Follow-up" icon={<Bell size={18} />} active={activeTab === 'followup'} onClick={() => setActiveTab('followup')} />
+                        <TabButton id="payments" label="CRM" icon={<DollarSign size={18} />} active={activeTab === 'payments'} onClick={() => setActiveTab('payments')} />
                         <TabButton id="integrations" label="Integrações" icon={<Globe size={18} />} active={activeTab === 'integrations'} onClick={() => setActiveTab('integrations')} />
                     </div>
 
                     {/* Content Area */}
-                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gradient-to-b from-gray-950 to-black">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar bg-gradient-to-b from-gray-950 to-black">
                         <form onSubmit={handleSubmit} className="space-y-8">
 
                             {activeTab === 'identity' && (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                                    <div className="grid grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                         <Field label="Nome do Agente" value={formData.name} onChange={v => setFormData({ ...formData, name: v })} placeholder="Ex: Pedro Vendas" />
                                         <Field label="Tipo de Negócio" value={formData.businessType} onChange={v => setFormData({ ...formData, businessType: v })} placeholder="Ex: E-commerce" />
                                     </div>
@@ -208,15 +200,15 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                                 <Zap size={18} className="text-indigo-400" /> Status do Agente
                                             </h4>
                                             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">
-                                                {formData.status === 'active' ? 'O AGENTE ESTÁ ATIVO E RESPONDENDO' : 'O AGENTE ESTÁ PAUSADO (APENAS REGISTRANDO)'}
+                                                {formData.status === 'ACTIVE' ? 'O AGENTE ESTÁ ATIVO E RESPONDENDO' : 'O AGENTE ESTÁ PAUSADO (APENAS REGISTRANDO)'}
                                             </p>
                                         </div>
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input
                                                 type="checkbox"
                                                 className="sr-only peer"
-                                                checked={formData.status === 'active'}
-                                                onChange={e => setFormData({ ...formData, status: e.target.checked ? 'active' : 'paused' })}
+                                                checked={formData.status === 'ACTIVE'}
+                                                onChange={e => setFormData({ ...formData, status: e.target.checked ? 'ACTIVE' : 'PAUSED' })}
                                             />
                                             <div className="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
                                         </label>
@@ -305,7 +297,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
 
                             {activeTab === 'ai' && (
                                 <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-300">
-                                    <div className="grid grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
@@ -457,9 +449,9 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                     </div>
 
                                     {/* Formulário de Adição de Regra */}
-                                    <div className="p-6 bg-white/5 border border-white/10 rounded-3xl space-y-4">
+                                    <div className="p-4 sm:p-6 bg-white/5 border border-white/10 rounded-3xl space-y-4">
                                         <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Nova Automatação Proativa</h5>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Nome da Régua</label>
                                                 <input id="fol-name" className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Ex: Retomar Venda Parada" />
@@ -467,16 +459,24 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-bold text-gray-500 uppercase">Tipo de Gatilho</label>
                                                 <select id="fol-type" className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500">
+                                                    <option value="AFTER_LAST_MESSAGE">Conversa Parada (Geral)</option>
                                                     <option value="SALES">Vendas (Pós Última Mensagem)</option>
                                                     <option value="POST_SALE">Pós-Venda (Após Pagamento)</option>
                                                     <option value="EVENT_REMINDER">Lembrete de Evento (Agenda)</option>
                                                 </select>
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-bold text-gray-500 uppercase">Intervalo (Dias)</label>
-                                                <input id="fol-days" type="number" className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500" placeholder="1" />
+                                                <label className="text-[10px] font-bold text-gray-500 uppercase">Intervalo</label>
+                                                <div className="flex gap-2">
+                                                    <input id="fol-days" type="number" className="flex-1 bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500" placeholder="1" />
+                                                    <select id="fol-unit" className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500">
+                                                        <option value="MINUTES">Minutos</option>
+                                                        <option value="HOURS">Horas</option>
+                                                        <option value="DAYS">Dias</option>
+                                                    </select>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
+                                            <div className="space-y-2 col-span-1 sm:col-span-2">
                                                 <label className="text-[10px] font-bold text-gray-500 uppercase italic">Instruções para a IA</label>
                                                 <input id="fol-msg" className="w-full bg-black/40 border border-white/10 rounded-xl p-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Ex: Tente converter a venda sem ser invasivo..." />
                                             </div>
@@ -487,6 +487,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                                 const name = (document.getElementById('fol-name') as HTMLInputElement).value;
                                                 const type = (document.getElementById('fol-type') as HTMLSelectElement).value;
                                                 const days = (document.getElementById('fol-days') as HTMLInputElement).value;
+                                                const unit = (document.getElementById('fol-unit') as HTMLSelectElement).value;
                                                 const msg = (document.getElementById('fol-msg') as HTMLInputElement).value;
 
                                                 if (!name || !msg) return toast.error("Preencha todos os campos");
@@ -495,7 +496,7 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                                     const res = await fetch(`/api/bots/${botData.id}/followup`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ name, message: msg, triggerDays: days, triggerType: type })
+                                                        body: JSON.stringify({ name, message: msg, triggerDays: days, triggerUnit: unit, triggerType: type })
                                                     });
                                                     if (res.ok) {
                                                         toast.success("Regra criada!");
@@ -531,15 +532,18 @@ export default function EditBotModal({ isOpen, onClose, botData, onSave }: EditB
                                                         <p className="text-xs text-gray-400 italic mb-2">"{r.message}"</p>
                                                         <div className="flex items-center gap-2 text-[9px] font-bold text-gray-500 uppercase tracking-widest">
                                                             <span className="bg-white/5 px-2 py-0.5 rounded-full">{r.triggerType}</span>
-                                                            <span className="bg-white/5 px-2 py-0.5 rounded-full">{r.triggerDays} {Math.abs(r.triggerDays) === 1 ? 'dia' : 'dias'}</span>
+                                                            <span className="bg-white/5 px-2 py-0.5 rounded-full">
+                                                                {r.triggerDays} {
+                                                                    r.triggerUnit === 'MINUTES' ? (Math.abs(r.triggerDays) === 1 ? 'minuto' : 'minutos') :
+                                                                    r.triggerUnit === 'HOURS' ? (Math.abs(r.triggerDays) === 1 ? 'hora' : 'horas') :
+                                                                    (Math.abs(r.triggerDays) === 1 ? 'dia' : 'dias')
+                                                                }
+                                                            </span>
                                                         </div>
                                                     </div>
                                                     <button
-                                                        onClick={async () => {
-                                                            if (!confirm("Remover esta automação?")) return;
-                                                            // Implement delete if needed, or just let users know it's a list
-                                                        }}
-                                                        className="p-3 bg-red-500/10 text-red-400 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
+                                                        onClick={() => handleDeleteFollowup(r.id)}
+                                                        className="p-3 bg-red-500/10 text-red-400 rounded-xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
@@ -730,8 +734,8 @@ function TabButton({ id, label, icon, active, onClick }: { id: string, label: st
         <button
             type="button"
             onClick={onClick}
-            className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-xs uppercase tracking-tight
-                ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 translate-x-1' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+            className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl transition-all font-bold text-[10px] sm:text-xs uppercase tracking-tight whitespace-nowrap
+                ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 sm:translate-x-1' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
         >
             <span className={active ? 'text-white' : 'text-indigo-400'}>{icon}</span>
             {label}

@@ -6,7 +6,7 @@ export class GeminiWrapper {
     chat = {
         completions: {
             create: async (body: any) => {
-                const model = body.model || 'gemini-1.5-flash-latest';
+                const model = body.model || 'gemini-1.5-flash';
                 let systemContent = "";
                 const contents = body.messages.map((m: any) => {
                     if (m.role === 'system') {
@@ -115,12 +115,12 @@ export async function getAiClient(options: {
         // Force upgrade legacy gemini models and fix invalid ones
         if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model.includes('gemini-2.0') || model.includes('2.5')) {
             if (!model.includes('flash') && !model.includes('pro')) {
-                model = 'gemini-1.5-flash-latest';
+                model = 'gemini-1.5-flash';
             } else if (model.includes('2.5')) {
                 model = 'gemini-2.0-flash'; // 2.5 doesn't exist yet, use 2.0
             }
         } else {
-            model = 'gemini-1.5-flash-latest';
+            model = 'gemini-1.5-flash';
         }
 
         return {

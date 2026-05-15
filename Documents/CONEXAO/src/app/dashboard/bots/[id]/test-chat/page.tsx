@@ -11,7 +11,7 @@ interface Message {
     timestamp: Date;
 }
 
-export default function TestChatPage({ params }: { params: Promise<{ id: string }> }) {
+export default function TestChatPage({ params }: { params: any }) {
     const router = useRouter();
     const [botId, setBotId] = useState<string>('');
     const [bot, setBot] = useState<any>(null);

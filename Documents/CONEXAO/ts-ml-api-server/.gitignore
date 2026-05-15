@@ -1,0 +1,20 @@
+# Downloads (não commitar ZIPs grandes)
+downloads/*.zip
+
+# Logs
+*.log
+logs/
+
+# Ambiente
+.env
+.env.local
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

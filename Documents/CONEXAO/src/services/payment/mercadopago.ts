@@ -5,8 +5,8 @@ const PLAN_VALUES: Record<string, number> = {
 };
 
 export const MercadoPagoService = {
-    async createPreference(customerData: { name?: string | null; email: string }, plan: string) {
-        const value = PLAN_VALUES[plan] || 97;
+    async createPreference(customerData: { name?: string | null; email: string }, plan: string, amount: number) {
+        const value = amount;
         const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
 
         if (!accessToken) {

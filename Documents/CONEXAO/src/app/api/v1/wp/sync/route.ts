@@ -1,117 +1,63 @@
-export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { verifyWpToken } from '@/lib/wp-token';
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { MercadoLivreService } from "@/services/mercadolivre/service";
 
 export async function POST(req: Request) {
     try {
-        const authHeader = req.headers.get('authorization');
-        const botIdHeader = req.headers.get('x-bot-id'); // Header opcional para múltiplos bots
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json({ error: 'Token (Bearer) não fornecido ou inválido' }, { status: 401 });
-        }
-
-        const tokenString = authHeader.split(' ')[1];
-        const decoded = verifyWpToken(tokenString);
-
-        if (!decoded || !decoded.id) {
-            return NextResponse.json({ error: 'Token inválido ou expirado' }, { status: 401 });
-        }
-
-        const tenantId = decoded.id as string;
         const body = await req.json();
-        const { type, data } = body; 
+        const { woo_product_id, price, stock, bot_id, tenant_id } = body;
 
-        if (!type || !data) {
-             return NextResponse.json({ error: 'Payload malformado (type e data requeridos)' }, { status: 400 });
+        if (!woo_product_id || (!price && stock === undefined)) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
-        
-        // Pega o bot específico (se header presente) ou o principal do usuário
-        const bot = await prisma.bot.findFirst({
-            where: botIdHeader ? { id: botIdHeader, tenantId } : { tenantId, status: 'active' },
-            orderBy: { createdAt: 'asc' }
+
+        // Identify the tenant
+        let finalTenantId = tenant_id;
+        if (!finalTenantId && bot_id) {
+            const bot = await prisma.bot.findUnique({ where: { id: bot_id }, select: { tenantId: true } });
+            finalTenantId = bot?.tenantId;
+        }
+
+        if (!finalTenantId) {
+            return NextResponse.json({ error: "Tenant not identified" }, { status: 400 });
+        }
+
+        // Find mappings for this product
+        const mappings = await prisma.productMapping.findMany({
+            where: { tenantId: finalTenantId, wooProductId: String(woo_product_id) }
         });
 
-        if (!bot) {
-            return NextResponse.json({ error: 'Nenhum Bot Ativo encontrado na conta para receber o Sync' }, { status: 404 });
+        if (mappings.length === 0) {
+            return NextResponse.json({ status: "skipped", message: "No mappings found for this product." });
         }
 
-        // Marcar como bot vinculado ao WordPress se ainda não estiver
-        if (!(bot as any).isWordpress) {
-            await prisma.bot.update({
-                where: { id: bot.id },
-                data: { isWordpress: true }
-            });
-        }
+        const results = [];
+        for (const mapping of mappings) {
+            try {
+                const updateData: any = {};
+                if (price) updateData.price = price;
+                if (stock !== undefined) updateData.available_quantity = stock;
 
-        if (type === 'product') {
-            const existingProduct = await prisma.product.findFirst({
-                where: { botId: bot.id, name: data.name } // Pode ser substituído por SKU ou externalId futuro
-            });
-
-            if (existingProduct) {
-                await prisma.product.update({
-                    where: { id: existingProduct.id },
-                    data: {
-                        price: parseFloat(data.price || 0),
-                        stock: parseInt(data.stock || 0),
-                        description: data.description || existingProduct.description,
-                        active: data.active !== undefined ? data.active : true,
-                        externalUrl: data.url || existingProduct.externalUrl
+                const mlResponse = await MercadoLivreService.updateItem(finalTenantId, mapping.mlItemId, updateData);
+                
+                await prisma.productMapping.update({
+                    where: { id: mapping.id },
+                    data: { 
+                        lastSync: new Date(),
+                        syncStatus: mlResponse.error ? "ERROR" : "SUCCESS",
+                        errorMessage: mlResponse.error ? JSON.stringify(mlResponse) : null
                     }
                 });
-            } else {
-                await prisma.product.create({
-                    data: {
-                        name: data.name,
-                        price: parseFloat(data.price || 0),
-                        stock: parseInt(data.stock || 0),
-                        description: data.description || '',
-                        active: data.active !== undefined ? data.active : true,
-                        botId: bot.id,
-                        externalUrl: data.url || ''
-                    }
-                });
+
+                results.push({ mlItemId: mapping.mlItemId, success: !mlResponse.error });
+            } catch (err: any) {
+                results.push({ mlItemId: mapping.mlItemId, success: false, error: err.message });
             }
-        } else if (type === 'comment') {
-            // Sincronizar comentário como uma nova mensagem/conversa
-            const remoteId = `WP_COMMENT_${data.id}`;
-            const authorIdentifier = data.author_email || `WP_USER_${data.author_name || 'anon'}`;
-            
-            // Criar ou encontrar conversa
-            const conversation = await prisma.conversation.upsert({
-                where: {
-                    botId_remoteId: { botId: bot.id, remoteId: remoteId },
-                },
-                update: { updatedAt: new Date() },
-                create: {
-                    botId: bot.id,
-                    remoteId: remoteId,
-                    channel: 'wordpress',
-                },
-            });
-
-            // Adicionar a mensagem do comentário
-            await prisma.message.create({
-                data: {
-                    conversationId: conversation.id,
-                    content: `[COMENTÁRIO NO POST: ${data.post_title}]\n"${data.content}"`,
-                    role: 'user',
-                },
-            });
-
-            return NextResponse.json({ success: true, message: 'Comentário sincronizado com a IA do bot' });
-        } else if (type === 'order') {
-             // Futuramente: Update Order Table 
-             return NextResponse.json({ success: true, message: 'Order sync não implementado ainda, mas payload recebido' });
         }
 
-        return NextResponse.json({ success: true, message: `Sync de [${type}] executado com sucesso no bot ${bot.name}` });
+        return NextResponse.json({ status: "processed", results });
 
     } catch (error: any) {
-        console.error('WP Sync Error:', error);
-        return NextResponse.json({ error: 'Erro interno ao sincronizar webhook do WordPress' }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-

@@ -65,6 +65,7 @@ import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
 import { format, addHours } from 'date-fns';
+import { mercadoLivreTools } from './mcp/mercadolivre';
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
@@ -120,6 +121,12 @@ export const MessageProcessor = {
 
             if (!bot) {
                 logToFile(`[Processor] Bot not found: ${identifier}`);
+                return null;
+            }
+
+            // SYSTEM DISPATCH CHECK: Agency dispatch channels should NEVER respond as bots
+            if (bot.businessType === 'SYSTEM_DISPATCH') {
+                logToFile(`[Processor] Skipping: bot ${bot.name} is a SYSTEM_DISPATCH channel.`);
                 return null;
             }
 
@@ -208,7 +215,7 @@ export const MessageProcessor = {
                 },
             });
 
-            if (bot.status === 'paused') {
+            if (bot.status?.toLowerCase() === 'paused') {
                 logToFile(`[Processor] Bot ${bot.name} is PAUSED. Message recorded. Skipping AI response.`);
                 return null;
             }
@@ -398,6 +405,7 @@ export const MessageProcessor = {
                 relevantKnowledge: combinedContext || undefined,
                 mediaList: mediaList.length > 0 ? mediaList : undefined,
                 isWordpress: activeBot.isWordpress,
+                isMercadoLivre: !!activeBot.tenant.mlAccessToken,
                 contactInfo: {
                     name: existingContact.name,
                     email: existingContact.email,
@@ -435,6 +443,15 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                 - Trate o autor do comentário pelo nome (se fornecido).`;
             }
 
+            // INJECT CURRENT DATE/TIME (Critical for scheduling)
+            const now = new Date();
+            const formattedDate = format(now, "eeee, dd 'de' MMMM 'de' yyyy", { locale: (await import('date-fns/locale')).ptBR });
+            const formattedTime = format(now, "HH:mm");
+            finalSystemPrompt += `\n\n🕒 CONTEXTO TEMPORAL:
+Hoje é ${formattedDate}.
+Hora atual: ${formattedTime}.
+Sempre use esta referência para resolver datas como "amanhã", "próxima semana", etc.`;
+
             // 10. Call AI Provider with Tool Calling support
             const { SchedulingService } = await import('../scheduling/service');
             const schedulingTools: any[] = [
@@ -460,9 +477,10 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                         parameters: {
                             type: 'object',
                             properties: {
-                                data_hora: { type: 'string', description: 'Data e hora no formato ISO (ex: 2024-03-10T14:00:00Z)' }
+                                data_hora: { type: 'string', description: 'Data e hora no formato ISO (ex: 2024-03-10T14:00:00Z)' },
+                                motivo: { type: 'string', description: 'O motivo ou notas sobre o que será tratado na reunião.' }
                             },
-                            required: ['data_hora']
+                            required: ['data_hora', 'motivo']
                         }
                     }
                 },
@@ -499,6 +517,20 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                             required: ['produto_nome', 'cliente_nome', 'cliente_email', 'cliente_cpf']
                         }
                     }
+                });
+            }
+
+            // --- INJECT MERCADO LIVRE TOOLS ---
+            if (bot.tenant.mlAccessToken) {
+                mercadoLivreTools.forEach(tool => {
+                    schedulingTools.push({
+                        type: 'function',
+                        function: {
+                            name: tool.name,
+                            description: tool.description,
+                            parameters: tool.parameters
+                        }
+                    });
                 });
             }
 
@@ -565,9 +597,10 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                                     botId: bot.id,
                                     contactId: existingContact.id,
                                     tenantId: bot.tenantId,
-                                    startTime
+                                    startTime,
+                                    notes: args.motivo
                                 });
-                                toolResult = `Agendamento confirmado para ${format(startTime, 'dd/MM/yyyy HH:mm')}. ID: ${appt.id}`;
+                                toolResult = `Agendamento solicitado para ${format(startTime, 'dd/MM/yyyy HH:mm')}. O atendente irá confirmar em breve. ID: ${appt.id}`;
                                 const scheduledStage = await prisma.crmStage.findFirst({
                                     where: { botId: bot.id, name: { contains: 'AGENDA', mode: 'insensitive' } }
                                 });
@@ -740,6 +773,17 @@ ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt prin
                                     }
                                 }
                             } catch (e: any) { toolResult = `Erro interno ao faturar: ${e.message}`; }
+                        } else {
+                            // --- EXECUTE MERCADO LIVRE TOOLS ---
+                            const mlTool = mercadoLivreTools.find(t => t.name === name);
+                            if (mlTool) {
+                                try {
+                                    const result = await mlTool.execute(args, { tenantId: bot.tenantId, botId: bot.id });
+                                    toolResult = JSON.stringify(result);
+                                } catch (e: any) {
+                                    toolResult = `Erro ao executar ferramenta ML: ${e.message}`;
+                                }
+                            }
                         }
 
                         logToFile(`[Processor] Tool Result [${name}]: ${toolResult.substring(0, 100)}...`);

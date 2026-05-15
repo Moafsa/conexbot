@@ -94,10 +94,28 @@ export async function GET(req: Request) {
         }
 
         // Calculate value (duplicated logic for safety in redirection, but could be shared)
-        let value = plan.price;
-        if (interval === 'QUARTERLY') value = plan.priceQuarterly || plan.price * 3;
-        if (interval === 'SEMIANNUAL') value = plan.priceSemiannual || plan.price * 6;
-        if (interval === 'YEARLY') value = plan.priceYearly || plan.price * 12;
+        let basePrice = plan.price;
+        
+        // --- Agency Pricing Override ---
+        if (tenant.agencyId && plan.productCatalogId) {
+            const agencyPricing = await prisma.agencyPricing.findUnique({
+                where: {
+                    agencyId_productId: {
+                        agencyId: tenant.agencyId,
+                        productId: plan.productCatalogId
+                    }
+                }
+            });
+            if (agencyPricing) {
+                basePrice = agencyPricing.monthlyPrice;
+            }
+        }
+        // ------------------------------
+
+        let value = basePrice;
+        if (interval === 'QUARTERLY') value = plan.priceQuarterly || basePrice * 3;
+        if (interval === 'SEMIANNUAL') value = plan.priceSemiannual || basePrice * 6;
+        if (interval === 'YEARLY') value = plan.priceYearly || basePrice * 12;
 
         switch (gateway) {
             case 'asaas': {

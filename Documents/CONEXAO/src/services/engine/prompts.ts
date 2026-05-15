@@ -46,6 +46,7 @@ export interface BotContext {
         specialistSkill?: string | null;
     };
     coupons?: CouponInfo[];
+    isMercadoLivre?: boolean;
 }
 
 export function buildSystemPrompt(bot: BotContext): string {
@@ -244,6 +245,14 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 1. 🌐 LOJA OFICIAL: Você é o assistente oficial integrado à loja WordPress do cliente.
 2. 🛒 CATÁLOGO SINCRONIZADO: Seus produtos e preços são puxados em tempo real do WooCommerce.
 3. 🏠 "AQUÍ NO SITE": Use expressões como "aqui no nosso site", "no nosso catálogo do WordPress", "você pode ver direto na nossa loja" para criar proximidade.`);
+    }
+
+    // Mercado Livre context awareness
+    if (bot.isMercadoLivre) {
+        sections.push(`═══ INTEGRAÇÃO MERCADO LIVRE ═══
+1. 🤝 SINCRONIZAÇÃO BIDIRECIONAL: Você está conectado ao Mercado Livre. Estoque e preços são sincronizados automaticamente com o WooCommerce.
+2. 🛠️ DIAGNÓSTICO DE ERROS: Você tem ferramentas para verificar o status de sincronização (ml_get_sync_status). Se o cliente reclamar de erro no ML ou preço errado, use esta ferramenta para investigar.
+3. 📦 GESTÃO ATIVA: Você pode consultar itens (ml_get_item) e atualizar preços (ml_update_price) diretamente no Mercado Livre se necessário.`);
     }
 
     // Coupons (Strategic)

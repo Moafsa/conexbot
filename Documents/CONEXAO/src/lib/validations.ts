@@ -24,7 +24,7 @@ export const loginSchema = z.object({
 export const createBotSchema = z.object({
     name: z.string().min(1, 'Nome é obrigatório'),
     businessType: z.string().min(1, 'Tipo de negócio é obrigatório'),
-    status: z.enum(['active', 'paused']).optional().default('active'),
+    status: z.enum(['active', 'paused', 'ACTIVE', 'PAUSED']).optional().default('ACTIVE'),
     voiceId: z.string().optional(),
     modules: z.array(z.string()).optional().default([]),
     address: z.string().optional(),

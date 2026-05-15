@@ -4,7 +4,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { MetaService } from '@/services/meta/meta-service';
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {

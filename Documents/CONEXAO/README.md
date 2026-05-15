@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Conext AI Infrastructure 🚀
 
-## Getting Started
+Plataforma de elite para Agências de IA White-Label. Fornecemos a infraestrutura tecnológica completa para que você foque na estratégia e no crescimento da sua marca.
 
-First, run the development server:
+## 🌟 Principais Recursos
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Portal da Agência 3.0:** Monitoramento de lucros e MRR em tempo real.
+- **Puro White-Label:** Customização total de domínios, logos e e-mails transacionais.
+- **Ecossistema de Elite:**
+  - WhatsApp de latência zero (Uzapi).
+  - Voz Humana Real (ElevenLabs).
+  - Agendamento Inteligente (Google Calendar).
+  - CRM Visual com análise de sentimento.
+  - Split de Pagamentos automático (Asaas).
+  - Geração de conteúdo SEO (Conext Writer).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 💰 Modelo de Escala Reversa
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Quanto mais sua agência fatura, menor é a taxa da plataforma:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Tier | MRR | Taxa |
+| :--- | :--- | :--- |
+| **Bronze** | Até R$ 5k | 20% |
+| **Prata** | R$ 5k - R$ 15k | 15% |
+| **Ouro** | R$ 15k - R$ 50k | 10% |
+| **Diamante** | Acima de R$ 50k | 5% |
 
-## Learn More
+## 🛠️ Tecnologias
 
-To learn more about Next.js, take a look at the following resources:
+- **Frontend:** Next.js, Tailwind CSS, Sora & Inter Fonts.
+- **Backend:** Node.js, Prisma ORM, PostgreSQL.
+- **Integrações:** Uzapi, ElevenLabs, Asaas, Mercado Livre, WordPress.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚀 Como Iniciar
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Clone o repositório.
+2. Instale as dependências: `npm install`.
+3. Configure as variáveis de ambiente no `.env`.
+4. Inicie o servidor de desenvolvimento: `npm run dev`.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+© 2025 Conext AI Infrastructure — Conectando Ideias. Gerando Futuro.

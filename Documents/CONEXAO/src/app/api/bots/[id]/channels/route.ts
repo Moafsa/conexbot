@@ -11,7 +11,7 @@ async function checkBotOwnership(botId: string, tenantId: string) {
     return bot !== null;
 }
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -49,7 +49,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {

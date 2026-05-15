@@ -19,19 +19,17 @@ export default function PricingPage() {
     const [interval, setInterval] = useState<'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'YEARLY'>('MONTHLY');
     const { data: session, status } = useSession();
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const type = searchParams.get("type");
-
     const [availableGateways, setAvailableGateways] = useState<string[]>(['asaas']);
+    const [activeTab, setActiveTab] = useState<string>('');
+    const [availableTabs, setAvailableTabs] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchPlans = async () => {
             try {
-                // Adiciona timestamp para evitar cache no navegador do cliente
                 const res = await fetch(`/api/plans?_t=${Date.now()}`);
                 const data = await res.json();
                 
-                let fetchedPlans = [];
+                let fetchedPlans: any[] = [];
                 let activeBots = 0;
 
                 if (data && Array.isArray(data.plans)) {
@@ -43,19 +41,36 @@ export default function PricingPage() {
                             setSelectedGateway(data.gateways[0] || 'asaas');
                         }
                     }
-                } else if (Array.isArray(data)) {
-                    fetchedPlans = data;
                 }
 
-                // Filter out plans that have fewer bots than the user currently has active
-                const allowedPlans = fetchedPlans.filter((p: any) => p.botLimit >= activeBots || p.botLimit === 0);
-                setPlans(allowedPlans);
+                // Group plans by Product Catalog
+                const groups: Record<string, any[]> = {};
+                fetchedPlans.forEach(p => {
+                    const catalogName = p.productCatalog?.name || 'Geral';
+                    if (!groups[catalogName]) groups[catalogName] = [];
+                    groups[catalogName].push(p);
+                });
+
+                const tabs = Object.keys(groups).map(name => ({
+                    id: name,
+                    label: name.replace(/_/g, ' '),
+                    plans: groups[name]
+                }));
+
+                setAvailableTabs(tabs);
+                if (tabs.length > 0 && !activeTab) {
+                    setActiveTab(tabs[0].id);
+                }
+
+                setPlans(fetchedPlans);
             } catch (error) {
                 console.error("Failed to fetch plans");
             }
         };
         fetchPlans();
     }, []);
+
+    const currentTabPlans = availableTabs.find(t => t.id === activeTab)?.plans || [];
 
     const handleCheckout = async (plan: string) => {
         if (status === 'unauthenticated' || !session) {
@@ -79,7 +94,6 @@ export default function PricingPage() {
             const data = await res.json();
 
             if (res.ok && data.checkoutUrl) {
-                // Open invoice in new tab, move current tab to dashboard
                 window.open(data.checkoutUrl, '_blank');
                 router.push('/dashboard/finance');
             } else {
@@ -100,14 +114,27 @@ export default function PricingPage() {
                     <Link href={status === 'unauthenticated' ? "/" : "/dashboard"} className="text-sm text-gray-500 hover:text-white transition-colors">
                         ← {status === 'unauthenticated' ? "Voltar para Início" : "Voltar para Dashboard"}
                     </Link>
-                    <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">
-                        {type === 'WRITER_PLUGIN' ? 'Planos Conext Writer' : 'Escolha seu Plano'}
+                    <h1 className="text-4xl md:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600 uppercase tracking-tighter">
+                        Escolha sua Solução
                     </h1>
-                    <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        {type === 'WRITER_PLUGIN' 
-                            ? 'Automatize seus posts e domine o SEO com inteligência artificial.' 
-                            : 'Comece a automatizar seu negócio hoje. Cancele a qualquer momento.'}
+                    <p className="text-gray-400 text-lg max-w-2xl mx-auto italic">
+                        Selecione o serviço ideal para o momento do seu negócio.
                     </p>
+
+                    {/* Service Tabs */}
+                    <div className="flex justify-center mt-10">
+                        <div className="flex flex-wrap gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/10">
+                            {availableTabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-xl' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
                     <div className="flex justify-center mt-6">
                         <div className="bg-white/5 p-1 flex rounded-xl border border-white/10">
@@ -147,7 +174,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {plans.filter(p => type === 'WRITER_PLUGIN' ? p.type === 'WRITER_PLUGIN' : p.type === 'PRIMARY').map((plan) => {
+                    {currentTabPlans.map((plan: any) => {
                         const baseMonthPrice = Number(plan.price) || 0;
                         let currentPrice = baseMonthPrice;
                         let originalPrice = baseMonthPrice;
@@ -167,7 +194,6 @@ export default function PricingPage() {
                             periodLabel = 'ano';
                         }
 
-                        // Arredonda para evitar problemas com floats (ex: 402.30 < 447.00)
                         const hasDiscount = originalPrice > 0 && currentPrice < originalPrice && currentPrice > 0;
                         const discountPercent = hasDiscount ? Math.round((1 - (currentPrice / originalPrice)) * 100) : 0;
                         const features = plan.features ? (typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features) : [];
@@ -177,8 +203,8 @@ export default function PricingPage() {
                             key={plan.id}
                             className={`relative p-8 rounded-3xl border border-white/10 bg-white/5 transition-transform hover:-translate-y-2`}
                         >
-                            {plan.name.toLowerCase().includes('enterprise') && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20">
+                            {plan.name.toLowerCase().includes('pro') && (
+                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20">
                                     Mais Popular
                                 </div>
                             )}
@@ -186,7 +212,7 @@ export default function PricingPage() {
                             <div className="flex flex-col gap-1 mb-6">
                                 {hasDiscount && (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-lg text-gray-500 font-medium line-through decoration-red-500 decoration-2">
+                                        <span className="text-lg text-gray-500 font-medium line-through decoration-red-500/50 decoration-2">
                                             De R$ {originalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </span>
                                         <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
@@ -198,6 +224,14 @@ export default function PricingPage() {
                                     <span className="text-4xl font-bold">R$ {currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     <span className="text-sm text-gray-400 uppercase">/{periodLabel}</span>
                                 </div>
+                                {plan.setupPrice > 0 && (
+                                    <div className="mt-3 p-3 rounded-2xl bg-white/5 border border-white/5">
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Pagamento Inicial</p>
+                                        <p className="text-sm font-bold text-amber-500">
+                                            + R$ {Number(plan.setupPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-400 font-normal">(Taxa de Ativação Única)</span>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <ul className="space-y-4 mb-8">
@@ -227,44 +261,6 @@ export default function PricingPage() {
                             </button>
                         </div>
                     )})}
-                </div>
-
-                {/* Plugin Promotion Section */}
-                <div className="mt-20 p-1 rounded-[32px] bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 border border-white/5">
-                    <div className="bg-[#050505] rounded-[31px] p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-10">
-                        <div className="space-y-6 flex-grow">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
-                                <Sparkles size={14} /> Plugin Adicional
-                            </div>
-                            <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Conext Writer Plugin</h2>
-                            <p className="text-gray-400 text-lg max-w-xl italic">
-                                O plugin definitivo para WordPress que utiliza toda a inteligência do Conextbot para automatizar seu SEO.
-                            </p>
-                            <div className="flex flex-wrap gap-4">
-                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
-                                    <Check className="text-blue-500" size={16} /> Posts Automáticos
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
-                                    <Check className="text-blue-500" size={16} /> SEO Otimizado
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-gray-300 bg-white/5 px-4 py-2 rounded-xl">
-                                    <Check className="text-blue-500" size={16} /> Licença WordPress
-                                </div>
-                            </div>
-                        </div>
-                        <div className="shrink-0 flex flex-col items-center gap-4">
-                            <div className="text-center mb-2">
-                                <p className="text-xs text-gray-500 font-bold uppercase mb-1">A partir de</p>
-                                <p className="text-4xl font-black">R$ 59,90<span className="text-sm font-normal text-gray-500">/mês</span></p>
-                            </div>
-                            <Link 
-                                href="/writer-plugin"
-                                className="px-10 py-5 bg-blue-600 hover:bg-blue-700 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/20 flex items-center gap-3 active:scale-95 text-white"
-                            >
-                                VER PLANOS DO PLUGIN <ChevronRight size={20} />
-                            </Link>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

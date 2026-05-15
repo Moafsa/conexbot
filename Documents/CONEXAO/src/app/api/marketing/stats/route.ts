@@ -1,15 +1,17 @@
-import { NextResponse } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getEffectiveTenantId } from "@/lib/get-effective-tenant";
 
-export async function GET() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+export async function GET(req: Request) {
     try {
+        const url = new URL(req.url);
+        const clientId = url.searchParams.get("clientId");
+        
+        const tenantId = await getEffectiveTenantId(clientId);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
         const postsCount = await prisma.marketingPost.count({
-            where: { tenantId: session.user.id }
+            where: { tenantId }
         });
 
         return NextResponse.json({ postsCount });

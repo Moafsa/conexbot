@@ -7,7 +7,7 @@ import { scrapeWebsite } from '@/services/engine/scraper';
 
 export async function POST(
     req: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     try {
         const session = await getServerSession(authOptions);

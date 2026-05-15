@@ -1,0 +1,179 @@
+/**
+ * Admin Styles
+ */
+
+.ts-ml-settings {
+    max-width: 1200px;
+}
+
+.ts-ml-accounts-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.ts-ml-account-card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0;
+    background: #fff;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.ts-ml-account-card-header {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ts-ml-account-card-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.ts-ml-account-details,
+.ts-ml-account-connection {
+    padding: 0 15px 15px;
+}
+
+.ts-ml-account-details p {
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+.ts-ml-account-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.ts-ml-account-actions .button-link-delete {
+    color: #b32d2e;
+    padding: 0;
+    line-height: 2.2;
+}
+
+.ts-ml-account-actions .button-link-delete:hover {
+    color: #d63638;
+}
+
+.ts-ml-edit-account-form {
+    background: #fffcf5;
+    padding: 15px;
+    border-top: 1px solid #ffe8c3;
+    border-bottom: 1px solid #ffe8c3;
+}
+
+.ts-ml-products-page {
+    margin-top: 20px;
+}
+
+.ts-ml-account-selector {
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.status-synced {
+    color: #00a32a;
+    font-weight: bold;
+}
+
+.status-pending {
+    color: #f0b849;
+    font-weight: bold;
+}
+
+.status-syncing {
+    color: #2271b1;
+    font-weight: bold;
+}
+
+.status-error {
+    color: #d63638;
+    font-weight: bold;
+}
+
+.status-not-synced {
+    color: #646970;
+}
+
+.ts-ml-stats-grid {
+    margin: 20px 0;
+}
+
+.ts-ml-stat-card {
+    text-align: center;
+}
+
+.ts-ml-stat-card h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    color: #646970;
+    margin-bottom: 10px;
+}
+
+.ts-ml-logs-section,
+.ts-ml-activity-section {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+/* Import Table Styles */
+.ts-ml-import-table {
+    margin-top: 20px;
+    table-layout: auto !important; /* Evita que o WP force larguras fixas */
+}
+
+.ts-ml-import-table th, .ts-ml-import-table td {
+    vertical-align: middle !important;
+}
+
+.ts-ml-import-table th.column-cb {
+    width: 30px !important;
+}
+
+.ts-ml-import-table th.column-thumb {
+    width: 60px !important;
+}
+
+.ts-ml-import-table td img {
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    max-width: 40px;
+    height: 40px;
+    object-fit: cover;
+    display: block;
+}
+
+.ts-ml-import-table .column-primary {
+    min-width: 200px;
+}
+
+@media screen and (max-width: 782px) {
+    .ts-ml-import-table.wp-list-table tr:not(.inline-edit-row):not(.no-items) td:not(.check-column) {
+        display: table-cell !important; /* Garante que mantenha formato de tabela */
+        width: auto !important;
+    }
+
+    .ts-ml-import-table th:not(.column-primary):not(.column-cb),
+    .ts-ml-import-table td:not(.column-primary):not(.check-column):not(.column-thumb) {
+         display: none !important;
+    }
+
+    .ts-ml-import-table .column-primary strong {
+        display: block;
+        white-space: normal;
+        word-break: break-all;
+    }
+}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/navigation";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { MarketingIAService } from "@/services/marketing/marketing-ia-service";
@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { theme, tone, platform, botId } = body;
+        const { theme, tone, platform, botId, baseImageUrls, videoUrl } = body;
 
         if (!theme || !botId) {
             return NextResponse.json({ error: "Tema e Bot ID são obrigatórios" }, { status: 400 });
@@ -21,7 +21,9 @@ export async function POST(req: Request) {
             botId,
             theme,
             tone,
-            platform
+            platform,
+            baseImageUrls: baseImageUrls || [],
+            videoUrl
         });
 
         return NextResponse.json(post);

@@ -7,7 +7,7 @@ import { AsaasService } from '@/services/payment/asaas';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     const session = await getServerSession(authOptions);
 
@@ -35,7 +35,7 @@ export async function GET(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     const session = await getServerSession(authOptions);
 
@@ -61,6 +61,22 @@ export async function PATCH(
             data: updateData
         });
 
+        // Se o novo role for AGENCY, garante que existe o registro na tabela Agency
+        if (updateData.role === 'AGENCY') {
+            const firstTier = await prisma.agencyTier.findFirst({
+                orderBy: { minSalesVolume: 'asc' }
+            });
+
+            await prisma.agency.upsert({
+                where: { tenantId: user.id },
+                update: {},
+                create: {
+                    tenantId: user.id,
+                    currentFee: firstTier ? firstTier.feePercentage : 20.0, // Usa a taxa do primeiro tier ou 20% se vazio
+                }
+            });
+        }
+
         // Hide password in response
         const { password: _, ...userWithoutPassword } = user;
         return NextResponse.json(userWithoutPassword);
@@ -72,7 +88,7 @@ export async function PATCH(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     const session = await getServerSession(authOptions);
 

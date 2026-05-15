@@ -106,6 +106,8 @@ export async function POST(req: Request) {
                         periodEnd.setMonth(periodEnd.getMonth() + 6);
                     } else if (subscription.interval === 'YEARLY') {
                         periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+                    } else if (subscription.interval === 'ONCE') {
+                        periodEnd.setFullYear(periodEnd.getFullYear() + 100); // 100 years for One-time
                     } else {
                         periodEnd.setMonth(periodEnd.getMonth() + 1); // Default MONTHLY
                     }
@@ -132,6 +134,22 @@ export async function POST(req: Request) {
                             periodEnd: periodEnd,
                         },
                     });
+
+                    // 3. Update Agency Sales Volume if client belongs to an agency
+                    if (subscription.tenant.agencyId) {
+                        const amountPaid = payment.value;
+                        await prisma.agency.update({
+                            where: { id: subscription.tenant.agencyId },
+                            data: {
+                                salesVolumeCurrentMonth: { increment: amountPaid },
+                                salesVolumeLifetime: { increment: amountPaid }
+                            }
+                        });
+                        console.log(`[Webhook] Updated Agency ${subscription.tenant.agencyId} sales volume with R$ ${amountPaid}`);
+                        
+                        // Note: A background job or manual trigger should check for Tier upgrades
+                    }
+
                     console.log(`[Webhook] System Subscription ${subscription.id} usage updated for new payment`);
                 }
             }

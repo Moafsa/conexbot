@@ -20,6 +20,7 @@ export async function GET() {
                     name: true,
                     status: true,
                     sessionName: true,
+                    businessType: true,
                 }
             }
         }

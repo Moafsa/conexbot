@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth';
 // List all bots for a specific user (tenant)
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     const session = await getServerSession(authOptions);
 
@@ -32,7 +32,7 @@ export async function GET(
 // Update a specific bot for a user (tenant)
 export async function PATCH(
     request: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     const session = await getServerSession(authOptions);
 

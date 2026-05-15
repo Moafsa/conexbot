@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail, Globe, Download, TrendingUp, Target } from "lucide-react";
+import { User, Bell, Shield, Smartphone, Loader2, Save, Check, AlertCircle, DollarSign, Zap, Mail, Globe, Download, TrendingUp, Target, Send } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { DispatchChannel } from "@/components/Agency/DispatchChannel";
 
 function SettingsContent() {
     const { data: session, update: updateSession } = useSession();
@@ -409,40 +410,64 @@ function SettingsContent() {
                                     </p>
 
                                     <div className="space-y-4">
-                                        {bots.length === 0 ? (
-                                            <div className="text-center py-8 text-gray-500">
-                                                Você ainda não tem bots criados.
-                                            </div>
-                                        ) : (
-                                            bots.map(bot => (
-                                                <div key={bot.id} className="p-4 rounded-xl border border-white/5 bg-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                    <div>
-                                                        <h4 className="font-medium text-white">{bot.name}</h4>
-                                                        <p className="text-xs text-gray-400 truncate max-w-[200px]">
-                                                            Sessão: {bot.sessionName || "Não configurada"}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${bot.connectionStatus === "CONNECTED"
-                                                                ? "bg-green-500/20 text-green-300 border-green-500/30"
-                                                                : bot.connectionStatus === "QRCODE"
-                                                                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30 animate-pulse"
-                                                                    : "bg-red-500/20 text-red-300 border-red-500/30"
-                                                            }`}>
-                                                            {bot.connectionStatus === "CONNECTED" ? "Conectado" :
-                                                                bot.connectionStatus === "QRCODE" ? "Aguardando QR Code" :
-                                                                    "Desconectado"}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => router.push(`/dashboard/bots/${bot.id}`)}
-                                                            className="text-xs btn-outline py-1 px-3"
-                                                        >
-                                                            Gerenciar
-                                                        </button>
-                                                    </div>
+                                        <DispatchChannel 
+                                            bots={bots} 
+                                            onRefresh={() => {
+                                                // Trigger a refresh of the bots list
+                                                const fetchData = async () => {
+                                                    const res = await fetch("/api/settings/whatsapp");
+                                                    const data = await res.json();
+                                                    if (res.ok) setBots(Array.isArray(data) ? data : []);
+                                                };
+                                                fetchData();
+                                            }} 
+                                        />
+
+                                        <div className="flex items-center justify-between pt-6">
+                                            <h4 className="text-sm font-medium text-gray-400">Bots de Clientes</h4>
+                                            <button 
+                                                onClick={() => router.push('/dashboard/bots')}
+                                                className="text-xs text-gray-500 hover:text-white transition-colors"
+                                            >
+                                                Gerenciar Todos os Bots
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {bots.filter(b => b.businessType !== 'SYSTEM_DISPATCH').length === 0 ? (
+                                                <div className="text-center py-8 border border-dashed border-white/10 rounded-2xl bg-white/5">
+                                                    <p className="text-gray-500 text-xs">Nenhum bot de cliente configurado.</p>
                                                 </div>
-                                            ))
-                                        )}
+                                            ) : (
+                                                bots.filter(b => b.businessType !== 'SYSTEM_DISPATCH').map(bot => (
+                                                    <div key={bot.id} className="p-4 rounded-xl border border-white/5 bg-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                        <div>
+                                                            <h4 className="font-medium text-white">{bot.name}</h4>
+                                                            <p className="text-xs text-gray-400 truncate max-w-[200px]">
+                                                                Sessão: {bot.sessionName || "Não configurada"}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${bot.connectionStatus === "CONNECTED"
+                                                                    ? "bg-green-500/20 text-green-300 border-green-500/30"
+                                                                    : bot.connectionStatus === "QRCODE"
+                                                                        ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30 animate-pulse"
+                                                                        : "bg-red-500/20 text-red-300 border-red-500/30"
+                                                                }`}>
+                                                                {bot.connectionStatus === "CONNECTED" ? "Conectado" :
+                                                                    bot.connectionStatus === "QRCODE" ? "Aguardando QR Code" :
+                                                                        "Desconectado"}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => router.push(`/dashboard/bots/${bot.id}`)}
+                                                                className="text-xs btn-outline py-1 px-3"
+                                                            >
+                                                                Gerenciar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

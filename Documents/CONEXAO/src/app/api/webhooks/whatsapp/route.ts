@@ -134,6 +134,12 @@ export async function POST(req: Request) {
             }
 
             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
+            
+            // SYSTEM DISPATCH CHECK: Agency dispatch channels should NEVER respond as bots
+            if (botDoc && botDoc.businessType === 'SYSTEM_DISPATCH') {
+                logToFile(`Skipping: session ${sessionName} is a SYSTEM_DISPATCH channel (Agency Dispatch).`);
+                return NextResponse.json({ status: 'skipped_system_dispatch' });
+            }
 
             // Admin Commands Handling
             if (botDoc && botDoc.tenant.whatsapp) {

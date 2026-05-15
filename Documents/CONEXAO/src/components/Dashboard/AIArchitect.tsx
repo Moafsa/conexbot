@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Upload, X, File, Image as ImageIcon, Check, Loader2, Edit, BookOpen, Mic, Square } from "lucide-react";
 import EditBotModal from "./EditBotModal";
 import FactsReview from "./FactsReview";
@@ -52,21 +53,25 @@ export default function AIArchitect() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  const { data: session } = useSession();
+
   // Initialize
   useEffect(() => {
-    // Check for global keys
-    fetch('/api/admin/config')
-      .then(res => {
-        if (res.status === 401 || res.status === 403) return { skipCheck: true };
-        return res.json();
-      })
-      .then(data => {
-        if (data.skipCheck) return;
-        if (!data.openaiApiKey && !data.geminiApiKey && !data.openrouterApiKey) {
-          setGlobalKeysMissing(true);
-        }
-      })
-      .catch(() => {});
+    // Only check for global keys if user is admin
+    if (session?.user?.role === 'SUPERADMIN') {
+      fetch('/api/admin/config')
+        .then(res => {
+          if (res.status === 401 || res.status === 403) return { skipCheck: true };
+          return res.json();
+        })
+        .then(data => {
+          if (data.skipCheck) return;
+          if (!data.openaiApiKey && !data.geminiApiKey && !data.openrouterApiKey) {
+            setGlobalKeysMissing(true);
+          }
+        })
+        .catch(() => {});
+    }
 
     if (editId) {
       fetch(`/api/bots/${editId}`)

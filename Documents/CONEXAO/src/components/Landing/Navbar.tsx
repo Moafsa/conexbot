@@ -1,115 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { User, Menu, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Menu, X, FileText } from "lucide-react";
 
 export default function Navbar({ branding }: { branding?: any }) {
-    const { data: session } = useSession();
-    const systemName = branding?.systemName || "Conext Bot";
-    const logo = branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png";
-
     const [scrolled, setScrolled] = useState(false);
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     useEffect(() => {
-        const handleScroll = () => {
-            setScrolled(window.scrollY > 20);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        const handleScroll = () => setScrolled(window.scrollY > 50);
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // Link para suporte caso não haja demo
+    const demoLink = branding?.supportWhatsapp 
+        ? `https://wa.me/${branding.supportWhatsapp.replace(/\D/g, '')}`
+        : "#";
+
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'py-2 md:py-4' : 'py-4 md:py-8'}`}>
-            <div className="max-w-7xl mx-auto px-4 md:px-6">
-                <div className={`glass rounded-2xl md:rounded-[2rem] px-4 md:px-8 py-3 md:py-4 flex items-center justify-between border border-white/5 transition-all duration-500 ${scrolled ? 'bg-black/80 backdrop-blur-2xl shadow-2xl shadow-cyan-500/10' : 'bg-transparent'}`}>
-                    {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2 md:gap-3 group">
-                        <img src={logo} alt={systemName} className="h-10 md:h-14 w-auto object-contain group-hover:scale-105 transition-all duration-300" />
-                        <span className="text-xl md:text-2xl font-black text-white italic hidden sm:inline-block">
-                            Conext <span className="text-gradient">Bot</span>
-                        </span>
+        <header className={`fixed w-full z-[100] transition-all duration-500 ${scrolled ? 'py-4 bg-black/40 backdrop-blur-md border-b border-white/5' : 'py-8 bg-transparent'}`}>
+            <div className="container mx-auto px-6 flex justify-between items-center">
+                {/* Logo Dinâmica ou SVG Fallback */}
+                <Link href="/" className="flex items-center space-x-3 group">
+                    <div className="relative">
+                        {branding?.logoWhiteUrl ? (
+                            <img 
+                                src={branding.logoWhiteUrl} 
+                                alt={branding.systemName || "Logo"} 
+                                className="h-10 w-auto group-hover:scale-110 transition-transform duration-500"
+                            />
+                        ) : (
+                            <svg className="h-10 w-auto text-indigo-500 group-hover:scale-110 transition-transform duration-500" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 70L50 10L80 70L50 90L20 70Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" opacity="0.2"/>
+                                <path d="M30 75L15 60L55 20L75 40L60 55L45 40" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+                                <circle cx="75" cy="40" r="4" fill="currentColor"/>
+                                <circle cx="15" cy="60" r="4" fill="currentColor"/>
+                                <path d="M85 15L75 25M85 25L75 15" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
+                            </svg>
+                        )}
+                        <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full scale-0 group-hover:scale-150 transition-transform duration-700"></div>
+                    </div>
+                    <span className="text-2xl font-black italic tracking-tighter text-white">
+                        {branding?.systemName || "Conext"}
+                    </span>
+                </Link>
+
+                {/* Nav Links */}
+                <nav className="hidden lg:flex items-center space-x-10 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                    <Link href="#agencias" className="hover:text-white transition-colors">Agências</Link>
+                    <Link href="#features" className="hover:text-white transition-colors">Serviços</Link>
+                    <Link href="/writer-plugin" className="hover:text-white transition-colors">Plugins</Link>
+                    <Link href="#integracoes" className="hover:text-white transition-colors">Integrações</Link>
+                    <Link href="/docs" className="flex items-center gap-2 hover:text-white transition-colors">
+                        <FileText size={14} /> Documentação
+                    </Link>
+                </nav>
+
+                {/* Right Side */}
+                <div className="flex items-center space-x-8">
+                    <Link href={demoLink} target="_blank" className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-white hover:text-indigo-400 transition-colors">
+                        Ver Demo
+                    </Link>
+                    <Link href="/auth/register" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+                        Começar Grátis
                     </Link>
 
-                    {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center gap-10">
-                        {[
-                            { label: 'Funcionalidades', href: '#features' },
-                            { label: 'Planos', href: '#pricing' },
-                            { label: 'Conext Writer', href: '/writer-plugin' },
-                            { label: 'Documentação', href: '/docs' }
-                        ].map((link) => (
-                            <Link 
-                                key={link.label} 
-                                href={link.href}
-                                className="text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors"
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-3 md:gap-6">
-                        {session ? (
-                            <Link href="/dashboard" className="px-4 md:px-8 py-2 md:py-3 bg-indigo-600 text-white text-xs md:text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">
-                                Dashboard
-                            </Link>
-                        ) : (
-                            <>
-                                <Link href="/auth/login" className="hidden sm:block text-sm font-medium text-gray-400 hover:text-indigo-400 transition-colors">
-                                    Entrar
-                                </Link>
-                                <Link 
-                                    href="/auth/register" 
-                                    className="px-4 md:px-8 py-2 md:py-3 bg-indigo-600 text-white text-[10px] md:text-sm font-bold rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 whitespace-nowrap"
-                                >
-                                    Começar Agora
-                                </Link>
-                            </>
-                        )}
-                        {/* Mobile Hamburger Toggle */}
-                        <button 
-                            className="md:hidden p-1 text-gray-400 hover:text-white transition-colors"
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        >
-                            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                        </button>
-                    </div>
+                    {/* Mobile Menu Toggle */}
+                    <button className="lg:hidden text-white" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                        {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    </button>
                 </div>
-
-                {/* Mobile Menu Dropdown */}
-                {mobileMenuOpen && (
-                    <div className="md:hidden mt-2 p-4 glass rounded-2xl border border-white/5 bg-black/90 backdrop-blur-2xl flex flex-col gap-4 animate-in slide-in-from-top-4">
-                        {[
-                            { label: 'Funcionalidades', href: '#features' },
-                            { label: 'Planos', href: '#pricing' },
-                            { label: 'Conext Writer', href: '/writer-plugin' },
-                            { label: 'Documentação', href: '/docs' }
-                        ].map((link) => (
-                            <Link 
-                                key={link.label} 
-                                href={link.href}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="text-sm font-medium text-gray-300 hover:text-indigo-400 transition-colors p-2 rounded-lg hover:bg-white/5"
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
-                        {!session && (
-                            <Link 
-                                href="/auth/login" 
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="sm:hidden text-sm font-medium text-gray-300 hover:text-indigo-400 p-2"
-                            >
-                                Entrar
-                            </Link>
-                        )}
-                    </div>
-                )}
             </div>
-        </nav>
+
+            {/* Mobile Menu */}
+            {isMenuOpen && (
+                <div className="lg:hidden absolute top-full left-0 w-full bg-black/95 backdrop-blur-2xl border-b border-white/5 p-8 animate-in fade-in slide-in-from-top-4">
+                    <nav className="flex flex-col space-y-6 text-xs font-black uppercase tracking-widest text-gray-400">
+                        <Link href="#agencias" onClick={() => setIsMenuOpen(false)}>Agências</Link>
+                        <Link href="#features" onClick={() => setIsMenuOpen(false)}>Serviços</Link>
+                        <Link href="/writer-plugin" onClick={() => setIsMenuOpen(false)}>Plugins</Link>
+                        <Link href="#integracoes" onClick={() => setIsMenuOpen(false)}>Integrações</Link>
+                        <Link href="/docs" onClick={() => setIsMenuOpen(false)}>Documentação</Link>
+                    </nav>
+                </div>
+            )}
+        </header>
     );
 }

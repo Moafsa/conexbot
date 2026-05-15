@@ -48,6 +48,12 @@ export const StorageService = {
             await parallelUploads3.done();
 
             const baseUrl = (S3_PUBLIC_URL || S3_ENDPOINT).replace(/\/+$/, "");
+            
+            // Se S3_PUBLIC_URL já contém o bucket (comum em setups locais), não repetimos
+            if (S3_PUBLIC_URL && S3_PUBLIC_URL.includes(S3_BUCKET)) {
+                return `${baseUrl}/${filename}`;
+            }
+            
             return `${baseUrl}/${S3_BUCKET}/${filename}`;
         } catch (error) {
             console.error("Storage Upload Error:", error);

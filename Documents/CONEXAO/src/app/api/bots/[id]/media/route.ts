@@ -9,7 +9,7 @@ console.log('[API Media] Route initialized /api/bots/[id]/media');
 /**
  * List all media for a bot
  */
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     console.log('[API Media] GET request received');
     try {
         const session = await getServerSession(authOptions);
@@ -44,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 /**
  * Handle new media (File Upload or External URL)
  */
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: any }) {
     console.log('[API Media] POST request received');
     try {
         const session = await getServerSession(authOptions);
@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 /**
  * Delete a media item
  */
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: any }) {
     console.log('[API Media] DELETE request received');
     try {
         const session = await getServerSession(authOptions);

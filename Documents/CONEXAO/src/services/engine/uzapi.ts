@@ -91,16 +91,18 @@ export const UzapiService = {
     async sendMessage(sessionName: string, to: string, text: string): Promise<boolean> {
         try {
             const phone = formatRecipientJid(to);
+            const payload = {
+                Phone: phone,
+                Body: text,
+            };
+            console.log(`[UZAPI] Sending message to ${phone}. Payload:`, JSON.stringify(payload));
             const res = await fetch(`${UZAPI_URL}/chat/send/text`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Token': sessionName,
                 },
-                body: JSON.stringify({
-                    Phone: phone,
-                    Body: text,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) {

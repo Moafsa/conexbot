@@ -18,47 +18,65 @@ export default async function DashboardLayout({
     // Check if user has an active subscription
     const session = await import('next-auth').then(m => m.getServerSession(require('@/lib/auth').authOptions)) as any;
     
-    // Redirect unauthenticated users to login (evita dashboard com "Plano Gratuito" para visitantes)
+    // Redirect unauthenticated users to login
     if (!session?.user) {
         const { redirect } = await import('next/navigation');
         redirect('/auth/login?callbackUrl=/dashboard');
     }
 
+    // --- Impersonation Logic (declared at top level) ---
+    const cookieStore = await (await import('next/headers')).cookies();
+    const impersonateId = cookieStore.get('impersonate_id')?.value;
+    const isImpersonating = Boolean(
+        impersonateId && (session?.user?.role === 'SUPERADMIN' || session?.user?.role === 'ADMIN')
+    );
+    // --------------------------------------------------
+
     let tenant = null;
     if (session?.user?.email) {
-        tenant = await prisma.tenant.findUnique({
-            where: { email: session.user.email },
-            include: { 
-                subscriptions: {
-                    include: { licenseKeys: true }
-                }, 
-                usageCounter: true 
-            }
-        });
+        // Determine target tenant (impersonation or self)
+        let targetId: string | undefined = session.user.id;
+        if (isImpersonating) {
+            targetId = impersonateId;
+        }
+
+        if (targetId) {
+            tenant = await prisma.tenant.findUnique({
+                where: { id: targetId },
+                include: { 
+                    subscriptions: {
+                        include: { licenseKeys: true }
+                    }, 
+                    usageCounter: true 
+                }
+            });
+        } else {
+            // Fallback: look up by email if id missing
+            tenant = await prisma.tenant.findUnique({
+                where: { email: session.user.email },
+                include: { 
+                    subscriptions: {
+                        include: { licenseKeys: true }
+                    }, 
+                    usageCounter: true 
+                }
+            });
+        }
         
-        // Let SUPERADMIN and ADMIN pass. For normal users, require at least one subscription.
-        if (tenant && tenant.role === 'USER') {
+        // Let SUPERADMIN, ADMIN, and AGENCY pass without sub check.
+        // For normal users, require at least one subscription.
+        if (tenant && tenant.role === 'USER' && !isImpersonating) {
             const activeSubs = tenant.subscriptions.filter((s: any) => 
                 ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)
             );
             const hasSub = activeSubs.length > 0;
 
-            console.log('DEBUG DASHBOARD ACCESS:', {
-                email: session.user.email,
-                role: tenant.role,
-                subsCount: tenant.subscriptions.length,
-                activeSubsCount: activeSubs.length,
-                statuses: tenant.subscriptions.map((s: any) => s.status),
-                hasSub
-            });
-
             if (!hasSub) {
-                console.log('REDIRECTING TO PRICING - NO ACTIVE SUB FOUND');
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
 
-            // Banner logic for first relevant subscription
+            // Banner logic
             const prioritizedSub = activeSubs.find((s: any) => s.status === 'TRIALING') || activeSubs.find((s: any) => s.status === 'PAST_DUE');
 
             if (prioritizedSub?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
@@ -91,7 +109,6 @@ export default async function DashboardLayout({
                     </div>
                 );
             }
-
         }
     }
 
@@ -100,5 +117,5 @@ export default async function DashboardLayout({
         hasWriter: Boolean(session?.user && (session.user.role === 'SUPERADMIN' || session.user.role === 'ADMIN' || tenant?.subscriptions?.some((s: any) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))))
     };
     
-    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans}>{children}</Shell>;
+    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans} isImpersonating={isImpersonating}>{children}</Shell>;
 }

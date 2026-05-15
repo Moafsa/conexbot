@@ -1,10 +1,20 @@
 import AdminSidebar from "@/components/Admin/AdminSidebar";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
-export default function AdminLayout({
+export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await getServerSession(authOptions) as any;
+    const role = session?.user?.role;
+
+    if (!session?.user || (role !== "ADMIN" && role !== "SUPERADMIN")) {
+        redirect("/dashboard");
+    }
+
     return (
         <div className="min-h-screen bg-black text-white flex">
             <AdminSidebar />

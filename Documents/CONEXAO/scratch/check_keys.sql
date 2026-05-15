@@ -1,0 +1,1 @@
+SELECT "openaiApiKey" FROM "Tenant";

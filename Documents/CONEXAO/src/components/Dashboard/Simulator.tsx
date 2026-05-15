@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, User, Bot, Loader2, Mic, Square } from "lucide-react";
+import { Send, User, Bot, Loader2, Mic, Square, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Message {
@@ -134,39 +134,53 @@ export function Simulator({ botId }: { botId: string }) {
     };
 
     return (
-        <div className="flex flex-col h-[600px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex flex-col h-[650px] bg-white/[0.02] backdrop-blur-xl rounded-[32px] border border-white/10 overflow-hidden shadow-2xl relative group text-white">
+            {/* Ambient Background Glow */}
+            <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-500/5 blur-[120px] -z-10 pointer-events-none"></div>
+
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Bot className="w-4 h-4" />
-                    <span>Ambiente de Teste (Simulador)</span>
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                        <Bot className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-black text-gray-200 uppercase tracking-widest">Ambiente de Teste</h3>
+                        <p className="text-[10px] text-gray-500 font-bold">SIMULADOR OFICIAL CONEXT</p>
+                    </div>
                 </div>
-                <div className="text-xs text-gray-400">
-                    Sessão: {sessionId}
+                <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10 text-[10px] font-mono text-gray-500">
+                    ID: {sessionId}
                 </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#e5ddd5]/30">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative">
                 {messages.length === 0 && (
-                    <div className="text-center py-10 text-gray-400 text-sm">
-                        <p>Mande um "Oi" para começar a testar!</p>
+                    <div className="h-full flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
+                        <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-gray-600 mb-2">
+                            <MessageCircle size={32} />
+                        </div>
+                        <div>
+                            <p className="text-gray-400 font-medium">Mande um "Oi" para começar!</p>
+                            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mt-1">O agente responderá em tempo real</p>
+                        </div>
                     </div>
                 )}
 
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
                     >
                         <div
-                            className={`max-w-[80%] rounded-lg p-3 text-sm ${msg.role === 'user'
-                                ? 'bg-[#dcf8c6] text-gray-800 rounded-tr-none shadow-sm'
-                                : 'bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-100'
+                            className={`max-w-[85%] rounded-2xl p-4 relative group ${msg.role === 'user'
+                                ? 'bg-emerald-500 text-black font-medium rounded-tr-none shadow-lg shadow-emerald-500/20'
+                                : 'bg-white/5 text-gray-200 rounded-tl-none border border-white/10'
                                 }`}
                         >
-                            <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                            <span className="text-[10px] text-gray-400 block text-right mt-1">
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                            <span className={`text-[10px] block mt-2 opacity-40 font-bold ${msg.role === 'user' ? 'text-black' : 'text-gray-400'}`}>
                                 {msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
@@ -174,9 +188,13 @@ export function Simulator({ botId }: { botId: string }) {
                 ))}
 
                 {loading && (
-                    <div className="flex justify-start">
-                        <div className="bg-white rounded-lg p-3 rounded-tl-none shadow-sm border border-gray-100">
-                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    <div className="flex justify-start animate-pulse">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 rounded-tl-none">
+                            <div className="flex gap-1">
+                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -184,30 +202,33 @@ export function Simulator({ botId }: { botId: string }) {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-gray-100 bg-white">
-                <div className="flex gap-2">
+            <div className="p-6 bg-black/20 border-t border-white/5">
+                <div className="flex items-center gap-3 bg-black/40 border border-white/5 p-2 rounded-[24px] focus-within:border-emerald-500/50 transition-all duration-300">
                     <button 
                         onClick={isRecording ? stopRecording : startRecording} 
-                        className={`p-2 rounded-full transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}
                         disabled={transcriptionLoading}
+                        title="Enviar áudio"
                     >
-                        {transcriptionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                        {transcriptionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <Square size={18} /> : <Mic size={20} />}
                     </button>
+                    
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder={transcriptionLoading ? "Transcrevendo..." : "Digite sua mensagem..."}
-                        className="flex-1 px-4 py-2 bg-white text-gray-900 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                        placeholder={transcriptionLoading ? "Transcrevendo áudio..." : "Digite sua mensagem aqui..."}
+                        className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder:text-gray-600 px-2"
                         disabled={loading || transcriptionLoading}
                     />
+
                     <button
                         onClick={handleSend}
                         disabled={loading || !input.trim() || transcriptionLoading}
-                        className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        className="w-10 h-10 bg-emerald-500 text-black rounded-full flex items-center justify-center hover:bg-emerald-400 transition-all disabled:opacity-20 disabled:grayscale shadow-lg shadow-emerald-500/20 active:scale-95"
                     >
-                        <Send className="w-4 h-4" />
+                        <Send size={18} className="ml-0.5" />
                     </button>
                 </div>
             </div>

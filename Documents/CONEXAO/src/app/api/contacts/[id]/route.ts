@@ -10,7 +10,7 @@ async function requireContactForTenant(contactId: string, tenantId: string) {
     });
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         const tenantId = (session?.user as { id?: string } | undefined)?.id;
@@ -51,7 +51,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         const tenantId = (session?.user as { id?: string } | undefined)?.id;
@@ -75,7 +75,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 }
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         const tenantId = (session?.user as { id?: string } | undefined)?.id;

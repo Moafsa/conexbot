@@ -5,7 +5,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 // crypto is native in Node 18.x+, providing randomUUID()
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {

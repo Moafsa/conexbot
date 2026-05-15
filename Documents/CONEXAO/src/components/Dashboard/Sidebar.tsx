@@ -4,12 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase } from "lucide-react";
 
-export default function Sidebar({ branding, userPlans }: { branding?: any, userPlans?: { hasPrimary: boolean, hasWriter: boolean } }) {
+export default function Sidebar({ branding, userPlans, isImpersonating }: { branding?: any, userPlans?: { hasPrimary: boolean, hasWriter: boolean }, isImpersonating?: boolean }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(true);
+
+    const handleStopImpersonating = async () => {
+        await fetch("/api/admin/impersonate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ targetId: null })
+        });
+        window.location.href = "/admin/agencies";
+    };
 
     const logo = branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png";
     const systemName = branding?.systemName || "Conext Bot";
@@ -17,36 +26,73 @@ export default function Sidebar({ branding, userPlans }: { branding?: any, userP
     const lastName = systemName.split(' ').slice(1).join(' ');
 
     const isAdmin = (session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'SUPERADMIN';
+    const isAgency = (session?.user as any)?.role === 'AGENCY' || (session?.user as any)?.isAgency;
 
-    // Base menu items
-    const overviewLink = (userPlans?.hasWriter && !userPlans?.hasPrimary && !isAdmin) ? "/dashboard/writer" : "/dashboard";
-    
-    const menuItems = [
-        { icon: LayoutDashboard, label: "Visão Geral", href: overviewLink },
-    ];
+    let menuItems: { icon: any, label: string, href: string }[] = [];
 
-    // Primary Plan Items (Bots/CRM)
-    if (userPlans?.hasPrimary || isAdmin) {
-        menuItems.push({ icon: Users, label: "CRM Pipeline", href: "/dashboard/crm" });
-        menuItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
-    }
-
-    // Writer Plan Items
-    if (userPlans?.hasWriter || isAdmin) {
-        menuItems.push({ icon: PenTool, label: "Escritor IA", href: "/dashboard/writer" });
-        menuItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
-    }
-
-    // Settings and Finance (Common to everyone signed up)
-    menuItems.push({ icon: CreditCard, label: "Financeiro", href: "/dashboard/finance" });
-    menuItems.push({ icon: Settings, label: "Configurações", href: "/dashboard/settings" });
-
-    if (isAdmin) {
-        menuItems.push({ icon: Shield, label: "Administração", href: "/admin" });
+    if (isAgency && !isAdmin) {
+        // ---- AGENCY MENU (clean & focused) ----
+        menuItems = [
+            { icon: LayoutDashboard, label: "Portal da Agência",  href: "/dashboard/agency" },
+            { icon: Briefcase,       label: "Meus Clientes",       href: "/dashboard/agency/clients" },
+            { icon: Tag,             label: "Minha Tabela",         href: "/dashboard/agency/pricing" },
+            // --- Divider group: Agency's own tools ---
+            { icon: MessageSquare,   label: "Meus Agentes",         href: "/dashboard/bots" },
+            { icon: Users,           label: "CRM Pipeline",         href: "/dashboard/crm" },
+            { icon: PenTool,         label: "Escritor IA",           href: "/dashboard/writer" },
+            { icon: TrendingUp,      label: "Marketing IA",          href: "/dashboard/marketing" },
+            // --- Account ---
+            { icon: CreditCard,      label: "Financeiro",            href: "/dashboard/finance" },
+            { icon: Settings,        label: "Configurações",         href: "/dashboard/settings" },
+        ];
+    } else if (isAdmin) {
+        // ---- ADMIN MENU ----
+        menuItems = [
+            { icon: LayoutDashboard, label: "Visão Geral",           href: "/dashboard" },
+            { icon: MessageSquare,   label: "Meus Agentes",           href: "/dashboard/bots" },
+            { icon: Users,           label: "CRM Pipeline",           href: "/dashboard/crm" },
+            { icon: PenTool,         label: "Escritor IA",             href: "/dashboard/writer" },
+            { icon: TrendingUp,      label: "Marketing IA",            href: "/dashboard/marketing" },
+            { icon: CreditCard,      label: "Financeiro",              href: "/dashboard/finance" },
+            { icon: Settings,        label: "Configurações",           href: "/dashboard/settings" },
+            // --- Admin shortcuts ---
+            { icon: Shield,          label: "Administração",           href: "/admin" },
+            { icon: Briefcase,       label: "Gestão Agências",         href: "/admin/agencies" },
+            { icon: ShoppingBag,     label: "Marketplace",             href: "/admin/marketplace" },
+        ];
+    } else {
+        // ---- USER MENU ----
+        const overviewLink = (userPlans?.hasWriter && !userPlans?.hasPrimary) ? "/dashboard/writer" : "/dashboard";
+        menuItems = [
+            { icon: LayoutDashboard, label: "Visão Geral",   href: overviewLink },
+        ];
+        if (userPlans?.hasPrimary) {
+            menuItems.push({ icon: Users,        label: "CRM Pipeline",  href: "/dashboard/crm" });
+            menuItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
+        }
+        if (userPlans?.hasWriter) {
+            menuItems.push({ icon: PenTool,    label: "Escritor IA",  href: "/dashboard/writer" });
+            menuItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
+        }
+        menuItems.push({ icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" });
+        menuItems.push({ icon: Settings,   label: "Configurações", href: "/dashboard/settings" });
     }
 
     return (
         <aside className={`h-full bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? 'w-20' : 'w-64'}`}>
+            {isImpersonating && (
+                <div className="bg-red-600 p-2 text-center text-[10px] font-black uppercase tracking-tighter">
+                    {collapsed ? "MODO SUPORTE" : "Modo Suporte Ativo"}
+                    {!collapsed && (
+                        <button 
+                            onClick={handleStopImpersonating}
+                            className="block w-full mt-1 bg-white text-red-600 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors"
+                        >
+                            Sair
+                        </button>
+                    )}
+                </div>
+            )}
             {/* Brand */}
             <div className="h-24 flex items-center justify-center border-b border-white/5 relative px-4 text-center">
                 {!collapsed && (

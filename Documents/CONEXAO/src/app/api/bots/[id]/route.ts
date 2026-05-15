@@ -5,7 +5,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { updateBotSchema } from '@/lib/validations';
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -38,7 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {
@@ -103,7 +103,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user) {

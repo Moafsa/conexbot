@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 // crypto is native in Node 19+ and latest versions of Node 18, so we can use randomUUID directly
 import { buildArchitectBotPayload } from '@/lib/architect-bot-payload';
 import { checkBotLimit } from '@/services/plan-limits';
@@ -144,16 +145,17 @@ export async function POST(req: Request) {
     }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const url = new URL(req.url);
+        const clientId = url.searchParams.get("clientId");
+        
+        const tenantId = await getEffectiveTenantId(clientId);
+        if (!tenantId) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const tenantId = (session.user as any).id;
-
-        console.log('[API /bots GET] TenantId:', tenantId);
+        console.log('[API /bots GET] Using Effective TenantId:', tenantId);
 
         const bots = await prisma.bot.findMany({
             where: { tenantId },

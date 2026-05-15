@@ -15,7 +15,7 @@ function detectImageMimeType(buffer: Buffer): string {
 
 /** Call Gemini generateContent directly - more robust for WhatsApp images */
 async function analyzeWithGeminiDirect(apiKey: string, base64Data: string, mimeType: string, prompt: string): Promise<string> {
-    const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
     for (const model of models) {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: 'POST',

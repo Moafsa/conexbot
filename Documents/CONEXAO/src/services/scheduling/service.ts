@@ -86,7 +86,8 @@ export class SchedulingService {
     contactId: string,
     tenantId: string,
     startTime: Date,
-    endTime?: Date
+    endTime?: Date,
+    notes?: string
   }) {
     const bot = await prisma.bot.findUnique({ where: { id: params.botId } });
     if (!bot) throw new Error('Bot not found');
@@ -108,7 +109,8 @@ export class SchedulingService {
         tenantId: params.tenantId,
         startTime: params.startTime,
         endTime: end,
-        status: 'CONFIRMED'
+        status: 'PENDING',
+        notes: params.notes
       },
       include: { contact: true }
     });
@@ -158,7 +160,7 @@ export class SchedulingService {
       calendarId: bot.googleCalendarId || 'primary',
       requestBody: {
         summary: `Agendamento: ${appointment.contact?.name || 'Cliente'}`,
-        description: `Agendamento realizado via Bot ${bot.name}. Contato: ${appointment.contact?.phone || 'N/A'}`,
+        description: `Agendamento realizado via Bot ${bot.name}. \nContato: ${appointment.contact?.phone || 'N/A'}\nNotas: ${appointment.notes || 'N/A'}`,
         start: { dateTime: appointment.startTime.toISOString() },
         end: { dateTime: appointment.endTime.toISOString() },
       }

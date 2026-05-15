@@ -11,7 +11,11 @@ export async function GET(req: Request) {
 
         // 1. Get all active bots
         const bots = await prisma.bot.findMany({
-            where: { status: 'ACTIVE' },
+            where: {
+                status: {
+                    in: ['ACTIVE', 'active']
+                }
+            },
             select: { id: true, name: true }
         });
 
@@ -21,22 +25,11 @@ export async function GET(req: Request) {
         console.log('[Cron] Processing rule-based followups...');
         await FollowUpService.processDailyFollowups();
 
-        // 3. Process stalled conversations (legacy/fallback)
-        const results = [];
-        for (const bot of bots) {
-            try {
-                await FollowUpService.processStalledConversations(bot.id);
-                results.push({ bot: bot.name, status: 'checked' });
-            } catch (e) {
-                console.error(`[Cron] Error processing bot ${bot.name}:`, e);
-                results.push({ bot: bot.name, status: 'error', error: String(e) });
-            }
-        }
-
+        // 3. Results summary
         return NextResponse.json({
             success: true,
             timestamp: new Date(),
-            results
+            message: "Follow-up rules processed."
         });
 
     } catch (error) {

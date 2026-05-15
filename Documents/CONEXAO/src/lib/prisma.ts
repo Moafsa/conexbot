@@ -3,7 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 const prismaClientSingleton = () => {
     const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl || dbUrl.includes('localhost') || process.env.NEXT_PHASE === 'phase-production-build') {
+    if (!dbUrl || process.env.NEXT_PHASE === 'phase-production-build') {
         // Build time or missing DB: return a client that won't try to connect at top-level
         return new PrismaClient();
     }

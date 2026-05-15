@@ -22,6 +22,7 @@ interface Appointment {
     status: 'PENDING' | 'CONFIRMED' | 'CANCELED';
     contactName?: string;
     contactPhone?: string;
+    notes?: string;
 }
 
 export function AgendaManager({ botId }: { botId: string }) {
@@ -94,6 +95,25 @@ export function AgendaManager({ botId }: { botId: string }) {
             alert("Erro ao salvar.");
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function handleStatusUpdate(apptId: string, status: string) {
+        try {
+            const res = await fetch(`/api/bots/${botId}/appointments/${apptId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+
+            if (res.ok) {
+                setAppointments(prev => prev.map(a => a.id === apptId ? { ...a, status: status as any } : a));
+            } else {
+                alert("Erro ao atualizar status.");
+            }
+        } catch (error) {
+            console.error("Error updating status", error);
+            alert("Erro ao atualizar status.");
         }
     }
 
@@ -257,6 +277,11 @@ export function AgendaManager({ botId }: { botId: string }) {
                                                 <Clock className="w-3 h-3" />
                                                 {format(new Date(appt.startTime), 'HH:mm')} - {format(new Date(appt.endTime), 'HH:mm')}
                                             </p>
+                                            {appt.notes && (
+                                                <p className="text-[10px] text-indigo-400 bg-indigo-500/5 px-2 py-0.5 rounded mt-1 border border-indigo-500/10 inline-block">
+                                                    {appt.notes}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -269,12 +294,24 @@ export function AgendaManager({ botId }: { botId: string }) {
                                             {appt.status}
                                         </span>
                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1 hover:bg-green-50 text-green-600 rounded" title="Confirmar">
-                                                <CheckCircle2 className="w-4 h-4" />
-                                            </button>
-                                            <button className="p-1 hover:bg-red-50 text-red-600 rounded" title="Cancelar">
-                                                <XCircle className="w-4 h-4" />
-                                            </button>
+                                            {appt.status !== 'CONFIRMED' && (
+                                                <button 
+                                                    onClick={() => handleStatusUpdate(appt.id, 'CONFIRMED')}
+                                                    className="p-1 hover:bg-green-50 text-green-600 rounded" 
+                                                    title="Confirmar"
+                                                >
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            {appt.status !== 'CANCELED' && (
+                                                <button 
+                                                    onClick={() => handleStatusUpdate(appt.id, 'CANCELED')}
+                                                    className="p-1 hover:bg-red-50 text-red-600 rounded" 
+                                                    title="Cancelar"
+                                                >
+                                                    <XCircle className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

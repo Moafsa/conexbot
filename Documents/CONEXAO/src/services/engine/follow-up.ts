@@ -9,98 +9,13 @@ export const FollowUpService = {
      * Checks for stalled conversations and sends follow-ups.
      * Should be called via Cron every hour.
      */
+    /**
+     * Legacy stalled conversations check - replaced by rule-based followup.
+     * @deprecated Use AFTER_LAST_MESSAGE rule instead.
+     */
     async processStalledConversations(botId: string) {
-        console.log(`[FollowUp] Checking bot ${botId}...`);
-
-        const STALLED_HOURS = 24;
-        const stalledTime = new Date(Date.now() - STALLED_HOURS * 60 * 60 * 1000);
-
-        // Find contacts in 'purchase' stages who haven't interacted recently
-        const stalls = await prisma.contact.findMany({
-            where: {
-                tenantId: { not: undefined }, // Safety check
-                // Associated bot check might be tricky via Contact-Tenant relation, 
-                // but we can find conversations linked to this bot.
-                // Better: Find conversations for this bot where updated_at is old.
-            },
-            include: {
-                tenant: true
-            }
-        });
-
-        // Better query via Conversation
-        const stalledConversations = await prisma.conversation.findMany({
-            where: {
-                botId: botId,
-                updatedAt: { lt: stalledTime },
-                status: 'open',
-            },
-            include: {
-                messages: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1,
-                },
-                bot: true
-            }
-        });
-
-        console.log(`[FollowUp] Found ${stalledConversations.length} stalled conversations.`);
-
-        for (const conv of stalledConversations) {
-            const lastMsg = conv.messages[0];
-            if (!lastMsg) continue;
-
-            // Only follow up if last message was NOT from us (wait, if last was from us, user didn't reply. If last was from user, we didn't reply - which is a bug).
-            // Actually, we want to follow up if USER didn't reply to US.
-            // So last message role == 'assistant'.
-
-            if (lastMsg.role !== 'assistant') continue;
-
-            // Check contact stage
-            const contact = await prisma.contact.findUnique({
-                where: { phone_botId: { phone: conv.remoteId, botId: conv.botId } }
-            });
-
-            if (!contact || ['LEAD', 'CHURNED', 'ACTION', 'SUPPORT'].includes(contact.funnelStage)) {
-                continue; // Skip these stages
-            }
-
-            console.log(`[FollowUp] Sending to ${conv.remoteId} (${contact.funnelStage})...`);
-
-            // Generate Follow-up Text
-            // We can ask Supervisor or use a template
-            const followUpPrompt = `
-            O cliente parou de responder há 24 horas.
-            Estágio: ${contact.funnelStage}.
-            Última mensagem do bot: "${lastMsg.content}".
-            
-            Gere uma mensagem curta de retomada de contato, empática e leve.
-            Ex: "Oi, conseguiu ver a proposta?"
-            `;
-
-            // For now, simple logic or call OpenAI
-            const message = `Olá! 👋 Conseguiu dar uma olhadinha na nossa última conversa? Estou por aqui se tiver dúvidas!`;
-
-            // Send
-            await UzapiService.sendMessage(conv.bot.sessionName!, conv.remoteId, message);
-
-            // Log (optional: update conversation to avoid looping)
-            // We might want to mark it as "followed_up" or just let updatedAt update?
-            // Sending message updates updatedAt automatically in normal flow, but UzapiService doesn't update DB.
-            // We must update DB.
-            await prisma.conversation.update({
-                where: { id: conv.id },
-                data: { updatedAt: new Date() } // Bumps timestamp so we don't spam instantly next run
-            });
-
-            await prisma.message.create({
-                data: {
-                    conversationId: conv.id,
-                    role: 'assistant',
-                    content: message
-                }
-            });
-        }
+        // No longer used, but kept for signature compatibility if needed
+        return;
     },
 
     /**
@@ -110,7 +25,11 @@ export const FollowUpService = {
         console.log('[FollowUp] Starting daily AI analysis...');
         try {
             const bots = await (prisma.bot as any).findMany({
-                where: { status: 'active' },
+                where: {
+                    status: {
+                        in: ['ACTIVE', 'active']
+                    }
+                },
                 include: {
                     followupRules: { where: { active: true } },
                     tenant: true
@@ -120,7 +39,6 @@ export const FollowUpService = {
             for (const bot of bots) {
                 if (!bot.followupRules || bot.followupRules.length === 0) continue;
 
-                // Find all active contacts for this bot
                 const contacts = await prisma.contact.findMany({
                     where: { botId: bot.id },
                     include: {
@@ -128,7 +46,14 @@ export const FollowUpService = {
                     }
                 });
 
+                console.log(`[FollowUp] Bot ${bot.name} (${bot.id}) has ${contacts.length} contacts.`);
+
                 for (const contact of contacts) {
+                    if (!contact.phone || contact.phone.startsWith('SIM_') || contact.phone.length < 8) {
+                        console.log(`[FollowUp] Skipping contact with invalid phone: ${contact.phone}`);
+                        continue;
+                    }
+                    console.log(`[FollowUp] Evaluating contact ${contact.phone} for bot ${bot.name}`);
                     for (const rule of bot.followupRules) {
                         await this.evaluateRule(bot, contact, rule);
                     }
@@ -143,20 +68,24 @@ export const FollowUpService = {
         const now = new Date();
         const lastActive = new Date(contact.lastActive || contact.updatedAt);
         const normalizedPhone = PhoneUtils.normalize(contact.phone);
-        const diffDays = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
+        const diffMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
+        const diffDays = Math.floor(diffMinutes / 1440);
+
+        const triggerValue = (rule as any).triggerValue || rule.triggerDays;
+        console.log(`[FollowUp] Rule "${rule.name}" (${rule.triggerType}) for ${contact.phone}: diffMinutes=${diffMinutes}, triggerUnit=${rule.triggerUnit}, triggerValue=${triggerValue}`);
 
         let shouldTrigger = false;
 
         if (rule.triggerType === 'SALES' && contact.funnelStage !== 'CUSTOMER') {
-            if (diffDays >= rule.triggerDays && diffDays < rule.triggerDays + 1) {
+            if (diffDays >= triggerValue && diffDays < triggerValue + 1) {
                 shouldTrigger = true;
             }
         } else if (rule.triggerType === 'POST_SALE' && contact.funnelStage === 'CUSTOMER') {
-            const lastOrder = contact.orders[0];
+            const lastOrder = contact.orders?.[0];
             if (lastOrder) {
                 const orderDate = new Date(lastOrder.createdAt);
                 const orderDiff = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-                if (orderDiff >= rule.triggerDays && orderDiff < rule.triggerDays + 1) {
+                if (orderDiff >= triggerValue && orderDiff < triggerValue + 1) {
                     shouldTrigger = true;
                 }
             }
@@ -164,19 +93,64 @@ export const FollowUpService = {
             const eventDate = new Date(contact.eventDate);
             const eventDiff = Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-            if (rule.triggerDays === eventDiff) {
+            if (triggerValue === eventDiff) {
                 shouldTrigger = true;
+            }
+        } else if (rule.triggerType === 'AFTER_LAST_MESSAGE' || rule.triggerType === 'STALLED') {
+            // Support for MINUTES, HOURS, DAYS
+            let targetMinutes = triggerValue;
+            if (rule.triggerUnit === 'HOURS') targetMinutes *= 60;
+            if (rule.triggerUnit === 'DAYS' || !rule.triggerUnit) targetMinutes *= 1440;
+
+            if (diffMinutes >= targetMinutes) {
+                const conversation = await prisma.conversation.findUnique({
+                    where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
+                    include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } }
+                });
+
+                const lastMsg = conversation?.messages?.[0];
+                // Trigger if last message was from assistant (typical stalled)
+                // OR if it was from user but it was REALLY long ago (system failure)
+                // OR if NO message history exists (newly imported or DB wiped)
+                if (!lastMsg || lastMsg.role === 'assistant' || diffMinutes > targetMinutes + 120) {
+                    shouldTrigger = true;
+                }
             }
         }
 
         if (shouldTrigger) {
-            // Check if we already sent this rule recently
-            const alreadySent = await prisma.message.findFirst({
+            // Adjust cooldown based on rule unit
+            let cooldownMs = 23 * 60 * 60 * 1000; // Default 23h
+            if (rule.triggerUnit === 'MINUTES') cooldownMs = (triggerValue - 0.5) * 60 * 1000;
+            if (rule.triggerUnit === 'HOURS') cooldownMs = (triggerValue - 0.5) * 60 * 60 * 1000;
+
+            const conv = await prisma.conversation.findUnique({ where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } } });
+            // Check if we already sent this follow-up AFTER the last user message
+            const lastFollowUp = await prisma.message.findFirst({
                 where: {
-                    content: { contains: `[FOLLOW-UP: ${rule.name}]` },
-                    createdAt: { gte: new Date(now.getTime() - 23 * 60 * 60 * 1000) }
-                }
+                    conversationId: conv?.id,
+                    content: { contains: `[FOLLOW-UP: ${rule.name}]` }
+                },
+                orderBy: { createdAt: 'desc' }
             });
+
+            let alreadySent = false;
+            if (lastFollowUp) {
+                const lastUserMsg = await prisma.message.findFirst({
+                    where: {
+                        conversationId: conv?.id,
+                        role: 'user'
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                if (!lastUserMsg || lastFollowUp.createdAt > lastUserMsg.createdAt) {
+                    // Block if it was already sent after the last user interaction
+                    alreadySent = true;
+                }
+            }
+
+            console.log(`[FollowUp] Checking for ${contact.phone}: alreadySent=${alreadySent}, convId=${conv?.id}`);
 
             if (!alreadySent) {
                 // Get last messages for context
@@ -185,10 +159,11 @@ export const FollowUpService = {
                     include: { messages: { orderBy: { createdAt: 'desc' }, take: 10 } }
                 });
 
-                // 2. Decide if follow-up is strategically good
-                const shouldFollowUp = await this.aiShouldFollowUp(bot, contact, rule, conversation?.messages || []);
+                console.log(`[FollowUp] Calling AI for ${contact.phone}. History length: ${conversation?.messages?.length || 0}`);
+                const { shouldFollowUp, reason } = await this.aiShouldFollowUp(bot, contact, rule, conversation?.messages || []);
+                
                 if (!shouldFollowUp) {
-                    console.log(`[FollowUp] AI decided NOT to follow up with ${contact.phone} for rule ${rule.name}`);
+                    console.log(`[FollowUp] AI decided NOT to follow up with ${contact.phone} for rule ${rule.name}. Reason: ${reason}`);
                     return;
                 }
 
@@ -292,10 +267,13 @@ export const FollowUpService = {
                 OBJETIVO: ${rule.message}
                 
                 ANALISE:
-                1. O cliente já respondeu positivamente recentemente?
-                2. O cliente pediu para não ser incomodado?
-                3. A última mensagem foi concluída (ex: ele já comprou o que a regra propõe)?
-                4. O tom da conversa indica que um follow-up automático seria chato ou invasivo agora?
+                1. O cliente pediu EXPLICITAMENTE para não ser incomodado? (Se não, tenda para TRUE)
+                2. O objetivo da regra ("${rule.name}") já foi alcançado na última mensagem?
+                3. O cliente já comprou ou fechou o que estávamos tentando?
+                
+                IMPORTANTE: Somos uma equipe de vendas ativa. O follow-up é essencial. 
+                Só responda FALSE se for realmente prejudicial à marca ou se o cliente já deu o próximo passo.
+                Se estiver em dúvida, responda TRUE.
                 
                 Responda APENAS com um JSON:
                 { "shouldFollowUp": true/false, "reason": "breve motivo" }
@@ -309,12 +287,12 @@ export const FollowUpService = {
             }) as any;
 
             const content = typeof aiResult === 'string' ? aiResult : aiResult.content;
-            const result = JSON.parse(content || '{"shouldFollowUp":true}');
+            const result = JSON.parse(content || '{"shouldFollowUp":true, "reason": "default"}');
             
-            return !!result.shouldFollowUp;
+            return { shouldFollowUp: !!result.shouldFollowUp, reason: result.reason || 'No reason' };
         } catch (e) {
             console.error('[FollowUp] AI decision failed, defaulting to TRUE:', e);
-            return true;
+            return { shouldFollowUp: true, reason: 'AI error' };
         }
     }
 };

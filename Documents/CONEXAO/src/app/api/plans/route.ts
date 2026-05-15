@@ -11,11 +11,27 @@ export async function GET(request: Request) {
 
         const session = await getServerSession(authOptions);
         let activeBots = 0;
+        let tenantAgencyId: string | null = null;
 
         if (session?.user) {
-            const tenantId = (session.user as any).id;
+            const userId = (session.user as any).id;
+            const tenant = await prisma.tenant.findUnique({
+                where: { id: userId },
+                select: { agencyId: true }
+            });
+            
+            if (tenant?.agencyId) {
+                tenantAgencyId = tenant.agencyId;
+            } else {
+                // Also check if the user is the agency owner itself
+                const agency = await prisma.agency.findUnique({
+                    where: { tenantId: userId }
+                });
+                if (agency) tenantAgencyId = agency.id;
+            }
+            
             activeBots = await prisma.bot.count({
-                where: { tenantId }
+                where: { tenantId: userId }
             });
         }
 
@@ -27,13 +43,44 @@ export async function GET(request: Request) {
 
         if (gateways.length === 0) gateways.push('asaas'); // Fallback safe default
 
-        const plans = await prisma.plan.findMany({
+        let plans = await prisma.plan.findMany({
             where: { 
                 active: true,
                 ...(type ? { type } : {})
             },
+            include: {
+                productCatalog: true
+            },
             orderBy: { price: 'asc' }
         });
+
+        if (tenantAgencyId) {
+            const agencyPricings = await prisma.agencyPricing.findMany({
+                where: { agencyId: tenantAgencyId }
+            });
+            const pricingMap = new Map(agencyPricings.map(ap => [ap.productId, ap]));
+            
+            plans = plans.map(plan => {
+                if (plan.productCatalogId) {
+                    const override = pricingMap.get(plan.productCatalogId);
+                    if (override) {
+                        // Use o markupPercent para manter a diferença entre os planos (Basic, Pro, Elite)
+                        const markupFactor = 1 + (override.markupPercent / 100);
+                        
+                        // Apply markup to all available frequencies, but keep setupPrice FIXED as defined by agency
+                        return { 
+                            ...plan, 
+                            price: plan.price * markupFactor,
+                            priceQuarterly: plan.priceQuarterly ? (plan.priceQuarterly * markupFactor) : (plan.price * 3 * markupFactor),
+                            priceSemiannual: plan.priceSemiannual ? (plan.priceSemiannual * markupFactor) : (plan.price * 6 * markupFactor),
+                            priceYearly: plan.priceYearly ? (plan.priceYearly * markupFactor) : (plan.price * 12 * markupFactor),
+                            setupPrice: override.setupPrice // Valor fixo e real da agência
+                        };
+                    }
+                }
+                return plan;
+            });
+        }
 
         return NextResponse.json({ plans, activeBots, gateways });
     } catch (error) {

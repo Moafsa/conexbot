@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conext | Ecossistema de IA White-Label</title>
+    
+    <!-- Google Fonts: Inter & Sora -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Sora', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            black: '#000000',
+                            dark: '#0A0A0A',
+                            surface: '#111111',
+                            gold: '#FFC107',
+                            goldLight: '#FFE082',
+                            gray: '#888888',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'marquee': 'marquee 25s linear infinite',
+                        'marquee2': 'marquee2 25s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        marquee: {
+                            '0%': { transform: 'translateX(0%)' },
+                            '100%': { transform: 'translateX(-100%)' },
+                        },
+                        marquee2: {
+                            '0%': { transform: 'translateX(100%)' },
+                            '100%': { transform: 'translateX(0%)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Icons & Animations -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Efeito de ruído para textura premium */
+        .noise::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://grainy-gradients.vercel.app/noise.svg');
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .gold-gradient {
+            background: linear-gradient(135deg, #FFC107 0%, #FFD54F 50%, #B8860B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .premium-card {
+            background: linear-gradient(145deg, rgba(20,20,20,0.8) 0%, rgba(5,5,5,0.9) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .premium-card:hover {
+            border-color: rgba(255, 193, 7, 0.3);
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(255, 193, 7, 0.1);
+        }
+
+        .glow-button {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .glow-button::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,193,7,0.4) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .glow-button:hover::after {
+            opacity: 1;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0; left: 0; z-index: -1;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #FFC107; }
+
+        .tier-card {
+            position: relative;
+            background: #0D0D0D;
+            border-radius: 24px;
+            overflow: hidden;
+        }
+
+        .tier-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="noise">
+
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- HEADER -->
+    <header class="fixed w-full z-[100] transition-all duration-500 py-6" id="header">
+        <div class="container mx-auto px-6 flex justify-between items-center">
+            <a href="#" class="flex items-center space-x-3 group">
+                <div class="relative">
+                    <svg class="h-10 w-auto text-brand-gold group-hover:scale-110 transition-transform duration-500" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 70L50 10L80 70L50 90L20 70Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" opacity="0.2"/>
+                        <path d="M30 75L15 60L55 20L75 40L60 55L45 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="75" cy="40" r="4" fill="currentColor"/>
+                        <circle cx="15" cy="60" r="4" fill="currentColor"/>
+                        <path d="M85 15L75 25M85 25L75 15" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                    <div class="absolute inset-0 bg-brand-gold/20 blur-xl rounded-full scale-0 group-hover:scale-150 transition-transform duration-700"></div>
+                </div>
+                <span class="text-2xl font-display font-extrabold tracking-tighter text-white">Conext</span>
+            </a>
+
+            <nav class="hidden lg:flex items-center space-x-10 text-sm font-semibold tracking-wide text-brand-gray uppercase">
+                <a href="#agencias" class="hover:text-brand-gold transition-colors">Agências</a>
+                <a href="#servicos" class="hover:text-brand-gold transition-colors">Serviços</a>
+                <a href="#plugins" class="hover:text-brand-gold transition-colors">Plugins</a>
+                <a href="#integracoes" class="hover:text-brand-gold transition-colors">Integrações</a>
+            </nav>
+
+            <div class="flex items-center space-x-6">
+                <a href="#" class="hidden sm:block text-sm font-bold text-white hover:text-brand-gold transition-colors">Ver Demo</a>
+                <a href="#" class="bg-brand-gold text-black px-6 py-3 rounded-full font-display font-extrabold text-sm uppercase tracking-wider glow-button shadow-[0_0_20px_rgba(255,193,7,0.3)]">
+                    Começar Grátis
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="relative min-h-screen flex items-center pt-20 overflow-hidden">
+        <div class="container mx-auto px-6 relative z-10">
+            <div class="max-w-5xl mx-auto text-center">
+                <div class="inline-block px-4 py-1.5 mb-8 rounded-full border border-brand-gold/30 bg-brand-gold/5 backdrop-blur-sm" data-aos="fade-down">
+                    <span class="text-xs font-black uppercase tracking-[0.2em] gold-gradient">Plataforma White-Label de IA</span>
+                </div>
+                
+                <h1 class="text-6xl md:text-8xl font-display font-extrabold text-white leading-tight mb-8" data-aos="fade-up" data-aos-delay="100">
+                    Sua Agência de IA.<br>
+                    <span class="gold-gradient italic">Sua Marca.</span>
+                </h1>
+                
+                <p class="text-xl md:text-2xl text-brand-gray max-w-3xl mx-auto mb-12 font-light leading-relaxed" data-aos="fade-up" data-aos-delay="200">
+                    Fornecemos a infraestrutura de elite. <span class="text-white font-medium">Você foca na estratégia.</span><br>
+                    100% Gratuito. Sem custos de entrada. Sem limites para crescer.
+                </p>
+
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-6" data-aos="fade-up" data-aos-delay="300">
+                    <a href="#" class="w-full sm:w-auto bg-white text-black px-10 py-5 rounded-2xl font-display font-extrabold text-lg transition-all hover:bg-brand-gold hover:scale-105 shadow-2xl">
+                        Criar Agência Grátis
+                    </a>
+                    <a href="#" class="w-full sm:w-auto px-10 py-5 rounded-2xl font-display font-extrabold text-lg border border-white/20 backdrop-blur-md hover:bg-white/5 transition-all flex items-center justify-center gap-3">
+                        <i class="ph-fill ph-play-circle text-2xl text-brand-gold"></i>
+                        Ver Ecossistema
+                    </a>
+                </div>
+
+                <div class="mt-20 relative" data-aos="zoom-in" data-aos-delay="400">
+                    <div class="absolute -inset-10 bg-brand-gold/10 blur-[100px] rounded-full"></div>
+                    <div class="relative bg-brand-surface/40 border border-white/10 rounded-3xl p-4 backdrop-blur-2xl shadow-2xl overflow-hidden">
+                        <div class="flex items-center space-x-2 mb-4 px-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/50"></div>
+                            <div class="h-4 w-32 bg-white/5 rounded ml-4"></div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4 h-64">
+                            <div class="bg-white/5 rounded-xl animate-pulse"></div>
+                            <div class="bg-white/5 rounded-xl animate-pulse delay-75"></div>
+                            <div class="bg-white/5 rounded-xl animate-pulse delay-150"></div>
+                            <div class="bg-white/5 rounded-xl animate-pulse delay-300"></div>
+                        </div>
+                    </div>
+                    <div class="absolute -right-10 top-1/2 bg-brand-gold text-black p-6 rounded-3xl shadow-2xl transform rotate-6 animate-float hidden md:block">
+                        <div class="text-3xl font-black">100%</div>
+                        <div class="text-xs font-bold uppercase">White Label</div>
+                    </div>
+                    <div class="absolute -left-10 bottom-0 bg-white text-black p-6 rounded-3xl shadow-2xl transform -rotate-3 animate-float hidden md:block" style="animation-delay: 2s;">
+                        <div class="text-3xl font-black">R$ 0</div>
+                        <div class="text-xs font-bold uppercase tracking-widest">Custo Zero</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section class="py-32 relative">
+        <div class="container mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-24">
+                <div data-aos="fade-right">
+                    <h2 class="text-brand-gold font-black uppercase tracking-[0.3em] text-sm mb-4">Pipeline</h2>
+                    <h3 class="text-4xl md:text-6xl font-display font-extrabold">Três passos para o topo.</h3>
+                </div>
+                <p class="text-brand-gray max-w-md mt-6 md:mt-0 text-lg">De agência iniciante a império de tecnologia em tempo recorde.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div class="premium-card p-10 rounded-[2.5rem] relative group" data-aos="fade-up">
+                    <div class="text-7xl font-display font-black text-white/5 absolute top-5 right-10 group-hover:text-brand-gold/10 transition-colors">01</div>
+                    <div class="w-20 h-20 bg-brand-gold/10 rounded-3xl flex items-center justify-center mb-10 border border-brand-gold/20">
+                        <i class="ph-duotone ph-user-plus text-4xl text-brand-gold"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-4">Onboarding Imediato</h4>
+                    <p class="text-brand-gray leading-relaxed">Crie sua agência instantaneamente. Sem burocracia, sem cartões. Seu painel exclusivo já vem pronto para operar.</p>
+                </div>
+                <div class="premium-card p-10 rounded-[2.5rem] relative group border-brand-gold/20" data-aos="fade-up" data-aos-delay="100">
+                    <div class="text-7xl font-display font-black text-white/5 absolute top-5 right-10">02</div>
+                    <div class="w-20 h-20 bg-brand-gold text-black rounded-3xl flex items-center justify-center mb-10 shadow-[0_0_30px_rgba(255,193,7,0.4)]">
+                        <i class="ph-duotone ph-sliders text-4xl"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-4">Engenharia de Preços</h4>
+                    <p class="text-brand-gray leading-relaxed">Você dita as regras. Configure margens, limites e recursos. Nossa infraestrutura é o seu palco de lucros.</p>
+                </div>
+                <div class="premium-card p-10 rounded-[2.5rem] relative group" data-aos="fade-up" data-aos-delay="200">
+                    <div class="text-7xl font-display font-black text-white/5 absolute top-5 right-10">03</div>
+                    <div class="w-20 h-20 bg-brand-gold/10 rounded-3xl flex items-center justify-center mb-10 border border-brand-gold/20">
+                        <i class="ph-duotone ph-lightning text-4xl text-brand-gold"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-4">Escala Global</h4>
+                    <p class="text-brand-gray leading-relaxed">Entregue agentes de IA treinados, voz humana e WhatsApp 24/7. O sucesso do seu cliente é o seu MRR.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- INFRAESTRUTURA -->
+    <section id="agencias" class="py-32 bg-brand-dark">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+                <div data-aos="fade-right">
+                    <h2 class="text-brand-gold font-black uppercase tracking-[0.3em] text-sm mb-4">Infraestrutura</h2>
+                    <h3 class="text-4xl md:text-6xl font-display font-extrabold mb-8 leading-tight">Um Arsenal Completo para sua Agência.</h3>
+                    
+                    <div class="space-y-8">
+                        <div class="flex items-start gap-6 p-6 rounded-3xl hover:bg-white/5 transition-all">
+                            <div class="w-14 h-14 rounded-2xl bg-brand-surface flex items-center justify-center flex-shrink-0">
+                                <i class="ph-duotone ph-layout text-3xl text-brand-gold"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Portal da Agência 3.0</h4>
+                                <p class="text-brand-gray">Monitore lucros, MRR e saúde financeira de cada cliente em um painel analítico de alta performance.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-6 p-6 rounded-3xl hover:bg-white/5 transition-all">
+                            <div class="w-14 h-14 rounded-2xl bg-brand-surface flex items-center justify-center flex-shrink-0">
+                                <i class="ph-duotone ph-palette text-3xl text-brand-gold"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Puro White-Label</h4>
+                                <p class="text-brand-gray">Customização cirúrgica. Domínios próprios, logos, cores e e-mails transacionais com a sua marca.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-6 p-6 rounded-3xl hover:bg-white/5 transition-all">
+                            <div class="w-14 h-14 rounded-2xl bg-brand-surface flex items-center justify-center flex-shrink-0">
+                                <i class="ph-duotone ph-chart-line-up text-3xl text-brand-gold"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Markup Dinâmico</h4>
+                                <p class="text-brand-gray">Flexibilidade total. Defina o quanto quer lucrar sobre cada ferramenta individualmente.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative" data-aos="fade-left">
+                    <div class="absolute -inset-20 bg-brand-gold/10 blur-[150px] rounded-full animate-pulse-slow"></div>
+                    <div class="premium-card rounded-[3rem] p-4 relative border-white/10">
+                        <div class="bg-brand-black/90 rounded-[2.5rem] p-8 aspect-square flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <div class="space-y-2">
+                                    <div class="w-32 h-6 bg-white/10 rounded-full"></div>
+                                    <div class="w-20 h-4 bg-white/5 rounded-full"></div>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-trend-up text-brand-gold text-2xl"></i>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="h-32 bg-white/5 rounded-3xl p-6">
+                                    <div class="text-xs uppercase text-brand-gray mb-2">MRR</div>
+                                    <div class="text-2xl font-black">R$ 45k</div>
+                                </div>
+                                <div class="h-32 bg-brand-gold text-black rounded-3xl p-6">
+                                    <div class="text-xs uppercase font-bold opacity-70 mb-2">Lucro</div>
+                                    <div class="text-2xl font-black">R$ 12k</div>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="h-4 bg-white/10 rounded-full w-full"></div>
+                                <div class="h-4 bg-white/10 rounded-full w-4/5"></div>
+                                <div class="h-4 bg-white/10 rounded-full w-2/3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SERVICOS -->
+    <section id="servicos" class="py-32">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-24" data-aos="fade-up">
+                <h2 class="text-brand-gold font-black uppercase tracking-[0.3em] text-sm mb-4">Para seus Clientes</h2>
+                <h3 class="text-4xl md:text-6xl font-display font-extrabold mb-6">Poder de Gigante. Preço de Parceiro.</h3>
+                <p class="text-brand-gray text-xl max-w-3xl mx-auto">Toda a tecnologia de ponta da Conext entregue por você.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up">
+                    <i class="ph-duotone ph-chat-centered-text text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">WhatsApp de Elite</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Uzapi de latência zero. Centenas de conversas simultâneas com estabilidade bancária.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="50">
+                    <i class="ph-duotone ph-microphone-stage text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Voz Humana Real</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Powered by ElevenLabs. Áudios que transmitem emoção e fecham vendas sozinhos.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="100">
+                    <i class="ph-duotone ph-brain text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Treinamento Rápido</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Treine a IA com URLs ou PDFs em segundos. Conhecimento infinito em instantes.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="150">
+                    <i class="ph-duotone ph-calendar text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Agendamento IA</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Conexão nativa com Google Calendar. Marcação de consultas sem erro humano.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="200">
+                    <i class="ph-duotone ph-funnel text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">CRM Visual Inteligente</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Movimentação automática de leads baseado no sentimento da conversa.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="250">
+                    <i class="ph-duotone ph-credit-card text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Split de Pagamentos</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Recebimentos via Asaas com divisão automática de comissões para parceiros.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="300">
+                    <i class="ph-duotone ph-eye text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Supervisor AI</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Monitoramento tático em tempo real. A IA sugere melhorias para o bot continuamente.</p>
+                </div>
+                <div class="premium-card p-8 rounded-3xl group" data-aos="fade-up" data-aos-delay="350">
+                    <i class="ph-duotone ph-pencil-circle text-5xl text-brand-gold mb-6 transition-transform group-hover:scale-110"></i>
+                    <h4 class="text-xl font-bold mb-3">Conext Writer</h4>
+                    <p class="text-brand-gray text-sm leading-relaxed">Geração de posts de alta conversão e SEO otimizado direto no WordPress.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AGENCIA HUB -->
+    <section class="py-32 relative overflow-hidden bg-gradient-to-b from-brand-black to-brand-dark">
+        <div class="container mx-auto px-6">
+            <div class="premium-card rounded-[4rem] p-12 md:p-20 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-1/2 h-full bg-brand-gold/5 blur-[120px] rounded-full translate-x-1/2"></div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative z-10">
+                    <div>
+                        <h2 class="text-brand-gold font-black uppercase tracking-[0.3em] text-sm mb-6">A Agência como Plataforma</h2>
+                        <h3 class="text-4xl md:text-6xl font-display font-extrabold mb-8 leading-tight">
+                            Não somos apenas uma ferramenta. <br>
+                            <span class="gold-gradient">Somos o seu motor.</span>
+                        </h3>
+                        <p class="text-xl text-brand-gray mb-10 leading-relaxed">
+                            A Conext é o sistema operacional da sua agência. Una a força de uma marca própria **White-Label** com o máximo de **Eficiência Operacional** através de múltiplos agentes de IA.
+                        </p>
+                        
+                        <ul class="space-y-6">
+                            <li class="flex items-center gap-4 text-white font-medium">
+                                <div class="w-6 h-6 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-check text-brand-gold text-xs"></i>
+                                </div>
+                                Gestão Centralizada de Múltiplos Clientes
+                            </li>
+                            <li class="flex items-center gap-4 text-white font-medium">
+                                <div class="w-6 h-6 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-check text-brand-gold text-xs"></i>
+                                </div>
+                                Faturamento e Cobrança Automatizada (Asaas)
+                            </li>
+                            <li class="flex items-center gap-4 text-white font-medium">
+                                <div class="w-6 h-6 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-check text-brand-gold text-xs"></i>
+                                </div>
+                                Onboarding Automatizado e Supervisão de Agentes
+                            </li>
+                            <li class="flex items-center gap-4 text-white font-medium">
+                                <div class="w-6 h-6 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-check text-brand-gold text-xs"></i>
+                                </div>
+                                Automação total dos processos internos da agência
+                            </li>
+                            <li class="flex items-center gap-4 text-white font-medium">
+                                <div class="w-6 h-6 rounded-full bg-brand-gold/20 flex items-center justify-center">
+                                    <i class="ph ph-check text-brand-gold text-xs"></i>
+                                </div>
+                                Supervisão de IA para Garantia de Qualidade
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[2rem] text-center transform hover:-translate-y-2 transition-all">
+                            <div class="text-4xl font-black mb-2 gold-gradient">80%</div>
+                            <p class="text-xs text-brand-gray uppercase font-bold tracking-widest">Redução de Custos</p>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[2rem] text-center transform translate-y-8 hover:translate-y-6 transition-all">
+                            <div class="text-4xl font-black mb-2 gold-gradient">10x</div>
+                            <p class="text-xs text-brand-gray uppercase font-bold tracking-widest">Mais Velocidade</p>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[2rem] text-center transform hover:-translate-y-2 transition-all">
+                            <div class="text-4xl font-black mb-2 gold-gradient">24/7</div>
+                            <p class="text-xs text-brand-gray uppercase font-bold tracking-widest">Operação Ativa</p>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[2rem] text-center transform translate-y-8 hover:translate-y-6 transition-all">
+                            <div class="text-4xl font-black mb-2 gold-gradient">∞</div>
+                            <p class="text-xs text-brand-gray uppercase font-bold tracking-widest">Escala Infinita</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TIERS -->
+    <section class="py-32 bg-brand-dark relative overflow-hidden">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-24" data-aos="fade-up">
+                <h2 class="text-brand-gold font-black uppercase tracking-[0.3em] text-sm mb-4">Parceria de Crescimento</h2>
+                <h3 class="text-4xl md:text-6xl font-display font-extrabold mb-6">Escala Reversa.</h3>
+                <p class="text-brand-gray text-xl max-w-2xl mx-auto">Quanto mais você fatura, menos nós cobramos. O lucro é seu por direito.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="tier-card p-10 border border-white/5 transition-all hover:border-[#CD7F32]/50 group" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="text-[#CD7F32] font-black uppercase tracking-widest text-xs mb-10 flex items-center">
+                        <i class="ph-fill ph-medal text-xl mr-2"></i> Bronze
+                    </div>
+                    <div class="text-6xl font-display font-black mb-4">20%</div>
+                    <p class="text-brand-gray text-sm mb-10">Até R$ 5k/mês MRR</p>
+                    <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div class="w-1/4 h-full bg-[#CD7F32]"></div>
+                    </div>
+                </div>
+
+                <div class="tier-card p-10 border border-white/5 transition-all hover:border-[#C0C0C0]/50" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="text-[#C0C0C0] font-black uppercase tracking-widest text-xs mb-10 flex items-center">
+                        <i class="ph-fill ph-medal text-xl mr-2"></i> Prata
+                    </div>
+                    <div class="text-6xl font-display font-black mb-4">15%</div>
+                    <p class="text-brand-gray text-sm mb-10">R$ 5k - R$ 15k MRR</p>
+                    <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div class="w-1/2 h-full bg-[#C0C0C0]"></div>
+                    </div>
+                </div>
+
+                <div class="tier-card p-10 border border-brand-gold/30 shadow-[0_0_50px_rgba(255,193,7,0.1)] relative" data-aos="zoom-in" data-aos-delay="300">
+                    <div class="absolute top-0 right-0 bg-brand-gold text-black px-4 py-1 text-[10px] font-black uppercase rounded-bl-xl tracking-tighter">Mais Popular</div>
+                    <div class="text-brand-gold font-black uppercase tracking-widest text-xs mb-10 flex items-center">
+                        <i class="ph-fill ph-medal text-xl mr-2"></i> Ouro
+                    </div>
+                    <div class="text-6xl font-display font-black mb-4 gold-gradient">10%</div>
+                    <p class="text-brand-gray text-sm mb-10">R$ 15k - R$ 50k MRR</p>
+                    <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div class="w-3/4 h-full bg-brand-gold"></div>
+                    </div>
+                </div>
+
+                <div class="tier-card p-10 border border-white/5 transition-all hover:border-[#b9f2ff]/50" data-aos="zoom-in" data-aos-delay="400">
+                    <div class="text-[#b9f2ff] font-black uppercase tracking-widest text-xs mb-10 flex items-center">
+                        <i class="ph-fill ph-sketch-logo text-xl mr-2"></i> Diamante
+                    </div>
+                    <div class="text-6xl font-display font-black mb-4 text-white">5%</div>
+                    <p class="text-brand-gray text-sm mb-10">Acima de R$ 50k MRR</p>
+                    <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div class="w-full h-full bg-[#b9f2ff]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- INTEGRATIONS -->
+    <section id="integracoes" class="py-32 relative overflow-hidden bg-brand-black border-y border-white/5">
+        <div class="container mx-auto px-6 text-center">
+            <h3 class="text-2xl font-bold mb-20 text-white/40 uppercase tracking-[0.4em]">Ecossistema Global de Integrações</h3>
+            
+            <div class="relative flex overflow-x-hidden">
+                <!-- Primeiro Grupo de Logos -->
+                <div class="py-12 animate-marquee flex items-center gap-20 whitespace-nowrap flex-shrink-0">
+                    <img src="https://cdn.simpleicons.org/whatsapp/white" alt="WhatsApp" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/mercadolivre/white" alt="Mercado Livre" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/instagram/white" alt="Instagram" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googleads/white" alt="Google Ads" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/semrush/white" alt="Semrush" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/openai/white" alt="OpenAI" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googlegemini/white" alt="Gemini" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/stripe/white" alt="Stripe" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googlecalendar/white" alt="Calendar" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/n8n/white" alt="n8n" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/chatwoot/white" alt="ChatWoot" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/elevenlabs/white" alt="ElevenLabs" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/postgresql/white" alt="PostgreSQL" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/nextdotjs/white" alt="Next.js" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://openrouter.ai/favicon.ico" alt="OpenRouter" class="h-8 w-auto opacity-40 hover:opacity-100 invert brightness-0 transition-all">
+                    <img src="https://dataforseo.com/wp-content/themes/dataforseo/img/logo.svg" alt="DataForSEO" class="h-6 w-auto opacity-40 hover:opacity-100 grayscale invert brightness-0 transition-all">
+                    <img src="https://logo.clearbit.com/asaas.com" alt="Asaas" class="h-8 w-auto opacity-40 grayscale invert brightness-0 hover:opacity-100 transition-all">
+                    <img src="integrations/uzapi.png" alt="Uzapi" class="h-8 w-auto opacity-40 hover:opacity-100 invert brightness-0 transition-all">
+                    <img src="integrations/conext.svg" alt="Conext" class="h-8 w-auto opacity-40 hover:opacity-100 transition-all">
+                </div>
+
+                <!-- Segundo Grupo (Clone para loop infinito) -->
+                <div class="py-12 animate-marquee flex items-center gap-20 whitespace-nowrap flex-shrink-0">
+                    <img src="https://cdn.simpleicons.org/whatsapp/white" alt="WhatsApp" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/wordpress/white" alt="WordPress" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/mercadolivre/white" alt="Mercado Livre" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/instagram/white" alt="Instagram" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googleads/white" alt="Google Ads" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/semrush/white" alt="Semrush" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/openai/white" alt="OpenAI" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googlegemini/white" alt="Gemini" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/stripe/white" alt="Stripe" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/googlecalendar/white" alt="Calendar" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/n8n/white" alt="n8n" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/chatwoot/white" alt="ChatWoot" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/elevenlabs/white" alt="ElevenLabs" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/postgresql/white" alt="PostgreSQL" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://cdn.simpleicons.org/nextdotjs/white" alt="Next.js" class="h-10 w-auto opacity-40 hover:opacity-100 transition-all">
+                    <img src="https://openrouter.ai/favicon.ico" alt="OpenRouter" class="h-8 w-auto opacity-40 hover:opacity-100 invert brightness-0 transition-all">
+                    <img src="https://dataforseo.com/wp-content/themes/dataforseo/img/logo.svg" alt="DataForSEO" class="h-6 w-auto opacity-40 hover:opacity-100 grayscale invert brightness-0 transition-all">
+                    <img src="https://logo.clearbit.com/asaas.com" alt="Asaas" class="h-8 w-auto opacity-40 grayscale invert brightness-0 hover:opacity-100 transition-all">
+                    <img src="integrations/uzapi.png" alt="Uzapi" class="h-8 w-auto opacity-40 hover:opacity-100 invert brightness-0 transition-all">
+                    <img src="integrations/conext.svg" alt="Conext" class="h-8 w-auto opacity-40 hover:opacity-100 transition-all">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="py-32 relative">
+        <div class="absolute inset-0 bg-brand-gold/10 blur-[150px] rounded-full translate-y-1/2"></div>
+        <div class="container mx-auto px-6 text-center relative z-10">
+            <h2 class="text-5xl md:text-8xl font-display font-black mb-12" data-aos="zoom-in">
+                O Próximo Unicórnio <br>
+                <span class="gold-gradient">pode ser o seu.</span>
+            </h2>
+            <p class="text-xl text-brand-gray mb-12 max-w-2xl mx-auto">Comece sua jornada tecnológica hoje. Sem riscos, apenas potencial infinito.</p>
+            <a href="#" class="bg-white text-black px-16 py-7 rounded-3xl font-display font-extrabold text-2xl transition-all hover:bg-brand-gold hover:scale-110 shadow-[0_0_100px_rgba(255,193,7,0.2)]">
+                Lançar Minha Agência Agora
+            </a>
+            <div class="mt-8 text-brand-gray font-bold uppercase tracking-widest text-xs">Acesso Gratuito por Tempo Limitado</div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="py-20 border-t border-white/5 bg-brand-black">
+        <div class="container mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-3 mb-8 md:mb-0">
+                    <svg class="h-8 w-auto text-brand-gold" viewBox="0 0 100 100" fill="none">
+                         <path d="M30 75L15 60L55 20L75 40L60 55L45 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                         <circle cx="75" cy="40" r="4" fill="currentColor"/>
+                    </svg>
+                    <span class="text-xl font-display font-bold">Conext</span>
+                </div>
+                
+                <div class="text-brand-gray text-sm space-x-8 mb-8 md:mb-0">
+                    <a href="#" class="hover:text-brand-gold">Privacidade</a>
+                    <a href="#" class="hover:text-brand-gold">Termos</a>
+                    <a href="#" class="hover:text-brand-gold">Suporte</a>
+                </div>
+
+                <div class="flex space-x-4">
+                    <a href="#" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brand-gold hover:text-black transition-all">
+                        <i class="ph ph-instagram-logo"></i>
+                    </a>
+                    <a href="#" class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-brand-gold hover:text-black transition-all">
+                        <i class="ph ph-linkedin-logo"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="text-center mt-12 text-brand-gray text-xs opacity-50 uppercase tracking-widest">
+                © 2025 Conext AI Infrastructure — Conectando Ideias. Gerando Futuro.
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({ duration: 1000, once: true });
+
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.speed = Math.random() * 0.5 + 0.1;
+                this.life = Math.random() * 100;
+                this.opacity = Math.random() * 0.5;
+            }
+            update() {
+                this.y -= this.speed;
+                this.life -= 0.1;
+                if (this.life <= 0) this.reset();
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 1, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 193, 7, ${this.opacity})`;
+                ctx.fill();
+            }
+        }
+
+        function initCanvas() {
+            resize();
+            for (let i = 0; i < 150; i++) particles.push(new Particle());
+            render();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(render);
+        }
+
+        window.addEventListener('resize', resize);
+        initCanvas();
+
+        window.addEventListener('scroll', () => {
+            const header = document.getElementById('header');
+            if (window.scrollY > 100) {
+                header.classList.add('bg-brand-black/90', 'backdrop-blur-xl', 'py-4', 'border-b', 'border-white/5');
+                header.classList.remove('py-6');
+            } else {
+                header.classList.remove('bg-brand-black/90', 'backdrop-blur-xl', 'py-4', 'border-b', 'border-white/5');
+                header.classList.add('py-6');
+            }
+        });
+    </script>
+</body>
+</html>

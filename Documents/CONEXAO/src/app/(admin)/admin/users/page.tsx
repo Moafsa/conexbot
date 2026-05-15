@@ -359,6 +359,7 @@ export default function UsersAdminPage() {
                                                 className="w-full mt-2 bg-[#0a0a0a] border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-blue-500 outline-none transition-all"
                                             >
                                                 <option value="USER">USUÁRIO COMUM</option>
+                                                <option value="AGENCY">AGÊNCIA PARCEIRA</option>
                                                 <option value="ADMIN">ADMINISTRADOR</option>
                                                 <option value="SUPERADMIN">SUPER ADMIN</option>
                                             </select>

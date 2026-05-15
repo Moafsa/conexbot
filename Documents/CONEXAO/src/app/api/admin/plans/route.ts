@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         console.log('[API /admin/plans POST] Received body:', JSON.stringify(body, null, 2));
 
-        const { name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features } = body;
+        const { name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features, productId } = body;
         
         const parseNum = (val: any) => {
             const num = Number(val);
@@ -69,7 +69,8 @@ export async function POST(request: Request) {
                 externalId,
                 platformSplitType,
                 platformSplitValue: parseNum(platformSplitValue),
-                features: features || []
+                features: features || [],
+                productCatalogId: productId || null
             }
         });
 
@@ -94,7 +95,7 @@ export async function PUT(request: Request) {
         const body = await request.json();
         console.log('[API /admin/plans PUT] Received body:', JSON.stringify(body, null, 2));
 
-        const { id, name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features } = body;
+        const { id, name, description, price, priceQuarterly, priceSemiannual, priceYearly, trialDays, botLimit, messageLimit, postLimit, wordLimit, type, active, externalId, platformSplitType, platformSplitValue, features, productId } = body;
         
         if (!id) {
             return NextResponse.json({ error: 'Missing ID' }, { status: 400 });
@@ -130,7 +131,8 @@ export async function PUT(request: Request) {
                 externalId,
                 platformSplitType,
                 platformSplitValue: parseNum(platformSplitValue),
-                features: features || []
+                features: features || [],
+                productCatalogId: productId || null
             }
         });
 

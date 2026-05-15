@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     ShoppingBag,
-    MessageSquare,
+    MessageCircle,
     Settings,
     BarChart3,
     ArrowLeft,
@@ -109,57 +109,57 @@ export default function BotDetailsPage() {
     if (!bot) return null;
 
     return (
-        <div className="space-y-6 animate-fade-in pb-10">
+        <div className="space-y-8 animate-fade-in pb-10">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
                     <button
                         onClick={() => router.push("/dashboard/bots")}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition text-gray-500"
+                        className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl transition-all text-gray-400 border border-white/5"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-800">{bot.name}</h1>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                            <span className={`w-2 h-2 rounded-full ${bot.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                        <h1 className="text-3xl font-black text-white tracking-tight">{bot.name}</h1>
+                        <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-gray-500 mt-1">
+                            <span className={`w-2 h-2 rounded-full ${bot.status === 'active' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-gray-600'}`}></span>
                             {bot.businessType} • {bot.sessionName ? "Online" : "Offline"}
                         </div>
                     </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <button
                         onClick={handleToggleStatus}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
                             bot.status === 'active' 
-                            ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20' 
-                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20' 
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
                         }`}
                     >
-                        {bot.status === 'active' ? <Zap className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+                        {bot.status === 'active' ? <Zap size={14} className="fill-current" /> : <Pause size={14} className="fill-current" />}
                         {bot.status === 'active' ? 'Ativo' : 'Pausado'}
                     </button>
                     <button
                         onClick={() => router.push(`/dashboard/create-bot?id=${botId}`)}
-                        className="btn-secondary flex items-center gap-2"
+                        className="h-10 px-4 bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-bold rounded-xl border border-white/10 transition-all flex items-center gap-2"
                     >
-                        <Settings className="w-4 h-4" />
+                        <Settings size={14} />
                         Configurar
                     </button>
                     <button
                         onClick={() => router.push("/dashboard/connect")}
-                        className="btn-primary flex items-center gap-2"
+                        className="h-10 px-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                     >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw size={14} />
                         Conexão
                     </button>
                     {bot.connectionStatus === 'CONNECTED' && (
                         <button
                             onClick={handleDisconnect}
-                            className="bg-red-500/10 hover:bg-red-500/20 text-red-600 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-red-500/20"
+                            className="h-10 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold rounded-xl border border-red-500/20 transition-all flex items-center gap-2"
                         >
-                            <LogOut className="w-4 h-4" />
+                            <LogOut size={14} />
                             Desconectar
                         </button>
                     )}
@@ -167,73 +167,82 @@ export default function BotDetailsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1 flex gap-1 overflow-x-auto">
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/5 w-full overflow-x-auto custom-scrollbar snap-x no-scrollbar">
                 <TabButton
                     active={activeTab === "overview"}
                     onClick={() => setActiveTab("overview")}
-                    icon={<BarChart3 className="w-4 h-4" />}
+                    icon={<BarChart3 size={16} />}
                     label="Visão Geral"
                 />
                 <TabButton
                     active={activeTab === "products"}
                     onClick={() => setActiveTab("products")}
-                    icon={<ShoppingBag className="w-4 h-4" />}
+                    icon={<ShoppingBag size={16} />}
                     label="Catálogo"
                 />
                 <TabButton
                     active={activeTab === "coupons"}
                     onClick={() => setActiveTab("coupons")}
-                    icon={<Ticket className="w-4 h-4" />}
+                    icon={<Ticket size={16} />}
                     label="Cupons"
                 />
                 <TabButton
                     active={activeTab === "media"}
                     onClick={() => setActiveTab("media")}
-                    icon={<FileText className="w-4 h-4" />}
-                    label="Materiais (PDF/Vídeo)"
+                    icon={<FileText size={16} />}
+                    label="Materiais"
                 />
                 <TabButton
                     active={activeTab === "simulator"}
                     onClick={() => setActiveTab("simulator")}
-                    icon={<MessageSquare className="w-4 h-4" />}
+                    icon={<MessageCircle size={16} />}
                     label="Simulador"
                 />
                 <TabButton
                     active={activeTab === "crm"}
                     onClick={() => setActiveTab("crm")}
-                    icon={<Users className="w-4 h-4" />}
+                    icon={<Users size={16} />}
                     label="CRM (Clientes)"
                 />
                 <TabButton
                     active={activeTab === "agenda"}
                     onClick={() => setActiveTab("agenda")}
-                    icon={<Calendar className="w-4 h-4" />}
+                    icon={<Calendar size={16} />}
                     label="Agenda"
                 />
                 <TabButton
                     active={activeTab === "security"}
                     onClick={() => setActiveTab("security")}
-                    icon={<ShieldAlert className="w-4 h-4" />}
+                    icon={<ShieldAlert size={16} />}
                     label="Segurança"
                 />
             </div>
 
             {/* Content */}
-            <div className="min-h-[400px]">
+            <div className="min-h-[500px]">
                 {activeTab === "overview" && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-gray-500 text-sm font-medium mb-1">Total de Conversas</h3>
-                            <p className="text-3xl font-bold text-gray-800">{bot._count?.conversations || 0}</p>
+                        <div className="bg-white/5 p-8 rounded-3xl border border-white/5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <MessageCircle size={100} />
+                            </div>
+                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Total de Conversas</h3>
+                            <p className="text-4xl font-black text-white leading-none">{bot._count?.conversations || 0}</p>
                         </div>
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-gray-500 text-sm font-medium mb-1">Total de Vendas</h3>
-                            <p className="text-3xl font-bold text-gray-800">R$ 0,00</p>
-                            <p className="text-xs text-gray-400 mt-1">Em desenvolvimento</p>
+                        <div className="bg-white/5 p-8 rounded-3xl border border-white/5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <Zap size={100} />
+                            </div>
+                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Total de Vendas</h3>
+                            <p className="text-4xl font-black text-emerald-400 leading-none">R$ 0,00</p>
+                            <p className="text-[10px] text-gray-600 font-bold uppercase tracking-tighter mt-2">Em desenvolvimento</p>
                         </div>
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-gray-500 text-sm font-medium mb-1">Produtos Ativos</h3>
-                            <p className="text-3xl font-bold text-gray-800">{bot._count?.products || 0}</p>
+                        <div className="bg-white/5 p-8 rounded-3xl border border-white/5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <ShoppingBag size={100} />
+                            </div>
+                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Produtos Ativos</h3>
+                            <p className="text-4xl font-black text-white leading-none">{bot._count?.products || 0}</p>
                         </div>
                     </div>
                 )}
@@ -251,21 +260,39 @@ export default function BotDetailsPage() {
                 )}
 
                 {activeTab === "simulator" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <div className="lg:col-span-3">
                             <Simulator botId={botId} />
                         </div>
-                        <div className="space-y-4">
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                <h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                                    <Zap className="w-4 h-4" />
+                        <div className="space-y-6">
+                            <div className="bg-emerald-500/5 p-6 rounded-[32px] border border-emerald-500/10 relative overflow-hidden">
+                                <div className="absolute -top-4 -right-4 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
+                                <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Zap size={14} className="fill-current" />
                                     Dicas de Teste
                                 </h3>
-                                <ul className="text-sm text-blue-700 space-y-2 list-disc pl-4">
-                                    <li>Pergunte o preço dos produtos que você cadastrou.</li>
-                                    <li>Tente negociar para ver a reação de vendas.</li>
-                                    <li>Pergunte sobre a empresa para testar a personalidade.</li>
+                                <ul className="text-sm text-gray-400 space-y-4">
+                                    <li className="flex gap-3">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
+                                        Pergunte o preço dos produtos que você cadastrou.
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
+                                        Tente negociar para ver a reação de vendas.
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
+                                        Pergunte sobre a empresa para testar a personalidade.
+                                    </li>
                                 </ul>
+                            </div>
+
+                            <div className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Satus do Agente</h3>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                    <span className="text-xs font-bold text-gray-300">Pronto para conversão</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -291,9 +318,9 @@ function TabButton({ active, onClick, icon, label }: any) {
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${active
-                ? "bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-100"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap snap-center ${active
+                ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
+                : "text-gray-500 hover:text-white hover:bg-white/5"
                 }`}
         >
             {icon}

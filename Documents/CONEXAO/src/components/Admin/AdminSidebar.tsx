@@ -13,7 +13,9 @@ import {
     ChevronLeft, 
     ChevronRight,
     LogOut,
-    Shield
+    Shield,
+    Handshake,
+    ShoppingBag
 } from "lucide-react";
 
 export default function AdminSidebar() {
@@ -25,6 +27,8 @@ export default function AdminSidebar() {
         { name: "Usuários", href: "/admin/users", icon: Users },
         { name: "Planos", href: "/admin/plans", icon: Package },
         { name: "Pagamentos", href: "/admin/payments", icon: CreditCard },
+        { name: "Gestão de Agências", href: "/admin/agencies", icon: Handshake },
+        { name: "Marketplace", href: "/admin/marketplace", icon: ShoppingBag },
         { name: "Meu Perfil", href: "/admin/profile", icon: UserCircle },
         { name: "Configurações", href: "/admin/settings", icon: Settings },
     ];

@@ -3,7 +3,7 @@
 import { Bot, Plus, MoreVertical, MessageSquare, Play, Zap, RefreshCw, Trash2, Settings, Edit, X, LogOut, Share2, Pause } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 export default function BotsPage() {
@@ -11,14 +11,19 @@ export default function BotsPage() {
     const [loading, setLoading] = useState(true);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const clientId = searchParams.get("clientId");
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const fetchBots = async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/bots');
+            const res = await fetch(`/api/bots${clientId ? `?clientId=${clientId}` : ''}`);
             const data = await res.json();
-            if (Array.isArray(data)) setBots(data);
+            if (Array.isArray(data)) {
+                // Filter out system bots from the general listing
+                setBots(data.filter((b: any) => b.businessType !== 'SYSTEM_DISPATCH'));
+            }
         } catch (err) {
             console.error('Error fetching bots:', err);
         } finally {
@@ -186,8 +191,13 @@ export default function BotsPage() {
         <div className="p-4 md:p-8 space-y-8" onClick={() => setOpenDropdown(null)}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Meus Agentes</h1>
-                    <p className="text-gray-400">Gerencie seus bots ativos e configurações.</p>
+                    <h1 className="text-2xl font-bold flex items-center gap-3">
+                        {clientId && <Bot className="text-indigo-500 animate-pulse" />}
+                        {clientId ? 'Gerenciando Agentes do Cliente' : 'Meus Agentes'}
+                    </h1>
+                    <p className="text-gray-400">
+                        {clientId ? `Você está configurando a infraestrutura para o cliente ID: ${clientId}` : 'Gerencie seus bots ativos e configurações.'}
+                    </p>
                 </div>
                 <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
                     <button
@@ -198,7 +208,7 @@ export default function BotsPage() {
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         <span>Atualizar</span>
                     </button>
-                    <Link href="/dashboard/create-bot" className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
+                    <Link href={`/dashboard/create-bot${clientId ? `?clientId=${clientId}` : ''}`} className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
                         <Plus size={18} />
                         <span>Novo Agente</span>
                     </Link>
@@ -241,7 +251,7 @@ export default function BotsPage() {
                                         >
                                             <div className="p-1">
                                                 <Link
-                                                    href={`/dashboard/bots/${bot.id}`}
+                                                    href={`/dashboard/bots/${bot.id}${clientId ? `?clientId=${clientId}` : ''}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Settings size={16} />
@@ -255,7 +265,7 @@ export default function BotsPage() {
                                                     Duplicar
                                                 </button>
                                                 <Link
-                                                    href={`/dashboard/create-bot?id=${bot.id}`}
+                                                    href={`/dashboard/create-bot?id=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Edit size={16} />
@@ -344,7 +354,7 @@ export default function BotsPage() {
                                 {bot.sessionName ? (
                                     <>
                                         <Link
-                                            href={`/dashboard/bots/${bot.id}`}
+                                            href={`/dashboard/bots/${bot.id}${clientId ? `?clientId=${clientId}` : ''}`}
                                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                         >
                                             <MessageSquare size={16} />
@@ -354,7 +364,7 @@ export default function BotsPage() {
                                 ) : (
                                     <>
                                         <Link
-                                            href={`/dashboard/connect?botId=${bot.id}`}
+                                            href={`/dashboard/connect?botId=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`}
                                             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors text-center"
                                         >
                                             Conectar WhatsApp
@@ -385,7 +395,7 @@ export default function BotsPage() {
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/dashboard/create-bot?id=${bot.id}`);
+                                        router.push(`/dashboard/create-bot?id=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`);
                                     }}
                                     title="Configurações Rápidas"
                                 >

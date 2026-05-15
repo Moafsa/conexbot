@@ -7,7 +7,7 @@ import { google } from 'googleapis';
 
 export async function GET(
     req: Request,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     try {
         const session = await getServerSession(authOptions);

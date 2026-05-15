@@ -10,7 +10,7 @@ export const MetaPostService = {
             include: { tenant: true }
         });
 
-        if (!post || !post.imageUrl || !post.tenant.metaAdsToken) {
+        if (!post || (!post.imageUrl && !post.videoUrl) || !post.tenant.metaAdsToken) {
             throw new Error("Post incompleto ou token Meta não configurado.");
         }
 
@@ -22,13 +22,21 @@ export const MetaPostService = {
         const igUserId = "YOUR_INSTAGRAM_BUSINESS_ID"; 
 
         const containerUrl = `https://graph.facebook.com/v22.0/${igUserId}/media`;
+        const params: Record<string, string> = {
+            caption: post.content,
+            access_token: post.tenant.metaAdsToken
+        };
+
+        if (post.mediaType === "VIDEO" || post.videoUrl) {
+            params.video_url = post.videoUrl!;
+            params.media_type = "REELS"; // Padrão para vídeos curtos/reels
+        } else {
+            params.image_url = post.imageUrl!;
+        }
+
         const containerRes = await fetch(containerUrl, {
             method: "POST",
-            body: new URLSearchParams({
-                image_url: post.imageUrl,
-                caption: post.content,
-                access_token: post.tenant.metaAdsToken
-            })
+            body: new URLSearchParams(params)
         });
         const containerData = await containerRes.json();
         
