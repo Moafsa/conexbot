@@ -605,6 +605,7 @@ model Agency {
   salesVolumeCurrentMonth Float           @default(0)
   salesVolumeLifetime     Float           @default(0)
   currentFee              Float           @default(20.0)
+  status                  String          @default("PENDING")
   asaasWalletId           String?
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt

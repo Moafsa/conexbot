@@ -60,7 +60,7 @@ export default function Navbar({ branding }: { branding?: any }) {
 
                 {/* Right Side */}
                 <div className="flex items-center space-x-8">
-                    <Link href="/auth/register" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+                    <Link href="/auth/register?isAgency=true" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)]">
                         Começar Grátis
                     </Link>
 

@@ -18,11 +18,13 @@ export default function RegisterPage() {
     const gateway = searchParams.get("gateway");
     const type = searchParams.get("type");
 
+    const isAgency = searchParams.get("isAgency") === "true";
+
     useEffect(() => {
-        if (!planId) {
+        if (!planId && !isAgency) {
             router.push("/pricing");
         }
-    }, [planId, router]);
+    }, [planId, isAgency, router]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -42,7 +44,8 @@ export default function RegisterPage() {
                     planId,
                     interval,
                     trial,
-                    type
+                    type,
+                    isAgency
                 }),
             });
 
@@ -67,7 +70,9 @@ export default function RegisterPage() {
             }
 
             // Redirect based on plan selection
-            if (trial === 'true' && planId) {
+            if (isAgency) {
+                router.push("/dashboard?welcome=true&pending=true");
+            } else if (trial === 'true' && planId) {
                 router.push("/dashboard?welcome=true");
             } else if (planId) {
                 router.push(`/api/checkout/portal?planId=${planId}&interval=${interval || 'MONTHLY'}&gateway=${gateway || 'asaas'}`);

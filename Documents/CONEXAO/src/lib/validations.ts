@@ -12,6 +12,7 @@ export const registerSchema = z.object({
     interval: z.enum(['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY']).nullable().optional(),
     trial: z.string().nullable().optional(), // Comes as string boolean from URL
     type: z.enum(['PRIMARY', 'WRITER_PLUGIN']).optional().default('PRIMARY'),
+    isAgency: z.union([z.boolean(), z.string()]).optional(),
 });
 
 export const loginSchema = z.object({

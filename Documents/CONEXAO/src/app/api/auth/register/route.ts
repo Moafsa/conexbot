@@ -15,9 +15,9 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type } = parsed.data;
+        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type, isAgency } = parsed.data;
 
-        if (!planId) {
+        if (!planId && !isAgency) {
             return NextResponse.json(
                 { error: 'Um plano deve ser selecionado para criar a conta.' },
                 { status: 400 }
@@ -72,6 +72,13 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
+                role: isAgency ? 'AGENCY' : 'USER',
+                agency: isAgency ? {
+                    create: {
+                        status: 'PENDING',
+                        currentFee: 20.0
+                    }
+                } : undefined,
                 subscriptions: plan ? {
                     create: {
                         planId: plan.id,
@@ -87,8 +94,8 @@ export async function POST(req: Request) {
                 } : undefined,
                 usageCounter: {
                     create: {
-                        messagesLimit: plan?.messageLimit || 5000,
-                        botsLimit: plan?.botLimit || 1,
+                        messagesLimit: isAgency ? 50000 : (plan?.messageLimit || 5000),
+                        botsLimit: isAgency ? 20 : (plan?.botLimit || 1),
                         periodEnd: new Date(Date.now() + (trial === 'true' && plan ? plan.trialDays : 30) * 24 * 60 * 60 * 1000)
                     }
                 }

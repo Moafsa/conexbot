@@ -47,7 +47,8 @@ export default async function DashboardLayout({
                     subscriptions: {
                         include: { licenseKeys: true }
                     }, 
-                    usageCounter: true 
+                    usageCounter: true,
+                    agency: true
                 }
             });
         } else {
@@ -58,13 +59,39 @@ export default async function DashboardLayout({
                     subscriptions: {
                         include: { licenseKeys: true }
                     }, 
-                    usageCounter: true 
+                    usageCounter: true,
+                    agency: true
                 }
             });
         }
         
-        // Let SUPERADMIN, ADMIN, and AGENCY pass without sub check.
+        // Let SUPERADMIN, ADMIN pass without sub check.
+        // For AGENCY, check if approved.
         // For normal users, require at least one subscription.
+
+        if (tenant && tenant.role === 'AGENCY' && !isImpersonating && tenant.agency?.status !== 'APPROVED') {
+            return (
+                <div className="min-h-screen bg-black flex items-center justify-center p-6 text-center">
+                    <div className="max-w-md space-y-6 animate-fade-in">
+                        <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto border border-indigo-500/20">
+                            <AlertTriangle size={40} className="text-indigo-500" />
+                        </div>
+                        <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Conta em Análise</h1>
+                        <p className="text-gray-400">
+                            Sua conta de agência foi criada com sucesso e está sendo analisada pelo nosso time. 
+                            Você receberá um email assim que for aprovado.
+                        </p>
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-sm text-gray-500">
+                            Status Atual: <span className="text-indigo-400 font-bold uppercase">{tenant.agency?.status || 'PENDING'}</span>
+                        </div>
+                        <Link href="/" className="block text-indigo-400 hover:text-white transition-colors font-medium">
+                            Voltar para o início
+                        </Link>
+                    </div>
+                </div>
+            );
+        }
+
         if (tenant && tenant.role === 'USER' && !isImpersonating) {
             const activeSubs = tenant.subscriptions.filter((s: any) => 
                 ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)
