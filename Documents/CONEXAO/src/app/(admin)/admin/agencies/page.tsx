@@ -9,7 +9,10 @@ import {
     UserCheck,
     CreditCard,
     MoreVertical,
-    Activity
+    Activity,
+    CheckCircle,
+    XCircle,
+    Clock
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -49,6 +52,26 @@ export default function AgenciesAdmin() {
             }
         } catch (error) {
             alert("Erro ao personificar");
+        }
+    };
+
+    const handleUpdateStatus = async (id: string, status: string) => {
+        if (!confirm(`Tem certeza que deseja marcar esta agência como ${status}?`)) return;
+        
+        try {
+            const res = await fetch("/api/admin/agencies", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, status })
+            });
+            if (res.ok) {
+                fetchAgencies();
+            } else {
+                alert("Erro ao atualizar status");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão");
         }
     };
 
@@ -93,8 +116,8 @@ export default function AgenciesAdmin() {
                             <th className="px-6 py-4">Agência / Parceiro</th>
                             <th className="px-6 py-4">Vendas (Mês)</th>
                             <th className="px-6 py-4">Taxa Atual</th>
-                            <th className="px-6 py-4">Status Meta</th>
-                            <th className="px-6 py-4 text-right">Suporte</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -121,18 +144,47 @@ export default function AgenciesAdmin() {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="w-full bg-white/5 h-2 rounded-full max-w-[100px] overflow-hidden">
-                                        <div className="bg-blue-500 h-full" style={{ width: '65%' }}></div>
-                                    </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">Meta: R$ 5.000</p>
+                                    {agency.status === 'APPROVED' ? (
+                                        <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase tracking-widest">
+                                            <CheckCircle size={14} /> Ativa
+                                        </span>
+                                    ) : agency.status === 'REJECTED' ? (
+                                        <span className="flex items-center gap-1.5 text-red-400 text-xs font-bold uppercase tracking-widest">
+                                            <XCircle size={14} /> Rejeitada
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1.5 text-amber-400 text-xs font-bold uppercase tracking-widest">
+                                            <Clock size={14} /> Pendente
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button 
-                                        onClick={() => handleImpersonate(agency.tenantId)}
-                                        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl font-bold text-xs ml-auto transition-all shadow-lg shadow-blue-500/20"
-                                    >
-                                        <UserCheck size={14} /> Acessar Painel
-                                    </button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        {agency.status !== 'APPROVED' && (
+                                            <button 
+                                                onClick={() => handleUpdateStatus(agency.id, 'APPROVED')}
+                                                className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all"
+                                                title="Aprovar Agência"
+                                            >
+                                                <CheckCircle size={18} />
+                                            </button>
+                                        )}
+                                        {agency.status === 'PENDING' && (
+                                            <button 
+                                                onClick={() => handleUpdateStatus(agency.id, 'REJECTED')}
+                                                className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all"
+                                                title="Rejeitar Agência"
+                                            >
+                                                <XCircle size={18} />
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={() => handleImpersonate(agency.tenantId)}
+                                            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-blue-500/20"
+                                        >
+                                            <UserCheck size={14} /> Acessar
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
