@@ -6,8 +6,9 @@ import prisma from '@/lib/prisma';
 import { AsaasService } from '@/services/payment/asaas';
 import { MercadoPagoService } from '@/services/payment/mercadopago';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id: clientId } = await params;
         const session = await getServerSession(authOptions);
         if (!session?.user) {
             return NextResponse.json({ error: 'Faça login para continuar' }, { status: 401 });
@@ -22,7 +23,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const agency = await prisma.agency.findUnique({ where: { tenantId: agencyTenantId } });
         if (!agency) return NextResponse.json({ error: "Not an agency" }, { status: 403 });
 
-        const clientId = params.id;
         
         // Verify the client belongs to this agency
         const client = await prisma.tenant.findUnique({
