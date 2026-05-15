@@ -21,6 +21,9 @@ export default function RegisterPage() {
     const isAgency = searchParams.get("isAgency") === "true";
 
     useEffect(() => {
+        if (isAgency) {
+            document.cookie = "is_agency_reg=true; path=/; max-age=3600";
+        }
         if (!planId && !isAgency) {
             router.push("/pricing");
         }
@@ -197,7 +200,10 @@ export default function RegisterPage() {
                     </div>
 
                     <button
-                        onClick={() => signIn("google", { callbackUrl: planId ? `/api/checkout/portal?planId=${planId}&interval=${interval || 'MONTHLY'}&gateway=${gateway || 'asaas'}` : "/dashboard" })}
+                        onClick={() => {
+                            if (isAgency) document.cookie = "is_agency_reg=true; path=/; max-age=3600";
+                            signIn("google", { callbackUrl: planId ? `/api/checkout/portal?planId=${planId}&interval=${interval || 'MONTHLY'}&gateway=${gateway || 'asaas'}` : "/dashboard" });
+                        }}
                         className="mt-6 w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
                     >
                         <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">

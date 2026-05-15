@@ -50,6 +50,10 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async signIn({ user, account, profile }) {
             if (account?.provider === 'google') {
+                const { cookies } = await import('next/headers');
+                const cookieStore = await cookies();
+                const isAgencyReg = cookieStore.get('is_agency_reg')?.value === 'true';
+
                 // Check if tenant exists, if not create one
                 const existingTenant = await prisma.tenant.findUnique({
                     where: { email: user.email! }
@@ -65,11 +69,17 @@ export const authOptions: NextAuthOptions = {
                         data: {
                             email: user.email!,
                             name: user.name,
-                            role: 'USER',
+                            role: isAgencyReg ? 'AGENCY' : 'USER',
+                            agency: isAgencyReg ? {
+                                create: {
+                                    status: 'PENDING',
+                                    currentFee: 20.0
+                                }
+                            } : undefined,
                             usageCounter: {
                                 create: {
-                                    messagesLimit: starterPlan?.messageLimit || 5000,
-                                    botsLimit: starterPlan?.botLimit || 1,
+                                    messagesLimit: isAgencyReg ? 50000 : (starterPlan?.messageLimit || 5000),
+                                    botsLimit: isAgencyReg ? 20 : (starterPlan?.botLimit || 1),
                                     periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
                                 }
                             }

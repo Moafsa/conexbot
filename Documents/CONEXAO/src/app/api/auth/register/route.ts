@@ -15,9 +15,14 @@ export async function POST(req: Request) {
             );
         }
 
-        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type, isAgency } = parsed.data;
+        let { name, email, password, whatsapp, cpfCnpj, planId, trial, type, isAgency } = parsed.data;
 
-        if (!planId && !isAgency) {
+        // Ensure isAgency is a boolean if it comes as a string from a form
+        const isAgencyFinal = isAgency === true || isAgency === "true";
+
+        console.log(`Registration attempt for ${email}. isAgency: ${isAgencyFinal}, planId: ${planId}`);
+
+        if (!planId && !isAgencyFinal) {
             return NextResponse.json(
                 { error: 'Um plano deve ser selecionado para criar a conta.' },
                 { status: 400 }
@@ -72,8 +77,8 @@ export async function POST(req: Request) {
                 password: hashedPassword,
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
-                role: isAgency ? 'AGENCY' : 'USER',
-                agency: isAgency ? {
+                role: isAgencyFinal ? 'AGENCY' : 'USER',
+                agency: isAgencyFinal ? {
                     create: {
                         status: 'PENDING',
                         currentFee: 20.0
@@ -94,8 +99,8 @@ export async function POST(req: Request) {
                 } : undefined,
                 usageCounter: {
                     create: {
-                        messagesLimit: isAgency ? 50000 : (plan?.messageLimit || 5000),
-                        botsLimit: isAgency ? 20 : (plan?.botLimit || 1),
+                        messagesLimit: isAgencyFinal ? 50000 : (plan?.messageLimit || 5000),
+                        botsLimit: isAgencyFinal ? 20 : (plan?.botLimit || 1),
                         periodEnd: new Date(Date.now() + (trial === 'true' && plan ? plan.trialDays : 30) * 24 * 60 * 60 * 1000)
                     }
                 }
