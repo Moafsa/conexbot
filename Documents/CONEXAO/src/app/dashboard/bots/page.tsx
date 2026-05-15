@@ -392,6 +392,16 @@ export default function BotsPage() {
                                     <Zap size={18} />
                                 </button>
                                 <button
+                                    className="p-2 bg-red-600/10 hover:bg-red-600/20 rounded-lg text-red-400 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(bot.id);
+                                    }}
+                                    title="Excluir Agente"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                                <button
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"
                                     onClick={(e) => {
                                         e.stopPropagation();

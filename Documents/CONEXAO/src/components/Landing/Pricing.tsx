@@ -55,17 +55,19 @@ export default function Pricing({ tiers }: { tiers?: any[] }) {
             ? `R$ ${(t.minSalesVolume/1000).toFixed(0)}k - R$ ${(nextTier.minSalesVolume/1000).toFixed(0)}k MRR`
             : `Acima de R$ ${(t.minSalesVolume/1000).toFixed(0)}k MRR`;
         
-        // Atribuir cores/ícones baseados no index
-        const visual = defaultTiers[i] || defaultTiers[defaultTiers.length-1];
+        // Atribuir cores/ícones baseados no index (ciclando se houver mais que o default)
+        const visual = defaultTiers[i % defaultTiers.length];
         
         return {
             ...visual,
             name: t.name || visual.name,
             percent: `${t.feePercentage}%`,
             mrr: range,
-            progress: `w-${(i+1)*25}% ${visual.color.replace('text-', 'bg-')}` // Simplificação da barra
+            // Cálculo de progresso baseado na posição na lista
+            progress: `bg-${visual.color.split('-')[1]}-${visual.color.split('-')[2] || '400'}`,
+            width: `${((i + 1) / tiers.length) * 100}%`
         };
-    }) : defaultTiers.map(t => ({...t, percent: `${t.feePercentage}%`}));
+    }) : defaultTiers.map(t => ({...t, percent: `${t.feePercentage}%`, width: t.progress.split(' ')[0].replace('w-', '')}));
 
     return (
         <section className="py-32 px-6 relative overflow-hidden" id="pricing">
@@ -104,7 +106,10 @@ export default function Pricing({ tiers }: { tiers?: any[] }) {
                             <p className="text-gray-500 text-sm mb-10 font-medium italic">{tier.mrr}</p>
                             
                             <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                                <div className={`h-full transition-all duration-1000 delay-300 ${tier.progress}`}></div>
+                                <div 
+                                    className={`h-full transition-all duration-1000 delay-300 ${tier.progress}`}
+                                    style={{ width: tier.width }}
+                                ></div>
                             </div>
                         </div>
                     ))}

@@ -16,7 +16,8 @@ import {
     Calendar,
     ShieldAlert,
     Ticket,
-    Pause
+    Pause,
+    Trash2
 } from "lucide-react";
 import { ProductManager } from "@/components/Dashboard/ProductManager";
 import { MediaManager } from "@/components/Dashboard/MediaManager";
@@ -102,6 +103,30 @@ export default function BotDetailsPage() {
         }
     }
 
+    async function handleDelete() {
+        if (!confirm('Tem certeza que deseja excluir este agente? Esta ação é irreversível.')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const res = await fetch(`/api/bots/${botId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                router.push("/dashboard/bots");
+            } else {
+                alert('Erro ao excluir agente.');
+            }
+        } catch (error) {
+            console.error('Failed to delete bot:', error);
+            alert('Erro ao excluir agente.');
+        } finally {
+            setLoading(false);
+        }
+    }
+
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Carregando agente...</div>;
     }
@@ -163,6 +188,13 @@ export default function BotDetailsPage() {
                             Desconectar
                         </button>
                     )}
+                    <button
+                        onClick={handleDelete}
+                        className="h-10 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-500 text-xs font-black rounded-xl border border-red-600/20 transition-all flex items-center gap-2"
+                    >
+                        <Trash2 size={14} />
+                        Excluir
+                    </button>
                 </div>
             </div>
 
