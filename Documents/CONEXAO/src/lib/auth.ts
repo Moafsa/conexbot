@@ -70,7 +70,7 @@ export const authOptions: NextAuthOptions = {
                             email: user.email!,
                             name: user.name,
                             role: isAgencyReg ? 'AGENCY' : 'USER',
-                            agency: isAgencyReg ? {
+                            agencyProfile: isAgencyReg ? {
                                 create: {
                                     status: 'PENDING',
                                     currentFee: 20.0
