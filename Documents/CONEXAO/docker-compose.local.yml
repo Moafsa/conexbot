@@ -120,6 +120,58 @@ services:
     command: sh -c "while true; do wget -qO- http://app:3000/api/cron/follow-up; sleep 60; done"
     restart: unless-stopped
 
+  chatwoot-web:
+    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
+    container_name: conext-chatwoot-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3005:3000"
+    environment:
+      - RAILS_ENV=production
+      - NODE_ENV=production
+      - INSTALLATION_ENV=docker
+      - SECRET_KEY_BASE=chatwoot-local-secret-32-chars-long-base
+      - FRONTEND_URL=http://localhost:3005
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DATABASE=chatwoot_production
+      - POSTGRES_USERNAME=admin
+      - POSTGRES_PASSWORD=password123
+      - REDIS_URL=redis://redis:6379/1
+      - ACTIVE_STORAGE_SERVICE=local
+    volumes:
+      - chatwoot_storage:/app/storage
+    command: sh -c "bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+
+  chatwoot-worker:
+    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
+    container_name: conext-chatwoot-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - RAILS_ENV=production
+      - NODE_ENV=production
+      - INSTALLATION_ENV=docker
+      - SECRET_KEY_BASE=chatwoot-local-secret-32-chars-long-base
+      - FRONTEND_URL=http://localhost:3005
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DATABASE=chatwoot_production
+      - POSTGRES_USERNAME=admin
+      - POSTGRES_PASSWORD=password123
+      - REDIS_URL=redis://redis:6379/1
+      - ACTIVE_STORAGE_SERVICE=local
+    volumes:
+      - chatwoot_storage:/app/storage
+    command: bundle exec sidekiq -C config/sidekiq.yml
+
 volumes:
   pgdata:
   redisdata:
@@ -127,3 +179,4 @@ volumes:
   wuzapi_sessions:
   wuzapi_db:
   miniodata:
+  chatwoot_storage:

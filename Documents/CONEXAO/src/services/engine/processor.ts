@@ -5,6 +5,7 @@ import { logToFile } from './logger';
 import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
 import { PhoneUtils } from '@/lib/phone-utils';
+import { acquireLock, releaseLock } from '@/lib/redis';
 
 async function detectAiMessage(text: string, bot?: any): Promise<boolean> {
     if (!text) return false;
@@ -71,31 +72,35 @@ const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
 const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
 
-const processingLocks = new Map<string, Promise<any>>();
-
 export const MessageProcessor = {
-    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number, adAttribution?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string; adId?: string; adsetId?: string; adName?: string; adsetName?: string; campaignId?: string; campaignName?: string; entrySource?: string; referrer?: string } } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
-        // Lock por canal + identificador: WhatsApp e WordPress nunca competem pela mesma chave
         const lockKey = `${channel}:${senderPhone}`;
-        console.log(`[Processor] DEBUG: Processing message from ${lockKey} (V3-RECURSIVE-HACK)`);
-        const existingLock = processingLocks.get(lockKey);
-        if (existingLock) {
-            logToFile(`[Processor] WAITING for existing lock: ${lockKey}`);
-            await existingLock;
+
+        // Distributed Redis lock — survives restarts and multi-instance deploys.
+        // TTL of 120s ensures lock is released even if the process crashes mid-flight.
+        const MAX_WAIT_MS = 30_000;
+        const POLL_MS = 500;
+        const TTL_MS = 120_000;
+        const deadline = Date.now() + MAX_WAIT_MS;
+
+        while (!(await acquireLock(lockKey, TTL_MS))) {
+            if (Date.now() > deadline) {
+                logToFile(`[Processor] Lock timeout for ${lockKey}, proceeding anyway`);
+                break;
+            }
+            logToFile(`[Processor] Waiting for lock: ${lockKey}`);
+            await new Promise(r => setTimeout(r, POLL_MS));
         }
 
-        const currentProcess = this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
-        processingLocks.set(lockKey, currentProcess);
-
         try {
-            return await currentProcess;
+            return await this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
         } finally {
-            processingLocks.delete(lockKey);
+            await releaseLock(lockKey).catch(() => {});
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -162,7 +167,8 @@ export const MessageProcessor = {
 
             logToFile(`[Processor] Using Provider: ${bot.aiProvider || 'openai'} (with Fallback enabled)`);
 
-            // 3. Find or create conversation
+            // 3. Find or create conversation (capture ad attribution on first touch)
+            const adAttr = options.adAttribution;
             const conversation = await prisma.conversation.upsert({
                 where: {
                     botId_remoteId: { botId: bot.id, remoteId: senderPhone },
@@ -172,7 +178,19 @@ export const MessageProcessor = {
                     botId: bot.id,
                     remoteId: senderPhone,
                     channel: channel,
-                },
+                    ...(adAttr && {
+                        utmSource:    adAttr.utmSource,
+                        utmMedium:    adAttr.utmMedium,
+                        utmCampaign:  adAttr.utmCampaign,
+                        utmContent:   adAttr.utmContent,
+                        adId:         adAttr.adId,
+                        adName:       adAttr.adName,
+                        campaignId:   adAttr.campaignId,
+                        campaignName: adAttr.campaignName,
+                        entrySource:  adAttr.entrySource,
+                        referrer:     adAttr.referrer,
+                    }),
+                } as any,
             });
 
             // 3.1. Check if conversation is PAUSED (handoff para humano)
@@ -247,8 +265,43 @@ export const MessageProcessor = {
                         botId: bot.id,
                         funnelStage: firstStage?.name || 'LEAD',
                         stageId: firstStage?.id,
+                        // Persist ad attribution so the agent sees it on every turn
+                        ...(adAttr && {
+                            utmSource:    adAttr.utmSource,
+                            utmMedium:    adAttr.utmMedium,
+                            utmCampaign:  adAttr.utmCampaign,
+                            utmContent:   adAttr.utmContent,
+                            utmTerm:      adAttr.utmTerm,
+                            adId:         adAttr.adId,
+                            adsetId:      adAttr.adsetId,
+                            adName:       adAttr.adName,
+                            adsetName:    adAttr.adsetName,
+                            campaignId:   adAttr.campaignId,
+                            campaignName: adAttr.campaignName,
+                            entrySource:  adAttr.entrySource,
+                        }),
                     } as any
                 });
+            } else if (adAttr && !(existingContact as any).entrySource) {
+                // Update attribution on existing contact only if not already set (first-touch model)
+                await prisma.contact.update({
+                    where: { id: existingContact.id },
+                    data: {
+                        utmSource:    adAttr.utmSource ?? undefined,
+                        utmMedium:    adAttr.utmMedium ?? undefined,
+                        utmCampaign:  adAttr.utmCampaign ?? undefined,
+                        utmContent:   adAttr.utmContent ?? undefined,
+                        utmTerm:      adAttr.utmTerm ?? undefined,
+                        adId:         adAttr.adId ?? undefined,
+                        adsetId:      adAttr.adsetId ?? undefined,
+                        adName:       adAttr.adName ?? undefined,
+                        adsetName:    adAttr.adsetName ?? undefined,
+                        campaignId:   adAttr.campaignId ?? undefined,
+                        campaignName: adAttr.campaignName ?? undefined,
+                        entrySource:  adAttr.entrySource ?? undefined,
+                    } as any
+                });
+                (existingContact as any) = { ...existingContact, ...adAttr };
             }
 
             // 6.0. Check if contact is BLOCKED
@@ -332,6 +385,21 @@ export const MessageProcessor = {
                     ...(analysis.summary && { notes: analysis.summary })
                 } as any
             });
+
+            // Sincronizar o estágio classificado pela IA com o Chatwoot
+            if (bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && options.chatwootConversationId) {
+                try {
+                    logToFile(`[Processor] Syncing AI classified stage ${analysis.nextStage} (${analysis.nextStageId}) to Chatwoot Conversation #${options.chatwootConversationId}`);
+                    await ChatwootService.updateConversationCustomAttributes(
+                        bot,
+                        options.chatwootConversationId,
+                        { crm_stage_id: analysis.nextStageId }
+                    );
+                } catch (cwErr: any) {
+                    logToFile(`[Processor] Failed to sync stage to Chatwoot: ${cwErr.message}`);
+                }
+            }
+
             existingContact.funnelStage = analysis.nextStage;
             (existingContact as any).assignedBotId = analysis.assignedBotId || (existingContact as any).assignedBotId;
 
@@ -410,6 +478,16 @@ export const MessageProcessor = {
                     name: existingContact.name,
                     email: existingContact.email,
                     company: (existingContact as any).company,
+                    // Ad attribution — enriches agent context with lead origin
+                    utmSource:    (existingContact as any).utmSource,
+                    utmMedium:    (existingContact as any).utmMedium,
+                    utmCampaign:  (existingContact as any).utmCampaign,
+                    utmContent:   (existingContact as any).utmContent,
+                    adId:         (existingContact as any).adId,
+                    adName:       (existingContact as any).adName,
+                    adsetName:    (existingContact as any).adsetName,
+                    campaignName: (existingContact as any).campaignName,
+                    entrySource:  (existingContact as any).entrySource,
                 },
                 crmContext: {
                     insight: existingContact.lastAiInsight,
@@ -519,6 +597,40 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     }
                 });
             }
+
+            // --- MAESTRO ORCHESTRATION: Inject Collaborator Tools ---
+            schedulingTools.push(
+                {
+                    type: 'function',
+                    function: {
+                        name: 'listar_colaboradores',
+                        description: 'Lista os colaboradores e prestadores de serviço disponíveis no sistema (ex: entregadores, médicos, veterinários, etc.). Retorna o nome, telefone, status e tipo de serviço.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                tipo: { type: 'string', description: 'Opcional. Filtro pelo tipo de colaborador (ex: DRIVER, DOCTOR, VET, etc.).' }
+                            }
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'despachar_servico',
+                        description: 'Despacha um serviço ou pedido enviando os detalhes diretamente para o WhatsApp de um colaborador. Se não souber o telefone, passe a localidade/especialidade e o tipo para o sistema selecionar automaticamente o melhor colaborador.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                detalhes_servico: { type: 'string', description: 'Os detalhes do serviço (ex: endereço de entrega, itens do pedido, observações).' },
+                                colaborador_telefone: { type: 'string', description: 'Opcional. O número de telefone direto do colaborador (com código de país e DDD).' },
+                                localidade: { type: 'string', description: 'Opcional. Palavra-chave, bairro, cidade ou especialidade para roteamento inteligente (ex: Farroupilha).' },
+                                tipo_colaborador: { type: 'string', description: 'Opcional. Tipo de profissional (ex: DRIVER, DOCTOR, VET). Default é DRIVER.' }
+                            },
+                            required: ['detalhes_servico']
+                        }
+                    }
+                }
+            );
 
             // --- INJECT MERCADO LIVRE TOOLS ---
             if (bot.tenant.mlAccessToken) {
@@ -773,6 +885,89 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     }
                                 }
                             } catch (e: any) { toolResult = `Erro interno ao faturar: ${e.message}`; }
+                        } else if (name === 'listar_colaboradores') {
+                            try {
+                                const whereClause: any = { botId: bot.id, contactType: { not: 'CUSTOMER' } };
+                                if (args.tipo) {
+                                    whereClause.contactType = args.tipo.toUpperCase();
+                                }
+                                const colaboradores = await prisma.contact.findMany({
+                                    where: whereClause,
+                                    select: { name: true, phone: true, contactType: true, driverStatus: true }
+                                });
+                                if (colaboradores.length === 0) {
+                                    toolResult = "Nenhum colaborador ou prestador encontrado no sistema.";
+                                } else {
+                                    toolResult = colaboradores.map(c => 
+                                        `- ${c.name || 'Sem nome'} (${c.phone}): Tipo=${c.contactType}, Status=${(c as any).driverStatus || 'N/A'}`
+                                    ).join('\n');
+                                }
+                            } catch (e: any) {
+                                toolResult = `Erro ao listar colaboradores: ${e.message}`;
+                            }
+                        } else if (name === 'despachar_servico') {
+                            try {
+                                const { UzapiService } = await import('@/services/engine/uzapi');
+                                let finalPhone = args.colaborador_telefone;
+                                let chosenName = '';
+
+                                if (!finalPhone) {
+                                    // Lógica de roteamento híbrido
+                                    const cType = (args.tipo_colaborador || 'DRIVER').toUpperCase();
+                                    const allColaboradores = await prisma.contact.findMany({
+                                        where: { botId: bot.id, contactType: cType }
+                                    });
+
+                                    if (allColaboradores.length === 0) {
+                                        throw new Error(`Nenhum colaborador do tipo ${cType} cadastrado.`);
+                                    }
+
+                                    // Filtra por localidade/palavra-chave se informada
+                                    let matchedColaboradores = allColaboradores;
+                                    if (args.localidade) {
+                                        const loc = args.localidade.toLowerCase().trim();
+                                        matchedColaboradores = allColaboradores.filter(c => {
+                                            if (!c.dispatchKeywords) return false;
+                                            const kwList = c.dispatchKeywords.toLowerCase().split(',').map(k => k.trim());
+                                            return kwList.some(kw => kw.includes(loc) || loc.includes(kw));
+                                        });
+                                    }
+
+                                    if (matchedColaboradores.length === 0) {
+                                        throw new Error(`Nenhum colaborador encontrado para a localidade/especialidade "${args.localidade}".`);
+                                    }
+
+                                    // Ordena por activeJobs (menor fila primeiro)
+                                    matchedColaboradores.sort((a, b) => (a.activeJobs || 0) - (b.activeJobs || 0));
+                                    
+                                    const bestColaborador = matchedColaboradores[0];
+                                    finalPhone = bestColaborador.phone;
+                                    chosenName = bestColaborador.name || 'Sem nome';
+
+                                    // Incrementa o contador de fila do colaborador
+                                    await prisma.contact.update({
+                                        where: { id: bestColaborador.id },
+                                        data: { activeJobs: { increment: 1 } }
+                                    });
+                                } else {
+                                    // Se informou telefone direto, localiza o contato correspondente para incrementar a fila
+                                    const contact = await prisma.contact.findFirst({
+                                        where: { botId: bot.id, phone: finalPhone }
+                                    });
+                                    if (contact) {
+                                        chosenName = contact.name || 'Sem nome';
+                                        await prisma.contact.update({
+                                            where: { id: contact.id },
+                                            data: { activeJobs: { increment: 1 } }
+                                        });
+                                    }
+                                }
+
+                                await UzapiService.sendMessage(bot.sessionName, finalPhone, args.detalhes_servico);
+                                toolResult = `Serviço despachado com sucesso para ${chosenName} (${finalPhone}). Fila de trabalhos ativos atualizada.`;
+                            } catch (e: any) {
+                                toolResult = `Erro ao despachar serviço: ${e.message}`;
+                            }
                         } else {
                             // --- EXECUTE MERCADO LIVRE TOOLS ---
                             const mlTool = mercadoLivreTools.find(t => t.name === name);
@@ -816,7 +1011,14 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
             // 12. Save Assistant Final Response (only if not a tool call already handled)
             if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
                 await prisma.message.create({
-                    data: { conversationId: conversation.id, content: cleanResponse, role: 'assistant' },
+                    data: {
+                        conversationId: conversation.id,
+                        content: cleanResponse,
+                        role: 'assistant',
+                        inputTokens: typeof aiResult === 'object' ? (aiResult.inputTokens ?? null) : null,
+                        outputTokens: typeof aiResult === 'object' ? (aiResult.outputTokens ?? null) : null,
+                        aiProvider: typeof aiResult === 'object' ? (aiResult.provider ?? null) : null,
+                    },
                 });
             }
 

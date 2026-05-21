@@ -69,7 +69,7 @@ model Tenant {
   metaAdsToken            String?
   metaAdsAccountId        String?
   accounts                Account[]
-  agencyProfile           Agency?             @relation("TenantAsAgency")
+  agency                  Agency?             @relation("TenantAsAgency")
   appointments            Appointment[]
   bots                    Bot[]
   botMaterials            BotMaterial[]
@@ -94,8 +94,8 @@ model ProductMapping {
   id           String   @id @default(uuid())
   tenantId     String
   botId        String?
-  wooProductId String   // ID no WooCommerce
-  mlItemId     String   // ID no Mercado Livre (ex: MLB12345)
+  wooProductId String // ID no WooCommerce
+  mlItemId     String // ID no Mercado Livre (ex: MLB12345)
   lastSync     DateTime @default(now())
   syncStatus   String   @default("SUCCESS") // SUCCESS, ERROR, PENDING
   errorMessage String?
@@ -182,6 +182,12 @@ model Bot {
   chatwootAccountId       String?
   chatwootToken           String?
   chatwootUrl             String?
+  chatwootInboxId         String?
+  aiAgentStatus           String              @default("ACTIVE")
+  niche                   String              @default("GENERIC")
+  deliveryFeeType         String              @default("FIXED")
+  deliveryFeeRules        Json?               @default("[]")
+  mapboxToken             String?
   connectionStatus        String              @default("DISCONNECTED")
   webhookToken            String?
   webhookUrl              String?
@@ -225,6 +231,8 @@ model Bot {
   conversations           Conversation[]
   coupons                 Coupon[]
   crmStages               CrmStage[]
+  crmPipelines            CrmPipeline[]
+  crmWorkingHoursEnd      String              @default("18:00")
   followupRules           FollowupRule[]
   marketingCampaigns      MarketingCampaign[]
   marketingPosts          MarketingPost[]
@@ -309,19 +317,33 @@ model BotMaterial {
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
-model CrmStage {
-  id          String    @id @default(uuid())
-  name        String
-  color       String    @default("gray")
-  order       Int       @default(0)
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  botId       String
-  contacts    Contact[]
-  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+model CrmPipeline {
+  id            String     @id @default(uuid())
+  name          String
+  botId         String
+  allowedAgents String[]   // Chatwoot agent emails/IDs who can see this pipeline
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  bot           Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  stages        CrmStage[]
+}
 
-  @@unique([botId, name])
+model CrmStage {
+  id          String       @id @default(uuid())
+  name        String
+  color       String       @default("gray")
+  order       Int          @default(0)
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  botId       String
+  pipelineId  String?
+  contacts    Contact[]
+  bot         Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  pipeline    CrmPipeline? @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([pipelineId])
 }
 
 model BotMedia {
@@ -411,49 +433,77 @@ model OrderItem {
 }
 
 model Contact {
-  id            String        @id @default(uuid())
-  phone         String
-  name          String?
-  email         String?
-  company       String?
-  role          String?
-  needs         String?
-  notes         String?
-  tags          String[]
-  lastActive    DateTime      @default(now())
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  tenantId      String
-  botId         String?
-  lastAiInsight String?
-  leadScore     Int           @default(0)
-  sentiment     String?
-  stageId       String?
-  funnelStage   String        @default("LEAD")
-  eventDate     DateTime?
-  assignedBotId String?
-  isBlocked     Boolean       @default(false)
-  appointments  Appointment[]
-  assignedBot   Bot?          @relation("AssignedBot", fields: [assignedBotId], references: [id])
-  bot           Bot?          @relation(fields: [botId], references: [id], onDelete: Cascade)
-  stage         CrmStage?     @relation(fields: [stageId], references: [id])
-  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  orders        Order[]
+  id               String        @id @default(uuid())
+  phone            String
+  name             String?
+  email            String?
+  company          String?
+  role             String?
+  needs            String?
+  notes            String?
+  tags             String[]
+  lastActive       DateTime      @default(now())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenantId         String
+  botId            String?
+  lastAiInsight    String?
+  leadScore        Int           @default(0)
+  sentiment        String?
+  stageId          String?
+  funnelStage      String        @default("LEAD")
+  eventDate        DateTime?
+  contactType      String        @default("CUSTOMER")
+  driverStatus     String?
+  dispatchKeywords String?
+  activeJobs       Int           @default(0)
+  assignedBotId    String?
+  isBlocked        Boolean       @default(false)
+  // Ad & UTM attribution — populated on first contact
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  adId             String?
+  adsetId          String?
+  adName           String?
+  adsetName        String?
+  campaignId       String?
+  campaignName     String?
+  entrySource      String?       // e.g. "whatsapp_ad", "organic", "webchat", "instagram_ad"
+  appointments     Appointment[]
+  assignedBot      Bot?          @relation("AssignedBot", fields: [assignedBotId], references: [id])
+  bot              Bot?          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  stage            CrmStage?     @relation(fields: [stageId], references: [id])
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders           Order[]
 
   @@unique([phone, botId])
 }
 
 model Conversation {
-  id          String    @id @default(uuid())
-  channel     String
-  remoteId    String
-  status      String    @default("open")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  botId       String
-  pausedUntil DateTime?
-  bot         Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
-  messages    Message[]
+  id           String    @id @default(uuid())
+  channel      String
+  remoteId     String
+  status       String    @default("open")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  botId        String
+  pausedUntil  DateTime?
+  // Ad attribution at conversation entry — set once when conversation is created
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  utmContent   String?
+  adId         String?
+  adName       String?
+  campaignId   String?
+  campaignName String?
+  entrySource  String?
+  referrer     String?
+  bot          Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  messages     Message[]
 
   @@unique([botId, remoteId])
 }
@@ -466,6 +516,9 @@ model Message {
   conversationId String
   tool_call_id   String?
   tool_calls     Json?
+  inputTokens    Int?
+  outputTokens   Int?
+  aiProvider     String?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
@@ -555,37 +608,40 @@ model UsageCounter {
 }
 
 model GlobalConfig {
-  id                     String   @id @default("system")
-  systemName             String   @default("ConextBot")
-  maintenanceMode        Boolean  @default(false)
-  googleClientId         String?
-  googleClientSecret     String?
-  openaiApiKey           String?
-  geminiApiKey           String?
-  asaasApiKey            String?
-  elevenLabsApiKey       String?
-  updatedAt              DateTime @updatedAt
-  supportEmail           String?
-  supportWhatsapp        String?
-  asaasWalletId          String?
-  smtpFrom               String?
-  smtpHost               String?
-  smtpPass               String?
-  smtpPort               Int?
-  smtpUser               String?
-  systemBotId            String?
-  logoColoredUrl         String?
-  logoWhiteUrl           String?
-  mercadoPagoAccessToken String?
-  stripePublishableKey   String?
-  stripeSecretKey        String?
-  openrouterApiKey       String?
-  metaAppId              String?
-  metaAppSecret          String?
-  metaVerifyToken        String?
-  platformAsaasWalletId  String?
-  mlClientId             String?
-  mlClientSecret         String?
+  id                      String   @id @default("system")
+  systemName              String   @default("ConextBot")
+  maintenanceMode         Boolean  @default(false)
+  googleClientId          String?
+  googleClientSecret      String?
+  openaiApiKey            String?
+  geminiApiKey            String?
+  asaasApiKey             String?
+  elevenLabsApiKey        String?
+  updatedAt               DateTime @updatedAt
+  supportEmail            String?
+  supportWhatsapp         String?
+  asaasWalletId           String?
+  smtpFrom                String?
+  smtpHost                String?
+  smtpPass                String?
+  smtpPort                Int?
+  smtpUser                String?
+  systemBotId             String?
+  logoColoredUrl          String?
+  logoWhiteUrl            String?
+  mercadoPagoAccessToken  String?
+  stripePublishableKey    String?
+  stripeSecretKey         String?
+  openrouterApiKey        String?
+  metaAppId               String?
+  metaAppSecret           String?
+  metaVerifyToken         String?
+  platformAsaasWalletId   String?
+  mlClientId              String?
+  mlClientSecret          String?
+  chatwootSuperAdminToken String?
+  chatwootBaseUrl         String?
+  mapboxToken             String?
 }
 
 model Notification {

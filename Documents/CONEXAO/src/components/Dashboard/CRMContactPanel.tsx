@@ -12,11 +12,12 @@ import { toast } from "sonner";
 
 interface CRMContactPanelProps {
     contactId: string;
+    botId: string;
     onClose: () => void;
     onDeleted?: () => void;
 }
 
-export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMContactPanelProps) {
+export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }: CRMContactPanelProps) {
     const [activeTab, setActiveTab] = useState<'chat' | 'data' | 'auto' | 'finance'>('chat');
     const [contact, setContact] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
@@ -28,12 +29,12 @@ export default function CRMContactPanel({ contactId, onClose, onDeleted }: CRMCo
 
     useEffect(() => {
         fetchContactData();
-    }, [contactId]);
+    }, [contactId, botId]);
 
     async function fetchContactData() {
         setLoading(true);
         try {
-            const res = await fetch(`/api/contacts/${contactId}`);
+            const res = await fetch(`/api/contacts/${contactId}?botId=${botId}`);
             if (res.ok) {
                 const data = await res.json();
                 setContact(data);

@@ -85,9 +85,9 @@ export default function DashboardPage() {
     ];
 
     return (
-        <>
+        <div className="p-4 md:p-8 space-y-8">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-white">
                         Olá, {session?.user?.name || "👋"}
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             )}
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat) => (
                     <div key={stat.label} className="glass rounded-2xl p-6 border border-white/5">
                         <div className="flex items-center gap-3 mb-3">
@@ -203,6 +203,6 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 }

@@ -179,8 +179,6 @@ export async function safeChatCompletion(options: {
 
             console.log(`[SafeAI] Attempting ${provider} with model ${model}`);
             
-            // Gemini Wrapper doesn't support tools yet in this implementation, 
-            // but we can pass them to OpenAI clients (OpenAI itself and OpenRouter)
             const completionOptions: any = {
                 model,
                 messages,
@@ -189,8 +187,23 @@ export async function safeChatCompletion(options: {
                 max_tokens,
             };
 
-            // Only send tools if the provider is NOT gemini (for now, unless we update GeminiWrapper)
-            if (provider !== 'gemini' && tools && tools.length > 0) {
+            // GeminiWrapper does not support tool calling yet.
+            // When Gemini is the PRIMARY provider and tools are required, log a warning
+            // so the fallback to OpenAI/OpenRouter is visible in logs rather than silent.
+            if (provider === 'gemini' && tools && tools.length > 0) {
+                if (provider === bot.aiProvider) {
+                    console.warn(
+                        `[SafeAI] WARNING: Bot "${bot.name}" has Gemini as primary provider but ` +
+                        `this request requires tool calling (${tools.length} tool(s)). ` +
+                        `Gemini does not support tools — falling back to next provider. ` +
+                        `Consider changing the bot's AI provider to OpenAI or OpenRouter.`
+                    );
+                }
+                // Skip tools for Gemini — continue to next provider in loop
+                continue;
+            }
+
+            if (tools && tools.length > 0) {
                 completionOptions.tools = tools;
                 completionOptions.tool_choice = tool_choice;
             }
@@ -205,7 +218,9 @@ export async function safeChatCompletion(options: {
                 return {
                     content,
                     toolCalls,
-                    provider
+                    provider,
+                    inputTokens: completion.usage?.prompt_tokens ?? 0,
+                    outputTokens: completion.usage?.completion_tokens ?? 0,
                 };
             }
 

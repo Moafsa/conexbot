@@ -28,6 +28,22 @@ function logToFile(msg: string) {
 
 export async function POST(req: Request) {
     try {
+        // Verify webhook secret to reject spoofed requests
+        const webhookSecret = process.env.UZAPI_WEBHOOK_SECRET;
+        if (webhookSecret) {
+            const headerToken = req.headers.get('x-webhook-token') || req.headers.get('authorization')?.replace('Bearer ', '');
+            if (headerToken !== webhookSecret) {
+                // Also allow token embedded in body (WuzAPI sends it there)
+                const cloned = req.clone();
+                const raw = await cloned.text();
+                const bodyToken = (() => { try { return JSON.parse(raw)?.token; } catch { return null; } })();
+                if (bodyToken !== webhookSecret) {
+                    logToFile(`[Security] Rejected webhook: invalid token`);
+                    return NextResponse.json({ status: 'unauthorized' }, { status: 401 });
+                }
+            }
+        }
+
         logToFile(`--- Incoming Webhook ---`);
         const contentType = req.headers.get('content-type') || '';
         logToFile(`Content-Type: ${contentType}`);
@@ -167,6 +183,40 @@ export async function POST(req: Request) {
                     return NextResponse.json({ status: 'command_processed' });
                 }
             }
+            // --- MAESTRO ORCHESTRATION: Employee / Driver Routing ---
+            if (botDoc) {
+                const contact = await prisma.contact.findUnique({
+                    where: { phone_botId: { phone: cleanPhone, botId: botDoc.id } }
+                });
+
+                if (contact && contact.contactType && contact.contactType !== 'CUSTOMER') {
+                    logToFile(`Received message from Employee: ${cleanPhone} (Type: ${contact.contactType})`);
+                    
+                    const cmd = messageBody?.trim().toLowerCase() || '';
+                    if (cmd === '1' || cmd === 'entregue' || cmd === 'finalizado' || cmd === 'concluido' || cmd === 'concluído') {
+                        const { UzapiService } = await import('@/services/engine/uzapi');
+                        const newJobs = Math.max(0, (contact.activeJobs || 0) - 1);
+                        await prisma.contact.update({
+                            where: { id: contact.id },
+                            data: { activeJobs: newJobs }
+                        });
+                        await UzapiService.sendMessage(sessionName, cleanPhone, '✅ Serviço/Trabalho concluído com sucesso! Fila atualizada.');
+                        logToFile(`Collaborator ${cleanPhone} completed job. Active jobs decremented to ${newJobs}.`);
+                        return NextResponse.json({ status: 'employee_job_completed' });
+                    }
+                    
+                    logToFile(`Skipping AI processing for employee ${cleanPhone}`);
+                    return NextResponse.json({ status: 'skipped_employee' });
+                }
+
+                // AI PAUSE CHECK (Transbordo)
+                if (botDoc.aiAgentStatus === 'PAUSED') {
+                    logToFile(`Bot ${botDoc.name} is PAUSED for transbordo. Skipping AI processing.`);
+                    // If Chatwoot integration is active, Chatwoot webhook handles human replies.
+                    return NextResponse.json({ status: 'skipped_paused_bot' });
+                }
+            }
+            // ---------------------------------------------------------
 
             // Group Filtering Logic
             if (isGroup) {

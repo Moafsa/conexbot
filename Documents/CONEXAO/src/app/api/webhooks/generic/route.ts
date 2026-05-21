@@ -61,6 +61,7 @@ export async function POST(req: Request) {
         // --- Data Extraction Setup ---
         let senderPhone = '';
         let messageText = '';
+        let chatwootConversationId: number | undefined = undefined;
 
         // 1. Chatwoot Format Detection
         if (body.event === 'message_created' && body.conversation) {
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
             }
 
             messageText = body.content || '';
+            chatwootConversationId = body.conversation.id;
             const senderInfo = body.sender || (body.conversation.meta && body.conversation.meta.sender) || {};
             // Prefer phone_number, fallback to identifier, then email, then ID
             senderPhone = senderInfo.phone_number || senderInfo.identifier || senderInfo.email || String(senderInfo.id || 'chatwoot_user');
@@ -87,10 +89,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'ignored', message: 'Missing text or sender phone/id' });
         }
 
-        logToFile(`[Generic Webhook] Processing for Bot ${bot.id}, Phone ${senderPhone}, Text: ${messageText}`);
+        logToFile(`[Generic Webhook] Processing for Bot ${bot.id}, Phone ${senderPhone}, Text: ${messageText}, ChatwootConversationId: ${chatwootConversationId}`);
 
         // Send to processor
-        MessageProcessor.process(bot.id, senderPhone, messageText, 'generic', 'id').catch(err => {
+        MessageProcessor.process(bot.id, senderPhone, messageText, 'generic', 'id', {
+            inputType: 'text',
+            chatwootConversationId
+        }).catch(err => {
             logToFile(`[Generic Webhook] Processor Error: ${err?.message || err}`);
             console.error(err);
         });

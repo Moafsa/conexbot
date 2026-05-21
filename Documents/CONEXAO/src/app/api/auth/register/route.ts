@@ -78,7 +78,7 @@ export async function POST(req: Request) {
                 whatsapp: whatsapp || null,
                 cpfCnpj: cpfCnpj || null,
                 role: isAgencyFinal ? 'AGENCY' : 'USER',
-                agencyProfile: isAgencyFinal ? {
+                agency: isAgencyFinal ? {
                     create: {
                         status: 'PENDING',
                         currentFee: 20.0

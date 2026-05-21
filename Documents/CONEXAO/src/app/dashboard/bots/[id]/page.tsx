@@ -134,7 +134,7 @@ export default function BotDetailsPage() {
     if (!bot) return null;
 
     return (
-        <div className="space-y-8 animate-fade-in pb-10">
+        <div className="p-4 md:p-8 space-y-8 animate-fade-in pb-10">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -320,7 +320,7 @@ export default function BotDetailsPage() {
                             </div>
 
                             <div className="bg-white/5 p-6 rounded-[32px] border border-white/5">
-                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Satus do Agente</h3>
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Status do Agente</h3>
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                                     <span className="text-xs font-bold text-gray-300">Pronto para conversão</span>

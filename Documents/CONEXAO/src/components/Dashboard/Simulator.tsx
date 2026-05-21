@@ -17,6 +17,7 @@ export function Simulator({ botId }: { botId: string }) {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const [sessionId] = useState(() => `SIM_${Math.random().toString(36).substring(7)}`);
     
     // Audio States
@@ -26,7 +27,12 @@ export function Simulator({ botId }: { botId: string }) {
     const audioChunksRef = useRef<Blob[]>([]);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: "smooth"
+            });
+        }
     };
 
     useEffect(() => {
@@ -155,7 +161,10 @@ export function Simulator({ botId }: { botId: string }) {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative">
+            <div 
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative"
+            >
                 {messages.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
                         <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-gray-600 mb-2">

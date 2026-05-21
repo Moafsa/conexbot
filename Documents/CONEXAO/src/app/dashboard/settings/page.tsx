@@ -251,7 +251,7 @@ function SettingsContent() {
     );
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="p-4 md:p-8 space-y-8 animate-fade-in">
             <div>
                 <h1 className="text-2xl font-bold">Configurações</h1>
                 <p className="text-gray-400">Gerencie sua conta e preferências.</p>

@@ -59,13 +59,16 @@ export default function Navbar({ branding }: { branding?: any }) {
                 </nav>
 
                 {/* Right Side */}
-                <div className="flex items-center space-x-8">
+                <div className="flex items-center space-x-4">
+                    <Link href="/auth/login" className="text-gray-400 hover:text-white transition-colors font-black text-[10px] uppercase tracking-widest px-4 py-2">
+                        Entrar
+                    </Link>
                     <Link href="/auth/register?isAgency=true" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)]">
                         Começar Grátis
                     </Link>
 
                     {/* Mobile Menu Toggle */}
-                    <button className="lg:hidden text-white" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                    <button className="lg:hidden text-white ml-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
                         {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
                     </button>
                 </div>

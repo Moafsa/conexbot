@@ -17,6 +17,16 @@ interface ContactInfo {
     email?: string | null;
     company?: string | null;
     phone?: string | null;
+    // Ad attribution — tells the agent where this lead came from
+    utmSource?: string | null;
+    utmMedium?: string | null;
+    utmCampaign?: string | null;
+    utmContent?: string | null;
+    adId?: string | null;
+    adName?: string | null;
+    adsetName?: string | null;
+    campaignName?: string | null;
+    entrySource?: string | null;
 }
 
 interface CouponInfo {
@@ -208,6 +218,34 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             `- Empresa: ${ci.company || 'não informado ainda'}`,
         ];
         sections.push(`═══ PERFIL DO CLIENTE ═══\n\n${contactLines.join('\n')}\n\nSe algum dado já está preenchido, NÃO peça novamente.`);
+
+        // Ad attribution context — only inject if there's data to show
+        const ci2 = bot.contactInfo;
+        const hasAdData = ci2.utmSource || ci2.utmCampaign || ci2.adName || ci2.campaignName || ci2.entrySource;
+        if (hasAdData) {
+            const adLines: string[] = [];
+
+            if (ci2.entrySource) adLines.push(`- Canal de entrada: ${ci2.entrySource}`);
+            if (ci2.campaignName) adLines.push(`- Campanha: ${ci2.campaignName}`);
+            if (ci2.adName)       adLines.push(`- Anúncio: ${ci2.adName}`);
+            if (ci2.adsetName)    adLines.push(`- Conjunto de anúncios: ${ci2.adsetName}`);
+            if (ci2.utmSource)    adLines.push(`- UTM Source: ${ci2.utmSource}`);
+            if (ci2.utmMedium)    adLines.push(`- UTM Medium: ${ci2.utmMedium}`);
+            if (ci2.utmCampaign)  adLines.push(`- UTM Campaign: ${ci2.utmCampaign}`);
+            if (ci2.utmContent)   adLines.push(`- UTM Content: ${ci2.utmContent}`);
+            if (ci2.adId)         adLines.push(`- Ad ID: ${ci2.adId}`);
+
+            sections.push(`═══ ORIGEM DO LEAD (USE PARA PERSONALIZAR O ATENDIMENTO) ═══
+
+${adLines.join('\n')}
+
+📌 INSTRUÇÕES:
+- Este cliente chegou até você através de um anúncio/campanha específica.
+- Use essa informação para conectar a conversa com o que ele viu no anúncio.
+- Se souber a oferta do anúncio (ex: "20% de desconto", "consulta grátis"), mencione-a.
+- Não diga explicitamente "você veio de um anúncio" — incorpore naturalmente.
+- Ex: Se o anúncio é de "promoção de pizza", comece já perguntando sobre o pedido.`);
+        }
     }
 
     // CRM Context (Recent insights)

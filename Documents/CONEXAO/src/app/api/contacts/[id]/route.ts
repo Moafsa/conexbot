@@ -19,32 +19,68 @@ export async function PUT(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const existing = await requireContactForTenant(id, tenantId);
-        if (!existing) {
-            return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+        const body = await req.json();
+        const { funnelStage, stageId, botId, name, email, notes } = body;
+
+        console.log(`[API] Updating contact/conversation ${id}:`, body);
+
+        // 1. Check if the bot has Chatwoot integration
+        if (botId) {
+            const bot = await prisma.bot.findFirst({
+                where: { id: botId, tenantId }
+            });
+
+            if (bot && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId) {
+                const baseUrl = bot.chatwootUrl.replace(/\/$/, '');
+                const chatwootUrl = `${baseUrl}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${id}/custom_attributes`;
+
+                const response = await fetch(chatwootUrl, {
+                    method: 'POST',
+                    headers: {
+                        'api_access_token': bot.chatwootToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        custom_attributes: {
+                            crm_stage_id: stageId
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    console.error(`[API /api/contacts/${id}] Chatwoot custom_attributes update failed:`, response.status, await response.text());
+                } else {
+                    console.log(`[API /api/contacts/${id}] Chatwoot conversation stage updated successfully`);
+                }
+            }
         }
 
-        const body = await req.json();
-        const { funnelStage, name, email, notes, tags } = body;
+        // 2. Also update in local database if contact exists
+        const existing = await requireContactForTenant(id, tenantId);
+        if (existing) {
+            const contact = await prisma.contact.update({
+                where: { id },
+                data: {
+                    funnelStage: funnelStage,
+                    stageId: stageId,
+                    name: name || undefined,
+                    email: email || undefined,
+                    notes: notes || undefined,
+                    assignedBotId: body.assignedBotId === 'none' ? null : body.assignedBotId
+                }
+            });
+            return NextResponse.json(contact);
+        }
 
-        console.log(`[API] Updating contact ${id}:`, body);
-
-        const contact = await prisma.contact.update({
-            where: { id },
-            data: {
-                funnelStage: body.funnelStage,
-                stageId: body.stageId,
-                name: body.name,
-                email: body.email,
-                notes: body.notes,
-                tags: body.tags,
-                isBlocked: body.isBlocked,
-                assignedBotId: body.assignedBotId === 'none' ? null : body.assignedBotId
-            }
+        // Return a mock contact object so the frontend drag-and-drop state updates correctly
+        return NextResponse.json({
+            id,
+            funnelStage,
+            stageId,
+            name,
+            email,
+            notes
         });
-
-        console.log(`[API] Contact ${id} updated successfully`);
-        return NextResponse.json(contact);
     } catch (error) {
         console.error('[API] Error updating contact:', error);
         return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
@@ -84,7 +120,10 @@ export async function GET(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const contact = await prisma.contact.findFirst({
+        const urlObj = new URL(req.url);
+        const botId = urlObj.searchParams.get('botId');
+
+        let contact = await prisma.contact.findFirst({
             where: { id, tenantId },
             include: {
                 orders: {
@@ -101,6 +140,85 @@ export async function GET(req: Request, { params }: { params: any }) {
                 }
             }
         });
+
+        if (!contact && botId) {
+            // Check if this is a Chatwoot conversation ID
+            const bot = await prisma.bot.findFirst({
+                where: { id: botId, tenantId }
+            });
+
+            if (bot && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId) {
+                const baseUrl = bot.chatwootUrl.replace(/\/$/, '');
+                // 1. Fetch Chatwoot conversation details
+                const convUrl = `${baseUrl}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${id}`;
+                const convRes = await fetch(convUrl, {
+                    headers: { 'api_access_token': bot.chatwootToken }
+                });
+
+                if (convRes.ok) {
+                    const convData = await convRes.json();
+                    
+                    // 2. Fetch Chatwoot conversation messages
+                    const messagesUrl = `${baseUrl}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${id}/messages`;
+                    const messagesRes = await fetch(messagesUrl, {
+                        headers: { 'api_access_token': bot.chatwootToken }
+                    });
+                    
+                    let cwMessages = [];
+                    if (messagesRes.ok) {
+                        const msgData = await messagesRes.json();
+                        cwMessages = msgData.payload || [];
+                    }
+
+                    // Get contact stage
+                    const customAttributes = convData.custom_attributes || {};
+                    const crmStageId = customAttributes.crm_stage_id;
+                    
+                    let stage = null;
+                    if (crmStageId) {
+                        stage = await prisma.crmStage.findUnique({
+                            where: { id: crmStageId }
+                        });
+                    }
+                    if (!stage) {
+                        stage = await prisma.crmStage.findFirst({
+                            where: { botId },
+                            orderBy: { order: 'asc' }
+                        });
+                    }
+
+                    // Format messages for the CRM panel
+                    const formattedMessages = cwMessages.map((m: any) => ({
+                        id: String(m.id),
+                        content: m.content || "",
+                        role: m.message_type === 'incoming' ? 'user' : 'assistant',
+                        createdAt: m.created_at ? new Date(m.created_at * 1000).toISOString() : new Date().toISOString()
+                    })).reverse(); // Chatwoot returns messages desc usually, reverse for panel asc
+
+                    return NextResponse.json({
+                        id,
+                        name: convData.meta?.sender?.name || convData.meta?.sender?.phone_number || 'Chatwoot User',
+                        phone: convData.meta?.sender?.phone_number || '00000000000',
+                        email: convData.meta?.sender?.email || null,
+                        funnelStage: stage?.name || 'LEAD',
+                        stageId: stage?.id || null,
+                        leadScore: customAttributes.lead_score || 50,
+                        sentiment: customAttributes.sentiment || 'NEUTRAL',
+                        lastAiInsight: customAttributes.last_ai_insight || null,
+                        lastActive: convData.updated_at ? new Date(convData.updated_at * 1000).toISOString() : new Date().toISOString(),
+                        isBlocked: false,
+                        notes: customAttributes.notes || null,
+                        orders: [],
+                        conversations: [
+                            {
+                                id,
+                                messages: formattedMessages
+                            }
+                        ]
+                    });
+                }
+            }
+        }
 
         if (!contact) {
             return NextResponse.json({ error: 'Contact not found' }, { status: 404 });

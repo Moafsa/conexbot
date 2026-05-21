@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluxo Automação Agência Cliente</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: transparent; color: var(--text-primary, #1a1a2e); }
+  
+  .container { padding: 16px; max-width: 900px; margin: 0 auto; }
+  
+  h2.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #6b7280); margin-bottom: 8px; margin-top: 16px; }
+  
+  /* PHASES */
+  .phases { display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+  .phase { flex: 1; min-width: 120px; border-radius: 8px; padding: 10px 8px; text-align: center; cursor: pointer; transition: transform .15s, box-shadow .15s; border: 2px solid transparent; }
+  .phase:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .phase.active { border-color: currentColor; }
+  .phase-num { font-size: 18px; font-weight: 800; display: block; }
+  .phase-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; display: block; margin-top: 2px; }
+  
+  .ph1 { background: #eef2ff; color: #4f46e5; }
+  .ph2 { background: #ecfdf5; color: #059669; }
+  .ph3 { background: #fff7ed; color: #ea580c; }
+  .ph4 { background: #fdf4ff; color: #9333ea; }
+  .ph5 { background: #fef2f2; color: #dc2626; }
+  .ph6 { background: #f0f9ff; color: #0284c7; }
+  
+  /* DETAIL PANEL */
+  .detail-panel { border-radius: 10px; padding: 14px; margin-top: 6px; min-height: 180px; transition: all .2s; }
+  .detail-panel.ph1-bg { background: #eef2ff; border: 1.5px solid #c7d2fe; }
+  .detail-panel.ph2-bg { background: #ecfdf5; border: 1.5px solid #a7f3d0; }
+  .detail-panel.ph3-bg { background: #fff7ed; border: 1.5px solid #fed7aa; }
+  .detail-panel.ph4-bg { background: #fdf4ff; border: 1.5px solid #e9d5ff; }
+  .detail-panel.ph5-bg { background: #fef2f2; border: 1.5px solid #fecaca; }
+  .detail-panel.ph6-bg { background: #f0f9ff; border: 1.5px solid #bae6fd; }
+  
+  .panel-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .panel-icon { font-size: 18px; }
+  
+  .steps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .step-card { background: white; border-radius: 7px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .step-card-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .step-card-body { font-size: 11px; color: var(--text-secondary, #6b7280); line-height: 1.4; }
+  .tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; text-transform: uppercase; margin-top: 4px; }
+  .tag-auto { background: #dcfce7; color: #16a34a; }
+  .tag-ai { background: #ede9fe; color: #7c3aed; }
+  .tag-manual { background: #fff3cd; color: #b45309; }
+  
+  /* BILLING MODEL */
+  .billing-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .bill-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .bill-card-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .bill-card-body { font-size: 11px; color: var(--text-secondary, #6b7280); line-height: 1.5; }
+  .bill-example { font-size: 11px; font-weight: 600; color: #0284c7; margin-top: 6px; padding: 4px 8px; background: #e0f2fe; border-radius: 5px; }
+  
+  /* PLATFORM TIERS */
+  .tiers { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .tier { flex: 1; min-width: 100px; background: white; border-radius: 8px; padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .tier-name { font-size: 11px; font-weight: 700; }
+  .tier-vol { font-size: 10px; color: #6b7280; margin-top: 2px; }
+  .tier-pct { font-size: 20px; font-weight: 800; margin-top: 4px; }
+  .t1 .tier-pct { color: #dc2626; }
+  .t2 .tier-pct { color: #ea580c; }
+  .t3 .tier-pct { color: #059669; }
+  .t4 .tier-pct { color: #4f46e5; }
+
+  /* CONNECTOR ARROWS */
+  .arrow-row { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 4px 0; }
+  .arrow { font-size: 14px; color: #9ca3af; }
+  
+  /* ONBOARDING FIELDS */
+  .fields-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .field-group { background: white; border-radius: 7px; padding: 8px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .field-group-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #4f46e5; margin-bottom: 4px; }
+  .field-item { font-size: 10px; color: #374151; padding: 1px 0; display: flex; align-items: center; gap: 4px; }
+  .field-item::before { content: '•'; color: #9ca3af; font-size: 12px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .billing-grid { grid-template-columns: 1fr; }
+    .fields-grid { grid-template-columns: 1fr; }
+    .phase { min-width: 80px; }
+    .tier { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h2 class="sr-only">Fluxo completo de automação de vendas para agência e clientes na plataforma ConextBot</h2>
+
+  <div class="section-title">Clique em cada fase para ver os detalhes</div>
+
+  <div class="phases">
+    <div class="phase ph1 active" onclick="show(0)" id="ph0">
+      <span class="phase-num">1</span>
+      <span class="phase-label">Onboarding</span>
+    </div>
+    <div class="phase ph2" onclick="show(1)" id="ph1">
+      <span class="phase-num">2</span>
+      <span class="phase-label">Conteúdo & Ads</span>
+    </div>
+    <div class="phase ph3" onclick="show(2)" id="ph2">
+      <span class="phase-num">3</span>
+      <span class="phase-label">Captura & Bot</span>
+    </div>
+    <div class="phase ph4" onclick="show(3)" id="ph3">
+      <span class="phase-num">4</span>
+      <span class="phase-label">CRM & Followup</span>
+    </div>
+    <div class="phase ph5" onclick="show(4)" id="ph4">
+      <span class="phase-num">5</span>
+      <span class="phase-label">Venda & Cobrança</span>
+    </div>
+    <div class="phase ph6" onclick="show(5)" id="ph5">
+      <span class="phase-num">6</span>
+      <span class="phase-label">Analytics & Split</span>
+    </div>
+  </div>
+
+  <div id="panel" class="detail-panel ph1-bg">
+    <!-- conteúdo dinâmico -->
+  </div>
+
+  <div class="section-title" style="margin-top:20px;">Modelo de cobrança — Agência → Cliente</div>
+  <div class="billing-grid">
+    <div class="bill-card">
+      <div class="bill-card-title">💰 Plano Fixo</div>
+      <div class="bill-card-body">Agência cobra mensalidade fixa. Plataforma recebe split % sobre tudo que a agência faturar com o cliente.</div>
+      <div class="bill-example">Ex: R$800/mês → plataforma leva 15%</div>
+    </div>
+    <div class="bill-card">
+      <div class="bill-card-title">📈 Split por Resultado</div>
+      <div class="bill-card-body">Agência cobra % sobre as vendas geradas pelo bot/marketing para o cliente. Zero mensalidade.</div>
+      <div class="bill-example">Ex: 3% das vendas → plataforma leva tier %</div>
+    </div>
+    <div class="bill-card">
+      <div class="bill-card-title">🔀 Híbrido</div>
+      <div class="bill-card-body">Base fixa menor + % de performance. Mais flexível para fechar contratos com clientes conservadores.</div>
+      <div class="bill-example">Ex: R$300 + 1,5% vendas</div>
+    </div>
+  </div>
+
+  <div class="section-title">Tier da plataforma sobre o faturamento da agência</div>
+  <div class="tiers">
+    <div class="tier t1">
+      <div class="tier-name">Starter</div>
+      <div class="tier-vol">até R$10k/mês</div>
+      <div class="tier-pct">20%</div>
+    </div>
+    <div class="tier t2">
+      <div class="tier-name">Growth</div>
+      <div class="tier-vol">R$10k–50k/mês</div>
+      <div class="tier-pct">15%</div>
+    </div>
+    <div class="tier t3">
+      <div class="tier-name">Scale</div>
+      <div class="tier-vol">R$50k–200k/mês</div>
+      <div class="tier-pct">10%</div>
+    </div>
+    <div class="tier t4">
+      <div class="tier-name">Enterprise</div>
+      <div class="tier-vol">+R$200k/mês</div>
+      <div class="tier-pct">6%</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const phases = [
+  {
+    bg: 'ph1-bg',
+    title: '🏢 Onboarding do Cliente',
+    content: `
+      <div class="fields-grid">
+        <div class="field-group">
+          <div class="field-group-title">🏪 Negócio</div>
+          <div class="field-item">Nome, nicho, segmento</div>
+          <div class="field-item">Site / Redes sociais</div>
+          <div class="field-item">CNPJ / CPF</div>
+          <div class="field-item">Endereço físico</div>
+          <div class="field-item">Horário de funcionamento</div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">🎯 Público-alvo</div>
+          <div class="field-item">Faixa etária / gênero</div>
+          <div class="field-item">Interesses e comportamento</div>
+          <div class="field-item">Localização geográfica</div>
+          <div class="field-item">Ticket médio esperado</div>
+          <div class="field-item">Persona (gerada por IA)</div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">📦 Produtos</div>
+          <div class="field-item">Catálogo com preços</div>
+          <div class="field-item">Serviços e combos</div>
+          <div class="field-item">Diferenciais e objeções</div>
+          <div class="field-item">Política de frete</div>
+          <div class="field-item">Estoque / disponibilidade</div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">📡 Canais</div>
+          <div class="field-item">WhatsApp Business API</div>
+          <div class="field-item">Instagram / Facebook</div>
+          <div class="field-item">Meta Pixel ID</div>
+          <div class="field-item">Google Analytics / Tag</div>
+          <div class="field-item">Email / SMTP</div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">💳 Financeiro</div>
+          <div class="field-item">Gateway de pagamento</div>
+          <div class="field-item">Modelo de cobrança</div>
+          <div class="field-item">Valor do plano ou % split</div>
+          <div class="field-item">Chave Asaas / MP</div>
+          <div class="field-item">Dia de vencimento</div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">🤖 IA do Bot</div>
+          <div class="field-item">Tom de voz / persona</div>
+          <div class="field-item">Base de conhecimento</div>
+          <div class="field-item">Scraping automático do site</div>
+          <div class="field-item">Objeções treinadas</div>
+          <div class="field-item">Horário de atendimento</div>
+        </div>
+      </div>
+      <div style="margin-top:10px; background:white; border-radius:7px; padding:8px 12px; font-size:11px; color:#374151;">
+        <strong>🤖 Auto-preenchimento por IA:</strong> ao informar o site, a plataforma faz scraping, extrai produtos, tom de voz, horários e pré-preenche o formulário. A agência só valida.
+      </div>
+    `
+  },
+  {
+    bg: 'ph2-bg',
+    title: '📱 Geração de Conteúdo & Gestão de Anúncios',
+    content: `
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-card-title">Estratégia de Conteúdo</div>
+          <div class="step-card-body">IA analisa nicho + histórico e gera calendário editorial (temas, hashtags, dias/horários ideais).</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Geração em Lote</div>
+          <div class="step-card-body">Posts gerados automaticamente (legenda + imagem). Enviados para aprovação da agência via link seguro.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Aprovação</div>
+          <div class="step-card-body">Agência (ou cliente) aprova/rejeita/edita posts via página pública com token. Um clique por post.</div>
+          <span class="tag tag-manual">Aprovação</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Publicação Agendada</div>
+          <div class="step-card-body">Cron publica automaticamente no Meta (Feed + Stories + Reels) e envia broadcast WhatsApp nos horários configurados.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Impulsionamento Inteligente</div>
+          <div class="step-card-body">Posts com alto engajamento orgânico são automaticamente impulsionados via Meta Ads com budget predefinido.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Otimização de Anúncios</div>
+          <div class="step-card-body">Cron diário avalia CPL e ROAS. IA decide pausar criativos ruins, escalar os bons e sugerir novos testes A/B.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+      </div>
+    `
+  },
+  {
+    bg: 'ph3-bg',
+    title: '📲 Captura de Leads & Atendimento pelo Bot',
+    content: `
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-card-title">Click-to-WhatsApp</div>
+          <div class="step-card-body">Anúncio Meta com botão direto pro WhatsApp. Pixel rastreia o evento Lead. UTM identifica origem.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Identificação do Lead</div>
+          <div class="step-card-body">Ao entrar no WhatsApp, bot coleta nome, email, interesse, orçamento via conversa natural. Sem formulário.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Qualificação por IA</div>
+          <div class="step-card-body">Lead Score calculado com base em respostas, tempo de resposta e comportamento. Prioriza os leads quentes.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Catálogo Inteligente</div>
+          <div class="step-card-body">Bot apresenta produtos relevantes baseado no perfil do lead. Detecta intenção de compra e abre carrinho.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Transferência Humana</div>
+          <div class="step-card-body">Quando detecta indecisão ou solicitação explícita, pausa o bot e notifica o atendente humano via Chatwoot/WhatsApp.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Pixel & Eventos</div>
+          <div class="step-card-body">Eventos enviados ao Meta CAPI em tempo real: Lead, InitiateCheckout, Purchase. Conversão rastreada sem cookie.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+      </div>
+    `
+  },
+  {
+    bg: 'ph4-bg',
+    title: '🗂️ CRM Automático & Follow-up Inteligente',
+    content: `
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-card-title">Entrada no CRM</div>
+          <div class="step-card-body">Lead qualificado entra automaticamente no estágio correto do pipeline (Novo Lead, Em Negociação, etc.).</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Movimentação por Regra</div>
+          <div class="step-card-body">Resposta → avança estágio. Sem resposta por X horas → regra de follow-up ativa. Pagamento confirmado → fecha venda.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Follow-up Multicanal</div>
+          <div class="step-card-body">Sequência: WhatsApp D+1, D+3, D+7. Mensagens diferentes por estágio e intenção do lead. Stoppa se responder.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Reagendamento</div>
+          <div class="step-card-body">Bot sugere horários disponíveis, confirma via WhatsApp e cria evento no Google Calendar. Lembrete automático.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Insights por IA</div>
+          <div class="step-card-body">Análise diária do pipeline: quais leads têm maior chance de fechar, por que estão parados, o que fazer.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Notificações</div>
+          <div class="step-card-body">Agência recebe push/email quando lead está "pronto para fechar" ou quando estágio importante muda.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+      </div>
+    `
+  },
+  {
+    bg: 'ph5-bg',
+    title: '💸 Venda, Cobrança & Split Automático',
+    content: `
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-card-title">Link de Pagamento</div>
+          <div class="step-card-body">Bot gera link Asaas/MercadoPago personalizado e envia pelo WhatsApp. Inclui produto, valor e desconto de cupom.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Confirmação de Pagamento</div>
+          <div class="step-card-body">Webhook do gateway confirma pagamento. Bot envia mensagem de confirmação e aciona entrega/agendamento.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Split Automático</div>
+          <div class="step-card-body">No momento do pagamento, o valor é dividido: % plataforma → wallet da Conext, % agência → wallet da agência, resto ao cliente.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Cobrança do Cliente</div>
+          <div class="step-card-body">Se modelo fixo: assinatura Asaas gerada automaticamente. Se split: calculado ao fim do mês sobre as vendas rastreadas.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Inadimplência</div>
+          <div class="step-card-body">Bot de cobrança envia lembretes automáticos D-3, D-0, D+1, D+5. Acesso suspenso automaticamente após X dias.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">NPS Pós-Venda</div>
+          <div class="step-card-body">48h após a venda, bot envia pesquisa de satisfação. Resultado entra no perfil do cliente e no relatório da agência.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+      </div>
+    `
+  },
+  {
+    bg: 'ph6-bg',
+    title: '📊 Analytics, Relatórios & Gestão de Split',
+    content: `
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-card-title">Dashboard da Agência</div>
+          <div class="step-card-body">Visão consolidada de todos os clientes: faturamento, leads, conversão, ROI de cada bot. Drill-down por cliente.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Relatório Semanal PDF</div>
+          <div class="step-card-body">Gerado automaticamente a cada semana com KPIs do cliente: posts, leads, vendas, ticket médio, ROI dos anúncios.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Atribuição de Vendas</div>
+          <div class="step-card-body">Cada venda é rastreada até a origem: qual post, qual anúncio, qual palavra-chave trouxe o lead que converteu.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Tier Automático</div>
+          <div class="step-card-body">Volume de vendas da agência é somado mensalmente. Tier é recalculado e o % da plataforma ajustado automaticamente.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Extrato de Split</div>
+          <div class="step-card-body">Agência vê extrato detalhado: cliente X → R$5.400 em vendas → R$162 para plataforma (3%). Transparência total.</div>
+          <span class="tag tag-auto">Auto</span>
+        </div>
+        <div class="step-card">
+          <div class="step-card-title">Previsão de Receita</div>
+          <div class="step-card-body">IA projeta faturamento dos próximos 30 dias baseado em tendências do pipeline e sazonalidade do nicho.</div>
+          <span class="tag tag-ai">IA</span>
+        </div>
+      </div>
+    `
+  }
+];
+
+let current = 0;
+
+function show(idx) {
+  const phaseEls = document.querySelectorAll('.phase');
+  phaseEls.forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  const p = phases[idx];
+  const panel = document.getElementById('panel');
+  panel.className = 'detail-panel ' + p.bg;
+  panel.innerHTML = `<div class="panel-title"><span class="panel-icon"></span>${p.title}</div>${p.content}`;
+  current = idx;
+}
+
+show(0);
+</script>
+</body>
+</html>
