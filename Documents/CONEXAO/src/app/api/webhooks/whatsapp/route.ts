@@ -139,6 +139,32 @@ export async function POST(req: Request) {
                     `resolvedRemoteId=${cleanPhone}, chatJid=${chatJid}, Body=${messageBody?.substring?.(0, 120) ?? messageBody}`
             );
 
+            // ── Click-to-WhatsApp Ad Attribution ──────────────────────────────────────
+            // Meta sends a `referral` object when a lead comes from a Click-to-WhatsApp ad.
+            // WuzAPI exposes it in the message payload under message.extendedTextMessage.contextInfo
+            // or directly as message.referral / body.referral.
+            const referralRaw =
+                message.referral ||
+                message.Referral ||
+                (message.extendedTextMessage as any)?.contextInfo?.externalAdReply ||
+                (body as any).referral ||
+                null;
+
+            let adAttribution: Record<string, string | undefined> | undefined;
+            if (referralRaw) {
+                adAttribution = {
+                    entrySource:  'whatsapp_ad',
+                    adId:         referralRaw.source_id || referralRaw.ad_id || referralRaw.adId,
+                    adName:       referralRaw.headline || referralRaw.ad_name || referralRaw.adName,
+                    campaignName: referralRaw.body || referralRaw.campaign_name,
+                    referrer:     referralRaw.source_url || referralRaw.source_url,
+                    utmSource:    'whatsapp',
+                    utmMedium:    'cpc',
+                };
+                logToFile(`[AdAttribution] Click-to-WhatsApp referral detected: adId=${adAttribution.adId}, ad="${adAttribution.adName}"`);
+            }
+            // ─────────────────────────────────────────────────────────────────────────
+
             if (!messageBody) {
                 logToFile(`Skipping: empty body.`);
                 return NextResponse.json({ status: 'skipped_empty' });
@@ -359,7 +385,7 @@ export async function POST(req: Request) {
 
                         if (transcription) {
                             const { BufferingService } = await import('@/services/engine/buffering');
-                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio', chatJid).catch(err => {
+                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio', chatJid, adAttribution).catch(err => {
                                 logToFile(`BUFFER ERROR (Audio): ${err?.message || err}`);
                             });
                         }
@@ -492,7 +518,7 @@ export async function POST(req: Request) {
                         // Passar direto ao Processor (evita race com buffer que recebia "")
                         const textToProcess = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${description}`;
                         logToFile(`Sending image description (${textToProcess.length} chars) to Processor for ${cleanPhone}`);
-                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image', whatsappChatJid: chatJid }).catch(err => {
+                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image', whatsappChatJid: chatJid, adAttribution }).catch(err => {
                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
                         });
                     } else {
@@ -505,12 +531,12 @@ export async function POST(req: Request) {
                 // Text Message Handling with Smart Buffering
                 try {
                     const { BufferingService } = await import('@/services/engine/buffering');
-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', chatJid);
+                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', chatJid, adAttribution);
                     logToFile(`Message buffered for ${cleanPhone}`);
                 } catch (e: any) {
                     logToFile(`BUFFER ERROR: ${e.message}`);
                     // Fallback to direct processing if buffering fails
-                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', whatsappChatJid: chatJid }).catch(err => {
+                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', whatsappChatJid: chatJid, adAttribution }).catch(err => {
                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
                     });
                 }

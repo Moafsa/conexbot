@@ -2,7 +2,9 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
-import { extractTextFromPDF, extractTextFromImage } from '@/services/ocr/extractor';
+import { extractTextByMime, detectMimeFromExtension } from '@/services/ocr/extractor';
+
+const MAX_FILE_SIZE_MB = 25;
 
 export async function POST(req: Request) {
     try {
@@ -12,64 +14,78 @@ export async function POST(req: Request) {
         }
 
         const formData = await req.formData();
-        const file = formData.get('file') as File;
+        const file = formData.get('file') as File | null;
         const botId = formData.get('botId') as string | null;
 
         if (!file) {
             return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
         }
 
+        // Size guard
+        const sizeMb = file.size / 1024 / 1024;
+        if (sizeMb > MAX_FILE_SIZE_MB) {
+            return NextResponse.json(
+                { error: `Arquivo muito grande (${sizeMb.toFixed(1)} MB). Limite: ${MAX_FILE_SIZE_MB} MB` },
+                { status: 413 }
+            );
+        }
+
+        // Resolve MIME — browser sometimes sends 'application/octet-stream' for unknown types
+        let mimeType = file.type || '';
+        if (!mimeType || mimeType === 'application/octet-stream') {
+            mimeType = detectMimeFromExtension(file.name);
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer());
-        let result;
+        const result = await extractTextByMime(buffer, mimeType);
 
-        if (file.type === 'application/pdf') {
-            result = await extractTextFromPDF(buffer);
-        } else if (file.type.startsWith('image/')) {
-            result = await extractTextFromImage(buffer);
-        } else {
-            return NextResponse.json({ error: 'Tipo de arquivo não suportado' }, { status: 400 });
+        if (!result.success) {
+            return NextResponse.json(
+                { success: false, error: result.error || 'Falha na extração de texto' },
+                { status: 422 }
+            );
         }
 
-        if (result.success) {
-            let mediaId = null;
+        let mediaId: string | null = null;
 
-            // If botId is provided, we persist the file and the extracted text
-            if (botId) {
-                const { StorageService } = await import('@/lib/storage');
-                const prisma = (await import('@/lib/prisma')).default;
+        // Persist to BotMedia if botId was provided
+        if (botId && result.text) {
+            const { StorageService } = await import('@/lib/storage');
+            const prisma = (await import('@/lib/prisma')).default;
 
-                const filename = `${botId}/${Date.now()}-${file.name}`;
-                const url = await StorageService.uploadFile(buffer, filename, file.type);
+            const filename = `${botId}/${Date.now()}-${file.name}`;
+            const url = await StorageService.uploadFile(buffer, filename, mimeType);
 
-                const media = await prisma.botMedia.create({
-                    data: {
-                        botId,
-                        type: file.type.startsWith('image/') ? 'image' : 'pdf',
-                        url,
-                        filename: file.name,
-                        extractedText: result.text,
-                        processedAt: new Date()
-                    }
-                });
-                mediaId = media.id;
-            }
+            const mediaType = mimeType.startsWith('image/') ? 'image'
+                            : mimeType === 'application/pdf'  ? 'pdf'
+                            : mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType === 'text/csv' ? 'spreadsheet'
+                            : mimeType.includes('wordprocessing') || mimeType.includes('msword') ? 'document'
+                            : 'text';
 
-            return NextResponse.json({
-                success: true,
-                extractedText: result.text,
-                fileName: file.name,
-                mediaId
+            const media = await prisma.botMedia.create({
+                data: {
+                    botId,
+                    type: mediaType,
+                    url,
+                    filename: file.name,
+                    extractedText: result.text,
+                    processedAt: new Date(),
+                },
             });
-        } else {
-            return NextResponse.json({
-                success: false,
-                error: result.error
-            }, { status: 500 });
+            mediaId = media.id;
         }
 
-    } catch (error) {
-        console.error('Upload error:', error);
-        return NextResponse.json({ error: 'Erro no processamento do arquivo' }, { status: 500 });
+        return NextResponse.json({
+            success: true,
+            extractedText: result.text,
+            fileName: file.name,
+            mimeType,
+            charCount: result.text.length,
+            mediaId,
+        });
+
+    } catch (error: any) {
+        console.error('[Upload] Error:', error);
+        return NextResponse.json({ error: 'Erro no processamento do arquivo', detail: error.message }, { status: 500 });
     }
 }
-

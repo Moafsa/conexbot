@@ -21,6 +21,7 @@ import bcrypt from 'bcryptjs';
 import { getNicheTemplate } from '@/lib/niche-templates';
 import { UzapiService } from '@/services/engine/uzapi';
 import { PhoneUtils } from '@/lib/phone-utils';
+import { ChatwootService } from '@/services/engine/chatwoot';
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions) as any;
@@ -52,6 +53,8 @@ export async function POST(req: Request) {
         websiteUrl,
         address,
         hours,
+        // Multi-channel support
+        channels = [],
         // Skip WhatsApp send (optional)
         skipSendAccess = false,
     } = body;
@@ -118,6 +121,42 @@ export async function POST(req: Request) {
             sessionName: `bot_${clientId.slice(0, 8)}_${Date.now()}`,
         },
     });
+
+    // 2a. Create BotChannels (multi-channel support)
+    if (Array.isArray(channels) && channels.length > 0) {
+        await prisma.botChannel.createMany({
+            data: channels.map((ch: any) => ({
+                botId: bot.id,
+                provider: ch.provider,
+                identifier: ch.identifier || undefined,
+                status: 'DISCONNECTED',
+            })),
+            skipDuplicates: true,
+        });
+    }
+
+    // 2b. Auto-provision Chatwoot account, user and API inbox
+    // Non-fatal: bot is created and fully functional even if Chatwoot provision fails
+    const appBaseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://app:3000';
+    const chatwootCreds = await ChatwootService.provisionForBot({
+        clientName: name,
+        clientEmail: email,
+        botId: bot.id,
+        botName: finalBotName,
+        appBaseUrl,
+        webhookToken: (bot as any).webhookToken || bot.id,
+    });
+    if (chatwootCreds) {
+        await prisma.bot.update({
+            where: { id: bot.id },
+            data: {
+                chatwootUrl: chatwootCreds.chatwootUrl,
+                chatwootToken: chatwootCreds.chatwootToken,
+                chatwootAccountId: chatwootCreds.chatwootAccountId,
+                chatwootInboxId: chatwootCreds.chatwootInboxId,
+            } as any,
+        });
+    }
 
     // 3. Create CRM pipeline + stages
     const pipeline = await prisma.crmPipeline.create({
@@ -193,6 +232,8 @@ export async function POST(req: Request) {
         pipelineId: pipeline.id,
         tempPassword,
         whatsappSent,
+        chatwootProvisioned: !!chatwootCreds,
+        chatwootAccountId: chatwootCreds?.chatwootAccountId ?? null,
         template: {
             niche: template.niche,
             label: template.label,

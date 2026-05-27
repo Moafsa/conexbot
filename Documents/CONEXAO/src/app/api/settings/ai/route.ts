@@ -10,6 +10,7 @@ const updateAiSettingsSchema = z.object({
     geminiApiKey: z.string().optional().nullable(),
     openrouterApiKey: z.string().optional().nullable(),
     elevenLabsApiKey: z.string().optional().nullable(),
+    anthropicApiKey: z.string().optional().nullable(),
 });
 
 export async function GET() {
@@ -29,6 +30,7 @@ export async function GET() {
                 geminiApiKey: true,
                 openrouterApiKey: true,
                 elevenLabsApiKey: true,
+                anthropicApiKey: true,
             } as any,
         });
 
@@ -57,6 +59,7 @@ export async function PUT(req: Request) {
                 geminiApiKey: data.geminiApiKey,
                 openrouterApiKey: data.openrouterApiKey,
                 elevenLabsApiKey: data.elevenLabsApiKey,
+                anthropicApiKey: data.anthropicApiKey,
             } as any,
         });
 

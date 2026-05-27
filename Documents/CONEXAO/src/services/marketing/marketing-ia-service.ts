@@ -18,12 +18,13 @@ export const MarketingIAService = {
         platform?: string;
         baseImageUrls?: string[];
         videoUrl?: string | null;
+        postFormat?: "SINGLE" | "CAROUSEL" | "VIDEO_SCRIPT";
     }) {
-        const { tenantId, botId, theme, tone = "Profissional", platform = "Instagram", baseImageUrls = [], videoUrl = null } = params;
+        const { tenantId, botId, theme, tone = "Profissional", platform = "Instagram", baseImageUrls = [], videoUrl = null, postFormat = "SINGLE" } = params;
 
         const tenant = await prisma.tenant.findUnique({
             where: { id: tenantId },
-            select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
+            select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true, anthropicApiKey: true }
         });
 
         if (!tenant) throw new Error("Tenant não encontrado");
@@ -40,6 +41,10 @@ export const MarketingIAService = {
         - Produtos/Serviços: ${bot.productsServices}
         - Base de Conhecimento: ${bot.knowledgeBase}
         ` : "";
+
+        // 0b. Buscar insights de IA sobre leads recentes (últimos 15 dias)
+        // O Maestro usa isso para entender padrões, sentimentos, objeções e ajustar a estratégia
+        const leadAIInsightsContext = await this.getLeadAIInsightsContext(botId, 15);
 
         // 1. Forçar OpenAI conforme solicitado pelo usuário
         const { client } = await getAiClient({ provider: "openai", tenant });
@@ -64,6 +69,66 @@ export const MarketingIAService = {
             return url;
         }));
 
+        // Configurar prompts e estruturas baseadas no formato selecionado
+        let formatPrompt = "";
+        let jsonResponseFormat = "";
+
+        if (postFormat === "CAROUSEL") {
+            formatPrompt = `
+            Você deve criar um CARROSSEL MULTISLIDE estruturado de alta conversão contendo de 4 a 7 slides.
+            Cada slide no array de "slides" deve ser focado em contar uma história, apresentar um problema, agitar o problema, dar a solução e fechar com uma chamada para ação (CTA).
+            Responda OBRIGATORIAMENTE contendo a legenda principal do post e o array estruturado de slides.
+            `;
+            jsonResponseFormat = `
+            {
+              "caption": "texto da legenda em PORTUGUÊS aqui (caption geral do post)",
+              "hashtags": ["tag1", "tag2"],
+              "imagePrompt": "prompt geral em inglês para a imagem de capa do carrossel",
+              "slides": [
+                {
+                  "slide": 1,
+                  "title": "TÍTULO DO SLIDE (Chamativo, em PORTUGUÊS, máximo 1 frase)",
+                  "content": "CONTEÚDO DO SLIDE (Em PORTUGUÊS, direto ao ponto, máximo 2 frases)",
+                  "visualDescription": "Instrução visual para o designer gráfico (em PORTUGUÊS) sobre quais imagens, fundos, ícones ou elementos colocar no slide"
+                }
+              ]
+            }
+            `;
+        } else if (postFormat === "VIDEO_SCRIPT") {
+            formatPrompt = `
+            Você deve criar um ROTEIRO DE VÍDEO (Reels/TikTok) estruturado cena a cena, de alta retenção.
+            Crie de 3 a 6 cenas encadeadas de forma dinâmica.
+            Responda OBRIGATORIAMENTE contendo a legenda principal do post e o array de cenas.
+            `;
+            jsonResponseFormat = `
+            {
+              "caption": "legenda do post em PORTUGUÊS para acompanhar o vídeo",
+              "hashtags": ["tag1", "tag2"],
+              "imagePrompt": "prompt geral em inglês para a thumbnail do vídeo",
+              "scenes": [
+                {
+                  "scene": 1,
+                  "time": "Minutagem estimada (ex: 0:00 - 0:05)",
+                  "audio": "ÁUDIO/LOCUÇÃO: O que o narrador ou apresentador fala nesta cena (em PORTUGUÊS)",
+                  "video": "DIRETRIZ VISUAL: O que aparece no vídeo (foco de câmera, gestos, cortes, em PORTUGUÊS)",
+                  "screenText": "TEXTO NA TELA: Textos ou palavras-chave que aparecem escritos na tela (em PORTUGUÊS)"
+                }
+              ]
+            }
+            `;
+        } else {
+            formatPrompt = `
+            Você deve criar um POST ÚNICO composto por uma legenda altamente engajadora e um conceito criativo de design.
+            `;
+            jsonResponseFormat = `
+            {
+              "caption": "texto da legenda em PORTUGUÊS aqui",
+              "hashtags": ["tag1", "tag2"],
+              "imagePrompt": "prompt detalhado em inglês estritamente fiel aos fatos informados aqui para geração da imagem de fundo"
+            }
+            `;
+        }
+
         // 2. Gerar Legenda e Prompt de Imagem Ultra-Realista
         const messages: any[] = [
             { 
@@ -73,9 +138,13 @@ export const MarketingIAService = {
                         type: "text",
                         text: `Você é o Diretor de Estratégia de uma agência de marketing profissional.
                         Seu objetivo é criar um post estratégico para o ${platform} sobre o tema: "${theme}".
-                        
+
+                        FORMATO DO CONTEÚDO:
+                        ${formatPrompt}
+
                         CONTEXTO DO CLIENTE (Use isso como guia de estilo e fatos):
                         ${botContext}
+                        ${leadAIInsightsContext ? `\n                        INSIGHTS DA IA SOBRE OS LEADS:\n${leadAIInsightsContext}\n                        Use estes insights para criar conteúdo que capture a atenção dos leads mais qualificados, reforce pontos positivos detectados e supere objeções identificadas. Adapte o tom ao sentimento dominante dos leads.` : ""}
 
                         REGRAS CRÍTICAS DE NEGÓCIO:
                         1. LEGENDA (caption): Deve ser escrita OBRIGATORIAMENTE em PORTUGUÊS, usando gatilhos mentais e o tom de voz "${tone}".
@@ -89,12 +158,8 @@ export const MarketingIAService = {
                         - Se houver fotos de referência: Mantenha a identidade visual da pessoa/objeto fiel à realidade, integrando-a em um ambiente profissional de agência.
                         - MANDATÓRIO: Qualquer texto escrito DENTRO da imagem (Títulos, chamadas, nomes) deve ser escrito OBRIGATORIAMENTE em PORTUGUÊS (BRASIL).
                         
-                        Responda APENAS em formato JSON:
-                        {
-                          "caption": "texto da legenda em PORTUGUÊS aqui",
-                          "hashtags": ["tag1", "tag2"],
-                          "imagePrompt": "prompt detalhado em inglês estritamente fiel aos fatos informados aqui"
-                        }`
+                        Responda APENAS em formato JSON correspondente ao seguinte esquema:
+                        ${jsonResponseFormat}`
                     },
                     ...processedImageUrls.map(url => ({
                         type: "image_url",
@@ -192,13 +257,31 @@ export const MarketingIAService = {
             }
         }
 
-        // 4. Persistir no Banco
+        // 4. Persistir no Banco de forma serializada se for carrossel/roteiro
         const safeHashtags = Array.isArray(result.hashtags) ? result.hashtags : [];
+        let dbContent = "";
+        
+        if (postFormat === "CAROUSEL") {
+            dbContent = JSON.stringify({
+                type: "carousel",
+                slides: result.slides || [],
+                caption: result.caption + (safeHashtags.length > 0 ? "\n\n" + safeHashtags.map((h: string) => `#${h}`).join(" ") : "")
+            });
+        } else if (postFormat === "VIDEO_SCRIPT") {
+            dbContent = JSON.stringify({
+                type: "video_script",
+                scenes: result.scenes || [],
+                caption: result.caption + (safeHashtags.length > 0 ? "\n\n" + safeHashtags.map((h: string) => `#${h}`).join(" ") : "")
+            });
+        } else {
+            dbContent = result.caption + (safeHashtags.length > 0 ? "\n\n" + safeHashtags.map((h: string) => `#${h}`).join(" ") : "");
+        }
+
         const post = await prisma.marketingPost.create({
             data: {
                 tenantId,
                 botId,
-                content: result.caption + (safeHashtags.length > 0 ? "\n\n" + safeHashtags.map((h: string) => `#${h}`).join(" ") : ""),
+                content: dbContent,
                 imageUrl: finalImageUrl,
                 videoUrl,
                 mediaType: videoUrl ? "VIDEO" : "IMAGE",
@@ -403,8 +486,10 @@ export const MarketingIAService = {
 
         const tenant = await prisma.tenant.findUnique({
             where: { id: tenantId },
-            select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
+            select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true, anthropicApiKey: true }
         });
+
+        if (!tenant) throw new Error("Tenant não encontrado");
 
         const { client } = await getAiClient({ provider: "openai", tenant });
 
@@ -498,8 +583,10 @@ export const MarketingIAService = {
 
             const tenant = await prisma.tenant.findUnique({
                 where: { id: tenantId },
-                select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
+                select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true, anthropicApiKey: true }
             });
+
+            if (!tenant) throw new Error("Tenant não encontrado");
 
             const { client } = await getAiClient({ provider: "openai", tenant });
 
@@ -542,5 +629,172 @@ export const MarketingIAService = {
                 { title: "Configurar Ads", desc: "Conecte sua conta da Meta Ads para receber insights de performance em tempo real." }
             ];
         }
-    }
+    },
+
+    /**
+     * Fetches AI insights about recent leads instead of raw conversations.
+     * The Maestro uses this to understand patterns, objections, interests, sentiment.
+     * Returns a compact summary of: lead quality, sentiment trends, common questions, objections overcome.
+     * Much better for campaign strategy than raw message dumps.
+     */
+    async getLeadAIInsightsContext(botId: string, limit = 15): Promise<string> {
+        try {
+            // Fetch recent contacts with their AI insights and sentiment
+            const contacts = await prisma.contact.findMany({
+                where: { botId, lastActive: { gte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) } },
+                orderBy: { leadScore: 'desc' },
+                take: limit,
+                select: {
+                    name: true,
+                    phone: true,
+                    funnelStage: true,
+                    leadScore: true,
+                    sentiment: true,
+                    lastAiInsight: true,
+                    needs: true,
+                    tags: true,
+                },
+            });
+
+            if (!contacts.length) return "";
+
+            // Aggregate insights
+            const sentiments = new Map<string, number>();
+            const stages = new Map<string, number>();
+            const insights: string[] = [];
+            let totalLeadScore = 0;
+
+            for (const c of contacts) {
+                if (c.sentiment) sentiments.set(c.sentiment, (sentiments.get(c.sentiment) ?? 0) + 1);
+                if (c.funnelStage) stages.set(c.funnelStage, (stages.get(c.funnelStage) ?? 0) + 1);
+                if (c.lastAiInsight) insights.push(`— ${c.name || c.phone.slice(-4)}: ${c.lastAiInsight.substring(0, 150)}`);
+                totalLeadScore += c.leadScore ?? 0;
+            }
+
+            const lines: string[] = [
+                `📊 ANÁLISE DE ${contacts.length} LEADS (últimos 15 dias):`,
+                `Pontuação média: ${Math.round(totalLeadScore / contacts.length)}/100`,
+                "",
+                "Sentimento dos leads:",
+                ...Array.from(sentiments.entries()).map(([s, count]) => `  ${s}: ${count} leads`),
+                "",
+                "Distribuição no funil:",
+                ...Array.from(stages.entries()).map(([stage, count]) => `  ${stage}: ${count}`),
+                "",
+                "Principais insights da IA:",
+                ...insights.slice(0, 5),
+            ];
+
+            return lines.join('\n');
+        } catch (err: any) {
+            logToFile(`[MarketingIA] getLeadAIInsightsContext error: ${err.message}`);
+            return "";
+        }
+    },
+
+    /**
+     * Fetches recent lead conversations for a bot and summarises them
+     * into a compact context string the Maestro can include in prompts.
+     * Returns empty string if no data or on error.
+     * Uses remoteId (phone) + Contact lookup for name/stage info.
+     */
+    async getLeadConversationsContext(botId: string, limit = 10): Promise<string> {
+        try {
+            const since = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000); // 15 days ago
+            const conversations = await prisma.conversation.findMany({
+                where: { botId, createdAt: { gte: since } },
+                orderBy: { updatedAt: 'desc' },
+                take: limit,
+                select: {
+                    id: true,
+                    remoteId: true,   // phone number for WhatsApp channel
+                    channel: true,
+                    messages: {
+                        orderBy: { createdAt: 'asc' },
+                        take: 6,
+                        select: { role: true, content: true },
+                    },
+                },
+            });
+
+            if (!conversations.length) return "";
+
+            // Bulk-fetch matching contacts for name/stage context
+            const phones = conversations.map(c => c.remoteId);
+            const contacts = await prisma.contact.findMany({
+                where: { botId, phone: { in: phones } },
+                select: { phone: true, name: true, funnelStage: true },
+            });
+            const contactMap = new Map(contacts.map(c => [c.phone, c]));
+
+            const lines: string[] = [
+                `${conversations.length} conversas recentes com leads (últimos 15 dias):`,
+            ];
+
+            for (const conv of conversations) {
+                const contact = contactMap.get(conv.remoteId);
+                const snippet = conv.messages
+                    .map((m: any) => `  [${m.role === 'assistant' ? 'Bot' : 'Lead'}]: ${(m.content || '').substring(0, 120)}`)
+                    .join('\n');
+                lines.push(
+                    `— Lead ${conv.remoteId.slice(-4)}${contact?.funnelStage ? ` | Etapa: ${contact.funnelStage}` : ''}${contact?.name ? ` | Nome: ${contact.name}` : ''}`,
+                    snippet,
+                );
+            }
+
+            return lines.join('\n');
+        } catch (err: any) {
+            logToFile(`[MarketingIA] getLeadConversationsContext error: ${err.message}`);
+            return "";
+        }
+    },
+
+    /**
+     * Returns a full lead conversation feed for a bot (used by the Maestro UI).
+     * Allows supervisors to read actual lead messages before deciding campaign strategy.
+     */
+    async getLeadConversationFeed(botId: string, page = 0, pageSize = 20): Promise<any[]> {
+        const skip = page * pageSize;
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days
+
+        const conversations = await prisma.conversation.findMany({
+            where: { botId, createdAt: { gte: since } },
+            orderBy: { updatedAt: 'desc' },
+            skip,
+            take: pageSize,
+            select: {
+                id: true,
+                remoteId: true,
+                channel: true,
+                createdAt: true,
+                updatedAt: true,
+                messages: {
+                    orderBy: { createdAt: 'asc' },
+                    take: 20,
+                    select: { role: true, content: true, createdAt: true },
+                },
+            },
+        });
+
+        if (!conversations.length) return [];
+
+        // Enrich with contact info
+        const phones = conversations.map((c: any) => c.remoteId);
+        const contacts = await prisma.contact.findMany({
+            where: { botId, phone: { in: phones } },
+            select: { phone: true, name: true, funnelStage: true, leadScore: true },
+        });
+        const contactMap = new Map(contacts.map((c: any) => [c.phone, c]));
+
+        return conversations.map((conv: any) => {
+            const contact = contactMap.get(conv.remoteId);
+            return {
+                ...conv,
+                contactPhone: conv.remoteId,
+                contactName: contact?.name ?? null,
+                crmStage: contact?.funnelStage ?? null,
+                leadScore: contact?.leadScore ?? 0,
+            };
+        });
+    },
 };

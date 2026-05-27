@@ -4,12 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList } from "lucide-react";
 
-export default function Sidebar({ branding, userPlans, isImpersonating }: { branding?: any, userPlans?: { hasPrimary: boolean, hasWriter: boolean }, isImpersonating?: boolean }) {
+export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo }: {
+    branding?: any;
+    userPlans?: { hasPrimary: boolean; hasWriter: boolean };
+    isImpersonating?: boolean;
+    isAgencyClient?: boolean;
+    agencyInfo?: { name: string; whatsapp: string | null; email: string | null } | null;
+}) {
     const pathname = usePathname();
     const { data: session } = useSession();
-    const [collapsed, setCollapsed] = useState(true);
+    const [collapsed, setCollapsed] = useState(false);
 
     const handleStopImpersonating = async () => {
         await fetch("/api/admin/impersonate", {
@@ -28,56 +34,143 @@ export default function Sidebar({ branding, userPlans, isImpersonating }: { bran
     const isAdmin = (session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'SUPERADMIN';
     const isAgency = (session?.user as any)?.role === 'AGENCY' || (session?.user as any)?.isAgency;
 
-    let menuItems: { icon: any, label: string, href: string }[] = [];
-
+    let menuCategories: {
+        category?: string;
+        items: { icon: any, label: string, href: string }[];
+    }[] = [];
+ 
     if (isAgency && !isAdmin) {
-        // ---- AGENCY MENU (clean & focused) ----
-        menuItems = [
-            { icon: LayoutDashboard, label: "Portal da Agência",  href: "/dashboard/agency" },
-            { icon: Briefcase,       label: "Meus Clientes",       href: "/dashboard/agency/clients" },
-            { icon: Tag,             label: "Minha Tabela",         href: "/dashboard/agency/pricing" },
-            // --- Divider group: Agency's own tools ---
-            { icon: MessageSquare,   label: "Meus Agentes",         href: "/dashboard/bots" },
-            { icon: Users,           label: "CRM Pipeline",         href: "/dashboard/crm" },
-            { icon: PenTool,         label: "Escritor IA",           href: "/dashboard/writer" },
-            { icon: TrendingUp,      label: "Marketing IA",          href: "/dashboard/marketing" },
-            // --- Account ---
-            { icon: CreditCard,      label: "Financeiro",            href: "/dashboard/finance" },
-            { icon: Settings,        label: "Configurações",         href: "/dashboard/settings" },
+        // ---- AGENCY MENU (categorized into strategic onboarding pipeline) ----
+        menuCategories = [
+            {
+                category: "ESTRUTURA & CLIENTES",
+                items: [
+                    { icon: LayoutDashboard, label: "Portal da Agência",  href: "/dashboard/agency" },
+                    { icon: Briefcase,       label: "Meus Clientes",       href: "/dashboard/agency/clients" },
+                ]
+            },
+            {
+                category: "PRODUÇÃO & ESTRATÉGIA",
+                items: [
+                    { icon: RefreshCw,       label: "Workflows de IA",     href: "/dashboard/agency/workflows" },
+                    { icon: ClipboardList,   label: "Quadro de Tasks",     href: "/dashboard/agency/tasks" },
+                    { icon: Bot,             label: "Squads de IA",        href: "/dashboard/agency/squads" },
+                ]
+            },
+            {
+                category: "MARKETING & ESCALA",
+                items: [
+                    { icon: MessageSquare,   label: "Meus Agentes",         href: "/dashboard/bots" },
+                    { icon: Users,           label: "CRM Pipeline",         href: "/dashboard/crm" },
+                    { icon: PenTool,         label: "Escritor IA",           href: "/dashboard/writer" },
+                    { icon: TrendingUp,      label: "Marketing IA",          href: "/dashboard/marketing" },
+                ]
+            },
+            {
+                category: "CONTA & CONFIGS",
+                items: [
+                    { icon: CreditCard,      label: "Financeiro",            href: "/dashboard/finance" },
+                    { icon: Settings,        label: "Configurações",         href: "/dashboard/settings" },
+                ]
+            }
         ];
     } else if (isAdmin) {
         // ---- ADMIN MENU ----
-        menuItems = [
-            { icon: LayoutDashboard, label: "Visão Geral",           href: "/dashboard" },
-            { icon: MessageSquare,   label: "Meus Agentes",           href: "/dashboard/bots" },
-            { icon: Users,           label: "CRM Pipeline",           href: "/dashboard/crm" },
-            { icon: PenTool,         label: "Escritor IA",             href: "/dashboard/writer" },
-            { icon: TrendingUp,      label: "Marketing IA",            href: "/dashboard/marketing" },
-            { icon: CreditCard,      label: "Financeiro",              href: "/dashboard/finance" },
-            { icon: Settings,        label: "Configurações",           href: "/dashboard/settings" },
-            // --- Admin shortcuts ---
-            { icon: Shield,          label: "Administração",           href: "/admin" },
-            { icon: Briefcase,       label: "Gestão Agências",         href: "/admin/agencies" },
-            { icon: ShoppingBag,     label: "Marketplace",             href: "/admin/marketplace" },
+        menuCategories = [
+            {
+                category: "SISTEMA & PRODUTO",
+                items: [
+                    { icon: LayoutDashboard, label: "Visão Geral",           href: "/dashboard" },
+                    { icon: MessageSquare,   label: "Meus Agentes",           href: "/dashboard/bots" },
+                    { icon: Users,           label: "CRM Pipeline",           href: "/dashboard/crm" },
+                    { icon: PenTool,         label: "Escritor IA",             href: "/dashboard/writer" },
+                    { icon: TrendingUp,      label: "Marketing IA",            href: "/dashboard/marketing" },
+                ]
+            },
+            {
+                category: "ADMINISTRAÇÃO",
+                items: [
+                    { icon: Shield,          label: "Administração",           href: "/admin" },
+                    { icon: Briefcase,       label: "Gestão Agências",         href: "/admin/agencies" },
+                    { icon: ShoppingBag,     label: "Marketplace",             href: "/admin/marketplace" },
+                ]
+            },
+            {
+                category: "CONTA",
+                items: [
+                    { icon: CreditCard,      label: "Financeiro",              href: "/dashboard/finance" },
+                    { icon: Settings,        label: "Configurações",           href: "/dashboard/settings" },
+                ]
+            }
         ];
+    } else if (isAgencyClient) {
+        // ---- AGENCY CLIENT MENU ----
+        const strategyItems = [
+            { icon: LayoutDashboard, label: "Visão Geral",  href: "/dashboard" },
+            { icon: MessageSquare,   label: "Meu Agente",   href: "/dashboard/bots" },
+            { icon: Users,           label: "CRM Pipeline", href: "/dashboard/crm" },
+        ];
+        const marketingItems = [];
+        if (userPlans?.hasWriter) {
+            marketingItems.push({ icon: PenTool,    label: "Escritor IA",  href: "/dashboard/writer" });
+            marketingItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
+        }
+        menuCategories = [
+            {
+                category: "ESTRUTURA & ESTRATÉGIA",
+                items: strategyItems
+            }
+        ];
+        if (marketingItems.length > 0) {
+            menuCategories.push({
+                category: "MARKETING & ESCALA",
+                items: marketingItems
+            });
+        }
+        menuCategories.push({
+            category: "CONTA",
+            items: [
+                { icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" },
+                { icon: Settings,   label: "Configurações", href: "/dashboard/settings" },
+            ]
+        });
     } else {
         // ---- USER MENU ----
         const overviewLink = (userPlans?.hasWriter && !userPlans?.hasPrimary) ? "/dashboard/writer" : "/dashboard";
-        menuItems = [
-            { icon: LayoutDashboard, label: "Visão Geral",   href: overviewLink },
-        ];
+        const primaryItems = [];
         if (userPlans?.hasPrimary) {
-            menuItems.push({ icon: Users,        label: "CRM Pipeline",  href: "/dashboard/crm" });
-            menuItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
+            primaryItems.push({ icon: Users,        label: "CRM Pipeline",  href: "/dashboard/crm" });
+            primaryItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
         }
+        const writerItems = [];
         if (userPlans?.hasWriter) {
-            menuItems.push({ icon: PenTool,    label: "Escritor IA",  href: "/dashboard/writer" });
-            menuItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
+            writerItems.push({ icon: PenTool,    label: "Escritor IA",  href: "/dashboard/writer" });
+            writerItems.push({ icon: TrendingUp, label: "Marketing IA", href: "/dashboard/marketing" });
         }
-        menuItems.push({ icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" });
-        menuItems.push({ icon: Settings,   label: "Configurações", href: "/dashboard/settings" });
+        menuCategories = [
+            {
+                category: "ESTRUTURA & ESTRATÉGIA",
+                items: [
+                    { icon: LayoutDashboard, label: "Visão Geral", href: overviewLink },
+                    ...primaryItems
+                ]
+            }
+        ];
+        if (writerItems.length > 0) {
+            menuCategories.push({
+                category: "MARKETING & ESCALA",
+                items: writerItems
+            });
+        }
+        menuCategories.push({
+            category: "CONTA",
+            items: [
+                { icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" },
+                { icon: Settings,   label: "Configurações", href: "/dashboard/settings" },
+            ]
+        });
     }
-
+ 
     return (
         <aside className={`h-full bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? 'w-20' : 'w-64'}`}>
             {isImpersonating && (
@@ -104,7 +197,7 @@ export default function Sidebar({ branding, userPlans, isImpersonating }: { bran
                     </div>
                 )}
                 {collapsed && <img src={logo} className="h-12 w-auto object-contain" alt="Logo" />}
-
+ 
                 <button
                     onClick={() => setCollapsed(!collapsed)}
                     className="absolute -right-3 top-8 bg-[#00a884] rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-[#008f6f] transition-colors text-white shadow-lg border border-[#0f172a]"
@@ -112,40 +205,85 @@ export default function Sidebar({ branding, userPlans, isImpersonating }: { bran
                     {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
                 </button>
             </div>
-
+ 
             {/* Menu */}
-            <nav className="flex-1 py-6 px-3 space-y-2">
-                {menuItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all group ${isActive
-                                ? "bg-[#00a884]/10 border border-[#00a884]/20 text-[#00a884]"
-                                : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                }`}
-                        >
-                            <span className={`text-xl transition-transform group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
-                                <item.icon size={22} />
-                            </span>
-                            <span className={`font-medium whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-                                {item.label}
-                            </span>
-                            {isActive && !collapsed && (
-                                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a884] shadow-[0_0_5px_#00a884]" />
-                            )}
-                        </Link>
-                    );
-                })}
+            <nav className="flex-1 py-6 px-3 space-y-5 overflow-y-auto">
+                {menuCategories.map((cat, catIdx) => (
+                    <div key={catIdx} className="space-y-1.5">
+                        {cat.category && !collapsed && (
+                            <p className="text-[10px] font-black tracking-widest text-[#00a884] uppercase px-4 opacity-50 select-none">
+                                {cat.category}
+                            </p>
+                        )}
+                        {cat.items.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all group ${isActive
+                                        ? "bg-[#00a884]/10 border border-[#00a884]/20 text-[#00a884]"
+                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                        }`}
+                                >
+                                    <span className={`text-xl transition-transform group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
+                                        <item.icon size={20} />
+                                    </span>
+                                    <span className={`font-medium whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
+                                        {item.label}
+                                    </span>
+                                    {isActive && !collapsed && (
+                                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a884] shadow-[0_0_5px_#00a884]" />
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                ))}
             </nav>
-
+ 
             {/* User / Footer */}
             <div className="p-4 border-t border-white/5 space-y-2 bg-[#0f172a]">
-                {/* Plugin Downloads based on plan */}
-                {userPlans?.hasPrimary && (
-                    <a 
-                        href="/conexbot-wp.zip" 
+                {/* Agency branding — shown only for agency clients */}
+                {isAgencyClient && agencyInfo && (
+                    collapsed ? (
+                        <div className="flex justify-center mb-1" title={`Gerenciado por ${agencyInfo.name}`}>
+                            <div className="w-9 h-9 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                                <Building2 size={17} className="text-purple-400" />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-1">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-purple-400">Gerenciado por</p>
+                            <p className="text-sm font-bold text-white truncate">{agencyInfo.name}</p>
+                            {agencyInfo.whatsapp && (
+                                <a
+                                    href={`https://wa.me/${agencyInfo.whatsapp.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-green-400 transition-colors"
+                                >
+                                    <Phone size={11} />
+                                    <span>{agencyInfo.whatsapp}</span>
+                                </a>
+                            )}
+                            {agencyInfo.email && (
+                                <a
+                                    href={`mailto:${agencyInfo.email}`}
+                                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-blue-400 transition-colors"
+                                >
+                                    <Mail size={11} />
+                                    <span className="truncate">{agencyInfo.email}</span>
+                                </a>
+                            )}
+                        </div>
+                    )
+                )}
+
+                {/* Plugin Downloads — hidden for agency clients */}
+                {!isAgencyClient && userPlans?.hasPrimary && (
+                    <a
+                        href="/conexbot-wp.zip"
                         download
                         className={`w-full flex items-center gap-3 p-3 rounded-xl bg-[#00a884]/10 hover:bg-[#00a884]/20 text-[#00a884] transition-colors border border-[#00a884]/20 ${collapsed ? 'justify-center' : ''}`}
                         title="Baixar Conext Bot"
@@ -155,9 +293,9 @@ export default function Sidebar({ branding, userPlans, isImpersonating }: { bran
                     </a>
                 )}
 
-                {userPlans?.hasWriter && (
-                    <a 
-                        href="/conext-writer.zip" 
+                {!isAgencyClient && userPlans?.hasWriter && (
+                    <a
+                        href="/conext-writer.zip"
                         download
                         className={`w-full flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-colors border border-indigo-500/20 ${collapsed ? 'justify-center' : ''}`}
                         title="Baixar Escritor IA"
@@ -168,9 +306,9 @@ export default function Sidebar({ branding, userPlans, isImpersonating }: { bran
                 )}
 
                 {/* Fallback if no specific plan is detected yet but user is active (or for admins) */}
-                {(!userPlans?.hasPrimary && !userPlans?.hasWriter) && (
-                    <a 
-                        href="/conexbot-wp.zip" 
+                {!isAgencyClient && (!userPlans?.hasPrimary && !userPlans?.hasWriter) && (
+                    <a
+                        href="/conexbot-wp.zip"
                         download
                         className={`w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 transition-colors border border-white/5 ${collapsed ? 'justify-center' : ''}`}
                         title="Baixar Plugin WP"

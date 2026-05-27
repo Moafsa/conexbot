@@ -19,7 +19,8 @@ import {
     FileText,
     Check,
     Copy,
-    X
+    X,
+    Sparkles
 } from "lucide-react";
 import Link from "next/link";
 
@@ -137,8 +138,8 @@ export default function ClientHubPage() {
             name: "Marketing Digital",
             description: "Gestão de anúncios e automação de tráfego.",
             icon: LayoutDashboard,
-            color: "text-purple-400",
-            bg: "bg-purple-400/10",
+            color: "text-cyan-400",
+            bg: "bg-cyan-400/10",
             manageUrl: `/dashboard/marketing?clientId=${clientId}`,
             type: "MARKETING"
         },
@@ -188,9 +189,19 @@ export default function ClientHubPage() {
                 </div>
 
                 <div className="flex gap-3">
-                    <button className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-2xl font-bold border border-white/10 transition-all text-sm flex items-center gap-2">
+                    <button
+                        onClick={() => router.push(`/dashboard/agency/clients/${clientId}/audit`)}
+                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold text-white transition-all text-sm flex items-center gap-2"
+                    >
+                        <Sparkles size={18} className="text-indigo-200" />
+                        Raio-X (Auditoria)
+                    </button>
+                    <button
+                        onClick={() => router.push(`/dashboard/agency/clients/new?clientId=${clientId}`)}
+                        className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-bold text-white transition-all text-sm flex items-center gap-2"
+                    >
                         <Settings size={18} />
-                        Editar Dados
+                        Editar Onboarding
                     </button>
                 </div>
             </div>
@@ -274,7 +285,7 @@ export default function ClientHubPage() {
                 </div>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-white/10 rounded-[40px] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-white/10 rounded-[40px] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
                     <div className="p-4 bg-indigo-500 rounded-3xl text-white shadow-xl shadow-indigo-500/20">
                         <MessageSquare size={32} />
@@ -314,20 +325,23 @@ export default function ClientHubPage() {
                         {!generatedInvoiceUrl ? (
                             <div className="space-y-6">
                                 <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">Plano Estratégico</label>
-                                    <select
-                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-4 px-5 text-white outline-none focus:border-blue-500/50 appearance-none"
-                                        value={selectedPlanId}
-                                        onChange={(e) => setSelectedPlanId(e.target.value)}
-                                    >
-                                        <option value="" disabled>Escolha um plano...</option>
-                                        {availablePlans
-                                            .filter(p => !filterType || p.type === filterType)
-                                            .map(p => (
-                                                <option key={p.id} value={p.id}>{p.name} - R$ {p.price}</option>
-                                            ))
-                                        }
-                                    </select>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 px-1">Serviço a ser Liberado</label>
+                                    <div className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-5 text-white flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
+                                                <Sparkles size={20} />
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-sm font-extrabold">
+                                                    {filterType === "PRIMARY" ? "Agentes de IA & WhatsApp" : 
+                                                     filterType === "MARKETING" ? "Marketing Digital" : 
+                                                     filterType === "CRM" ? "CRM & Funis de Vendas" : 
+                                                     filterType === "WRITER_PLUGIN" ? "Escritor IA (Redação)" : "Serviço Geral"}
+                                                </p>
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Ativação Direta Sem Complicações</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4">
@@ -356,6 +370,43 @@ export default function ClientHubPage() {
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* Market Suggestion & Revenue Split Preview */}
+                                {(() => {
+                                    const val = parseFloat(customValue) || 0;
+                                    const platformFeePercent = client?.agencyFee || 0;
+                                    const platformShare = (val * platformFeePercent) / 100;
+                                    const agencyShare = val - platformShare;
+
+                                    // Define market suggestions based on filterType
+                                    let suggestedPrice = 249;
+                                    if (filterType === "MARKETING") suggestedPrice = 349;
+                                    if (filterType === "CRM") suggestedPrice = 199;
+                                    if (filterType === "WRITER_PLUGIN") suggestedPrice = 149;
+
+                                    return (
+                                        <div className="space-y-4 bg-white/5 border border-white/5 rounded-2xl p-5 text-left text-xs text-gray-400">
+                                            <div className="flex items-center gap-2 text-indigo-400 font-bold">
+                                                <Sparkles size={14} className="animate-pulse" />
+                                                <span>💡 Sugestão Mínima de Mercado: R$ {suggestedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                            
+                                            {val > 0 && (
+                                                <div className="space-y-2 pt-2 border-t border-white/5">
+                                                    <p className="text-[10px] uppercase font-black tracking-wider text-gray-500">Estimativa de Divisão de Receita</p>
+                                                    <div className="flex justify-between items-center text-sm font-semibold">
+                                                        <span className="text-gray-300">🏢 Agência (Você):</span>
+                                                        <span className="text-emerald-400">R$ {agencyShare.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-500">({100 - platformFeePercent}%)</span></span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm font-semibold">
+                                                        <span className="text-gray-300">⚡ Plataforma (Taxa):</span>
+                                                        <span className="text-blue-400">R$ {platformShare.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-[10px] text-gray-500">({platformFeePercent}%)</span></span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">Canal de Pagamento</label>

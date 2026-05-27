@@ -100,7 +100,7 @@ export const MessageProcessor = {
         }
     },
 
-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number, adAttribution?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string; adId?: string; adsetId?: string; adName?: string; adsetName?: string; campaignId?: string; campaignName?: string; entrySource?: string; referrer?: string } } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         try {
             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
 
@@ -144,7 +144,7 @@ export const MessageProcessor = {
 
 
             // 2. Usage limits check
-            let counter = bot.tenant.usageCounter;
+            const counter = bot.tenant.usageCounter;
             
             // Auto-sync limits if there is an active/trialing subscription that has a plan
             const sub = subscription;
@@ -1069,6 +1069,32 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                 mediaMatches: mediaMatches as RegExpMatchArray[],
                 options,
             });
+
+            // 14b. Chatwoot bidirectional sync — push exchange to Chatwoot inbox (non-blocking)
+            // Only for WhatsApp channel. Simulator/generic/wordpress are already in the app or handled separately.
+            if (channel === 'whatsapp' && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                ChatwootService.syncToConversation(
+                    bot,
+                    senderPhone,
+                    (existingContact as any)?.name,
+                    messageText,
+                    cleanResponse,
+                ).then(async (cwConvId) => {
+                    if (cwConvId && conversation?.id) {
+                        // Persist chatwootConversationId on our Conversation so stage sync works
+                        await prisma.conversation.update({
+                            where: { id: conversation.id },
+                            data: { chatwootConversationId: cwConvId } as any,
+                        }).catch(() => {}); // ignore if column doesn't exist yet
+                        // Also sync CRM stage to Chatwoot
+                        if (analysis?.nextStageId) {
+                            ChatwootService.updateConversationCustomAttributes(
+                                bot, cwConvId, { crm_stage: analysis.nextStage, crm_stage_id: analysis.nextStageId }
+                            ).catch(() => {});
+                        }
+                    }
+                }).catch((e: any) => logToFile(`[Processor] Chatwoot sync error: ${e.message}`));
+            }
 
             // 15. Subscription Autonomy (Cancellation & Status)
             const CANCELLATION_KEYWORDS = /(cancelar|encerrar|parar|desistir).*(assinatura|plano|serviço|mensalidade)/i;

@@ -58,7 +58,7 @@ export async function GET() {
     }
 
     let totalMonthlyRevenue = 0;
-    let activeClientsCount = agency.clients.length;
+    const activeClientsCount = agency.clients.length;
     let activeSubscriptionsCount = 0;
 
     agency.clients.forEach((client: any) => {

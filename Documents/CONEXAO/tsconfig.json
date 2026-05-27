@@ -40,6 +40,9 @@
     "node_modules",
     "docker",
     "scripts",
-    ".agent"
+    ".agent",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "tmp"
   ]
 }

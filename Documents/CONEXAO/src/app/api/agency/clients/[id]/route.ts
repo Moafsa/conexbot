@@ -27,7 +27,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                     plan: true
                 }
             },
-            usageCounter: true
+            usageCounter: true,
+            bots: {
+                take: 1
+            },
+            clientAudits: {
+                orderBy: {
+                    createdAt: 'desc'
+                }
+            }
         }
     });
  
@@ -35,7 +43,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
  
-    return NextResponse.json(client);
+    return NextResponse.json({
+        ...client,
+        agencyFee: agency.currentFee
+    });
 }
 
 // PUT - Update client info

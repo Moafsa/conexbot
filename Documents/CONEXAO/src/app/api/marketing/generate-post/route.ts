@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { theme, tone, platform, botId, baseImageUrls, videoUrl } = body;
+        const { theme, tone, platform, botId, baseImageUrls, videoUrl, postFormat } = body;
 
         if (!theme || !botId) {
             return NextResponse.json({ error: "Tema e Bot ID são obrigatórios" }, { status: 400 });
@@ -23,7 +23,8 @@ export async function POST(req: Request) {
             tone,
             platform,
             baseImageUrls: baseImageUrls || [],
-            videoUrl
+            videoUrl,
+            postFormat
         });
 
         return NextResponse.json(post);

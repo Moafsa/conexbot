@@ -18,7 +18,8 @@ export const BufferingService = {
         text: string,
         channel: 'whatsapp' | 'simulator',
         inputType: 'text' | 'audio' | 'image' = 'text',
-        whatsappChatJid?: string
+        whatsappChatJid?: string,
+        adAttribution?: Record<string, string | undefined>
     ) {
         const key = `${sessionName}:${contactId}`;
         const r = getRedis();
@@ -48,16 +49,23 @@ export const BufferingService = {
         // Set TTL on the list so it auto-cleans if the timer fires but Redis was restarted
         await r.expire(bufferKey(key), Math.ceil((delay + 30_000) / 1000));
 
-        // Store metadata (channel, jid, hadAudio)
+        // Store metadata (channel, jid, hadAudio, adAttribution)
         const hadAudio = inputType === 'audio';
         const existingMeta = await r.hgetall(metaKey(key));
-        await r.hset(metaKey(key), {
+        const metaPayload: Record<string, string> = {
             sessionName,
             contactId,
             channel,
             whatsappChatJid: whatsappChatJid || existingMeta.whatsappChatJid || '',
             hadAudio: (existingMeta.hadAudio === '1' || hadAudio) ? '1' : '0',
-        });
+        };
+        // Only store ad attribution once (first-touch)
+        if (adAttribution && !existingMeta.adAttribution) {
+            metaPayload.adAttribution = JSON.stringify(adAttribution);
+        } else if (existingMeta.adAttribution) {
+            metaPayload.adAttribution = existingMeta.adAttribution;
+        }
+        await r.hset(metaKey(key), metaPayload);
         await r.expire(metaKey(key), Math.ceil((delay + 30_000) / 1000));
 
         // Reset debounce timer
@@ -85,6 +93,7 @@ export const BufferingService = {
 
         const combinedText = messages.join('\n');
         const inputType = meta.hadAudio === '1' ? 'audio' : 'text';
+        const adAttribution = meta.adAttribution ? JSON.parse(meta.adAttribution) : undefined;
 
         console.log(`[Buffering] Flushing ${messages.length} message(s) for ${meta.contactId}`);
 
@@ -94,7 +103,7 @@ export const BufferingService = {
             combinedText,
             meta.channel as any,
             'sessionName',
-            { inputType: inputType as any, whatsappChatJid: meta.whatsappChatJid || undefined }
+            { inputType: inputType as any, whatsappChatJid: meta.whatsappChatJid || undefined, adAttribution }
         ).catch(err => console.error('[Buffering] Process error:', err));
     },
 };

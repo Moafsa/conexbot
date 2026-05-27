@@ -94,7 +94,7 @@ export async function GET() {
                 error: asaasError
             },
             subscriptions: subscription.map((s: any) => {
-                let expiresAt = new Date(s.updatedAt);
+                const expiresAt = new Date(s.updatedAt);
                 const interval = s.plan?.interval || 'MONTHLY';
 
                 if (s.status === 'ACTIVE') {

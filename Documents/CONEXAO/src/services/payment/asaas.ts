@@ -365,7 +365,102 @@ export const AsaasService = {
             percentualValue?: number;
         }>;
     }): Promise<{ success: boolean; id?: string; url?: string; error?: string }> {
-        // ... (existing code)
+        try {
+            // MOCK MODE FOR DEV
+            if (!params.apiKey || params.apiKey === 'mock_key') {
+                console.log('[Asaas] Using Mock Subscription for Dev');
+                return {
+                    success: true,
+                    id: `sub_mock_${Date.now()}`,
+                    url: `https://sandbox.asaas.com/money/pay/mock-${Date.now()}`
+                };
+            }
+
+            // Create or get customer first
+            const customerBody: any = {
+                name: params.customerName,
+                email: params.customerEmail,
+                mobilePhone: params.customerPhone,
+            };
+            if (params.customerCpfCnpj && params.customerCpfCnpj.trim() !== '') {
+                customerBody.cpfCnpj = normalizeCpfCnpj(params.customerCpfCnpj);
+            }
+
+            const customerRes = await asaasFetch('/customers', {
+                method: 'POST',
+                body: JSON.stringify(customerBody),
+            }, params.apiKey);
+
+            let customerId: string;
+            if (customerRes.ok) {
+                const customer = await customerRes.json();
+                customerId = customer.id;
+            } else {
+                if (customerRes.status === 400) {
+                    try {
+                        const errData = await customerRes.json();
+                        const msg = errData.errors?.[0]?.description || 'Dados do cliente inválidos';
+                        return { success: false, error: msg };
+                    } catch {
+                        return { success: false, error: 'Dados do cliente inválidos. Verifique nome, email, CPF e telefone.' };
+                    }
+                }
+                const searchRes = await asaasFetch(
+                    `/customers?email=${encodeURIComponent(params.customerEmail)}`,
+                    { method: 'GET' },
+                    params.apiKey
+                );
+
+                if (!searchRes.ok) {
+                    return { success: false, error: 'Failed to create/find customer' };
+                }
+
+                const searchData = await searchRes.json();
+                if (!searchData.data || searchData.data.length === 0) {
+                    return { success: false, error: 'Customer creation failed' };
+                }
+                customerId = searchData.data[0].id;
+            }
+
+            // Create subscription
+            const nextDueDate = new Date();
+            nextDueDate.setDate(nextDueDate.getDate() + 7); // 7 days from now
+
+            const subRes = await asaasFetch('/subscriptions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    customer: customerId,
+                    billingType: 'UNDEFINED',
+                    value: params.value,
+                    nextDueDate: nextDueDate.toISOString().split('T')[0],
+                    cycle: PLAN_INTERVAL_MAP[params.cycle] || 'MONTHLY',
+                    description: params.description,
+                    split: params.splits,
+                }),
+            }, params.apiKey);
+
+            if (!subRes.ok) {
+                const error = await subRes.json();
+                console.error('[Asaas] Subscription creation error:', error);
+                return {
+                    success: false,
+                    error: error.errors?.[0]?.description || 'Subscription creation failed',
+                };
+            }
+
+            const subscription = await subRes.json();
+            return {
+                success: true,
+                id: subscription.id,
+                url: subscription.invoiceUrl || subscription.bankSlipUrl,
+            };
+        } catch (error) {
+            console.error('[Asaas] createSubscriptionForBot error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
     },
 
     /**

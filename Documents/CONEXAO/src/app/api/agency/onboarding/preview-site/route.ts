@@ -20,7 +20,9 @@ const EXTRACT_PROMPT = `Analise o conteúdo do site abaixo e retorne um JSON com
   "niche": "um de: restaurante | clinica | ecommerce | salao | imobiliaria | generico",
   "address": "endereço físico, se encontrado",
   "hours": "horário de funcionamento, se encontrado",
-  "phone": "telefone principal, se encontrado",
+  "phone": "telefone principal (sem formatação se possível), se encontrado",
+  "email": "email de contato principal, se encontrado",
+  "cpfCnpj": "CPF ou CNPJ da empresa (sem formatação se possível), se encontrado",
   "suggestedBotName": "nome sugerido para o bot (ex: Atendente Digital do [Nome])",
   "keyProducts": ["produto/serviço 1", "produto/serviço 2", "produto/serviço 3"]
 }

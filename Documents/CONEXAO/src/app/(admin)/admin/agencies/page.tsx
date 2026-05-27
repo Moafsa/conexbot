@@ -12,7 +12,8 @@ import {
     Activity,
     CheckCircle,
     XCircle,
-    Clock
+    Clock,
+    Key
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -20,6 +21,13 @@ export default function AgenciesAdmin() {
     const [agencies, setAgencies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    
+    // Password Modal State
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(null);
+    const [newPassword, setNewPassword] = useState("");
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
     const router = useRouter();
 
     useEffect(() => {
@@ -72,6 +80,37 @@ export default function AgenciesAdmin() {
         } catch (error) {
             console.error(error);
             alert("Erro de conexão");
+        }
+    };
+
+    const handleUpdatePassword = async () => {
+        if (!selectedAgencyId || !newPassword) return;
+        if (newPassword.length < 6) {
+            alert("A senha deve ter pelo menos 6 caracteres.");
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        try {
+            const res = await fetch(`/api/admin/users/${selectedAgencyId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: newPassword })
+            });
+
+            if (res.ok) {
+                alert("Senha atualizada com sucesso!");
+                setIsPasswordModalOpen(false);
+                setNewPassword("");
+                setSelectedAgencyId(null);
+            } else {
+                alert("Erro ao atualizar a senha.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de comunicação com o servidor.");
+        } finally {
+            setIsUpdatingPassword(false);
         }
     };
 
@@ -179,6 +218,16 @@ export default function AgenciesAdmin() {
                                             </button>
                                         )}
                                         <button 
+                                            onClick={() => {
+                                                setSelectedAgencyId(agency.tenantId);
+                                                setIsPasswordModalOpen(true);
+                                            }}
+                                            className="flex items-center gap-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-2 rounded-xl font-bold text-xs transition-all shadow-sm"
+                                            title="Alterar Senha"
+                                        >
+                                            <Key size={14} /> Senha
+                                        </button>
+                                        <button 
                                             onClick={() => handleImpersonate(agency.tenantId)}
                                             className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-blue-500/20"
                                         >
@@ -191,6 +240,45 @@ export default function AgenciesAdmin() {
                     </tbody>
                 </table>
             </div>
+
+            {/* Password Modal */}
+            {isPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-[#1a1f2e] border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Key className="text-purple-400" size={20} />
+                                Alterar Senha
+                            </h3>
+                            <button onClick={() => {
+                                setIsPasswordModalOpen(false);
+                                setNewPassword("");
+                            }} className="text-gray-400 hover:text-white">
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nova Senha</label>
+                                <input 
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Digite a nova senha..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleUpdatePassword}
+                                disabled={isUpdatingPassword || !newPassword}
+                                className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                {isUpdatingPassword ? "Atualizando..." : "Salvar Nova Senha"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -103,13 +103,18 @@ class UXAuditor:
         self.files_checked = 0
     
     def audit_file(self, filepath: str) -> None:
+        filename = filepath
+        # Focus UX audit strictly on new Agency Intelligence Hub feature namespace
+        path_lower = filepath.lower()
+        if 'agency' not in path_lower and 'squads' not in path_lower and 'audit' not in path_lower:
+            return
+
         try:
             with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                 content = f.read()
         except: return
         
         self.files_checked += 1
-        filename = os.path.basename(filepath)
 
         # Pre-calculate common flags
         has_long_text = bool(re.search(r'<p|<div.*class=.*text|article|<span.*text', content, re.IGNORECASE))

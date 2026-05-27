@@ -11,27 +11,49 @@ export async function GET(req: Request, { params }: { params: any }) {
         const pipelineId = searchParams.get('pipelineId');
 
         const whereCondition: any = { botId: id };
-        if (pipelineId) {
-            whereCondition.pipelineId = pipelineId;
-        } else {
-            // Se nenhum pipelineId for especificado, podemos retornar apenas os stages sem pipeline ou criar um pipeline padrão
-            whereCondition.pipelineId = null;
+
+        // Resolve which pipelineId to use:
+        // - If explicitly provided in the query, use it.
+        // - If not, auto-detect the bot's first pipeline (new bots always have a pipeline).
+        // - If no pipeline exists at all, fall back to null (legacy bots whose stages predate pipelines).
+        let resolvedPipelineId: string | null = pipelineId;
+        if (!pipelineId) {
+            const firstPipeline = await prisma.crmPipeline.findFirst({
+                where: { botId: id },
+                orderBy: { createdAt: 'asc' },
+                select: { id: true },
+            });
+            resolvedPipelineId = firstPipeline?.id ?? null;
         }
+        whereCondition.pipelineId = resolvedPipelineId;
 
         let stages = await prisma.crmStage.findMany({
             where: whereCondition,
             orderBy: { order: 'asc' }
         });
 
-        // Se o pipelineId for especificado e não existirem etapas para ele, criar etapas padrão para esse pipeline
-        if (stages.length === 0 && pipelineId) {
-            console.log(`[API /bots/${id}/crm/stages] No stages found for pipeline ${pipelineId}, creating defaults.`);
+        // If we found a pipeline but no stages yet, check if there are orphan stages (pipelineId = null)
+        // and adopt them into this pipeline before auto-creating defaults.
+        if (stages.length === 0 && resolvedPipelineId) {
+            const orphans = await prisma.crmStage.findMany({ where: { botId: id, pipelineId: null } });
+            if (orphans.length > 0) {
+                await prisma.crmStage.updateMany({
+                    where: { botId: id, pipelineId: null },
+                    data: { pipelineId: resolvedPipelineId },
+                });
+                stages = await prisma.crmStage.findMany({ where: whereCondition, orderBy: { order: 'asc' } });
+            }
+        }
+
+        // Se não existirem etapas para o pipeline resolvido, criar etapas padrão
+        if (stages.length === 0 && resolvedPipelineId) {
+            console.log(`[API /bots/${id}/crm/stages] No stages found for pipeline ${resolvedPipelineId}, creating defaults.`);
             const defaultStages = [
-                { botId: id, pipelineId: pipelineId, name: 'NOVO', color: 'blue', order: 0, description: 'Leads recentes' },
-                { botId: id, pipelineId: pipelineId, name: 'EM ATENDIMENTO', color: 'amber', order: 1, description: 'Leads em conversação' },
-                { botId: id, pipelineId: pipelineId, name: 'APRESENTAÇÃO', color: 'purple', order: 2, description: 'Proposta enviada' },
-                { botId: id, pipelineId: pipelineId, name: 'NEGOCIAÇÃO', color: 'pink', order: 3, description: 'Ajustes finos' },
-                { botId: id, pipelineId: pipelineId, name: 'GANHO', color: 'emerald', order: 4, description: 'Venda concluída' },
+                { botId: id, pipelineId: resolvedPipelineId, name: 'NOVO', color: 'blue', order: 0, description: 'Leads recentes' },
+                { botId: id, pipelineId: resolvedPipelineId, name: 'EM ATENDIMENTO', color: 'amber', order: 1, description: 'Leads em conversação' },
+                { botId: id, pipelineId: resolvedPipelineId, name: 'APRESENTAÇÃO', color: 'purple', order: 2, description: 'Proposta enviada' },
+                { botId: id, pipelineId: resolvedPipelineId, name: 'NEGOCIAÇÃO', color: 'pink', order: 3, description: 'Ajustes finos' },
+                { botId: id, pipelineId: resolvedPipelineId, name: 'GANHO', color: 'emerald', order: 4, description: 'Venda concluída' },
             ];
 
             await prisma.crmStage.createMany({
@@ -45,7 +67,10 @@ export async function GET(req: Request, { params }: { params: any }) {
             });
         }
 
-        return NextResponse.json(stages);
+        // Return stages with _pipelineId metadata so the frontend can track which pipeline is active
+        return NextResponse.json(stages, {
+            headers: { 'x-pipeline-id': resolvedPipelineId ?? '' }
+        });
     } catch (error) {
         console.error('[API /bots/[id]/crm/stages GET] Internal Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

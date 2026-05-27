@@ -123,7 +123,7 @@ export async function GET(req: Request, { params }: { params: any }) {
         const urlObj = new URL(req.url);
         const botId = urlObj.searchParams.get('botId');
 
-        let contact = await prisma.contact.findFirst({
+        const contact = await prisma.contact.findFirst({
             where: { id, tenantId },
             include: {
                 orders: {

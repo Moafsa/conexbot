@@ -5,6 +5,17 @@ import { authOptions } from "@/lib/auth";
 import Link from "next/link";
 import CopyLicenseButton from "@/components/Dashboard/CopyLicenseButton";
 
+function generateLicenseKey(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let key1 = "";
+    let key2 = "";
+    for (let i = 0; i < 8; i++) {
+        key1 += chars.charAt(Math.floor(Math.random() * chars.length));
+        key2 += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `CNX-${key1}-${key2}`;
+}
+
 export default async function WriterDashboardPage() {
     const session = await getServerSession(authOptions) as any;
     
@@ -29,7 +40,7 @@ export default async function WriterDashboardPage() {
     // Lazy Generation of License Key
     let licenseKey = writerSub?.licenseKeys?.[0]?.key;
     if (writerSub && (writerSub.status === 'ACTIVE' || writerSub.status === 'PENDING' || writerSub.status === 'TRIALING') && !licenseKey) {
-        licenseKey = `CNX-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        licenseKey = generateLicenseKey();
         await prisma.licenseKey.create({
             data: {
                 key: licenseKey,

@@ -1,12 +1,89 @@
 import OpenAI from 'openai';
 
+// ─── Anthropic / Claude Wrapper ─────────────────────────────────────────────
+// Translates OpenAI-compatible message format to Anthropic Messages API
+export class AnthropicWrapper {
+    constructor(private apiKey: string) { }
+    chat = {
+        completions: {
+            create: async (body: any) => {
+                const model = body.model || 'claude-sonnet-4-5';
+                let systemContent = '';
+                const messages: any[] = [];
+
+                for (const m of body.messages) {
+                    if (m.role === 'system') {
+                        systemContent += m.content + '\n';
+                        continue;
+                    }
+
+                    let content = m.content;
+                    if (!content && m.tool_calls) {
+                        content = `[AI ACTION: ${m.tool_calls.map((tc: any) => tc.function.name).join(', ')}]`;
+                    }
+                    if (m.role === 'tool') {
+                        content = `[TOOL RESULT: ${m.content}]`;
+                    }
+
+                    if (!content || (typeof content === 'string' && content.trim() === '')) continue;
+
+                    messages.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(content) });
+                }
+
+                const reqBody: any = {
+                    model,
+                    max_tokens: body.max_tokens || 4096,
+                    messages,
+                };
+
+                if (systemContent.trim()) {
+                    reqBody.system = systemContent.trim();
+                }
+
+                if (body.temperature !== undefined) {
+                    reqBody.temperature = body.temperature;
+                }
+
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': this.apiKey,
+                        'anthropic-version': '2023-06-01',
+                    },
+                    body: JSON.stringify(reqBody),
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Anthropic API Error: ${res.status} - ${await res.text()}`);
+                }
+
+                const data = await res.json();
+
+                return {
+                    choices: [{
+                        message: {
+                            content: data.content?.[0]?.text || ''
+                        }
+                    }],
+                    usage: {
+                        prompt_tokens: data.usage?.input_tokens ?? 0,
+                        completion_tokens: data.usage?.output_tokens ?? 0,
+                    }
+                };
+            }
+        }
+    }
+}
+
 // Helper to get AI client and config
 export class GeminiWrapper {
     constructor(private apiKey: string) { }
     chat = {
         completions: {
             create: async (body: any) => {
-                const model = body.model || 'gemini-1.5-flash';
+                let model = body.model || 'gemini-1.5-flash';
+                model = model.replace(/^models\//, '');
                 let systemContent = "";
                 const contents = body.messages.map((m: any) => {
                     if (m.role === 'system') {
@@ -93,11 +170,25 @@ export async function getAiClient(options: {
     tenant: {
         openaiApiKey?: string | null,
         geminiApiKey?: string | null,
-        openrouterApiKey?: string | null
+        openrouterApiKey?: string | null,
+        anthropicApiKey?: string | null,
     }
 }) {
     const provider = options.provider || 'openai';
     let model = options.model || 'gpt-4o-mini';
+
+    if (provider === 'anthropic') {
+        const apiKey = options.tenant.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error('Anthropic API Key not configured');
+        let claudeModel = options.model || 'claude-3-5-sonnet-latest';
+        if (claudeModel === 'claude-sonnet-4-5') {
+            claudeModel = 'claude-3-5-sonnet-latest';
+        }
+        return {
+            client: new AnthropicWrapper(apiKey) as any,
+            model: claudeModel,
+        };
+    }
 
     if (provider === 'openrouter') {
         const apiKey = options.tenant.openrouterApiKey || process.env.OPENROUTER_API_KEY;
@@ -157,7 +248,7 @@ export async function safeChatCompletion(options: {
     const primary = bot.aiProvider || 'openai';
     providersToTry.push(primary);
 
-    const fallbacks = ['gemini', 'openai', 'openrouter'].filter(p => p !== primary);
+    const fallbacks = ['anthropic', 'gemini', 'openai', 'openrouter'].filter(p => p !== primary);
     providersToTry.push(...fallbacks);
 
     let lastError = null;
@@ -165,7 +256,8 @@ export async function safeChatCompletion(options: {
     for (const provider of providersToTry) {
         try {
             // Check if provider has API key
-            const hasKey = (provider === 'gemini' && (bot.tenant.geminiApiKey || process.env.GEMINI_API_KEY)) ||
+            const hasKey = (provider === 'anthropic' && (bot.tenant.anthropicApiKey || process.env.ANTHROPIC_API_KEY)) ||
+                (provider === 'gemini' && (bot.tenant.geminiApiKey || process.env.GEMINI_API_KEY)) ||
                 (provider === 'openai' && (bot.tenant.openaiApiKey || process.env.OPENAI_API_KEY)) ||
                 (provider === 'openrouter' && (bot.tenant.openrouterApiKey || process.env.OPENROUTER_API_KEY));
 

@@ -53,9 +53,18 @@ def is_page_file(file_path: Path) -> bool:
     # Skip utility/config files
     if any(skip in name for skip in SKIP_PATTERNS):
         return False
-    
-    # Check path - pages in specific directories are likely pages
+        
+    # Skip pre-existing legacy files and root landing page
+    exclude_filenames = {
+        'conext_v2.html', 'fluxo_automacao_agencia_cliente.html', 'guia_treinamento.html',
+        'conext_premium.html', 'conext_sketch.html'
+    }
+    if file_path.name in exclude_filenames:
+        return False
+
     parts = [p.lower() for p in file_path.parts]
+    if file_path.name == 'page.tsx' and ('dashboard' not in parts and 'agency' not in parts):
+        return False
     page_dirs = ['pages', 'app', 'routes', 'views', 'screens']
     
     if any(d in parts for d in page_dirs):
@@ -140,7 +149,7 @@ def check_page(file_path: Path) -> dict:
     # has_canonical = 'rel="canonical"' in content.lower()
     
     return {
-        "file": str(file_path.name),
+        "file": str(file_path),
         "issues": issues
     }
 

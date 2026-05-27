@@ -76,9 +76,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Use custom value if provided and above minimum
         let value = customValue || basePrice;
 
-        // Simple validation: don't allow price below plan price (to protect platform fees)
-        if (customValue && customValue < plan.price) {
-            return NextResponse.json({ error: `O valor não pode ser inferior ao mínimo da plataforma (R$ ${plan.price})` }, { status: 400 });
+        // Simple validation: allow any price down to R$ 1.00 to protect gateway payment minimums
+        if (customValue && customValue < 1.00) {
+            return NextResponse.json({ error: `O valor mínimo para geração da fatura é R$ 1,00` }, { status: 400 });
         }
 
         if (interval === 'QUARTERLY') value = value * 3;

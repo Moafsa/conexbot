@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, Plus, Search, Mail, Building2, Trash2, ExternalLink, UserPlus, LayoutDashboard, FileText, Copy, Check, Edit2, Send, MessageSquare, Bot } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Users, Plus, Search, Mail, Building2, Trash2, ExternalLink, UserPlus, LayoutDashboard, FileText, Copy, Check, Edit2, Send, MessageSquare, Bot, Sparkles } from "lucide-react";
 
 export default function AgencyClientsPage() {
+    const router = useRouter();
     const [clients, setClients] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -13,8 +15,21 @@ export default function AgencyClientsPage() {
     const [inviteName, setInviteName] = useState("");
     const [inviteCpfCnpj, setInviteCpfCnpj] = useState("");
     const [invitePhone, setInvitePhone] = useState("");
+    const [inviteNiche, setInviteNiche] = useState("generico");
+    const [inviteWebsite, setInviteWebsite] = useState("");
+    const [inviteSitePreview, setInviteSitePreview] = useState<any>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [inviting, setInviting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const NICHES = [
+        { value: 'generico', label: '🤖 Genérico' },
+        { value: 'restaurante', label: '🍽️ Restaurante / Delivery' },
+        { value: 'clinica', label: '🏥 Clínica / Saúde' },
+        { value: 'ecommerce', label: '🛒 E-commerce / Loja' },
+        { value: 'salao', label: '💈 Salão / Estética' },
+        { value: 'imobiliaria', label: '🏠 Imobiliária' },
+    ];
 
     // Invoice Modal states
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -67,32 +82,55 @@ export default function AgencyClientsPage() {
         }
     };
 
+    const handlePreviewSite = async () => {
+        if (!inviteWebsite) return;
+        setPreviewLoading(true);
+        setInviteSitePreview(null);
+        try {
+            const res = await fetch("/api/agency/onboarding/preview-site", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: inviteWebsite })
+            });
+            const data = await res.json();
+            if (res.ok && data.extracted) {
+                setInviteSitePreview(data.extracted);
+                if (data.extracted.niche) setInviteNiche(data.extracted.niche.toLowerCase());
+                if (data.extracted.businessName && !inviteName) setInviteName(data.extracted.businessName);
+            }
+        } catch { /* silent */ } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     const handleInvite = async () => {
         if (!inviteEmail || !inviteName) return alert("Preencha nome e e-mail.");
         if (!inviteCpfCnpj) return alert("CPF/CNPJ é obrigatório para emissão de faturas.");
         if (!invitePhone) return alert("Telefone é obrigatório para emissão de faturas.");
         setInviting(true);
         try {
-            const res = await fetch("/api/agency/clients", {
+            // Use the full onboarding endpoint (creates Tenant + Bot + Pipeline + Stages + Rules + UsageCounter)
+            const res = await fetch("/api/agency/onboarding", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    email: inviteEmail, 
+                body: JSON.stringify({
+                    email: inviteEmail,
                     name: inviteName,
                     cpfCnpj: inviteCpfCnpj,
-                    phone: invitePhone
+                    phone: invitePhone,
+                    niche: inviteNiche,
+                    websiteUrl: inviteWebsite || undefined,
+                    knowledgeBase: inviteSitePreview?.knowledgeBaseExcerpt || undefined,
                 })
             });
             const data = await res.json();
             if (res.ok) {
-                if (data.tempPassword) {
-                    alert(`✅ Cliente cadastrado!\n\nE-mail: ${inviteEmail}\nSenha provisória: ${data.tempPassword}\n\nCompartilhe estas credenciais com o cliente.`);
-                }
+                const tmpl = data.template?.label || inviteNiche;
+                alert(`✅ Cliente cadastrado com sucesso!\n\nE-mail: ${inviteEmail}\nSenha provisória: ${data.tempPassword}\nBot criado: ${tmpl}\n\nCompartilhe estas credenciais com o cliente.`);
                 setShowInviteModal(false);
-                setInviteEmail("");
-                setInviteName("");
-                setInviteCpfCnpj("");
-                setInvitePhone("");
+                setInviteEmail(""); setInviteName(""); setInviteCpfCnpj("");
+                setInvitePhone(""); setInviteNiche("generico"); setInviteWebsite("");
+                setInviteSitePreview(null);
                 fetchClients();
             } else {
                 alert(data.error || "Erro ao adicionar cliente.");
@@ -232,13 +270,23 @@ export default function AgencyClientsPage() {
                     </h1>
                     <p className="text-gray-400 mt-1">Gerencie os clientes sob sua gestão.</p>
                 </div>
-                <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
-                >
-                    <UserPlus size={18} />
-                    Adicionar Cliente
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-3 rounded-2xl font-medium text-sm transition-all text-gray-300"
+                        title="Cadastro rápido"
+                    >
+                        <UserPlus size={16} />
+                        <span className="hidden sm:inline">Rápido</span>
+                    </button>
+                    <button
+                        onClick={() => router.push("/dashboard/agency/clients/new")}
+                        className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-emerald-500/20"
+                    >
+                        <Sparkles size={18} />
+                        Novo Cliente (Wizard)
+                    </button>
+                </div>
             </div>
 
             {/* Stats */}
@@ -415,6 +463,34 @@ export default function AgencyClientsPage() {
                         </div>
 
                         <div className="space-y-4">
+                            {/* Website URL + Auto-detect */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Site do Cliente (Opcional)</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="url"
+                                        placeholder="https://empresa.com.br"
+                                        className="flex-1 bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-emerald-500/50"
+                                        value={inviteWebsite}
+                                        onChange={(e) => setInviteWebsite(e.target.value)}
+                                    />
+                                    <button
+                                        onClick={handlePreviewSite}
+                                        disabled={!inviteWebsite || previewLoading}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-2xl text-xs font-bold transition-all whitespace-nowrap"
+                                    >
+                                        {previewLoading ? '⏳...' : '🔍 Detectar'}
+                                    </button>
+                                </div>
+                                {inviteSitePreview && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-gray-300 space-y-1">
+                                        <p className="font-bold text-emerald-400">✅ Site detectado: {inviteSitePreview.businessName}</p>
+                                        {inviteSitePreview.address && <p>📍 {inviteSitePreview.address}</p>}
+                                        {inviteSitePreview.hours && <p>🕐 {inviteSitePreview.hours}</p>}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-xs font-black uppercase tracking-widest text-gray-500">Nome do Cliente / Empresa</label>
                                 <input
@@ -425,6 +501,22 @@ export default function AgencyClientsPage() {
                                     onChange={(e) => setInviteName(e.target.value)}
                                 />
                             </div>
+
+                            {/* Niche selector */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Nicho / Segmento</label>
+                                <select
+                                    value={inviteNiche}
+                                    onChange={(e) => setInviteNiche(e.target.value)}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-emerald-500/50"
+                                >
+                                    {NICHES.map(n => (
+                                        <option key={n.value} value={n.value}>{n.label}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-gray-600">O bot será criado com template e funil de vendas pré-configurado para este nicho.</p>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-xs font-black uppercase tracking-widest text-gray-500">E-mail de Acesso</label>
                                 <input
@@ -462,7 +554,7 @@ export default function AgencyClientsPage() {
                         </div>
 
                         <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 text-xs text-gray-400">
-                            💡 Uma senha provisória será gerada. O cliente poderá alterar no primeiro acesso.
+                            💡 Bot, funil de vendas, regras de follow-up e senha de acesso são criados automaticamente.
                         </div>
 
                         <div className="flex gap-3">

@@ -19,7 +19,7 @@ export async function POST(
 
         if (!post) return NextResponse.json({ error: "Post não encontrado" }, { status: 404 });
 
-        let shareToken = post.shareToken || crypto.randomBytes(16).toString("hex");
+        const shareToken = post.shareToken || crypto.randomBytes(16).toString("hex");
 
         if (!post.shareToken) {
             await prisma.marketingPost.update({

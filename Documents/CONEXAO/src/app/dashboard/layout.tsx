@@ -43,24 +43,34 @@ export default async function DashboardLayout({
         if (targetId) {
             tenant = await prisma.tenant.findUnique({
                 where: { id: targetId },
-                include: { 
+                include: {
                     subscriptions: {
                         include: { licenseKeys: true }
-                    }, 
+                    },
                     usageCounter: true,
-                    agency: true
+                    agency: true,
+                    managedBy: {
+                        include: {
+                            tenant: { select: { name: true, whatsapp: true, email: true } }
+                        }
+                    },
                 }
             });
         } else {
             // Fallback: look up by email if id missing
             tenant = await prisma.tenant.findUnique({
                 where: { email: session.user.email },
-                include: { 
+                include: {
                     subscriptions: {
                         include: { licenseKeys: true }
-                    }, 
+                    },
                     usageCounter: true,
-                    agency: true
+                    agency: true,
+                    managedBy: {
+                        include: {
+                            tenant: { select: { name: true, whatsapp: true, email: true } }
+                        }
+                    },
                 }
             });
         }
@@ -92,13 +102,17 @@ export default async function DashboardLayout({
             );
         }
 
+        // Detect agency client (managed user who pays through agency invoices)
+        const isAgencyClient = !!(tenant?.agencyId && tenant?.role === 'USER');
+
         if (tenant && tenant.role === 'USER' && !isImpersonating) {
-            const activeSubs = tenant.subscriptions.filter((s: any) => 
+            const activeSubs = tenant.subscriptions.filter((s: any) =>
                 ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)
             );
             const hasSub = activeSubs.length > 0;
 
-            if (!hasSub) {
+            // Agency clients are billed through the agency — never redirect them to platform pricing
+            if (!hasSub && !isAgencyClient) {
                 const { redirect } = await import('next/navigation');
                 redirect('/pricing');
             }
@@ -139,10 +153,38 @@ export default async function DashboardLayout({
         }
     }
 
+    const isAgencyClient = !!(tenant?.agencyId && tenant?.role === 'USER');
+
     const userPlans = {
-        hasPrimary: Boolean(session?.user && (session.user.role === 'SUPERADMIN' || session.user.role === 'ADMIN' || tenant?.subscriptions?.some((s: any) => s.type === 'PRIMARY' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)))),
-        hasWriter: Boolean(session?.user && (session.user.role === 'SUPERADMIN' || session.user.role === 'ADMIN' || tenant?.subscriptions?.some((s: any) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))))
+        hasPrimary: Boolean(session?.user && (
+            session.user.role === 'SUPERADMIN' ||
+            session.user.role === 'ADMIN' ||
+            isAgencyClient || // agency clients always have access to primary features
+            tenant?.subscriptions?.some((s: any) => s.type === 'PRIMARY' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
+        )),
+        hasWriter: Boolean(session?.user && (
+            session.user.role === 'SUPERADMIN' ||
+            session.user.role === 'ADMIN' ||
+            tenant?.subscriptions?.some((s: any) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
+        )),
     };
-    
-    return <Shell branding={config} alertBanner={trialBanner} userPlans={userPlans} isImpersonating={isImpersonating}>{children}</Shell>;
+
+    const agencyInfo = isAgencyClient ? {
+        name: (tenant as any)?.managedBy?.tenant?.name || 'Sua Agência',
+        whatsapp: (tenant as any)?.managedBy?.tenant?.whatsapp || null,
+        email: (tenant as any)?.managedBy?.tenant?.email || null,
+    } : null;
+
+    return (
+        <Shell
+            branding={config}
+            alertBanner={trialBanner}
+            userPlans={userPlans}
+            isImpersonating={isImpersonating}
+            isAgencyClient={isAgencyClient}
+            agencyInfo={agencyInfo}
+        >
+            {children}
+        </Shell>
+    );
 }

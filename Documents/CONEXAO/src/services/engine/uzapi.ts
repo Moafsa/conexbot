@@ -328,7 +328,7 @@ export const UzapiService = {
         directPath?: string; DirectPath?: string;
     }): Promise<Buffer | null> {
         try {
-            let url = (imageMessage.URL || imageMessage.Url || '').replace(/ /g, '+');
+            const url = (imageMessage.URL || imageMessage.Url || '').replace(/ /g, '+');
             const mimetype = imageMessage.mimetype || imageMessage.Mimetype || 'image/jpeg';
             const fileLength = imageMessage.fileLength ?? imageMessage.FileLength ?? 0;
             const directPath = imageMessage.directPath || imageMessage.DirectPath || '';
@@ -398,7 +398,7 @@ export const UzapiService = {
     }): Promise<Buffer | null> {
         try {
             // WuzAPI issue #66: + in URL can become space when decoded - restore for API
-            let url = (audioMessage.URL || audioMessage.Url || '').replace(/ /g, '+');
+            const url = (audioMessage.URL || audioMessage.Url || '').replace(/ /g, '+');
             const mimetype = audioMessage.mimetype || audioMessage.Mimetype || 'audio/ogg; codecs=opus';
             const fileLength = audioMessage.fileLength ?? audioMessage.FileLength ?? 0;
             const directPath = audioMessage.directPath || audioMessage.DirectPath || '';

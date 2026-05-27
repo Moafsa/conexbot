@@ -15,7 +15,7 @@ export async function POST(req: Request) {
             );
         }
 
-        let { name, email, password, whatsapp, cpfCnpj, planId, trial, type, isAgency } = parsed.data;
+        const { name, email, password, whatsapp, cpfCnpj, planId, trial, type, isAgency } = parsed.data;
 
         // Ensure isAgency is a boolean if it comes as a string from a form
         const isAgencyFinal = isAgency === true || isAgency === "true";

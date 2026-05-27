@@ -57,6 +57,7 @@ model Tenant {
   openaiApiKey            String?
   openrouterApiKey        String?
   elevenLabsApiKey        String?
+  anthropicApiKey         String?
   asaasWalletId           String?
   resetToken              String?             @unique
   resetTokenExpires       DateTime?
@@ -88,6 +89,8 @@ model Tenant {
   mlRefreshToken          String?
   mlTokenExpires          DateTime?
   mlUserId                String?
+  clientAudits            ClientAudit[] @relation("ClientAudits")
+  clientTasks             ClientTask[] @relation("ClientTasks")
 }
 
 model ProductMapping {
@@ -642,6 +645,65 @@ model GlobalConfig {
   chatwootSuperAdminToken String?
   chatwootBaseUrl         String?
   mapboxToken             String?
+  anthropicApiKey         String?
+}
+
+// ─── Agency Intelligence Hub Models ───────────────────────────────────────
+
+model AgentTemplate {
+  id           String   @id @default(uuid())
+  squadId      String
+  squadName    String
+  name         String
+  role         String
+  emoji        String   @default("🤖")
+  systemPrompt String   @db.Text
+  tasks        Json     @default("[]")
+  llmProvider  String   @default("anthropic")
+  llmModel     String   @default("claude-sonnet-4-5")
+  isCustom     Boolean  @default(false)
+  agencyId     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([squadId])
+  @@index([agencyId])
+}
+
+model ClientAudit {
+  id           String   @id @default(uuid())
+  clientId     String
+  agencyId     String
+  scores       Json
+  report       Json
+  missions     Json     @default("[]")
+  overallScore Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  client       Tenant   @relation("ClientAudits", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([agencyId])
+}
+
+model ClientTask {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  squadId     String
+  agentId     String
+  clientId    String
+  agencyId    String
+  status      String   @default("PENDING") // PENDING, IN_PROGRESS, APPROVED, COMPLETED
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client      Tenant   @relation("ClientTasks", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([agencyId])
 }
 
 model Notification {

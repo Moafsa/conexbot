@@ -45,6 +45,7 @@ export function CRM() {
     const [draggedContact, setDraggedContact] = useState<string | null>(null);
     const [selectedContactPanel, setSelectedContactPanel] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
 
 
     useEffect(() => {
@@ -93,6 +94,9 @@ export function CRM() {
             if (res.ok) {
                 const data = await res.json();
                 setStages(data);
+                // Track which pipeline is active so new stages go to the right pipeline
+                const pipelineIdFromHeader = res.headers.get('x-pipeline-id');
+                setActivePipelineId(pipelineIdFromHeader || null);
             }
         } catch (error) {
             toast.error("Erro ao carregar estágios");
@@ -122,7 +126,7 @@ export function CRM() {
             const res = await fetch(`/api/bots/${selectedBotId}/crm/stages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newStageName, order: stages.length })
+                body: JSON.stringify({ name: newStageName, order: stages.length, pipelineId: activePipelineId })
             });
             if (res.ok) {
                 toast.success("Estágio criado!");

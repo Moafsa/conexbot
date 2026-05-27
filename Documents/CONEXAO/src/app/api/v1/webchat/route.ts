@@ -6,7 +6,30 @@ import { MessageProcessor } from '@/services/engine/processor';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { botId, message, sessionId, contactInfo } = body;
+        // utm_* and ad_* fields are passed by the frontend from URL params (e.g. ?utm_source=google)
+        const {
+            botId, message, sessionId, contactInfo,
+            utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+            ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name,
+            entry_source, referrer,
+        } = body;
+
+        // Build adAttribution only if there's any data
+        const adAttribution = (utm_source || utm_medium || utm_campaign || ad_id || entry_source) ? {
+            utmSource:    utm_source,
+            utmMedium:    utm_medium,
+            utmCampaign:  utm_campaign,
+            utmContent:   utm_content,
+            utmTerm:      utm_term,
+            adId:         ad_id,
+            adsetId:      adset_id,
+            adName:       ad_name,
+            adsetName:    adset_name,
+            campaignId:   campaign_id,
+            campaignName: campaign_name,
+            entrySource:  entry_source || (utm_source ? `webchat_${utm_source}` : 'webchat'),
+            referrer,
+        } : undefined;
 
         if (!botId || !message) {
             return NextResponse.json({ error: 'Parâmetros botId e message são obrigatórios' }, { status: 400 });
@@ -64,11 +87,12 @@ export async function POST(req: Request) {
         let response;
         try {
             response = await MessageProcessor.process(
-                bot.id, 
-                sessionId || 'web_user', 
-                message, 
+                bot.id,
+                sessionId || 'web_user',
+                message,
                 'generic',
-                'id'
+                'id',
+                { inputType: 'text', adAttribution }
             );
         } catch (procErr: any) {
             console.error(`[WebChat API] MessageProcessor CRASHED:`, procErr);

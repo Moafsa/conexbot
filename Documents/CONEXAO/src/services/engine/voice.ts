@@ -207,7 +207,7 @@ export const VoiceService = {
             const num = parseInt(integer.replace(/\./g, ''));
             const centsNum = cents ? parseInt(cents) : 0;
             
-            let parts = [];
+            const parts = [];
             if (num > 0) {
                 parts.push(this.numberToWordsPT(num));
                 parts.push(num === 1 ? 'real' : 'reais');

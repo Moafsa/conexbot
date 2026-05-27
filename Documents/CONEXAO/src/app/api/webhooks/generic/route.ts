@@ -65,18 +65,47 @@ export async function POST(req: Request) {
 
         // 1. Chatwoot Format Detection
         if (body.event === 'message_created' && body.conversation) {
-            // Ignore messages from the agent/system itself (Chatwoot sends outgoing replies too)
+            messageText = body.content || '';
+            chatwootConversationId = body.conversation.id;
+            const senderInfo = body.sender || {};
+            const senderType: string = senderInfo.type || senderInfo.sender_type || '';
+
+            // CASE A: Human agent typed a reply in Chatwoot → forward to WhatsApp (do NOT re-process through AI)
+            if (body.message_type === 'outgoing' && senderType === 'user') {
+                // Get the customer's phone from the conversation meta
+                const contactMeta = body.conversation?.meta?.sender || {};
+                const customerPhone = contactMeta.phone_number || contactMeta.identifier || String(contactMeta.id || '');
+                if (!customerPhone || !messageText) {
+                    return NextResponse.json({ status: 'ignored', message: 'Missing customer phone or text for agent reply' });
+                }
+                logToFile(`[Generic Webhook] Chatwoot AGENT reply → WhatsApp for ${customerPhone}: "${messageText.substring(0, 80)}"`);
+                // Forward the human agent's message to the customer on WhatsApp
+                try {
+                    const { UzapiService } = await import('@/services/whatsapp/uzapi');
+                    await UzapiService.sendMessage(bot.sessionName || '', customerPhone.replace(/\D/g, ''), messageText);
+                    return NextResponse.json({ status: 'forwarded_to_whatsapp' });
+                } catch (fwdErr: any) {
+                    logToFile(`[Generic Webhook] Forward agent reply to WhatsApp failed: ${fwdErr.message}`);
+                    return NextResponse.json({ status: 'forward_error', message: fwdErr.message }, { status: 500 });
+                }
+            }
+
+            // CASE B: Outgoing from bot/system (pushed by our syncToConversation) — ignore to avoid loops
             if (body.message_type === 'outgoing' || body.message_type === 'template') {
-                logToFile(`[Generic Webhook] Ignored outgoing Chatwoot message`);
+                logToFile(`[Generic Webhook] Ignored outgoing Chatwoot message (type=${senderType})`);
                 return NextResponse.json({ status: 'ignored_outgoing' });
             }
 
-            messageText = body.content || '';
-            chatwootConversationId = body.conversation.id;
-            const senderInfo = body.sender || (body.conversation.meta && body.conversation.meta.sender) || {};
+            // CASE C: Incoming from customer (we pushed this ourselves via sync — ignore to avoid loop)
+            // In API channel inboxes, 'incoming' messages come from our own pushes; WhatsApp already handled them.
+            if (body.message_type === 'incoming') {
+                logToFile(`[Generic Webhook] Ignored Chatwoot incoming (already processed via WhatsApp webhook)`);
+                return NextResponse.json({ status: 'ignored_already_processed' });
+            }
+
+            // CASE D: Fallback — treat as customer message for legacy / non-WhatsApp inboxes
             // Prefer phone_number, fallback to identifier, then email, then ID
             senderPhone = senderInfo.phone_number || senderInfo.identifier || senderInfo.email || String(senderInfo.id || 'chatwoot_user');
-
         }
         // 2. n8n / Generic Custom Format Detection
         else {

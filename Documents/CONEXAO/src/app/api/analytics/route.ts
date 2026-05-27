@@ -13,6 +13,28 @@ export async function GET() {
 
         const tenantId = (session.user as any).id;
 
+        // Fetch tenant info including agency relationship
+        const tenantBase = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: {
+                agencyId: true,
+                role: true,
+                managedBy: {
+                    select: {
+                        id: true,
+                        tenant: { select: { name: true, whatsapp: true, email: true } },
+                    },
+                },
+            },
+        });
+
+        const isAgencyClient = !!(tenantBase?.agencyId && tenantBase?.role === 'USER');
+        const agencyInfo = isAgencyClient && tenantBase?.managedBy ? {
+            name: tenantBase.managedBy.tenant?.name || 'Sua Agência',
+            whatsapp: tenantBase.managedBy.tenant?.whatsapp || null,
+            email: tenantBase.managedBy.tenant?.email || null,
+        } : null;
+
         // Aggregate analytics
         const [
             totalBots,
@@ -39,21 +61,21 @@ export async function GET() {
                     createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
                 },
             }),
-            prisma.subscription.findUnique({
-                where: { 
-                    tenantId_type: { 
-                        tenantId, 
-                        type: 'PRIMARY' 
-                    } 
+            prisma.subscription.findFirst({
+                where: {
+                    tenantId,
+                    type: 'PRIMARY',
+                    status: { in: ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'] },
                 },
-                include: { plan: true }
+                include: { plan: true },
+                orderBy: { createdAt: 'desc' },
             }),
             prisma.usageCounter.findUnique({ where: { tenantId } }),
             prisma.tenant.findUnique({
                 where: { id: tenantId },
-                select: { 
-                    openaiApiKey: true, 
-                    geminiApiKey: true, 
+                select: {
+                    openaiApiKey: true,
+                    geminiApiKey: true,
                     openrouterApiKey: true,
                     elevenLabsApiKey: true,
                     asaasApiKey: true
@@ -61,6 +83,28 @@ export async function GET() {
             }),
             prisma.bot.count({ where: { tenantId, connectionStatus: 'CONNECTED' } }),
         ]);
+
+        // For agency clients: fetch primary bot details
+        let primaryBot = null;
+        if (isAgencyClient) {
+            primaryBot = await prisma.bot.findFirst({
+                where: { tenantId, status: 'active' },
+                select: {
+                    id: true,
+                    name: true,
+                    niche: true,
+                    connectionStatus: true,
+                    channels: { select: { provider: true, identifier: true, status: true } },
+                    _count: {
+                        select: {
+                            conversations: true,
+                            contacts: true,
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'asc' },
+            });
+        }
 
         const hasAiKeys = !!(tenantDetails?.openaiApiKey || tenantDetails?.geminiApiKey || tenantDetails?.openrouterApiKey);
         const hasElevenLabs = !!tenantDetails?.elevenLabsApiKey;
@@ -111,7 +155,11 @@ export async function GET() {
                 hasAsaas,
                 hasVoiceConfig,
                 hasAdvancedConfig
-            }
+            },
+            // Agency client context
+            isAgencyClient,
+            agencyInfo,
+            primaryBot,
         });
     } catch (error) {
         console.error('Analytics error:', error);

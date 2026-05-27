@@ -5,6 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DollarSign, TrendingUp, CreditCard, Download, Loader2, ArrowUpRight, Wallet, Receipt, AlertCircle } from "lucide-react";
 import { Suspense } from "react";
 
+function SearchParamsHandler({ setOrdersSearch }: { setOrdersSearch: (val: string) => void }) {
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const clientEmail = searchParams.get('clientEmail');
+        if (clientEmail) {
+            setOrdersSearch(clientEmail);
+        }
+    }, [searchParams, setOrdersSearch]);
+    return null;
+}
+
 function ErrorBanner() {
     const searchParams = useSearchParams();
     const error = searchParams.get('error');
@@ -56,13 +67,6 @@ export default function FinancePage() {
         }, 300);
         return () => clearTimeout(timeout);
     }, [ordersPage, ordersSearch]);
-
-    useEffect(() => {
-        const clientEmail = searchParams.get('clientEmail');
-        if (clientEmail) {
-            setOrdersSearch(clientEmail);
-        }
-    }, [searchParams]);
 
     const fetchOrders = async (page = 1, search = '') => {
         setTableLoading(true);
@@ -172,6 +176,7 @@ export default function FinancePage() {
         <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
             <Suspense fallback={null}>
                 <ErrorBanner />
+                <SearchParamsHandler setOrdersSearch={setOrdersSearch} />
             </Suspense>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>

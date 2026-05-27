@@ -2,15 +2,15 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
-    TrendingUp, 
-    Search, 
-    PenTool, 
-    BarChart3, 
-    Settings, 
-    Plus, 
-    Zap, 
-    Instagram, 
-    Facebook, 
+    TrendingUp,
+    Search,
+    PenTool,
+    BarChart3,
+    Settings,
+    Plus,
+    Zap,
+    Instagram,
+    Facebook,
     ArrowUpRight,
     SearchCode,
     Sparkles,
@@ -25,7 +25,8 @@ import {
     XCircle,
     CheckCircle2,
     Check,
-    Trash2
+    Trash2,
+    ChevronRight
 } from "lucide-react";
 import { uploadMarketingMedia } from "@/app/actions/marketing-actions";
 
@@ -66,6 +67,7 @@ function MarketingContent() {
 
     const tabs = [
         { id: "overview", label: "Visão Geral", icon: BarChart3 },
+        { id: "leads", label: "Conversas com Leads", icon: History },
         { id: "seo", label: "SEO & Keywords", icon: SearchCode },
         { id: "content", label: "Criador de Posts", icon: Sparkles },
         { id: "ads", label: "Anúncios (Meta Ads)", icon: Target },
@@ -294,6 +296,7 @@ function MarketingContent() {
                     setEditingPost(post);
                     setShowEditModal(true);
                 }} />}
+                {activeTab === "leads" && <LeadsConversationTab bots={bots} loadingBots={loadingBots} />}
                 {activeTab === "seo" && <SEOTab />}
                 {activeTab === "content" && <ContentTab bots={bots} loadingBots={loadingBots} />}
                 {activeTab === "ads" && <AdsTab selectedClientId={selectedClientId} setShowCampaignModal={setShowCampaignModal} bots={bots} loadingBots={loadingBots} />}
@@ -852,6 +855,139 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
     );
 }
 
+// ─── Leads Conversation Tab ────────────────────────────────────────────────────
+function LeadsConversationTab({ bots, loadingBots }: { bots: any[]; loadingBots: boolean }) {
+    const [selectedBotId, setSelectedBotId] = useState<string>("");
+    const [conversations, setConversations] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [page, setPage] = useState(0);
+    const [expanded, setExpanded] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!selectedBotId && bots.length > 0) setSelectedBotId(bots[0].id);
+    }, [bots]);
+
+    useEffect(() => {
+        if (selectedBotId) { setPage(0); fetchFeed(selectedBotId, 0); }
+    }, [selectedBotId]);
+
+    const fetchFeed = async (botId: string, p: number) => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/marketing/leads-feed?botId=${botId}&page=${p}`);
+            const data = await res.json();
+            if (res.ok) setConversations(data.conversations || []);
+        } catch { /* silent */ }
+        finally { setLoading(false); }
+    };
+
+    if (loadingBots) return <div className="text-center text-gray-500 py-16">Carregando bots...</div>;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-start justify-between flex-wrap gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <History size={20} className="text-emerald-400" />
+                        Conversas com Leads
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Veja o que os leads estão perguntando e use isso para decidir sua estratégia de conteúdo.
+                    </p>
+                </div>
+                <select
+                    value={selectedBotId}
+                    onChange={e => setSelectedBotId(e.target.value)}
+                    className="bg-[#1a2235] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                >
+                    {bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+            </div>
+
+            {loading ? (
+                <div className="text-center text-gray-500 py-12">Carregando conversas...</div>
+            ) : conversations.length === 0 ? (
+                <div className="text-center text-gray-600 py-12 space-y-2">
+                    <History size={32} className="mx-auto text-gray-700" />
+                    <p className="text-sm">Nenhuma conversa nos últimos 30 dias para este bot.</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {conversations.map((conv: any) => (
+                        <div
+                            key={conv.id}
+                            className="bg-[#111827] border border-white/10 rounded-xl overflow-hidden"
+                        >
+                            <button
+                                onClick={() => setExpanded(expanded === conv.id ? null : conv.id)}
+                                className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-emerald-900/40 border border-emerald-500/30 rounded-full flex items-center justify-center text-xs text-emerald-400 font-bold">
+                                        {(conv.contactName || conv.contactPhone || "?")[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-white">
+                                            {conv.contactName || conv.contactPhone || "Lead desconhecido"}
+                                        </p>
+                                        {conv.crmStage && (
+                                            <span className="text-xs text-gray-500">Etapa: {conv.crmStage}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                    {conv.summary && (
+                                        <span className="hidden sm:inline max-w-xs truncate">{conv.summary}</span>
+                                    )}
+                                    <span>{new Date(conv.updatedAt).toLocaleDateString('pt-BR')}</span>
+                                    <ChevronRight size={14} className={`transition-transform ${expanded === conv.id ? "rotate-90" : ""}`} />
+                                </div>
+                            </button>
+                            {expanded === conv.id && conv.messages?.length > 0 && (
+                                <div className="border-t border-white/5 p-4 space-y-2 bg-[#0b0f1a]">
+                                    {conv.messages.map((msg: any, i: number) => (
+                                        <div
+                                            key={i}
+                                            className={`flex ${msg.role === 'assistant' ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            <div className={`max-w-[80%] px-3 py-2 rounded-xl text-xs ${
+                                                msg.role === 'assistant'
+                                                    ? 'bg-emerald-900/40 text-emerald-100'
+                                                    : 'bg-[#1a2235] text-gray-300'
+                                            }`}>
+                                                <span className="text-[10px] font-semibold opacity-60 block mb-0.5">
+                                                    {msg.role === 'assistant' ? 'Bot' : 'Lead'}
+                                                </span>
+                                                {msg.content}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {conversations.length === 20 && (
+                <div className="flex justify-center gap-3 pt-2">
+                    {page > 0 && (
+                        <button onClick={() => { const p = page - 1; setPage(p); fetchFeed(selectedBotId, p); }}
+                            className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 rounded-lg text-gray-400">
+                            ← Anterior
+                        </button>
+                    )}
+                    <button onClick={() => { const p = page + 1; setPage(p); fetchFeed(selectedBotId, p); }}
+                        className="px-4 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 rounded-lg text-white">
+                        Próximas →
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function SEOTab() {
     const [keyword, setKeyword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -1066,6 +1202,8 @@ function ContentTab({ bots, loadingBots }: any) {
     const [tone, setTone] = useState("Profissional");
     const [platform, setPlatform] = useState("Instagram Feed");
     const [botId, setBotId] = useState("");
+    const [postFormat, setPostFormat] = useState("SINGLE");
+    const [activeSlide, setActiveSlide] = useState(0);
     const [loading, setLoading] = useState(false);
     const [generatedPost, setGeneratedPost] = useState<any>(null);
     const [baseImages, setBaseImages] = useState<string[]>([]);
@@ -1168,7 +1306,8 @@ function ContentTab({ bots, loadingBots }: any) {
                     platform, 
                     botId, 
                     baseImageUrls: baseImages,
-                    videoUrl: videoUrl 
+                    videoUrl: videoUrl,
+                    postFormat
                 })
             });
             const data = await res.json();
@@ -1321,6 +1460,19 @@ function ContentTab({ bots, loadingBots }: any) {
                             />
                         </div>
 
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-400">Formato do Conteúdo</label>
+                            <select 
+                                value={postFormat}
+                                onChange={(e) => setPostFormat(e.target.value)}
+                                className="w-full bg-[#0b0f1a] border border-emerald-500/20 rounded-2xl p-3 text-emerald-400 font-bold focus:border-emerald-500/50 outline-none transition-all"
+                            >
+                                <option value="SINGLE">Post Único (Imagem + Legenda)</option>
+                                <option value="CAROUSEL">Carrossel Multislide (Vários Slides)</option>
+                                <option value="VIDEO_SCRIPT">Roteiro de Vídeo (Reels/TikTok/Shorts)</option>
+                            </select>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-400">Tom de Voz</label>
@@ -1339,7 +1491,12 @@ function ContentTab({ bots, loadingBots }: any) {
                                 <label className="text-sm font-medium text-gray-400">Plataforma</label>
                                 <select 
                                     value={platform}
-                                    onChange={(e) => setPlatform(e.target.value)}
+                                    onChange={(e) => {
+                                        setPlatform(e.target.value);
+                                        if (e.target.value.includes("Reels")) {
+                                            setPostFormat("VIDEO_SCRIPT");
+                                        }
+                                    }}
                                     className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-3 text-white focus:border-emerald-500/50 outline-none transition-all"
                                 >
                                     <option>Instagram Feed</option>
@@ -1434,40 +1591,176 @@ function ContentTab({ bots, loadingBots }: any) {
 
             <div className="space-y-6">
                 {generatedPost ? (() => {
-                    const headline = generatedPost.content.split('\n')[0].replace(/[#*]/g, '').substring(0, 60) || "Destaque Conexão";
+                    let parsedData: any = null;
+                    try {
+                        if (generatedPost.content && (generatedPost.content.trim().startsWith('{') || generatedPost.content.trim().startsWith('['))) {
+                            parsedData = JSON.parse(generatedPost.content);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse structured post data:", e);
+                    }
+
+                    const captionText = parsedData ? parsedData.caption : generatedPost.content;
+                    const headline = captionText.split('\n')[0].replace(/[#*]/g, '').substring(0, 60) || "Destaque Conexão";
                     
                     return (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="relative aspect-square rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group">
-                            {/* Imagem Base */}
-                            {generatedPost.mediaType === "VIDEO" || generatedPost.videoUrl ? (
-                                <video src={generatedPost.videoUrl || generatedPost.imageUrl} controls className="w-full h-full object-cover" />
-                            ) : (
-                                <img 
-                                    src={generatedPost.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} 
-                                    alt="Preview" 
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                />
-                            )}
+                        {parsedData && parsedData.type === "carousel" ? (
+                            /* --- GORGEOUS PREMIUM CAROUSEL PREVIEW --- */
+                            <div className="space-y-4">
+                                <div className="relative aspect-square rounded-[2rem] overflow-hidden border border-emerald-500/20 bg-black/60 shadow-2xl flex flex-col justify-between p-8">
+                                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/10 to-black/80 z-0"></div>
+                                    {generatedPost.imageUrl && (
+                                        <img src={generatedPost.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-20 z-0 mix-blend-overlay" alt="BG" />
+                                    )}
+                                    
+                                    {/* Header do Slide */}
+                                    <div className="relative z-10 flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full">
+                                            Carrossel Dinâmico
+                                        </span>
+                                        <span className="text-xs font-mono font-bold text-gray-400">
+                                            Slide {activeSlide + 1} de {parsedData.slides?.length || 1}
+                                        </span>
+                                    </div>
 
-                            {/* Badge de Status */}
-                            <div className="absolute top-6 right-6">
-                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md shadow-xl ${
-                                    generatedPost.status === 'PUBLISHED' 
-                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                                    : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                                }`}>
-                                    {generatedPost.status === 'PUBLISHED' ? 'Publicado' : 'Criativo Pronto'}
-                                </span>
+                                    {/* Conteúdo do Slide */}
+                                    <div className="relative z-10 space-y-4 my-auto text-center max-w-lg mx-auto">
+                                        <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight bg-gradient-to-r from-white via-white to-emerald-300 bg-clip-text text-transparent">
+                                            {parsedData.slides?.[activeSlide]?.title}
+                                        </h3>
+                                        <p className="text-sm sm:text-base text-gray-200 leading-relaxed font-medium">
+                                            {parsedData.slides?.[activeSlide]?.content}
+                                        </p>
+                                    </div>
+
+                                    {/* Diretriz do Designer (Glassmorphism Footer) */}
+                                    <div className="relative z-10 bg-white/5 border border-white/10 backdrop-blur-md p-4 rounded-2xl space-y-1">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Diretriz Visual para o Designer:</p>
+                                        <p className="text-xs text-gray-300 italic font-medium">
+                                            "{parsedData.slides?.[activeSlide]?.visualDescription || "Foco no conceito da marca."}"
+                                        </p>
+                                    </div>
+
+                                    {/* Navegação de Slides */}
+                                    <div className="absolute top-1/2 -translate-y-1/2 left-4 right-4 z-20 flex justify-between pointer-events-none">
+                                        <button 
+                                            disabled={activeSlide === 0}
+                                            onClick={() => setActiveSlide(prev => Math.max(0, prev - 1))}
+                                            className="w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-emerald-500 hover:border-emerald-500 disabled:opacity-20 transition-all pointer-events-auto shadow-lg"
+                                        >
+                                            ←
+                                        </button>
+                                        <button 
+                                            disabled={activeSlide === (parsedData.slides?.length || 1) - 1}
+                                            onClick={() => setActiveSlide(prev => Math.min((parsedData.slides?.length || 1) - 1, prev + 1))}
+                                            className="w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-emerald-500 hover:border-emerald-500 disabled:opacity-20 transition-all pointer-events-auto shadow-lg"
+                                        >
+                                            →
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Slides Thumbnails */}
+                                <div className="flex gap-2 overflow-x-auto py-2 custom-scrollbar">
+                                    {parsedData.slides?.map((slide: any, idx: number) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setActiveSlide(idx)}
+                                            className={`px-4 py-2.5 rounded-xl border text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
+                                                activeSlide === idx 
+                                                ? "bg-emerald-500 border-emerald-500 text-black shadow-lg shadow-emerald-500/10" 
+                                                : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                                            }`}
+                                        >
+                                            Slide {slide.slide}: {slide.title?.substring(0, 15)}...
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        ) : parsedData && parsedData.type === "video_script" ? (
+                            /* --- GORGEOUS PREMIUM VIDEO SCRIPT GRID --- */
+                            <div className="space-y-4">
+                                <div className="bg-[#0f172a] border border-blue-500/20 rounded-[2rem] p-6 space-y-6 shadow-2xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] -mr-32 -mt-32"></div>
+                                    <div className="relative z-10 flex items-center justify-between border-b border-white/10 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 font-bold">
+                                                Reels
+                                            </div>
+                                            <div>
+                                                <h4 className="font-extrabold text-white text-base">Roteiro Técnico de Vídeo</h4>
+                                                <p className="text-[9px] text-blue-400 uppercase font-black tracking-widest">Reels / TikTok / Shorts</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs font-mono font-bold text-gray-400">
+                                            {parsedData.scenes?.length || 0} cenas planejadas
+                                        </span>
+                                    </div>
+
+                                    <div className="relative z-10 space-y-4 max-h-[380px] overflow-y-auto custom-scrollbar pr-2">
+                                        {parsedData.scenes?.map((scene: any, idx: number) => (
+                                            <div key={idx} className="bg-black/30 border border-white/5 rounded-2xl p-4 space-y-3 hover:border-blue-500/30 transition-all">
+                                                <div className="flex items-center justify-between border-b border-white/5 pb-2 text-[10px] uppercase font-black tracking-widest">
+                                                    <span className="text-blue-400 font-bold">CENA {scene.scene}</span>
+                                                    <span className="text-gray-500 font-mono">{scene.time}</span>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9px] font-black text-gray-500 uppercase">Locução / Áudio:</span>
+                                                        <p className="text-gray-200 leading-relaxed font-medium">"{scene.audio}"</p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <span className="text-[9px] font-black text-gray-500 uppercase">Instrução de Vídeo:</span>
+                                                        <p className="text-gray-300 leading-relaxed italic">"{scene.video}"</p>
+                                                    </div>
+                                                </div>
+                                                {scene.screenText && (
+                                                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center gap-2 text-xs">
+                                                        <span className="text-[9px] font-black text-blue-400/80 uppercase">Texto na Tela:</span>
+                                                        <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-3 py-1 rounded-lg font-bold">
+                                                            {scene.screenText}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* --- STANDARD SINGLE POST IMAGE PREVIEW --- */
+                            <div className="relative aspect-square rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group">
+                                {/* Imagem Base */}
+                                {generatedPost.mediaType === "VIDEO" || generatedPost.videoUrl ? (
+                                    <video src={generatedPost.videoUrl || generatedPost.imageUrl} controls className="w-full h-full object-cover" />
+                                ) : (
+                                    <img 
+                                        src={generatedPost.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} 
+                                        alt="Preview" 
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    />
+                                )}
+
+                                {/* Badge de Status */}
+                                <div className="absolute top-6 right-6">
+                                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md shadow-xl ${
+                                        generatedPost.status === 'PUBLISHED' 
+                                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                    }`}>
+                                        {generatedPost.status === 'PUBLISHED' ? 'Publicado' : 'Criativo Pronto'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Legenda Final (Português)</h4>
                                 <button 
                                     onClick={() => {
-                                        navigator.clipboard.writeText(generatedPost.content);
+                                        navigator.clipboard.writeText(captionText);
                                         alert("Legenda copiada!");
                                     }}
                                     className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase transition-colors"
@@ -1475,7 +1768,7 @@ function ContentTab({ bots, loadingBots }: any) {
                                     Copiar
                                 </button>
                             </div>
-                            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{generatedPost.content}</p>
+                            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{captionText}</p>
                         </div>
 
                         <div className="flex flex-col gap-3">

@@ -19,7 +19,7 @@ function SettingsContent() {
     const [profile, setProfile] = useState({ name: "", email: "", whatsapp: "", cpfCnpj: "" });
     const [notifications, setNotifications] = useState({ email: true, whatsapp: true, marketing: false });
     const [finance, setFinance] = useState({ asaasApiKey: "", asaasWalletId: "" });
-    const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "" });
+    const [aiSettings, setAiSettings] = useState({ openaiApiKey: "", geminiApiKey: "", openrouterApiKey: "", elevenLabsApiKey: "", anthropicApiKey: "" });
     const [marketingSettings, setMarketingSettings] = useState({ googleAdsDeveloperToken: "", googleAdsCustomerId: "", semrushApiKey: "", dataForSeoApiKey: "" });
 
     const [smtpConfigs, setSmtpConfigs] = useState<any[]>([]);
@@ -57,7 +57,8 @@ function SettingsContent() {
                             openaiApiKey: data.openaiApiKey || "",
                             geminiApiKey: data.geminiApiKey || "",
                             openrouterApiKey: data.openrouterApiKey || "",
-                            elevenLabsApiKey: data.elevenLabsApiKey || ""
+                            elevenLabsApiKey: data.elevenLabsApiKey || "",
+                            anthropicApiKey: data.anthropicApiKey || ""
                         });
                     }
                 } else if (activeTab === "smtp") {
@@ -528,11 +529,30 @@ function SettingsContent() {
                                                 value={aiSettings.elevenLabsApiKey}
                                                 onChange={e => setAiSettings({ ...aiSettings, elevenLabsApiKey: e.target.value })}
                                                 placeholder="sk_..."
-                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors font-mono text-sm"
                                             />
-                                            <div className="mt-2 p-3 bg-purple-500/5 border border-purple-500/10 rounded-lg">
+                                            <div className="mt-2 p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
                                                 <p className="text-[10px] text-gray-400">
                                                     Para vozes personalizadas, pegue a chave em <a href="https://elevenlabs.io" target="_blank" className="underline">elevenlabs.io</a>. Depois, insira the **Voice ID** desejado nas configurações individuais de cada bot.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-white/10">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="text-xs font-bold bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent uppercase tracking-widest">✦ Novo</span>
+                                                <label className="block text-sm text-gray-300 font-medium">Anthropic (Claude) API Key</label>
+                                            </div>
+                                            <input
+                                                type="password"
+                                                value={aiSettings.anthropicApiKey}
+                                                onChange={e => setAiSettings({ ...aiSettings, anthropicApiKey: e.target.value })}
+                                                placeholder="sk-ant-..."
+                                                className="w-full bg-black/20 border border-orange-500/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-400 transition-colors font-mono text-sm"
+                                            />
+                                            <div className="mt-2 p-3 bg-orange-500/5 border border-orange-500/10 rounded-lg">
+                                                <p className="text-[10px] text-gray-400">
+                                                    Obtenha em <a href="https://console.anthropic.com/settings/keys" target="_blank" className="underline text-orange-300">console.anthropic.com</a>. Utilizado pelo Hub de Squads para análises estratégicas profundas com o Claude.
                                                 </p>
                                             </div>
                                         </div>

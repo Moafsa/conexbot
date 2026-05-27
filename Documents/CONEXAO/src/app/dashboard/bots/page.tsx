@@ -10,6 +10,7 @@ export default function BotsPage() {
     const [bots, setBots] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [isAgencyClient, setIsAgencyClient] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const clientId = searchParams.get("clientId");
@@ -176,6 +177,12 @@ export default function BotsPage() {
     useEffect(() => {
         fetchBots();
 
+        // Fetch agency client context once
+        fetch('/api/analytics')
+            .then(r => r.json())
+            .then(d => { if (d.isAgencyClient) setIsAgencyClient(true); })
+            .catch(() => {});
+
         // Refresh list when page becomes visible
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -193,10 +200,14 @@ export default function BotsPage() {
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-3">
                         {clientId && <Bot className="text-indigo-500 animate-pulse" />}
-                        {clientId ? 'Gerenciando Agentes do Cliente' : 'Meus Agentes'}
+                        {clientId ? 'Gerenciando Agentes do Cliente' : isAgencyClient ? 'Meu Agente' : 'Meus Agentes'}
                     </h1>
                     <p className="text-gray-400">
-                        {clientId ? `Você está configurando a infraestrutura para o cliente ID: ${clientId}` : 'Gerencie seus bots ativos e configurações.'}
+                        {clientId
+                            ? `Você está configurando a infraestrutura para o cliente ID: ${clientId}`
+                            : isAgencyClient
+                                ? 'Seu agente foi criado e configurado pela sua agência.'
+                                : 'Gerencie seus bots ativos e configurações.'}
                     </p>
                 </div>
                 <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
@@ -208,10 +219,13 @@ export default function BotsPage() {
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                         <span>Atualizar</span>
                     </button>
-                    <Link href={`/dashboard/create-bot${clientId ? `?clientId=${clientId}` : ''}`} className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
-                        <Plus size={18} />
-                        <span>Novo Agente</span>
-                    </Link>
+                    {/* Hide "Novo Agente" for agency clients — their bot was created via onboarding */}
+                    {!isAgencyClient && (
+                        <Link href={`/dashboard/create-bot${clientId ? `?clientId=${clientId}` : ''}`} className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
+                            <Plus size={18} />
+                            <span>Novo Agente</span>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -222,7 +236,13 @@ export default function BotsPage() {
                     </div>
                 ) : bots.length === 0 ? (
                     <div className="col-span-3 text-center py-20 text-gray-500">
-                        Nenhum agente encontrado.
+                        <Bot className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+                        <p className="mb-4">{isAgencyClient ? 'Seu agente está sendo configurado. Em breve aparecerá aqui.' : 'Nenhum agente encontrado.'}</p>
+                        {!isAgencyClient && (
+                            <Link href="/dashboard/create-bot" className="btn-primary px-6 py-2 text-sm">
+                                Criar Primeiro Agente
+                            </Link>
+                        )}
                     </div>
                 ) : (
                     bots.map((bot: any) => (
