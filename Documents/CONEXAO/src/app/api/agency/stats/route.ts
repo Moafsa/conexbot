@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { cookies } from "next/headers";
+import { getDynamicAgencyFee } from "@/lib/agency";
 
 export async function GET() {
     const session = await getServerSession(authOptions) as any;
@@ -94,7 +95,8 @@ export async function GET() {
     const nextTierName = nextTier ? (nextTier.name || `Tier ${nextTier.feePercentage}%`) : "Máximo Alcançado";
     const nextTierLimit = nextTier ? nextTier.minSalesVolume : 0;
 
-    const platformFee = agency.currentFee / 100;
+    const dynamicFee = await getDynamicAgencyFee(agency);
+    const platformFee = dynamicFee / 100;
     const platformFeeAmount = totalMonthlyRevenue * platformFee;
     const estimatedMonthlyProfit = totalMonthlyRevenue - platformFeeAmount;
 
@@ -106,7 +108,7 @@ export async function GET() {
         totalMonthlyRevenue,
         estimatedMonthlyProfit,
         platformCommission: platformFeeAmount,
-        currentFee: agency.currentFee,
+        currentFee: dynamicFee,
         tierInfo: {
             currentTierName: tierName,
             nextTierName: nextTierName,

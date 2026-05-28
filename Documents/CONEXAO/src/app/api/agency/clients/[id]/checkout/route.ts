@@ -5,6 +5,7 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { AsaasService } from '@/services/payment/asaas';
 import { MercadoPagoService } from '@/services/payment/mercadopago';
+import { getDynamicAgencyFee } from '@/lib/agency';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -133,14 +134,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
                 let splits: any[] | undefined = undefined;
 
-                if (globalConfig?.platformAsaasWalletId && agency.currentFee > 0) {
+                const dynamicFee = await getDynamicAgencyFee(agency);
+
+                if (globalConfig?.platformAsaasWalletId && dynamicFee > 0) {
                     splits = [
                         {
                             walletId: globalConfig.platformAsaasWalletId,
-                            percentualValue: agency.currentFee
+                            percentualValue: dynamicFee
                         }
                     ];
-                    console.log(`[Checkout] Applying platform split of ${agency.currentFee}% to wallet ${globalConfig.platformAsaasWalletId}`);
+                    console.log(`[Checkout] Applying platform split of ${dynamicFee}% to wallet ${globalConfig.platformAsaasWalletId}`);
                 }
                 // ---------------------------------
 

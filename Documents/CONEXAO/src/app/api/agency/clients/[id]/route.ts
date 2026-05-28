@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { PlanType } from "@prisma/client";
+import { getDynamicAgencyFee } from "@/lib/agency";
  
 // GET - Fetch client details and subscriptions
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -43,9 +44,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
     }
  
+    const dynamicFee = await getDynamicAgencyFee(agency);
+
     return NextResponse.json({
         ...client,
-        agencyFee: agency.currentFee
+        agencyFee: dynamicFee
     });
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getDynamicAgencyFee } from "@/lib/agency";
 
 export async function GET() {
     const session = await getServerSession(authOptions);
@@ -22,8 +23,16 @@ export async function GET() {
         },
         orderBy: { salesVolumeCurrentMonth: 'desc' }
     });
+
+    const agenciesWithDynamicFees = await Promise.all(agencies.map(async (agency) => {
+        const dynamicFee = await getDynamicAgencyFee(agency);
+        return {
+            ...agency,
+            currentFee: dynamicFee
+        };
+    }));
     
-    return NextResponse.json(agencies);
+    return NextResponse.json(agenciesWithDynamicFees);
 }
 
 export async function PUT(req: Request) {

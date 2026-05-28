@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { getDynamicAgencyFee } from '@/lib/agency';
 
 const ASAAS_PROD = 'https://api.asaas.com/v3';
 const ASAAS_SANDBOX = 'https://api-sandbox.asaas.com/v3';
@@ -494,7 +495,7 @@ export const AsaasService = {
 
         // 2. Calcular o split da plataforma (taxa decrescente)
         // O percentual da plataforma é agency.currentFee
-        const splitPercent = agency.currentFee;
+        const splitPercent = await getDynamicAgencyFee(agency);
 
         // 3. Criar a assinatura na conta do Asaas da Agência
         return await this.createSubscriptionForBot({

@@ -20,7 +20,9 @@ import {
     Check,
     Copy,
     X,
-    Sparkles
+    Sparkles,
+    Loader2,
+    RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,6 +34,14 @@ export default function ClientHubPage() {
     const [client, setClient] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Tab & UX suggestions states
+    const [activeTab, setActiveTab] = useState("services"); // "services" | "plano_de_voo"
+    const [syncing, setSyncing] = useState(false);
+    const [syncStep, setSyncStep] = useState(0);
+    const [syncSuccess, setSyncSuccess] = useState(false);
+    const [mappedMissions, setMappedMissions] = useState<string[]>([]);
+    const [mappingMissionId, setMappingMissionId] = useState<string | null>(null);
 
     // Invoice Modal states
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -117,6 +127,51 @@ export default function ClientHubPage() {
         }
         setShowInvoiceModal(true);
         setGeneratedInvoiceUrl(null);
+    };
+
+    const handleMapMission = async (mission: any) => {
+        setMappingMissionId(mission.id);
+        try {
+            const res = await fetch("/api/agency/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: mission.title,
+                    description: mission.description,
+                    squadId: mission.squad || "generico",
+                    agentId: mission.id,
+                    clientId: clientId,
+                    status: "PENDING"
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setMappedMissions(prev => [...prev, mission.id]);
+                alert("Missão mapeada como Task no Kanban com sucesso!");
+            } else {
+                alert(data.error || "Erro ao mapear missão no Kanban.");
+            }
+        } catch (e) {
+            alert("Erro de conexão.");
+        } finally {
+            setMappingMissionId(null);
+        }
+    };
+
+    const handleSyncContext = () => {
+        setSyncing(true);
+        setSyncStep(0);
+        setSyncSuccess(false);
+
+        const interval = setInterval(() => {
+            setSyncStep(s => {
+                if (s < 3) return s + 1;
+                clearInterval(interval);
+                setSyncing(false);
+                setSyncSuccess(true);
+                return s;
+            });
+        }, 1200);
     };
 
     if (loading) return <div className="p-12 text-center text-white">Carregando Hub do Cliente...</div>;
@@ -221,69 +276,373 @@ export default function ClientHubPage() {
                 </div>
             </div>
 
-            <div className="space-y-6">
-                <h2 className="text-xl font-bold flex items-center gap-3">
-                    <Zap className="text-emerald-500" />
-                    Ecossistema de Serviços
-                </h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {services.map((service) => {
-                        const sub = getSubscription(service.type);
-                        const isActive = sub && ['ACTIVE', 'TRIALING'].includes(sub.status);
-
-                        return (
-                            <div key={service.id} className="bg-white/5 border border-white/10 rounded-[40px] p-8 space-y-6 relative overflow-hidden group hover:border-white/20 transition-all">
-                                {isActive && <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-all"></div>}
-                                
-                                <div className="flex items-start justify-between relative z-10">
-                                    <div className={`p-4 rounded-2xl ${service.bg} ${service.color}`}>
-                                        <service.icon size={28} />
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
-                                        {isActive ? 'Liberado' : 'Aguardando'}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 relative z-10">
-                                    <h3 className="text-xl font-bold">{service.name}</h3>
-                                    <p className="text-gray-500 text-sm leading-relaxed">{service.description}</p>
-                                </div>
-
-                                {isActive ? (
-                                    <div className="space-y-3 pt-4 relative z-10">
-                                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-white/5 p-3 rounded-xl border border-white/5">
-                                            <ShieldCheck size={14} className="text-emerald-500" />
-                                            Plano: {sub?.plan?.name || "Premium"}
-                                        </div>
-                                        <button 
-                                            onClick={() => router.push(service.manageUrl)}
-                                            className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
-                                        >
-                                            Configurar Infraestrutura
-                                            <ChevronRight size={18} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3 pt-4 relative z-10">
-                                        <div className="flex items-center gap-2 text-xs text-gray-400 bg-orange-500/5 p-3 rounded-xl border border-orange-500/10">
-                                            <AlertCircle size={14} className="text-orange-500" />
-                                            Este serviço ainda não foi contratado.
-                                        </div>
-                                        <button 
-                                            onClick={() => openInvoiceForType(service.type)}
-                                            className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-bold border border-white/10 flex items-center justify-center gap-2 transition-all"
-                                        >
-                                            Liberar Serviço
-                                            <DollarSign size={18} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
+            {/* Tab Navigation */}
+            <div className="flex border-b border-white/10 gap-6">
+                <button
+                    onClick={() => setActiveTab("services")}
+                    className={`pb-4 text-sm font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === "services" ? "text-emerald-400 border-emerald-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
+                >
+                    Infraestrutura & Serviços
+                </button>
+                <button
+                    onClick={() => setActiveTab("plano_de_voo")}
+                    className={`pb-4 text-sm font-black uppercase tracking-wider transition-all border-b-2 flex items-center gap-2 ${activeTab === "plano_de_voo" ? "text-indigo-400 border-indigo-500" : "text-gray-500 border-transparent hover:text-gray-300"}`}
+                >
+                    <Sparkles size={16} className={activeTab === "plano_de_voo" ? "text-indigo-400" : "text-gray-500"} />
+                    Plano de Voo Estratégico
+                </button>
             </div>
+
+            {activeTab === "services" && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    <h2 className="text-xl font-bold flex items-center gap-3">
+                        <Zap className="text-emerald-500" />
+                        Ecossistema de Serviços
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {services.map((service) => {
+                            const sub = getSubscription(service.type);
+                            const isActive = sub && ['ACTIVE', 'TRIALING'].includes(sub.status);
+
+                            return (
+                                <div key={service.id} className="bg-white/5 border border-white/10 rounded-[40px] p-8 space-y-6 relative overflow-hidden group hover:border-white/20 transition-all">
+                                    {isActive && <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/20 transition-all"></div>}
+                                    
+                                    <div className="flex items-start justify-between relative z-10">
+                                        <div className={`p-4 rounded-2xl ${service.bg} ${service.color}`}>
+                                            <service.icon size={28} />
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-orange-500/10 text-orange-400 border-orange-500/20'}`}>
+                                            {isActive ? 'Liberado' : 'Aguardando'}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 relative z-10">
+                                        <h3 className="text-xl font-bold">{service.name}</h3>
+                                        <p className="text-gray-500 text-sm leading-relaxed">{service.description}</p>
+                                    </div>
+
+                                    {isActive ? (
+                                        <div className="space-y-3 pt-4 relative z-10">
+                                            <div className="flex items-center gap-2 text-xs text-gray-400 bg-white/5 p-3 rounded-xl border border-white/5">
+                                                <ShieldCheck size={14} className="text-emerald-500" />
+                                                Plano: {sub?.plan?.name || "Premium"}
+                                            </div>
+                                            <button 
+                                                onClick={() => router.push(service.manageUrl)}
+                                                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                                            >
+                                                Configurar Infraestrutura
+                                                <ChevronRight size={18} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3 pt-4 relative z-10">
+                                            <div className="flex items-center gap-2 text-xs text-gray-400 bg-orange-500/5 p-3 rounded-xl border border-orange-500/10">
+                                                <AlertCircle size={14} className="text-orange-500" />
+                                                Este serviço ainda não foi contratado.
+                                            </div>
+                                            <button 
+                                                onClick={() => openInvoiceForType(service.type)}
+                                                className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-bold border border-white/10 flex items-center justify-center gap-2 transition-all"
+                                            >
+                                                Liberar Serviço
+                                                <DollarSign size={18} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "plano_de_voo" && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                    {!client.clientAudits || client.clientAudits.length === 0 ? (
+                        <div className="bg-white/5 border border-white/10 rounded-[40px] p-12 text-center max-w-xl mx-auto space-y-6">
+                            <div className="w-20 h-20 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-3xl flex items-center justify-center mx-auto text-4xl shadow-inner animate-pulse">
+                                🎯
+                            </div>
+                            <h3 className="text-2xl font-black">Nenhum Plano de Voo Gerado</h3>
+                            <p className="text-gray-400 text-sm leading-relaxed">
+                                Você ainda não realizou o Raio-X de Inteligência para este cliente. Dispare a auditoria para que nossos especialistas analisem a copy, posicionamento de marca, pixel de tráfego, SEO e oferta!
+                            </p>
+                            <button
+                                onClick={() => router.push(`/dashboard/agency/clients/${clientId}/audit`)}
+                                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold transition-all text-sm shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2 mx-auto"
+                            >
+                                <Sparkles size={16} /> Disparar Raio-X Agora
+                            </button>
+                        </div>
+                    ) : (
+                        (() => {
+                            const lastAudit = client.clientAudits[0];
+                            const { scores, overallScore, report, missions } = lastAudit;
+
+                            const getScoreColor = (score: number) => {
+                                if (score >= 80) return "text-emerald-400 border-emerald-500/20 bg-emerald-500/10";
+                                if (score >= 50) return "text-yellow-400 border-yellow-500/20 bg-yellow-500/10";
+                                return "text-red-400 border-red-500/20 bg-red-500/10";
+                            };
+
+                            const getPriorityLabel = (p: number) => {
+                                if (p === 1) return { label: "🚨 Crítico / Imediato", cls: "bg-red-500/20 text-red-400 border-red-500/30" };
+                                if (p === 2) return { label: "⚠️ Importante", cls: "bg-orange-500/20 text-orange-400 border-orange-500/30" };
+                                if (p === 3) return { label: "⚡ Recomendado", cls: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" };
+                                return { label: "⚙️ Otimização", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+                            };
+
+                            const SQUAD_METADATA: Record<string, { label: string; color: string; bg: string }> = {
+                                copy: { label: "Copy Squad", color: "text-orange-400 border-orange-500/20", bg: "bg-orange-500/10" },
+                                brand: { label: "Brand Squad", color: "text-indigo-400 border-indigo-500/20", bg: "bg-indigo-500/10" },
+                                traffic: { label: "Traffic Masters", color: "text-red-400 border-red-500/20", bg: "bg-red-500/10" },
+                                data: { label: "Data Squad", color: "text-emerald-400 border-emerald-500/20", bg: "bg-emerald-500/10" },
+                                strategy: { label: "Hormozi Squad", color: "text-yellow-400 border-yellow-500/20", bg: "bg-yellow-500/10" }
+                            };
+
+                            const SYNC_STEPS = [
+                                "Carregando histórico de auditoria...",
+                                "Raspando estrutura e tags de SEO do site...",
+                                "Compilando métricas de tráfego e pixel...",
+                                "Sincronizando memória dos agentes do conselho..."
+                            ];
+
+                            return (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    {/* Left Column: Report & Actions (2/3) */}
+                                    <div className="lg:col-span-2 space-y-8">
+                                        {/* Score Card Header */}
+                                        <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[100px] -mr-32 -mt-32"></div>
+                                            <div className="space-y-2 relative z-10 text-left">
+                                                <h3 className="text-2xl font-black">Diagnóstico Estratégico</h3>
+                                                <p className="text-gray-400 text-sm">Raio-X de marca, SEO, tráfego pago e oferta do cliente.</p>
+                                            </div>
+                                            <div className={`px-6 py-4 rounded-3xl border flex items-center gap-3 relative z-10 shrink-0 ${getScoreColor(overallScore)}`}>
+                                                <Sparkles size={24} />
+                                                <div>
+                                                    <p className="text-[10px] uppercase font-black tracking-widest text-gray-400">Score de Saúde</p>
+                                                    <p className="text-3xl font-black">{overallScore}/100</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Dynamic Squad Analysis */}
+                                        <div className="space-y-6">
+                                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                                <Sparkles size={20} className="text-indigo-400" />
+                                                Análise do Conselho de IAs
+                                            </h3>
+
+                                            <div className="grid grid-cols-1 gap-6">
+                                                {Object.entries(report || {}).map(([key, val]: [string, any]) => {
+                                                    const metadata = SQUAD_METADATA[key] || { label: "Especialista", color: "text-gray-400 border-white/5", bg: "bg-white/5" };
+                                                    return (
+                                                        <div key={key} className="bg-white/5 border border-white/10 rounded-[32px] p-8 space-y-6 hover:border-white/20 transition-all text-left">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className={`px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider ${metadata.color} ${metadata.bg}`}>
+                                                                    {metadata.label}
+                                                                </span>
+                                                                <span className="text-xs text-gray-500 font-medium">Pontuação do Pilar: {scores[key] || 0}%</span>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                                                {/* Problems */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-xs font-black uppercase tracking-wider text-red-400 flex items-center gap-1.5">
+                                                                        <AlertCircle size={14} /> Problemas Identificados
+                                                                    </h4>
+                                                                    <ul className="space-y-2">
+                                                                        {val.problems?.map((p: string, idx: number) => (
+                                                                            <li key={idx} className="text-xs text-gray-400 leading-relaxed flex items-start gap-2">
+                                                                                <span className="text-red-500 mt-1 select-none">•</span>
+                                                                                <span>{p}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+
+                                                                {/* Solutions */}
+                                                                <div className="space-y-3">
+                                                                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                                                                        <ShieldCheck size={14} /> Recomendações Táticas
+                                                                    </h4>
+                                                                    <ul className="space-y-2">
+                                                                        {val.solutions?.map((s: string, idx: number) => (
+                                                                            <li key={idx} className="text-xs text-gray-300 leading-relaxed flex items-start gap-2">
+                                                                                <span className="text-emerald-500 mt-1 select-none">✔</span>
+                                                                                <span>{s}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* SWOT Matrix */}
+                                        <div className="space-y-4 text-left">
+                                            <h3 className="text-xl font-bold">Matriz SWOT Estratégica</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-3xl p-6 space-y-2">
+                                                    <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">💪 Forças (Strengths)</p>
+                                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                                        Autoridade comercial consolidada, tempo de mercado físico notável, diferenciais de atendimento presencial e onboarding concluído na plataforma.
+                                                    </p>
+                                                </div>
+                                                <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-6 space-y-2">
+                                                    <p className="text-xs font-black text-red-400 uppercase tracking-widest">🚨 Fraquezas (Weaknesses)</p>
+                                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                                        Inconsistência severa na publicação de conteúdos de engajamento, erros de carregamento/redirecionamento no site oficial e atrito técnico.
+                                                    </p>
+                                                </div>
+                                                <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-3xl p-6 space-y-2">
+                                                    <p className="text-xs font-black text-cyan-400 uppercase tracking-widest">🚀 Oportunidades (Opportunities)</p>
+                                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                                        Campanhas ativas de tráfego pago geolocalizadas na microrregião, vídeos educacionais (Reels de tour) e otimização das chamadas para o WhatsApp.
+                                                    </p>
+                                                </div>
+                                                <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-3xl p-6 space-y-2">
+                                                    <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">⚠️ Ameaças (Threats)</p>
+                                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                                        Concorrentes digitais nativos agressivos e perda de relevância orgânica para agregadores imobiliários centralizados.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Trilha de Missões / Plano de Ação */}
+                                        <div className="space-y-6 text-left">
+                                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                                <FileText size={20} className="text-emerald-400" />
+                                                Trilha de Missões Operacionais (Kanban)
+                                            </h3>
+
+                                            <div className="space-y-4">
+                                                {Array.isArray(missions) && missions.map((mission: any) => {
+                                                    const isMapped = mappedMissions.includes(mission.id);
+                                                    const pMeta = getPriorityLabel(mission.priority);
+
+                                                    return (
+                                                        <div key={mission.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                            <div className="space-y-1.5 flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`text-[9px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${pMeta.cls}`}>
+                                                                        {pMeta.label}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-gray-500 font-bold uppercase">Squad: {mission.squad}</span>
+                                                                </div>
+                                                                <h4 className="font-extrabold text-white text-base">{mission.title}</h4>
+                                                                <p className="text-xs text-gray-400 leading-relaxed">{mission.description}</p>
+                                                            </div>
+
+                                                            <button
+                                                                onClick={() => handleMapMission(mission)}
+                                                                disabled={isMapped || mappingMissionId === mission.id}
+                                                                className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all shrink-0 ${isMapped ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default" : "bg-white/5 border border-white/10 hover:bg-emerald-500 hover:border-emerald-500 text-gray-300 hover:text-white"}`}
+                                                            >
+                                                                {mappingMissionId === mission.id ? (
+                                                                    <span className="flex items-center gap-1.5"><Loader2 className="animate-spin" size={12} /> Mapeando...</span>
+                                                                ) : isMapped ? (
+                                                                    <span className="flex items-center gap-1.5"><Check size={12} /> Mapeada no Kanban</span>
+                                                                ) : (
+                                                                    "Mapear no Kanban"
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: AI Context Ingestion Panel (1/3) */}
+                                    <div className="space-y-6 text-left">
+                                        <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 space-y-6 relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl -mr-16 -mt-16"></div>
+                                            
+                                            <div className="p-3 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-2xl w-fit">
+                                                <Sparkles size={24} />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <h3 className="font-bold text-lg">Memória do Contexto de IA</h3>
+                                                <p className="text-xs text-gray-400 leading-relaxed">
+                                                    Sincronize as mídias sociais, o site raspado, as metas da campanha e os insights de conversa diretamente para os robôs do Squad.
+                                                </p>
+                                            </div>
+
+                                            {syncing ? (
+                                                <div className="bg-[#0b0f1a] border border-white/5 rounded-2xl p-5 space-y-3">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <Loader2 size={16} className="animate-spin text-indigo-400" />
+                                                        <p className="text-xs font-semibold text-indigo-400">Ingerindo dados...</p>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 leading-relaxed animate-pulse">{SYNC_STEPS[syncStep]}</p>
+                                                    <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
+                                                        <div 
+                                                            className="bg-indigo-500 h-1 rounded-full transition-all duration-700" 
+                                                            style={{ width: `${((syncStep + 1) / SYNC_STEPS.length) * 100}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            ) : syncSuccess ? (
+                                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 text-center space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                                                    <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-emerald-400">
+                                                        <Check size={20} strokeWidth={3} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-emerald-400">Contexto Sincronizado!</p>
+                                                        <p className="text-[10px] text-gray-500">Pronto para consultas nos bots e squads.</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between text-xs">
+                                                    <span className="text-gray-500 font-bold uppercase tracking-wider">Status:</span>
+                                                    <span className="text-orange-400 font-extrabold flex items-center gap-1">● Desatualizado</span>
+                                                </div>
+                                            )}
+
+                                            {!syncing && (
+                                                <button
+                                                    onClick={handleSyncContext}
+                                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                                                >
+                                                    <RefreshCw size={16} className={syncSuccess ? "" : "animate-spin"} />
+                                                    {syncSuccess ? "Sincronizar Novamente" : "Sincronizar Contexto"}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Strategic Tips */}
+                                        <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 space-y-6">
+                                            <h3 className="font-bold text-lg">💡 Sugestão Operacional</h3>
+                                            <div className="space-y-4 text-xs">
+                                                <div className="p-4 bg-white/5 rounded-2xl space-y-1">
+                                                    <p className="font-black text-indigo-400 uppercase tracking-widest text-[9px]">Workflow Indicado</p>
+                                                    <p className="font-bold text-white text-sm">Negócio Local 10x</p>
+                                                    <p className="text-gray-500">Desenhe ofertas locais e capte leads com tráfego geolocalizado de forma rápida.</p>
+                                                </div>
+                                                <div className="p-4 bg-white/5 rounded-2xl space-y-1">
+                                                    <p className="font-black text-emerald-400 uppercase tracking-widest text-[9px]">Squad de Frente</p>
+                                                    <p className="font-bold text-white text-sm">Traffic Masters & Copy Squad</p>
+                                                    <p className="text-gray-500">Combine a captação estruturada de Pedro Sobral com o poder de redação de Gary Halbert.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()
+                    )}
+                </div>
+            )}
 
             <div className="bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 border border-white/10 rounded-[40px] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
