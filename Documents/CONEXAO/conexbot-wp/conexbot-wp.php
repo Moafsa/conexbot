@@ -3,8 +3,8 @@
  * Plugin Name: Conexbot Automação & CRM (WhatsApp)
  * Plugin URI: https://app.conext.click
  * Description: Integre perfeitamente a Inteligência Artificial Conexão ao seu WooCommerce. O Bot mapeia seu estoque e interage com clientes via Chat e WhatsApp.
- * Version: 1.0.3
- * Author: Equipe Conexão AI
+ * Version: 1.0.6
+ * Author: Conext
  * License: GPLv2 or later
  * Text Domain: conexbot-wp
  */
@@ -14,11 +14,19 @@ if (!defined('ABSPATH')) {
 }
 
 // 1. Constantes e Inclusões
+define('CONEXBOT_WP_VERSION', '1.0.6');
+define('CONEXBOT_WP_PLUGIN_FILE', __FILE__);
 define('CONEXBOT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CONEXBOT_API_URL', 'https://app.conext.click/api/v1/wp');
 define('CONEXBOT_EMBED_URL', 'https://app.conext.click/embed/dashboard');
 require_once CONEXBOT_PLUGIN_DIR . 'includes/class-woocommerce-sync.php';
+require_once CONEXBOT_PLUGIN_DIR . 'includes/class-conexbot-wp-auto-updater.php';
 require_once CONEXBOT_PLUGIN_DIR . 'admin/settings-page.php';
+
+// Inicializar auto updater
+if (class_exists('Conexbot_WP_Auto_Updater')) {
+    new Conexbot_WP_Auto_Updater(plugin_basename(__FILE__));
+}
 
 // 2. Sincronização WooCommerce
 add_action('plugins_loaded', function () {

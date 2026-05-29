@@ -413,36 +413,6 @@ class TS_ML_API_Handler
     }
 
     /**
-     * Get valid access token
-     *
-     * @param int $account_id Account ID
-     * @return string|WP_Error
-     */
-    public function get_valid_token($account_id)
-    {
-        global $wpdb;
-        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
-
-        $account = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table_accounts WHERE id = %d",
-            $account_id
-        ));
-
-        if (!$account) {
-            // Check if we should use SaaS tokens instead of local accounts
-            $use_saas = get_option('ts_ml_use_saas') === 'yes';
-            $saas_url = get_option('ts_ml_saas_url');
-            $bot_id = get_option('ts_ml_bot_id');
-
-            if ($use_saas && !empty($saas_url) && !empty($bot_id)) {
-                return $this->get_token_from_saas($saas_url, $bot_id);
-            }
-
-            return new WP_Error('account_not_found', __('Conta não encontrada.', 'ts-ml-integration'));
-        }
-    }
-
-    /**
      * Fetch token from Conextbot SaaS
      */
     private function get_token_from_saas($saas_url, $bot_id) {
@@ -466,6 +436,35 @@ class TS_ML_API_Handler
 
         return new WP_Error('saas_token_error', __('Erro ao obter token do SaaS', 'ts-ml-integration'));
     }
+
+    /**
+     * Get valid access token
+     *
+     * @param int $account_id Account ID
+     * @return string|WP_Error
+     */
+    public function get_valid_token($account_id)
+    {
+        // Check if we should use SaaS tokens instead of local accounts
+        $use_saas = get_option('ts_ml_use_saas') === 'yes';
+        $saas_url = get_option('ts_ml_saas_url');
+        $bot_id = get_option('ts_ml_bot_id');
+
+        if ($use_saas && !empty($saas_url) && !empty($bot_id)) {
+            return $this->get_token_from_saas($saas_url, $bot_id);
+        }
+
+        global $wpdb;
+        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+
+        $account = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_accounts WHERE id = %d",
+            $account_id
+        ));
+
+        if (!$account) {
+            return new WP_Error('account_not_found', __('Conta não encontrada.', 'ts-ml-integration'));
+        }
 
         // Check if token is expired
         if ($this->is_token_expired($account->token_expires_at)) {

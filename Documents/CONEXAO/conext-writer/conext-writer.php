@@ -1,10 +1,10 @@
 <?php
 /*
 Plugin Name: Conext Writer
-Plugin URI: https://conexbot.com
+Plugin URI: https://app.conext.click
 Description: Multi-Agent AI Writer with OpenAI and Gemini fallbacks for automated content generation and SEO optimization.
-Version: 1.0.1
-Author: ConexBot
+Version: 1.0.4
+Author: Conext
 Text Domain: conext-writer
 */
 
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define Plugin Constants
-define('CONEXT_WRITER_VERSION', '1.0.1');
+define('CONEXT_WRITER_VERSION', '1.0.4');
 define('CONEXT_WRITER_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CONEXT_WRITER_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -28,11 +28,17 @@ require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-writer.php'
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-seo.php';
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/agents/class-agent-visualist.php';
 require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/class-conext-i18n-fallback.php';
+require_once CONEXT_WRITER_PLUGIN_DIR . 'includes/class-conext-writer-auto-updater.php';
 
 // Initialize Plugin
 function conext_writer_init() {
     // Load Text Domain
     load_plugin_textdomain('conext-writer', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
+    // Initialize Auto Updater
+    if (class_exists('Conext_Writer_Auto_Updater')) {
+        new Conext_Writer_Auto_Updater(plugin_basename(__FILE__));
+    }
 
     // i18n Fallback for missing MO files
     Conext_i18n_Fallback::init();

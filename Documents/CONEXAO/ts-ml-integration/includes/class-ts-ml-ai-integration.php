@@ -59,9 +59,10 @@ class TS_ML_AI_Integration {
             return $original_message; // Fallback to original if no API key
         }
 
-        $model = get_option('ts_ml_ai_model', 'gpt-3.5-turbo');
+        $model = get_option('ts_ml_ai_model', 'gpt-4o-mini');
+        $site_name = get_bloginfo('name');
         $system_prompt = get_option('ts_ml_ai_system_prompt', 
-            'Você é um assistente virtual da loja de brinquedos Toy Sport. Responda de forma educada, curta e prestativa. O foco é ajudar o cliente a comprar.'
+            sprintf('Você é um assistente virtual da loja %s. Responda de forma educada, curta e prestativa. O foco é ajudar o cliente a comprar.', $site_name)
         );
 
         $messages = array(
@@ -95,7 +96,7 @@ class TS_ML_AI_Integration {
      * @param string $api_key  API Key
      * @return array|WP_Error
      */
-    private function call_openai_api($messages, $model, $api_key) {
+    public function call_openai_api($messages, $model, $api_key) {
         $url = 'https://api.openai.com/v1/chat/completions';
         
         $body = array(

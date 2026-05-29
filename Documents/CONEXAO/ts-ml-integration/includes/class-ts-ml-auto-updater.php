@@ -217,10 +217,10 @@ class TS_ML_Auto_Updater {
         }
         
         $args = new stdClass();
-        $args->name = 'ToySport Mercado Livre Integration';
+        $args->name = 'Conextbot Mercado Livre Integration';
         $args->slug = $this->plugin_slug;
         $args->version = $plugin_info->version;
-        $args->author = 'CONEXT';
+        $args->author = 'Conext';
         $args->author_profile = 'https://conext.com.br';
         $args->homepage = $plugin_info->homepage;
         $args->download_link = $plugin_info->download_url;

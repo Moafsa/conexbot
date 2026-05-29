@@ -2,9 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 
-const pluginFilePath = path.join(__dirname, '../conext-writer/conext-writer.php');
-const pluginDir = path.join(__dirname, '../conext-writer');
-const destinationZip = path.join(__dirname, '../public/conext-writer.zip');
+const pluginFilePath = path.join(__dirname, '../ts-ml-integration/ts-ml-integration.php');
+const pluginDir = path.join(__dirname, '../ts-ml-integration');
+const destinationZip = path.join(__dirname, '../public/ts-ml-integration.zip');
 
 if (!fs.existsSync(pluginFilePath)) {
     console.error('Plugin file not found!');
@@ -29,7 +29,7 @@ console.log(`Incrementing version: ${currentVersion} -> ${newVersion}`);
 
 // 2. Replace version headers in main plugin file
 content = content.replace(/(Version:\s*)([0-9.]+)/i, `$1${newVersion}`);
-content = content.replace(/(define\('CONEXT_WRITER_VERSION',\s*')([0-9.]+)('\))/i, `$1${newVersion}$3`);
+content = content.replace(/(define\('TS_ML_VERSION',\s*')([0-9.]+)('\))/i, `$1${newVersion}$3`);
 fs.writeFileSync(pluginFilePath, content, 'utf8');
 
 // 3. Compress using 'archiver' for 100% Linux/Docker cross-platform compatibility!
@@ -38,7 +38,7 @@ const output = fs.createWriteStream(destinationZip);
 const archive = archiver('zip', { zlib: { level: 9 } });
 
 output.on('close', function() {
-    console.log(`Success! Plugin updated and zipped to public/conext-writer.zip (v${newVersion})`);
+    console.log(`Success! Plugin updated and zipped to public/ts-ml-integration.zip (v${newVersion})`);
     console.log(`Total size: ${(archive.pointer() / 1024 / 1024).toFixed(2)} MB`);
 });
 
@@ -47,5 +47,5 @@ archive.on('error', function(err) {
 });
 
 archive.pipe(output);
-archive.directory(pluginDir, 'conext-writer');
+archive.directory(pluginDir, 'ts-ml-integration');
 archive.finalize();

@@ -1,18 +1,18 @@
 <?php
 /**
- * Plugin Name: ToySport Mercado Livre Integration
- * Plugin URI: https://toysport.com.br
- * Description: Integração completa entre WooCommerce e Mercado Livre com sincronização bidirecional, gestão de pedidos, mensagens, envios e muito mais.
- * Version: 1.0.0
- * Author: CONEXT
- * Author URI: https://conext.com.br
+ * Plugin Name: Conextbot Mercado Livre Integration
+ * Plugin URI: https://app.conext.click
+ * Description: Integração completa e automatizada entre WooCommerce e Mercado Livre. Sincronize estoque, preços, produtos, pedidos, mensagens e envios em tempo real via Conextbot.
+ * Version: 1.0.11
+ * Author: Conext
+ * Author URI: https://app.conext.click
  * Text Domain: ts-ml-integration
  * Domain Path: /languages
  * Requires at least: 6.8
  * Requires PHP: 8.2
  * WC requires at least: 10.0
  * WC tested up to: 10.0
- * Update URI: https://seusite.com.br/updates/ts-ml-integration
+ * Update URI: https://app.conext.click/api/v1/ml/update
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
@@ -24,8 +24,9 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants immediately (needed for activation hook)
 if (!defined('TS_ML_VERSION')) {
-    define('TS_ML_VERSION', '1.0.0');
+    define('TS_ML_VERSION', '1.0.11');
     define('TS_ML_PLUGIN_FILE', __FILE__);
+    define('TS_ML_UPDATE_API_URL', 'https://app.conext.click/api/v1/ml/update');
 
     // Use dirname(__FILE__) instead of plugin_dir_path to avoid function calls
     // that might not be available when WordPress is just reading plugin headers
@@ -238,7 +239,7 @@ function ts_ml_php_version_notice()
     ?>
     <div class="error">
         <p>
-            <strong><?php esc_html_e('ToySport Mercado Livre Integration', 'ts-ml-integration'); ?></strong>
+            <strong><?php esc_html_e('Conextbot Mercado Livre Integration', 'ts-ml-integration'); ?></strong>
             <?php
             printf(
                 esc_html__('requer PHP %s ou superior. Você está usando PHP %s.', 'ts-ml-integration'),
@@ -259,7 +260,7 @@ function ts_ml_woocommerce_missing_notice()
     ?>
     <div class="error">
         <p>
-            <strong><?php esc_html_e('ToySport Mercado Livre Integration', 'ts-ml-integration'); ?></strong>
+            <strong><?php esc_html_e('Conextbot Mercado Livre Integration', 'ts-ml-integration'); ?></strong>
             <?php esc_html_e('requer que o WooCommerce esteja instalado e ativo.', 'ts-ml-integration'); ?>
         </p>
     </div>

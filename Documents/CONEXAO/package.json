@@ -6,6 +6,8 @@
     "dev": "next dev -H 0.0.0.0 -p 3004",
     "build": "next build",
     "build:plugin": "node scripts/build-wp-plugin.js",
+    "build:ml-plugin": "node scripts/build-plugin.js",
+    "dev:ml-plugin": "node scripts/watch-plugin.js",
     "build:writer-plugin": "node scripts/build-writer-plugin.js",
     "start": "next start",
     "worker": "npx tsx src/workers/message-worker.ts",

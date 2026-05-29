@@ -196,6 +196,19 @@ if (isset($_POST['save_api_credentials']) && check_admin_referer('ts_ml_save_api
     }
 }
 
+// Handle SaaS Disconnect
+if (isset($_POST['disconnect_saas']) && check_admin_referer('ts_ml_disconnect_saas')) {
+    update_option('ts_ml_use_saas', 'no');
+    update_option('ts_ml_bot_id', '');
+    update_option('ts_ml_license_key', '');
+    
+    global $wpdb;
+    $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+    $wpdb->delete($table_accounts, array('access_token' => 'saas_managed'));
+    
+    $settings_saved = true;
+}
+
 // Handle settings save
 $settings_saved = false;
 if (isset($_POST['save_settings']) && check_admin_referer('ts_ml_save_settings')) {
@@ -212,13 +225,39 @@ if (isset($_POST['save_settings']) && check_admin_referer('ts_ml_save_settings')
     update_option('ts_ml_debug_mode', isset($_POST['debug_mode']) ? 'yes' : 'no');
     update_option('ts_ml_sync_frequency', sanitize_text_field($_POST['sync_frequency'] ?? 'hourly'));
     update_option('ts_ml_price_adjustment_fixed', sanitize_text_field($_POST['price_adjustment_fixed'] ?? ''));
-    
+
     // SaaS Connection
-    update_option('ts_ml_use_saas', isset($_POST['use_saas']) ? 'yes' : 'no');
+    $use_saas = isset($_POST['use_saas']) ? 'yes' : 'no';
+    update_option('ts_ml_use_saas', $use_saas);
     update_option('ts_ml_saas_url', esc_url_raw($_POST['saas_url'] ?? ''));
     update_option('ts_ml_bot_id', sanitize_text_field($_POST['bot_id'] ?? ''));
     update_option('ts_ml_license_key', sanitize_text_field($_POST['license_key'] ?? ''));
     update_option('ts_ml_auto_create_on_ml', isset($_POST['auto_create_on_ml']) ? 'yes' : 'no');
+
+    if ($use_saas === 'yes') {
+        global $wpdb;
+        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
+        if ($table_exists) {
+            $count = $wpdb->get_var("SELECT COUNT(*) FROM $table_accounts");
+            if (intval($count) === 0) {
+                $wpdb->insert(
+                    $table_accounts,
+                    array(
+                        'account_name' => 'Conextbot SaaS',
+                        'country' => 'BR',
+                        'is_active' => 1,
+                        'access_token' => 'saas_managed',
+                        'refresh_token' => 'saas_managed',
+                        'token_expires_at' => date('Y-m-d H:i:s', time() + 365 * 24 * 3600),
+                        'created_at' => current_time('mysql'),
+                        'updated_at' => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
+                );
+            }
+        }
+    }
 
     $settings_saved = true;
 }
@@ -305,65 +344,94 @@ if (!isset($settings_saved)) {
     }
     ?>
 
-    <div class="ts-ml-settings">
         <!-- CONEXTBOT SAAS CONNECTION -->
-        <div class="ts-ml-saas-card" style="background: #f0f6fb; border: 1px solid #c3d9e9; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
-            <h2 style="margin-top: 0; color: #2271b1;">🚀 Conexão Conextbot (SaaS & IA)</h2>
-            <p><?php esc_html_e('Conecte seu WordPress ao SaaS centralizado para habilitar Inteligência Artificial, gestão automática de tokens e sincronização inteligente.', 'ts-ml-integration'); ?></p>
-            
-            <form method="post" action="">
-                <?php wp_nonce_field('ts_ml_save_settings'); ?>
+        <?php
+        $saas_url = get_option('ts_ml_saas_url', 'https://app.conext.click');
+        $shop_url = home_url();
+        $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=saas_callback');
+        $connect_url = $saas_url . '/dashboard/integrations/wordpress/connect?shop_url=' . urlencode($shop_url) . '&redirect_uri=' . urlencode($redirect_uri);
+        $is_saas_connected = (get_option('ts_ml_use_saas') === 'yes' && !empty(get_option('ts_ml_bot_id')));
+        $is_manual_mode = isset($_GET['mode']) && $_GET['mode'] === 'manual';
+        ?>
+        <div class="ts-ml-saas-card" style="background: #ffffff; border: 1px solid #e5e5e5; padding: 25px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <?php if (!$is_saas_connected) : ?>
+                <div style="text-align: center; padding: 20px 10px;">
+                    <div style="font-size: 50px; margin-bottom: 15px;">🔌</div>
+                    <h2 style="margin-top: 0; color: #1d2327; font-size: 24px; font-weight: 600;"><?php esc_html_e('Conecte sua Loja ao Conextbot', 'ts-ml-integration'); ?></h2>
+                    <p style="font-size: 15px; color: #64748b; max-width: 600px; margin: 0 auto 25px auto; line-height: 1.6;">
+                        <?php esc_html_e('Habilite o cérebro de Inteligência Artificial para responder perguntas automaticamente e sincronize seus produtos, preços e estoque com o Mercado Livre em tempo real através do nosso SaaS.', 'ts-ml-integration'); ?>
+                    </p>
+                    
+                    <a href="<?php echo esc_url($connect_url); ?>" class="button button-primary button-hero" style="background: #00a32a; border-color: #00a32a; font-size: 16px; padding: 5px 35px; height: auto; line-height: 2.2; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,163,42,0.2); font-weight: 600;">
+                        <?php esc_html_e('Conectar Minha Loja Agora', 'ts-ml-integration'); ?>
+                    </a>
+
+                    <div style="margin-top: 25px; font-size: 13px; color: #94a3b8;">
+                        <?php esc_html_e('Não requer criação de chaves de desenvolvedor. Autenticação oficial e simplificada por OAuth.', 'ts-ml-integration'); ?>
+                    </div>
+
+                    <?php if (!$is_manual_mode) : ?>
+                        <p style="margin-top: 25px; margin-bottom: 0; font-size: 13px;"><a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings&mode=manual')); ?>" style="color: #64748b; text-decoration: underline;"><?php esc_html_e('Configuração avançada para desenvolvedores (manual sem SaaS)', 'ts-ml-integration'); ?></a></p>
+                    <?php else : ?>
+                        <p style="margin-top: 25px; margin-bottom: 0; font-size: 13px;"><a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>" style="color: #64748b; text-decoration: underline;"><?php esc_html_e('Voltar para conexão simplificada de 1 clique (Recomendado)', 'ts-ml-integration'); ?></a></p>
+                    <?php endif; ?>
+                </div>
+            <?php else : ?>
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="font-size: 32px; margin-right: 15px;">✅</span>
+                        <div>
+                            <h2 style="margin: 0; color: #1d2327; font-size: 20px; font-weight: 600;"><?php esc_html_e('Loja Conectada ao Conextbot', 'ts-ml-integration'); ?></h2>
+                            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
+                                <?php esc_html_e('Integração ativa e sincronizando em segundo plano através do SaaS centralizado.', 'ts-ml-integration'); ?>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <form method="post" action="" onsubmit="return confirm('<?php esc_attr_e('Tem certeza que deseja desconectar sua loja do Conextbot SaaS? Isso desativará a IA e a sincronização.', 'ts-ml-integration'); ?>');">
+                        <?php wp_nonce_field('ts_ml_disconnect_saas'); ?>
+                        <input type="submit" name="disconnect_saas" class="button button-secondary" style="color: #d63638; border-color: #d63638; font-weight: 600; padding: 5px 15px;" value="<?php esc_attr_e('Desconectar Loja', 'ts-ml-integration'); ?>" />
+                    </form>
+                </div>
+
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><?php esc_html_e('Usar Conextbot SaaS', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <label class="switch">
-                                <input type="checkbox" name="use_saas" value="1" <?php checked(get_option('ts_ml_use_saas'), 'yes'); ?> />
-                                <?php esc_html_e('Ativar integração com o Cérebro IA (Recomendado)', 'ts-ml-integration'); ?>
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('URL do SaaS', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <input type="url" name="saas_url" value="<?php echo esc_attr(get_option('ts_ml_saas_url')); ?>" class="regular-text" placeholder="https://app.conextbot.com.br" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Bot ID', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <input type="text" name="bot_id" value="<?php echo esc_attr(get_option('ts_ml_bot_id')); ?>" class="regular-text" placeholder="ID do seu agente no Conextbot" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Chave de Licença', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <input type="password" name="license_key" value="<?php echo esc_attr(get_option('ts_ml_license_key')); ?>" class="regular-text" placeholder="Sua chave de licença" />
-                            <p class="description"><?php esc_html_e('Pode ser mensal, trimestral ou anual conforme seu plano.', 'ts-ml-integration'); ?></p>
-                        </td>
-                    </tr>
-                    <?php if (get_option('ts_ml_use_saas') === 'yes') : ?>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Status da Conexão', 'ts-ml-integration'); ?></th>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Status da Conexão', 'ts-ml-integration'); ?></th>
                         <td>
                             <?php
                             $token_check = TS_ML_API_Handler::instance()->get_valid_token(0);
                             if (!is_wp_error($token_check)) {
-                                echo '<span style="color: #00a32a; font-weight: bold;">✅ Ativa e Conectada</span>';
+                                echo '<span style="color: #00a32a; font-weight: bold; display: inline-flex; align-items: center;"><span style="display: inline-block; width: 8px; height: 8px; background: #00a32a; border-radius: 50%; margin-right: 8px;"></span>Ativa e Conectada</span>';
                             } else {
                                 echo '<span style="color: #d63638; font-weight: bold;">❌ Erro de Conexão: ' . esc_html($token_check->get_error_message()) . '</span>';
                             }
                             ?>
                         </td>
                     </tr>
-                    <?php endif; ?>
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Bot ID', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <code><?php echo esc_html(get_option('ts_ml_bot_id')); ?></code>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('URL do SaaS', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <code><?php echo esc_html(get_option('ts_ml_saas_url')); ?></code>
+                        </td>
+                    </tr>
                 </table>
-                <p class="submit">
-                    <input type="submit" name="save_settings" class="button button-primary" value="<?php esc_attr_e('Salvar e Validar Conexão', 'ts-ml-integration'); ?>" />
-                </p>
-            </form>
+            <?php endif; ?>
         </div>
 
+        <?php if ($is_saas_connected) : ?>
+            <div class="notice notice-info" style="border-left-color: #00a32a; padding: 15px; margin-bottom: 25px; background: #fff;">
+                <h3 style="margin-top: 0; color: #00a32a;"><?php esc_html_e('☁️ Conexão via SaaS Ativa', 'ts-ml-integration'); ?></h3>
+                <p><?php esc_html_e('Você não precisa configurar credenciais da API do Mercado Livre localmente! O Conextbot SaaS gerencia toda a comunicação, autenticação (OAuth) e atualização de tokens de forma centralizada.', 'ts-ml-integration'); ?></p>
+                <p><?php esc_html_e('Basta conectar contas adicionais ou gerenciar configurações diretamente no seu painel Conextbot.', 'ts-ml-integration'); ?></p>
+                <p><a href="<?php echo esc_url($saas_url . '/dashboard/integrations'); ?>" target="_blank" class="button button-secondary">🔗 <?php esc_html_e('Ir para o Painel do Conextbot', 'ts-ml-integration'); ?></a></p>
+            </div>
+        <?php elseif ($is_manual_mode) : ?>
         <!-- PASSO 1: Credenciais da API (POR PAÍS) -->
         <h2><?php esc_html_e('🔑 Passo 1: Credenciais da API do Mercado Livre', 'ts-ml-integration'); ?></h2>
         <div class="notice notice-info">
@@ -753,6 +821,7 @@ if (!isset($settings_saved)) {
                     value="<?php esc_attr_e('Adicionar Conta', 'ts-ml-integration'); ?>" />
             </p>
         </form>
+        <?php endif; ?>
 
         <hr style="margin: 40px 0;">
 
@@ -953,7 +1022,7 @@ if (!isset($settings_saved)) {
                     </th>
                     <td>
                         <textarea name="ai_system_prompt" id="ai_system_prompt" rows="5"
-                            class="large-text code"><?php echo esc_textarea(get_option('ts_ml_ai_system_prompt', 'Você é um assistente virtual da loja de brinquedos Toy Sport. Responda de forma educada, curta e prestativa. O foco é ajudar o cliente a comprar.')); ?></textarea>
+                            class="large-text code"><?php echo esc_textarea(get_option('ts_ml_ai_system_prompt', sprintf('Você é um assistente virtual da loja %s. Responda de forma educada, curta e prestativa. O foco é ajudar o cliente a comprar.', esc_html(get_bloginfo('name'))))); ?></textarea>
                         <p class="description">
                             <?php esc_html_e('Instruções iniciais para a IA saber como se comportar.', 'ts-ml-integration'); ?>
                         </p>

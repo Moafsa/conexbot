@@ -2,19 +2,44 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 
-const sourceDir = path.join(__dirname, '../conexbot-wp');
-const outPath = path.join(__dirname, '../public/conexbot-wp.zip');
+const pluginFilePath = path.join(__dirname, '../conexbot-wp/conexbot-wp.php');
+const pluginDir = path.join(__dirname, '../conexbot-wp');
+const destinationZip = path.join(__dirname, '../public/conexbot-wp.zip');
 
-console.log('📦 Empacotando Plugin do WordPress...');
+if (!fs.existsSync(pluginFilePath)) {
+    console.error('Plugin file not found!');
+    process.exit(1);
+}
 
-const output = fs.createWriteStream(outPath);
-const archive = archiver('zip', {
-    zlib: { level: 9 } // Melhor compressão
-});
+// 1. Read current version
+let content = fs.readFileSync(pluginFilePath, 'utf8');
+const versionMatch = content.match(/Version:\s*([0-9.]+)/i);
+if (!versionMatch) {
+    console.error('Version header not found in plugin file!');
+    process.exit(1);
+}
+
+const currentVersion = versionMatch[1];
+const versionParts = currentVersion.split('.').map(Number);
+// Increment patch version
+versionParts[2] = (versionParts[2] || 0) + 1;
+const newVersion = versionParts.join('.');
+
+console.log(`Incrementing version: ${currentVersion} -> ${newVersion}`);
+
+// 2. Replace version headers in main plugin file
+content = content.replace(/(Version:\s*)([0-9.]+)/i, `$1${newVersion}`);
+content = content.replace(/(define\('CONEXBOT_WP_VERSION',\s*')([0-9.]+)('\))/i, `$1${newVersion}$3`);
+fs.writeFileSync(pluginFilePath, content, 'utf8');
+
+// 3. Compress using 'archiver' for 100% Linux/Docker cross-platform compatibility!
+console.log('Zipping plugin directory using archiver...');
+const output = fs.createWriteStream(destinationZip);
+const archive = archiver('zip', { zlib: { level: 9 } });
 
 output.on('close', function() {
-    console.log(`✅ Plugin gerado com sucesso em: ./public/conexbot-wp.zip`);
-    console.log(`Tamanho total: ${(archive.pointer() / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`Success! Plugin updated and zipped to public/conexbot-wp.zip (v${newVersion})`);
+    console.log(`Total size: ${(archive.pointer() / 1024 / 1024).toFixed(2)} MB`);
 });
 
 archive.on('error', function(err) {
@@ -22,7 +47,5 @@ archive.on('error', function(err) {
 });
 
 archive.pipe(output);
-
-// Adiciona os arquivos principais ignorando nodes_modules (se houver no futuro)
-archive.directory(sourceDir, 'conexbot-wp');
+archive.directory(pluginDir, 'conexbot-wp');
 archive.finalize();

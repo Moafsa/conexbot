@@ -26,6 +26,24 @@ if (isset($_POST['save_mappings']) && check_admin_referer('ts_ml_save_mappings')
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Mapeamentos salvos com sucesso!', 'ts-ml-integration') . '</p></div>';
 }
 
+// Handle Auto Mapping via AI
+if (isset($_POST['auto_map_ai']) && check_admin_referer('ts_ml_save_mappings')) {
+    $mapper = TS_ML_Category_Mapper::instance();
+    $ui_data = $mapper->get_mappings_for_ui();
+    $mapped_count = 0;
+
+    foreach ($ui_data as $item) {
+        if (empty($item['ml_id'])) {
+            $mapped_id = $mapper->auto_map_via_ai(intval($item['wc_id']), $item['wc_name']);
+            if ($mapped_id) {
+                $mapped_count++;
+            }
+        }
+    }
+
+    echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('%d categorias mapeadas automaticamente via IA com sucesso!', 'ts-ml-integration'), $mapped_count) . '</p></div>';
+}
+
 $mapper = TS_ML_Category_Mapper::instance();
 $ui_data = $mapper->get_mappings_for_ui();
 ?>
@@ -95,6 +113,9 @@ $ui_data = $mapper->get_mappings_for_ui();
         <p class="submit">
             <input type="submit" name="save_mappings" id="submit" class="button button-primary"
                 value="<?php esc_attr_e('Salvar Mapeamentos', 'ts-ml-integration'); ?>">
+            &nbsp;
+            <input type="submit" name="auto_map_ai" id="auto_map_ai" class="button button-secondary"
+                value="<?php esc_attr_e('Mapear Não-Mapeadas via IA (GPT-4o-Mini)', 'ts-ml-integration'); ?>">
         </p>
     </form>
 </div>
