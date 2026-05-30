@@ -425,16 +425,34 @@ class TS_ML_API_Handler
             'headers' => array('Accept' => 'application/json')
         ));
 
-        if (is_wp_error($response)) return $response;
+        if (is_wp_error($response)) {
+            $error_msg = $response->get_error_message();
+            update_option('ts_ml_saas_last_error', $error_msg);
+            return $response;
+        }
 
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body_str = wp_remote_retrieve_body($response);
+        $body = json_decode($body_str, true);
+
+        if ($status_code >= 400 || isset($body['error'])) {
+            $error_msg = isset($body['message']) ? $body['message'] : (isset($body['error']) ? $body['error'] : 'Erro desconhecido');
+            update_option('ts_ml_saas_last_error', $error_msg);
+            return new WP_Error('saas_token_error', $error_msg);
+        }
+
         if (isset($body['access_token'])) {
+            // Clear any active error state
+            delete_option('ts_ml_saas_last_error');
+            
             // Cache for 1 hour
             set_transient($cache_key, $body['access_token'], HOUR_IN_SECONDS);
             return $body['access_token'];
         }
 
-        return new WP_Error('saas_token_error', __('Erro ao obter token do SaaS', 'ts-ml-integration'));
+        $error_msg = __('Resposta inválida do SaaS.', 'ts-ml-integration');
+        update_option('ts_ml_saas_last_error', $error_msg);
+        return new WP_Error('saas_token_error', $error_msg);
     }
 
     /**

@@ -51,6 +51,7 @@ class TS_ML_Admin
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         add_action('admin_init', array($this, 'handle_saas_callback'));
+        add_action('admin_notices', array($this, 'display_saas_admin_notices'));
 
         // AJAX Handlers for Import
         add_action('wp_ajax_ts_ml_fetch_items', array($this, 'ajax_fetch_items'));
@@ -461,6 +462,8 @@ class TS_ML_Admin
             update_option('ts_ml_license_key', $license_key);
         }
         update_option('ts_ml_saas_url', $saas_url);
+        update_option('ts_ml_connected_site_url', site_url());
+        delete_option('ts_ml_saas_last_error');
 
         // Update virtual account
         global $wpdb;
@@ -489,5 +492,39 @@ class TS_ML_Admin
 
         wp_redirect(admin_url('admin.php?page=ts-ml-settings&settings_saved=1&account_connected=1'));
         exit;
+    }
+
+    /**
+     * Display administrative notices for SaaS errors and URL mismatches
+     */
+    public function display_saas_admin_notices()
+    {
+        if (get_option('ts_ml_use_saas') !== 'yes') {
+            return;
+        }
+
+        // 1. Check Site URL Mismatch (e.g. Migration or staging vs prod change)
+        $connected_url = get_option('ts_ml_connected_site_url');
+        $current_url = site_url();
+        if (!empty($connected_url) && $connected_url !== $current_url) {
+            $reconnect_url = admin_url('admin.php?page=ts-ml-settings');
+            ?>
+            <div class="notice notice-warning is-dismissible">
+                <p><strong><?php _e('Conextbot Mercado Livre:', 'ts-ml-integration'); ?></strong> <?php printf(__('Foi detectada uma alteração no endereço da sua loja (de <code>%s</code> para <code>%s</code>). Para evitar falhas de sincronização e atualizar as credenciais seguras, por favor, <a href="%s">reconecte sua loja agora</a>.', 'ts-ml-integration'), esc_url($connected_url), esc_url($current_url), esc_url($reconnect_url)); ?></p>
+            </div>
+            <?php
+            return;
+        }
+
+        // 2. Check SaaS connection or license error
+        $last_error = get_option('ts_ml_saas_last_error');
+        if (!empty($last_error)) {
+            $reconnect_url = admin_url('admin.php?page=ts-ml-settings');
+            ?>
+            <div class="notice notice-error is-dismissible">
+                <p><strong><?php _e('Conextbot Mercado Livre:', 'ts-ml-integration'); ?></strong> <?php printf(__('A sincronização com o Mercado Livre está pausada porque a conexão com o SaaS foi revogada, expirou ou a licença está inválida. (Erro: %s). <a href="%s">Clique aqui para reconectar sua loja agora</a>.', 'ts-ml-integration'), esc_html($last_error), esc_url($reconnect_url)); ?></p>
+            </div>
+            <?php
+        }
     }
 }
