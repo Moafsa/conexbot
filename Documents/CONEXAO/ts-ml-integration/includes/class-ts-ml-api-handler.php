@@ -199,6 +199,37 @@ class TS_ML_API_Handler
      */
     public function refresh_token($refresh_token, $country = 'BR')
     {
+        $use_saas = get_option('ts_ml_use_saas') === 'yes';
+        $saas_url = get_option('ts_ml_saas_url');
+
+        if ($use_saas && !empty($saas_url)) {
+            // Refresh token using the SaaS secure proxy
+            $url = rtrim($saas_url, '/') . '/api/v1/ml/refresh';
+            $response = wp_remote_post($url, array(
+                'headers' => array('Content-Type' => 'application/json'),
+                'body' => json_encode(array('refresh_token' => $refresh_token)),
+                'timeout' => 30,
+            ));
+
+            if (is_wp_error($response)) {
+                update_option('ts_ml_saas_last_error', $response->get_error_message());
+                return $response;
+            }
+
+            $status_code = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+
+            if ($status_code >= 400 || isset($data['error'])) {
+                $error_msg = isset($data['message']) ? $data['message'] : (isset($data['error']) ? $data['error'] : 'Erro no refresh do SaaS');
+                update_option('ts_ml_saas_last_error', $error_msg);
+                return new WP_Error('refresh_error', $error_msg);
+            }
+
+            delete_option('ts_ml_saas_last_error');
+            return $data;
+        }
+
         $app_id = get_option('ts_ml_app_id_' . $country);
         $app_secret = get_option('ts_ml_app_secret_' . $country);
 
@@ -463,14 +494,6 @@ class TS_ML_API_Handler
      */
     public function get_valid_token($account_id)
     {
-        // Check if we should use SaaS tokens instead of local accounts
-        $use_saas = get_option('ts_ml_use_saas') === 'yes';
-        $saas_url = get_option('ts_ml_saas_url');
-        $bot_id = get_option('ts_ml_bot_id');
-
-        if ($use_saas && !empty($saas_url) && !empty($bot_id)) {
-            return $this->get_token_from_saas($saas_url, $bot_id);
-        }
 
         global $wpdb;
         $table_accounts = $wpdb->prefix . 'ts_ml_accounts';

@@ -441,57 +441,64 @@ class TS_ML_Admin
             return;
         }
 
-        if (!isset($_GET['action']) || $_GET['action'] !== 'saas_callback') {
-            return;
-        }
+        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : '';
 
-        $bot_id = isset($_GET['bot_id']) ? sanitize_text_field($_GET['bot_id']) : '';
-        $license_key = isset($_GET['license_key']) ? sanitize_text_field($_GET['license_key']) : '';
-        $saas_url = isset($_GET['saas_url']) ? esc_url_raw($_GET['saas_url']) : 'https://app.conext.click';
-        $account_name = isset($_GET['account_name']) ? sanitize_text_field($_GET['account_name']) : 'Conextbot SaaS';
+        if ($action === 'saas_callback') {
+            $bot_id = isset($_GET['bot_id']) ? sanitize_text_field($_GET['bot_id']) : '';
+            $license_key = isset($_GET['license_key']) ? sanitize_text_field($_GET['license_key']) : '';
+            $saas_url = isset($_GET['saas_url']) ? esc_url_raw($_GET['saas_url']) : 'https://app.conext.click';
 
-        if (empty($bot_id)) {
-            wp_redirect(admin_url('admin.php?page=ts-ml-settings&oauth_error=' . urlencode(__('Conexão falhou: Bot ID não enviado pelo SaaS.', 'ts-ml-integration'))));
+            if (empty($bot_id)) {
+                wp_redirect(admin_url('admin.php?page=ts-ml-settings&oauth_error=' . urlencode(__('Conexão falhou: Bot ID não enviado pelo SaaS.', 'ts-ml-integration'))));
+                exit;
+            }
+
+            // Save options
+            update_option('ts_ml_use_saas', 'yes');
+            update_option('ts_ml_bot_id', $bot_id);
+            if (!empty($license_key)) {
+                update_option('ts_ml_license_key', $license_key);
+            }
+            update_option('ts_ml_saas_url', $saas_url);
+            update_option('ts_ml_connected_site_url', site_url());
+            delete_option('ts_ml_saas_last_error');
+
+            wp_redirect(admin_url('admin.php?page=ts-ml-settings&settings_saved=1'));
             exit;
         }
 
-        // Save options
-        update_option('ts_ml_use_saas', 'yes');
-        update_option('ts_ml_bot_id', $bot_id);
-        if (!empty($license_key)) {
-            update_option('ts_ml_license_key', $license_key);
-        }
-        update_option('ts_ml_saas_url', $saas_url);
-        update_option('ts_ml_connected_site_url', site_url());
-        delete_option('ts_ml_saas_last_error');
+        if ($action === 'saas_ml_callback') {
+            $account_id = isset($_GET['account_id']) ? intval($_GET['account_id']) : 0;
+            $access_token = isset($_GET['access_token']) ? sanitize_text_field($_GET['access_token']) : '';
+            $refresh_token = isset($_GET['refresh_token']) ? sanitize_text_field($_GET['refresh_token']) : '';
+            $expires_in = isset($_GET['expires_in']) ? intval($_GET['expires_in']) : 21600;
 
-        // Update virtual account
-        global $wpdb;
-        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
+            if (empty($account_id) || empty($access_token)) {
+                wp_redirect(admin_url('admin.php?page=ts-ml-settings&oauth_error=' . urlencode(__('Conexão falhou: Dados de conta inválidos do SaaS.', 'ts-ml-integration'))));
+                exit;
+            }
 
-        if ($table_exists) {
-            // Delete old SaaS accounts to avoid duplicates
-            $wpdb->delete($table_accounts, array('access_token' => 'saas_managed'));
+            global $wpdb;
+            $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+            $expires_at = date('Y-m-d H:i:s', time() + $expires_in);
 
-            $wpdb->insert(
+            $wpdb->update(
                 $table_accounts,
                 array(
-                    'account_name' => $account_name,
-                    'country' => 'BR',
+                    'access_token' => $access_token,
+                    'refresh_token' => $refresh_token,
+                    'token_expires_at' => $expires_at,
                     'is_active' => 1,
-                    'access_token' => 'saas_managed',
-                    'refresh_token' => 'saas_managed',
-                    'token_expires_at' => date('Y-m-d H:i:s', time() + 365 * 24 * 3600),
-                    'created_at' => current_time('mysql'),
                     'updated_at' => current_time('mysql'),
                 ),
-                array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
+                array('id' => $account_id),
+                array('%s', '%s', '%s', '%d', '%s'),
+                array('%d')
             );
-        }
 
-        wp_redirect(admin_url('admin.php?page=ts-ml-settings&settings_saved=1&account_connected=1'));
-        exit;
+            wp_redirect(admin_url('admin.php?page=ts-ml-settings&account_connected=1'));
+            exit;
+        }
     }
 
     /**

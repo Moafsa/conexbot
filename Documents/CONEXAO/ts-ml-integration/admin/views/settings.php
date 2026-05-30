@@ -426,14 +426,16 @@ if (!isset($settings_saved)) {
 
         <?php if ($is_saas_connected) : ?>
             <div class="notice notice-info" style="border-left-color: #00a32a; padding: 15px; margin-bottom: 25px; background: #fff;">
-                <h3 style="margin-top: 0; color: #00a32a;"><?php esc_html_e('☁️ Conexão via SaaS Ativa', 'ts-ml-integration'); ?></h3>
-                <p><?php esc_html_e('Você não precisa configurar credenciais da API do Mercado Livre localmente! O Conextbot SaaS gerencia toda a comunicação, autenticação (OAuth) e atualização de tokens de forma centralizada.', 'ts-ml-integration'); ?></p>
-                <p><?php esc_html_e('Basta conectar contas adicionais ou gerenciar configurações diretamente no seu painel Conextbot.', 'ts-ml-integration'); ?></p>
+                <h3 style="margin-top: 0; color: #00a32a;"><?php esc_html_e('☁️ Conexão via SaaS Conextbot Ativa', 'ts-ml-integration'); ?></h3>
+                <p><?php esc_html_e('A sua loja está integrada ao Conextbot SaaS! Você pode agora conectar e autorizar uma ou mais contas do Mercado Livre abaixo usando o fluxo seguro do SaaS (OAuth simplificado de 1 clique).', 'ts-ml-integration'); ?></p>
                 <p><a href="<?php echo esc_url($saas_url . '/dashboard/integrations'); ?>" target="_blank" class="button button-secondary">🔗 <?php esc_html_e('Ir para o Painel do Conextbot', 'ts-ml-integration'); ?></a></p>
             </div>
-        <?php elseif ($is_manual_mode) : ?>
-        <!-- PASSO 1: Credenciais da API (POR PAÍS) -->
-        <h2><?php esc_html_e('🔑 Passo 1: Credenciais da API do Mercado Livre', 'ts-ml-integration'); ?></h2>
+        <?php endif; ?>
+
+        <?php if ($is_saas_connected || $is_manual_mode) : ?>
+            <?php if ($is_manual_mode && !$is_saas_connected) : ?>
+            <!-- PASSO 1: Credenciais da API (POR PAÍS) -->
+            <h2><?php esc_html_e('🔑 Passo 1: Credenciais da API do Mercado Livre', 'ts-ml-integration'); ?></h2>
         <div class="notice notice-info">
             <p><strong><?php esc_html_e('ℹ️ Importante:', 'ts-ml-integration'); ?></strong>
                 <?php esc_html_e('As credenciais da API são configuradas POR PAÍS. Todas as contas do mesmo país compartilham as mesmas credenciais (App ID e Secret Key).', 'ts-ml-integration'); ?>
@@ -623,6 +625,8 @@ if (!isset($settings_saved)) {
             </tr>
         </table>
 
+        <?php endif; ?>
+
         <hr style="margin: 40px 0;">
 
         <!-- PASSO 2: Contas (INDIVIDUAIS) -->
@@ -746,12 +750,21 @@ if (!isset($settings_saved)) {
                                     <?php
                                     $oauth_url = '';
                                     $oauth_error = '';
-                                    if (class_exists('TS_ML_API_Handler')) {
-                                        $oauth_result = TS_ML_API_Handler::instance()->get_oauth_url($account->id, $account->country);
-                                        if (is_wp_error($oauth_result)) {
-                                            $oauth_error = $oauth_result->get_error_message();
-                                        } else {
-                                            $oauth_url = $oauth_result;
+                                    if ($is_saas_connected) {
+                                        $bot_id = get_option('ts_ml_bot_id');
+                                        $oauth_url = rtrim($saas_url, '/') . '/dashboard/integrations/wordpress/connect-ml' .
+                                            '?bot_id=' . urlencode($bot_id) .
+                                            '&account_id=' . urlencode($account->id) .
+                                            '&shop_url=' . urlencode($shop_url) .
+                                            '&redirect_uri=' . urlencode(admin_url('admin.php?page=ts-ml-settings'));
+                                    } else {
+                                        if (class_exists('TS_ML_API_Handler')) {
+                                            $oauth_result = TS_ML_API_Handler::instance()->get_oauth_url($account->id, $account->country);
+                                            if (is_wp_error($oauth_result)) {
+                                                $oauth_error = $oauth_result->get_error_message();
+                                            } else {
+                                                $oauth_url = $oauth_result;
+                                            }
                                         }
                                     }
                                     ?>
@@ -764,11 +777,6 @@ if (!isset($settings_saved)) {
                                         <a href="<?php echo esc_url($oauth_url); ?>" class="button button-primary" target="_blank">
                                             <?php esc_html_e('Conectar Conta', 'ts-ml-integration'); ?>
                                         </a>
-                                        <p class="description">
-                                            <small style="color: #d63638;">
-                                                <?php esc_html_e('⚠️ Se aparecer erro de DNS, verifique se a URL gerada usa mercadolivre.com.br para o Brasil.', 'ts-ml-integration'); ?>
-                                            </small>
-                                        </p>
                                     <?php } ?>
                                 <?php } else { ?>
                                     <p><strong style="color: #00a32a;"><?php esc_html_e('✅ Conectada', 'ts-ml-integration'); ?></strong>

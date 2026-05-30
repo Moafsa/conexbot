@@ -11,11 +11,21 @@ export async function GET(req: Request) {
         return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings?error=ml_auth_failed`);
     }
 
-    // Parse composite state if present: tenantId__shopUrl__wpRedirectUri
+    // Parse composite state: tenantId__accountId__shopUrl__wpRedirectUri or tenantId__shopUrl__wpRedirectUri
     const parts = state.split("__");
-    const tenantId = parts[0];
-    const shopUrl = parts.length > 1 ? decodeURIComponent(parts[1]) : null;
-    const wpRedirectUri = parts.length > 2 ? decodeURIComponent(parts[2]) : null;
+    let tenantId = parts[0];
+    let accountId: string | null = null;
+    let shopUrl: string | null = null;
+    let wpRedirectUri: string | null = null;
+
+    if (parts.length === 4) {
+        accountId = parts[1];
+        shopUrl = decodeURIComponent(parts[2]);
+        wpRedirectUri = decodeURIComponent(parts[3]);
+    } else {
+        shopUrl = parts.length > 1 ? decodeURIComponent(parts[1]) : null;
+        wpRedirectUri = parts.length > 2 ? decodeURIComponent(parts[2]) : null;
+    }
 
     try {
         // Exchange code and save tokens in Tenant database
@@ -28,29 +38,38 @@ export async function GET(req: Request) {
         const nickname = (tenant as any)?.mlUserId ? `Mercado Livre (${(tenant as any).mlUserId})` : "Mercado Livre";
 
         if (wpRedirectUri) {
-            // WordPress integration flow!
-            // 1. Get or create Bot for this tenant
-            let bot = await prisma.bot.findFirst({
-                where: { tenantId: tenantId }
-            });
-
-            if (!bot) {
-                // Create a default bot if none exists
-                bot = await prisma.bot.create({
-                    data: {
-                        name: `Agente ${nickname}`,
-                        businessType: "COMMERCIAL",
-                        tenantId: tenantId,
-                    }
-                });
-            }
-
-            // 2. Redirect back to WooCommerce settings page with Bot ID and License Key
             const finalWpUrl = new URL(wpRedirectUri);
-            finalWpUrl.searchParams.set("bot_id", bot.id);
-            finalWpUrl.searchParams.set("license_key", tenantId);
-            finalWpUrl.searchParams.set("account_name", nickname);
-            finalWpUrl.searchParams.set("saas_url", `${process.env.NEXT_PUBLIC_APP_URL}`);
+
+            // If accountId is present, this is Step 2: Connect ML Account!
+            if (accountId && accountId !== "0") {
+                finalWpUrl.searchParams.set("action", "saas_ml_callback");
+                finalWpUrl.searchParams.set("account_id", accountId);
+                finalWpUrl.searchParams.set("access_token", callbackData.access_token);
+                finalWpUrl.searchParams.set("refresh_token", callbackData.refresh_token);
+                finalWpUrl.searchParams.set("expires_in", String(callbackData.expires_in));
+                finalWpUrl.searchParams.set("ml_user_id", String(callbackData.user_id));
+                finalWpUrl.searchParams.set("account_name", `ML Conta (${callbackData.user_id})`);
+            } else {
+                // Otherwise, this is Step 1 (or backward-compatible flow)
+                let bot = await prisma.bot.findFirst({
+                    where: { tenantId: tenantId }
+                });
+
+                if (!bot) {
+                    bot = await prisma.bot.create({
+                        data: {
+                            name: `Agente ${nickname}`,
+                            businessType: "COMMERCIAL",
+                            tenantId: tenantId,
+                        }
+                    });
+                }
+
+                finalWpUrl.searchParams.set("bot_id", bot.id);
+                finalWpUrl.searchParams.set("license_key", tenantId);
+                finalWpUrl.searchParams.set("account_name", nickname);
+                finalWpUrl.searchParams.set("saas_url", `${process.env.NEXT_PUBLIC_APP_URL}`);
+            }
 
             return NextResponse.redirect(finalWpUrl.toString());
         }

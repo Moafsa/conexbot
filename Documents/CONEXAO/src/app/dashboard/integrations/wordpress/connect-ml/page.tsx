@@ -4,9 +4,11 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 
-function WordPressConnectContent() {
+function WordPressConnectMlContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const botId = searchParams.get("bot_id");
+    const accountId = searchParams.get("account_id");
     const shopUrl = searchParams.get("shop_url");
     const wpRedirectUri = searchParams.get("redirect_uri");
 
@@ -14,9 +16,9 @@ function WordPressConnectContent() {
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
-        if (!shopUrl || !wpRedirectUri) {
+        if (!botId || !accountId || !shopUrl || !wpRedirectUri) {
             setStatus("error");
-            setErrorMessage("Parâmetros de integração inválidos ou incompletos.");
+            setErrorMessage("Parâmetros de conexão do Mercado Livre inválidos ou incompletos.");
             return;
         }
 
@@ -33,36 +35,24 @@ function WordPressConnectContent() {
                     return;
                 }
 
-                // 2. Register / Get Bot in SaaS database
-                const tenantId = session.user.id;
-                const registerRes = await fetch("/api/v1/wp/register-store", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ shopUrl, tenantId })
-                });
-                const registerData = await registerRes.json();
+                // 2. Fetch system configuration for Client ID
+                const urlRes = await fetch(`/api/auth/mercadolivre/url-plugin?shop_url=${encodeURIComponent(shopUrl)}&redirect_uri=${encodeURIComponent(wpRedirectUri)}&account_id=${accountId}`);
+                const urlData = await urlRes.json();
 
-                if (!registerRes.ok || !registerData.botId) {
-                    throw new Error(registerData.error || "Falha ao registrar loja no SaaS.");
+                if (!urlRes.ok || !urlData.url) {
+                    throw new Error(urlData.error || "Falha ao gerar URL de autenticação.");
                 }
 
                 setStatus("redirecting");
-                
-                // Redirect back to WooCommerce immediately with Bot ID and License Key
-                const finalWpUrl = new URL(wpRedirectUri);
-                finalWpUrl.searchParams.set("bot_id", registerData.botId);
-                finalWpUrl.searchParams.set("license_key", tenantId);
-                finalWpUrl.searchParams.set("saas_url", window.location.origin);
-                
-                window.location.href = finalWpUrl.toString();
+                window.location.href = urlData.url;
             } catch (err: any) {
                 setStatus("error");
-                setErrorMessage(err.message || "Erro desconhecido ao iniciar conexão com o SaaS.");
+                setErrorMessage(err.message || "Erro desconhecido ao iniciar conexão.");
             }
         };
 
         initOAuth();
-    }, [shopUrl, wpRedirectUri, router]);
+    }, [botId, accountId, shopUrl, wpRedirectUri, router]);
 
     return (
         <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -70,7 +60,7 @@ function WordPressConnectContent() {
                 {status === "loading" && (
                     <div className="space-y-4 my-6">
                         <RefreshCw className="animate-spin w-12 h-12 text-indigo-500 mx-auto" />
-                        <h2 className="text-xl font-bold">Conectando ao SaaS...</h2>
+                        <h2 className="text-xl font-bold">Verificando Integração...</h2>
                         <p className="text-gray-400 text-sm">Autenticando sua sessão do Conextbot.</p>
                     </div>
                 )}
@@ -78,15 +68,15 @@ function WordPressConnectContent() {
                 {status === "redirecting" && (
                     <div className="space-y-4 my-6">
                         <RefreshCw className="animate-spin w-12 h-12 text-green-500 mx-auto" />
-                        <h2 className="text-xl font-bold text-green-400">Vinculando Loja...</h2>
-                        <p className="text-gray-400 text-sm">Retornando para o seu painel do WooCommerce.</p>
+                        <h2 className="text-xl font-bold text-green-400">Conectando Conta...</h2>
+                        <p className="text-gray-400 text-sm">Redirecionando de forma segura para o Mercado Livre.</p>
                     </div>
                 )}
 
                 {status === "error" && (
                     <div className="space-y-4 my-6">
                         <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
-                        <h2 className="text-xl font-bold text-red-400">Falha na Conexão</h2>
+                        <h2 className="text-xl font-bold text-red-400">Falha na Autenticação</h2>
                         <p className="text-red-300 text-sm">{errorMessage}</p>
                         <button onClick={() => router.push("/dashboard")} className="w-full mt-4 bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 rounded-lg transition" style={{ display: 'block', textDecoration: 'none' }}>
                             Ir para o Painel
@@ -98,10 +88,10 @@ function WordPressConnectContent() {
     );
 }
 
-export default function WordPressConnectPage() {
+export default function WordPressConnectMlPage() {
     return (
         <Suspense fallback={<div className="text-white p-10 text-center">Carregando...</div>}>
-            <WordPressConnectContent />
+            <WordPressConnectMlContent />
         </Suspense>
     );
 }
