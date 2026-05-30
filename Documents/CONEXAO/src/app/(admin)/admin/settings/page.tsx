@@ -27,7 +27,9 @@ export default function AdminSettingsPage() {
         systemBotId: '',
         metaAppId: '',
         metaAppSecret: '',
-        metaVerifyToken: ''
+        metaVerifyToken: '',
+        mlClientId: '',
+        mlClientSecret: ''
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -213,6 +215,23 @@ export default function AdminSettingsPage() {
                                         onChange={v => setSettings({ ...settings, mercadoPagoAccessToken: v })}
                                         placeholder="APP_USR-..."
                                     />
+                                </div>
+                                <div className="border-t border-[#1a1a1a] my-4 pt-4">
+                                    <h4 className="text-sm font-bold text-gray-500 mb-4 uppercase">Mercado Livre (Integração SaaS)</h4>
+                                    <SettingInput
+                                        label="Client ID / App ID"
+                                        value={settings.mlClientId}
+                                        onChange={v => setSettings({ ...settings, mlClientId: v })}
+                                        placeholder="Ex: 1234567890123456"
+                                    />
+                                    <div className="mt-4">
+                                        <SettingInput
+                                            label="Client Secret / Chave Secreta"
+                                            value={settings.mlClientSecret}
+                                            onChange={v => setSettings({ ...settings, mlClientSecret: v })}
+                                            placeholder="Ex: abcdefghijklmnopqrstuvwxyz"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="border-t border-[#1a1a1a] my-4 pt-4">
                                     <h4 className="text-sm font-bold text-gray-500 mb-4 uppercase">Inteligência Artificial</h4>

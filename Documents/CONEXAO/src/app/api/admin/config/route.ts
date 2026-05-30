@@ -85,7 +85,9 @@ export async function PUT(req: Request) {
             logoWhiteUrl: body.logoWhiteUrl || null,
             metaAppId: body.metaAppId || null,
             metaAppSecret: body.metaAppSecret || null,
-            metaVerifyToken: body.metaVerifyToken || null
+            metaVerifyToken: body.metaVerifyToken || null,
+            mlClientId: body.mlClientId || null,
+            mlClientSecret: body.mlClientSecret || null
         };
 
         console.log(`[AdminConfig] [${timestamp}] Attempting upsert...`);
