@@ -7,8 +7,15 @@ export async function GET(req: Request) {
     const stateBase64 = searchParams.get("state");
     const error = searchParams.get("error");
     
+    const host = req.headers.get("host") || "app.conext.click";
+    const protocol = host.includes("localhost") || host.includes("0.0.0.0") ? "http" : "https";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || `${protocol}://${host}`;
+    
+    // For Facebook OAuth, we must use the official domain if we are in production
+    const finalAppUrl = appUrl.includes("0.0.0.0") ? "https://app.conext.click" : appUrl;
+    
     const origin = new URL(req.url).origin;
-    const redirectUri = `${origin}/api/integrations/facebook/callback`;
+    const redirectUri = `${finalAppUrl}/api/integrations/facebook/callback`;
     
     let finalRedirect = `${origin}/dashboard/marketing`;
 

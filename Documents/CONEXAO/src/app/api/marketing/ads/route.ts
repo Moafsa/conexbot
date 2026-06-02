@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getEffectiveTenantId } from "@/lib/get-effective-tenant";
 import { MetaAdsService } from "@/services/marketing/meta-ads-service";
+import { GoogleAdsService } from "@/services/marketing/google-ads-service";
 
 export async function GET(req: Request) {
     try {

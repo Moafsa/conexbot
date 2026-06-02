@@ -23,8 +23,15 @@ export async function GET(req: Request) {
         return NextResponse.redirect(new URL(`/dashboard/marketing?error=meta_not_configured`, req.url));
     }
 
-    const origin = new URL(req.url).origin;
-    const redirectUri = `${origin}/api/integrations/facebook/callback`;
+    const host = req.headers.get("host") || "app.conext.click";
+    const protocol = host.includes("localhost") || host.includes("0.0.0.0") ? "http" : "https";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || `${protocol}://${host}`;
+    
+    // For Facebook OAuth, we must use the official domain if we are in production
+    // So if it's 0.0.0.0, we force it to the real domain to avoid Facebook's error
+    const finalAppUrl = appUrl.includes("0.0.0.0") ? "https://app.conext.click" : appUrl;
+    
+    const redirectUri = `${finalAppUrl}/api/integrations/facebook/callback`;
     
     // Scopes for ads and pages and instagram
     const scope = [

@@ -5,6 +5,9 @@ import { MarketingNotificationService } from "./notification-service";
 import { StorageService } from "@/lib/storage";
 import crypto from "crypto";
 import { ImageCompositor } from "./image-compositor";
+import { DataForSeoService } from "./dataforseo-service";
+import { SemrushService } from "./semrush-service";
+import { MetaAdsService } from "./meta-ads-service";
 
 export const MarketingIAService = {
     /**
@@ -353,7 +356,6 @@ export const MarketingIAService = {
         if (tenant.dataForSeoApiKey) {
             try {
                 console.log("[KeywordResearch] Usando DataForSEO para:", keyword);
-                const { DataForSeoService } = require("./dataforseo-service");
                 const results = await DataForSeoService.getSearchVolume(tenantId, [keyword]);
                 if (results && results.length > 0) {
                     const res = results[0];
@@ -376,7 +378,6 @@ export const MarketingIAService = {
         if (!data && tenant.semrushApiKey) {
             try {
                 console.log("[KeywordResearch] Usando Semrush para:", keyword);
-                const { SemrushService } = require("./semrush-service");
                 const res = await SemrushService.getKeywordData(tenantId, keyword);
                 if (res) {
                     data = {

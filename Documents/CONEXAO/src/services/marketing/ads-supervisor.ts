@@ -81,7 +81,6 @@ export const AdsSupervisorService = {
         const campaignName = `[AUTO] Otimização - ${bot.name} - ${new Date().toLocaleDateString()}`;
         
         try {
-            const { MetaAdsService } = require("./meta-ads-service");
             const externalId = await MetaAdsService.createCampaign(bot.tenantId, {
                 name: campaignName,
                 objective: bot.adsObjective || "OUTREACH",
