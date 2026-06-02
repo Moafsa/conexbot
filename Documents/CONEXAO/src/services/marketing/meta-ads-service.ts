@@ -18,7 +18,7 @@ export const MetaAdsService = {
             ? tenant.metaAdsAccountId 
             : `act_${tenant.metaAdsAccountId}`;
 
-        const url = `https://graph.facebook.com/v22.0/${accountId}/campaigns?fields=name,status,objective,budget_remaining,daily_budget,lifetime_budget&access_token=${tenant.metaAdsToken}`;
+        const url = `https://graph.facebook.com/v22.0/${accountId}/campaigns?fields=name,status,objective,budget_remaining,daily_budget,lifetime_budget,adsets{id,name,status,daily_budget,ads{id,name,status,creative{thumbnail_url,image_url,body,title}}}&access_token=${tenant.metaAdsToken}`;
         
         try {
             const res = await fetch(url);

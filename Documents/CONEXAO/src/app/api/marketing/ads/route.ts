@@ -28,3 +28,25 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Erro ao buscar dados de anúncios" }, { status: 500 });
     }
 }
+
+export async function POST(req: Request) {
+    try {
+        const body = await req.json();
+        const { name, objective, dailyBudget, clientId, targeting, creativeUrl } = body;
+        
+        const tenantId = await getEffectiveTenantId(clientId);
+        if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const campaignId = await MetaAdsService.createCampaign(tenantId, {
+            name,
+            objective,
+            dailyBudget,
+            targeting,
+            creativeUrl
+        });
+
+        return NextResponse.json({ id: campaignId, success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message || "Erro ao criar campanha" }, { status: 500 });
+    }
+}

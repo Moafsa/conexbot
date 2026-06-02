@@ -339,6 +339,10 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
     const [name, setName] = useState("");
     const [objective, setObjective] = useState("OUTREACH");
     const [budget, setBudget] = useState("50");
+    const [ageMin, setAgeMin] = useState("18");
+    const [ageMax, setAgeMax] = useState("65");
+    const [locations, setLocations] = useState("BR");
+    const [creativeUrl, setCreativeUrl] = useState("");
 
     const handleCreate = async () => {
         if (!name) return alert("Dê um nome para a campanha");
@@ -351,7 +355,13 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
                     name, 
                     objective, 
                     dailyBudget: parseFloat(budget) * 100,
-                    clientId: selectedClientId 
+                    clientId: selectedClientId,
+                    targeting: {
+                        age_min: parseInt(ageMin),
+                        age_max: parseInt(ageMax),
+                        geo_locations: { countries: locations.split(',').map((l: string) => l.trim().toUpperCase()) }
+                    },
+                    creativeUrl
                 })
             });
             
@@ -371,31 +381,35 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-[#0f172a] border border-white/10 rounded-[40px] w-full max-w-lg p-10 space-y-8 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] -mr-32 -mt-32"></div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-[#0f172a] border border-white/10 rounded-[40px] w-full max-w-2xl p-10 space-y-8 shadow-2xl relative my-auto animate-in zoom-in-95 duration-300">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
                 
-                <div className="relative z-10">
-                    <h2 className="text-3xl font-black flex items-center gap-3">
-                        <Target className="text-blue-500" />
-                        Nova Campanha
-                    </h2>
-                    <p className="text-gray-400 mt-2">Configure sua campanha de anúncios na Meta (FB/IG).</p>
+                <div className="relative z-10 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-3xl font-black flex items-center gap-3">
+                            <Target className="text-blue-500" />
+                            Nova Campanha Meta AI
+                        </h2>
+                        <p className="text-gray-400 mt-2">Configuração avançada via API Meta Ads.</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-all text-gray-500 hover:text-white">
+                        <X size={20} />
+                    </button>
                 </div>
 
                 <div className="space-y-6 relative z-10">
-                    <div className="space-y-2">
-                        <label className="text-xs font-black uppercase tracking-widest text-gray-500">Nome da Campanha</label>
-                        <input 
-                            type="text"
-                            placeholder="Ex: Lançamento Verão 2025"
-                            className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-blue-500/50 transition-all"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2 md:col-span-2">
+                            <label className="text-xs font-black uppercase tracking-widest text-gray-500">Nome da Campanha</label>
+                            <input 
+                                type="text"
+                                placeholder="Ex: Lead Generation Q4"
+                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-blue-500/50 transition-all"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black uppercase tracking-widest text-gray-500">Objetivo</label>
                             <select 
@@ -403,37 +417,60 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
                                 value={objective}
                                 onChange={(e) => setObjective(e.target.value)}
                             >
-                                <option value="OUTREACH">Alcance</option>
-                                <option value="TRAFFIC">Tráfego</option>
+                                <option value="OUTREACH">Alcance (Brand Awareness)</option>
+                                <option value="TRAFFIC">Tráfego no Site</option>
                                 <option value="CONVERSIONS">Conversões</option>
-                                <option value="LEAD_GEN">Geração de Leads</option>
+                                <option value="LEAD_GEN">Geração de Cadastros (Leads)</option>
                             </select>
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-black uppercase tracking-widest text-gray-500">Orçamento Diário (R$)</label>
                             <input 
                                 type="number"
-                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-blue-500/50"
+                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-4 px-6 text-white outline-none focus:border-blue-500/50 font-mono"
                                 value={budget}
                                 onChange={(e) => setBudget(e.target.value)}
                             />
                         </div>
                     </div>
+
+                    <div className="space-y-4 pt-4 border-t border-white/10">
+                        <h4 className="text-sm font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2"><Target size={16}/> Segmentação</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Idade Min</label>
+                                <input type="number" className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-blue-500/50" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Idade Max</label>
+                                <input type="number" className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-blue-500/50" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} />
+                            </div>
+                            <div className="space-y-2 md:col-span-1 col-span-2">
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-500">Países</label>
+                                <input type="text" placeholder="BR, PT, US" className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-blue-500/50 uppercase" value={locations} onChange={(e) => setLocations(e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2 pt-4 border-t border-white/10">
+                        <label className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2"><Sparkles size={14} className="text-blue-400"/> URL do Criativo</label>
+                        <input 
+                            type="text"
+                            placeholder="https://cdn.example.com/ad-image.jpg"
+                            className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl py-3 px-4 text-white outline-none focus:border-blue-500/50"
+                            value={creativeUrl}
+                            onChange={(e) => setCreativeUrl(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 <div className="flex gap-4 pt-4 relative z-10">
                     <button 
-                        onClick={onClose}
-                        className="flex-1 py-4 rounded-2xl border border-white/10 text-gray-400 hover:bg-white/5 transition-all font-bold"
-                    >
-                        Cancelar
-                    </button>
-                    <button 
                         onClick={handleCreate}
                         disabled={loading}
-                        className="flex-1 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold transition-all disabled:opacity-50 shadow-xl shadow-blue-600/20"
+                        className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold transition-all disabled:opacity-50 shadow-xl shadow-blue-600/20 text-lg uppercase tracking-widest"
                     >
-                        {loading ? "Criando..." : "Criar Campanha"}
+                        {loading ? "Publicando via Meta API..." : "Criar Campanha"}
                     </button>
                 </div>
             </div>
@@ -2014,25 +2051,65 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                         </div>
                     ) : (
                         data.campaigns.map((camp: any) => (
-                            <div key={camp.id} className="bg-[#0b0f1a] border border-white/5 rounded-2xl p-4 flex items-center gap-4 hover:border-blue-500/30 transition-all">
-                                <div className="w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center shrink-0">
-                                    <Instagram size={24} className="text-gray-400" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold truncate text-lg">{camp.name}</h4>
-                                    <div className="flex items-center gap-4 mt-1">
-                                        <span className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${camp.status === 'ACTIVE' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-gray-400/10 text-gray-400'}`}>
-                                            {camp.status}
-                                        </span>
-                                        <span className="text-xs text-gray-500">Objetivo: {camp.objective}</span>
-                                        {camp.daily_budget && <span className="text-xs text-gray-500">Orçamento: R$ {(camp.daily_budget / 100).toFixed(2)}/dia</span>}
+                            <div key={camp.id} className="bg-[#0b0f1a] border border-white/5 rounded-2xl p-4 flex flex-col gap-4 hover:border-blue-500/30 transition-all">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center shrink-0">
+                                        <Instagram size={24} className="text-gray-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold truncate text-lg">{camp.name}</h4>
+                                        <div className="flex items-center gap-4 mt-1">
+                                            <span className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${camp.status === 'ACTIVE' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-gray-400/10 text-gray-400'}`}>
+                                                {camp.status}
+                                            </span>
+                                            <span className="text-xs text-gray-500">Objetivo: {camp.objective}</span>
+                                            {camp.daily_budget && <span className="text-xs text-gray-500">Orçamento: R$ {(camp.daily_budget / 100).toFixed(2)}/dia</span>}
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex items-center gap-6">
+                                        <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg">
+                                            <Settings size={20} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="text-right flex items-center gap-6">
-                                    <button className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg">
-                                        <Settings size={20} />
-                                    </button>
-                                </div>
+                                {/* AdSets & Ads List */}
+                                {camp.adsets?.data && camp.adsets.data.length > 0 && (
+                                    <div className="pl-16 space-y-3 pt-2 border-t border-white/5 mt-2">
+                                        {camp.adsets.data.map((adset: any) => (
+                                            <div key={adset.id} className="space-y-2">
+                                                <div className="flex items-center justify-between text-sm bg-white/[0.02] p-2 rounded-lg border border-white/5">
+                                                    <div className="flex items-center gap-2">
+                                                        <Target size={14} className="text-blue-400"/>
+                                                        <span className="font-bold text-gray-300">{adset.name}</span>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${adset.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-500'}`}>{adset.status}</span>
+                                                    </div>
+                                                    {adset.daily_budget && <span className="text-xs text-gray-500">R$ {(adset.daily_budget / 100).toFixed(2)}/dia</span>}
+                                                </div>
+                                                
+                                                {/* Ads */}
+                                                {adset.ads?.data && adset.ads.data.length > 0 && (
+                                                    <div className="pl-6 space-y-2">
+                                                        {adset.ads.data.map((ad: any) => (
+                                                            <div key={ad.id} className="flex items-center gap-3 bg-black/20 p-2 rounded-lg border border-white/5">
+                                                                <div className="w-10 h-10 bg-white/5 rounded-lg overflow-hidden shrink-0 border border-white/10">
+                                                                    {ad.creative?.thumbnail_url || ad.creative?.image_url ? (
+                                                                        <img src={ad.creative.thumbnail_url || ad.creative.image_url} alt="Ad Thumbnail" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center"><Sparkles size={12} className="text-gray-500"/></div>
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-gray-300 line-clamp-1">{ad.name}</p>
+                                                                    <p className="text-[10px] text-gray-500">{ad.status}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}
@@ -2102,30 +2179,68 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                 {/* Meta Settings */}
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
                     <h3 className="text-xl font-bold flex items-center gap-3">
-                        <Target className="text-blue-500" size={24} />
+                        <Facebook className="text-blue-500" size={24} />
                         Meta Marketing (FB/IG)
                     </h3>
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-400">Access Token (Marketing API)</label>
-                            <input 
-                                type="password" 
-                                value={settings.metaAdsToken}
-                                onChange={e => setSettings({...settings, metaAdsToken: e.target.value})}
-                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
-                                placeholder="EAAB..." 
-                            />
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-400">
+                                Conecte sua conta do Facebook para autorizar a automação de anúncios e posts.
+                            </p>
+                            
+                            {settings.metaAdsToken ? (
+                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                                            <CheckCircle2 size={16} className="text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-white">Facebook Conectado</p>
+                                            <p className="text-[10px] text-emerald-400 uppercase tracking-widest">Token Ativo</p>
+                                        </div>
+                                    </div>
+                                    <a 
+                                        href={`/api/integrations/facebook/connect${selectedClientId ? `?clientId=${selectedClientId}` : ""}`}
+                                        className="text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        Reconectar
+                                    </a>
+                                </div>
+                            ) : (
+                                <a 
+                                    href={`/api/integrations/facebook/connect${selectedClientId ? `?clientId=${selectedClientId}` : ""}`}
+                                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/20"
+                                >
+                                    <Facebook size={18} />
+                                    Conectar com Facebook
+                                </a>
+                            )}
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-400">Ad Account ID</label>
-                            <input 
-                                type="text" 
-                                value={settings.metaAdsAccountId}
-                                onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
-                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
-                                placeholder="act_123456789" 
-                            />
-                        </div>
+                        
+                        <div className="pt-4 border-t border-white/5 space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400 flex items-center justify-between">
+                                    <span>Access Token (Manual)</span>
+                                    <span className="text-[10px] text-gray-600 uppercase">Opcional</span>
+                                </label>
+                                <input 
+                                    type="password" 
+                                    value={settings.metaAdsToken}
+                                    onChange={e => setSettings({...settings, metaAdsToken: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
+                                    placeholder="EAAB..." 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Ad Account ID</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.metaAdsAccountId}
+                                    onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
+                                    placeholder="act_123456789" 
+                                />
+                            </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-400">Pixel ID (Conversões)</label>
                             <input 
