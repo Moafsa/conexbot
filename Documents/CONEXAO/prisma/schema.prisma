@@ -199,6 +199,7 @@ model Bot {
   googleCalendarId        String?             @default("primary")
   appointmentDuration     Int                 @default(30)
   workingHours            Json?
+  onboardingData          Json?
   messageBuffer           Int                 @default(1500)
   asaasApiKey             String?
   userSplitValue          Float               @default(0)

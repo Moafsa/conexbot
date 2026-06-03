@@ -17,6 +17,8 @@ interface ContactInfo {
     email?: string | null;
     company?: string | null;
     phone?: string | null;
+    notes?: any[];
+    orders?: any[];
     // Ad attribution — tells the agent where this lead came from
     utmSource?: string | null;
     utmMedium?: string | null;
@@ -192,7 +194,7 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
         sections.push(`═══ FLUXO DE ATENDIMENTO (RÁPIDO) ═══
 1. SAUDAÇÃO PADRÃO: Cumprimento prático ("Opa, e aí! Tá interessado em [Assunto]?")
 2. IDENTIFICAÇÃO: Entenda o que o cliente quer em 1-2 perguntas
-3. APRESENTAÇÃO: Mostre a solução de forma objetiva
+3. APRESENTAÇÃO: Moostre a solução de forma objetiva
 4. FECHAMENTO: Peça a venda! Não espere o cliente decidir sozinho
 5. PÓS-VENDA: Confirme o pedido e agradeça`);
     }
@@ -217,7 +219,16 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             `- E-mail: ${ci.email || 'não informado ainda'}`,
             `- Empresa: ${ci.company || 'não informado ainda'}`,
         ];
-        sections.push(`═══ PERFIL DO CLIENTE ═══\n\n${contactLines.join('\n')}\n\nSe algum dado já está preenchido, NÃO peça novamente.`);
+
+        if (ci.notes && ci.notes.length > 0) {
+            contactLines.push(`- Anotações do Suporte: ${ci.notes.map((n: any) => `[${n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}] ${n.content}`).join(' | ')}`);
+        }
+
+        if (ci.orders && ci.orders.length > 0) {
+            contactLines.push(`- Histórico de Compras/Pedidos: ${ci.orders.map((o: any) => `Pedido ${o.id.substring(0,8)} - R$ ${o.totalAmount} (${o.status})`).join(' | ')}`);
+        }
+
+        sections.push(`💡 PERFIL DO CLIENTE 💡\n\n${contactLines.join('\n')}\n\nSe algum dado já está preenchido, NÃO peça novamente. Use as anotações e histórico de compras para oferecer um atendimento personalizado.`);
 
         // Ad attribution context — only inject if there's data to show
         const ci2 = bot.contactInfo;

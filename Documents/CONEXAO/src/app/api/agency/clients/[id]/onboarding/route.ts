@@ -51,9 +51,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
                     niche: true,
                     systemPrompt: true,
                     modules: true,
+                    deliveryFeeType: true,
+                    deliveryFeeRules: true,
                     websiteUrl: true,
                     address: true,
                     hours: true,
+                    description: true,
+                    productsServices: true,
+                    paymentMethods: true,
+                    onboardingData: true,
                     channels: {
                         select: {
                             provider: true,
@@ -96,6 +102,18 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         botName: bot?.name || '',
         systemPrompt: bot?.systemPrompt || '',
         modules: bot?.modules || ['crm'],
+        // Extended fields mapping
+        description: bot?.description || (bot as any)?.onboardingData?.description || '',
+        productsServices: bot?.productsServices || (bot as any)?.onboardingData?.productsServices || '',
+        paymentMethods: bot?.paymentMethods?.length ? bot.paymentMethods : ((bot as any)?.onboardingData?.paymentMethods || []),
+        targetAudience: (bot as any)?.onboardingData?.targetAudience || '',
+        tone: (bot as any)?.onboardingData?.tone || 'Profissional',
+        persona: (bot as any)?.onboardingData?.persona || '',
+        differentials: (bot as any)?.onboardingData?.differentials || '',
+        keyProducts: (bot as any)?.onboardingData?.keyProducts || '',
+        avgTicket: (bot as any)?.onboardingData?.avgTicket || '',
+        deliveryFeeType: bot?.deliveryFeeType || 'FIXED',
+        deliveryFeeRules: bot?.deliveryFeeRules ? (typeof bot.deliveryFeeRules === 'string' ? JSON.parse(bot.deliveryFeeRules) : bot.deliveryFeeRules) : [],
     });
 }
 
@@ -141,6 +159,19 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         channels = [],
         modules,
         systemPrompt,
+        // Extended fields
+        targetAudience,
+        tone,
+        persona,
+        productsServices,
+        differentials,
+        paymentMethods,
+        avgTicket,
+        description,
+        keyProducts,
+        extractedProducts = [],
+        deliveryFeeType,
+        deliveryFeeRules,
     } = body;
 
     try {
@@ -155,6 +186,29 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
                 hours: hours || undefined,
                 modules: modules || undefined,
                 systemPrompt: systemPrompt || undefined,
+                description: description || undefined,
+                productsServices: productsServices || undefined,
+                paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : paymentMethods ? [paymentMethods] : [],
+                deliveryFeeType: deliveryFeeType || undefined,
+                deliveryFeeRules: deliveryFeeRules || undefined,
+                products: extractedProducts.length > 0 ? {
+                    create: extractedProducts.map((p: any) => ({
+                        name: String(p.name).substring(0, 200),
+                        description: p.description ? String(p.description).substring(0, 500) : null,
+                        price: Number(p.price) || 0,
+                        salePrice: p.salePrice ? Number(p.salePrice) : null,
+                        active: true,
+                        stock: 999
+                    }))
+                } : undefined,
+                onboardingData: {
+                    targetAudience,
+                    tone,
+                    persona,
+                    differentials,
+                    keyProducts,
+                    avgTicket,
+                },
             },
         });
 

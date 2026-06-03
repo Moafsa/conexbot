@@ -77,12 +77,15 @@ const INITIAL = {
     productsServices:"",
     differentials:   "",
     keyProducts:     "",
+    extractedProducts: [] as any[],
     // Step 4 – Canais (multi-channel)
     channels:        [] as Array<{ provider: string; identifier: string }>,
     hours:           "",
     // Step 5 – Financeiro
     paymentMethods:  [] as string[],
     avgTicket:       "",
+    deliveryFeeType: "FIXED",
+    deliveryFeeRules: [] as { region: string; fee: number }[],
     // Step 6 – IA do Bot
     botName:         "",
     systemPrompt:    "",
@@ -126,14 +129,29 @@ export default function NewClientWizardPage() {
                     if (data.success) {
                         setForm(f => ({
                             ...f,
-                            // Step 1 – Negócio
+                            // Step 1 - Negócio
                             businessName: data.businessName || f.businessName,
                             niche: data.niche || f.niche,
                             address: data.address || f.address,
                             websiteUrl: data.websiteUrl || f.websiteUrl,
-                            // Step 4 – Canais
+                            description: data.description || f.description,
+                            // Step 2
+                            targetAudience: data.targetAudience || f.targetAudience,
+                            tone: data.tone || f.tone,
+                            persona: data.persona || f.persona,
+                            // Step 3
+                            productsServices: data.productsServices || f.productsServices,
+                            differentials: data.differentials || f.differentials,
+                            keyProducts: data.keyProducts || f.keyProducts,
+                            extractedProducts: data.extractedProducts || f.extractedProducts,
+                            // Step 4 - Canais
                             channels: data.channels || f.channels,
                             hours: data.hours || f.hours,
+                            // Step 5
+                            paymentMethods: data.paymentMethods || f.paymentMethods,
+                            avgTicket: data.avgTicket || f.avgTicket,
+                            deliveryFeeType: data.deliveryFeeType || f.deliveryFeeType,
+                            deliveryFeeRules: data.deliveryFeeRules || f.deliveryFeeRules,
                             // Step 6 – IA do Bot
                             botName: data.botName || f.botName,
                             systemPrompt: data.systemPrompt || f.systemPrompt,
@@ -268,8 +286,12 @@ export default function NewClientWizardPage() {
                 persona:         form.persona || undefined,
                 productsServices:form.productsServices || undefined,
                 differentials:   form.differentials || undefined,
-                paymentMethods:  form.paymentMethods.length ? form.paymentMethods.join(", ") : undefined,
+                keyProducts:     form.keyProducts || undefined,
+                extractedProducts: form.extractedProducts.length > 0 ? form.extractedProducts : undefined,
+                paymentMethods:  form.paymentMethods,
                 avgTicket:       form.avgTicket || undefined,
+                deliveryFeeType: form.deliveryFeeType,
+                deliveryFeeRules:form.deliveryFeeRules.length > 0 ? form.deliveryFeeRules : undefined,
                 systemPrompt:    form.systemPrompt || undefined,
                 modules:         form.modules,
                 description:     form.description || undefined,
@@ -625,12 +647,12 @@ function Step2Publico({ form, set }: any) {
                 </div>
             </div>
 
-            <Field label="Persona do Bot (opcional)" note="Como o bot se apresenta (ex: 'Ana, especialista em beleza')">
+            <Field label="Estilo de Atendimento (Persona)" note="Como o bot se apresenta (ex: Jovem e descontraído, Atendente formal)">
                 <input
                     type="text"
                     value={form.persona}
                     onChange={e => set("persona", e.target.value)}
-                    placeholder="Ex: Carla, consultora de beleza da Estética Silva"
+                    placeholder="Ex: Carla, consultora de beleza simpática e ágil"
                     className={fieldCls(false)}
                 />
             </Field>
@@ -639,9 +661,82 @@ function Step2Publico({ form, set }: any) {
 }
 
 function Step3Produtos({ form, set }: any) {
+    const [menuText, setMenuText] = useState("");
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractError, setExtractError] = useState<string|null>(null);
+
+    const handleExtractMenu = async () => {
+        if (!menuText) return;
+        setIsExtracting(true);
+        setExtractError(null);
+        try {
+            const res = await fetch("/api/agency/onboarding/extract-menu", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ menuText }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                set("extractedProducts", data.products);
+                setMenuText("");
+            } else {
+                setExtractError(data.error || "Erro ao extrair cardápio.");
+            }
+        } catch (err: any) {
+            setExtractError(err.message || "Erro de conexão.");
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <StepHeader icon={Package} title="Produtos & Serviços" desc="O que a empresa oferece? O bot usará isso para conversar com leads." />
+
+            {(form.niche === "restaurante" || form.niche === "ecommerce") && (
+                <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+                    <h3 className="text-sm font-medium text-emerald-300 flex items-center gap-1.5">
+                        <Sparkles size={16} /> Importador Mágico de Cardápio / Catálogo
+                    </h3>
+                    <p className="text-xs text-gray-400">Cole o texto completo do cardápio aqui e a IA transformará automaticamente em produtos estruturados para o bot.</p>
+                    <textarea
+                        rows={4}
+                        value={menuText}
+                        onChange={e => setMenuText(e.target.value)}
+                        placeholder="Ex: 1. Pizza Calabresa R$45,00. Ingredientes: molho, mussarela, calabresa e cebola..."
+                        className={fieldCls(false) + " resize-none"}
+                    />
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleExtractMenu}
+                            disabled={isExtracting || !menuText}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isExtracting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                            Extrair Produtos
+                        </button>
+                        {form.extractedProducts?.length > 0 && (
+                            <span className="text-xs text-emerald-400">{form.extractedProducts.length} produtos extraídos com sucesso!</span>
+                        )}
+                        {extractError && <span className="text-xs text-red-400">{extractError}</span>}
+                    </div>
+
+                    {form.extractedProducts?.length > 0 && (
+                        <div className="mt-3 bg-[#111827] rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 border border-white/5">
+                            {form.extractedProducts.map((p: any, idx: number) => (
+                                <div key={idx} className="flex justify-between items-start border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                                    <div>
+                                        <p className="text-sm text-white font-medium">{p.name}</p>
+                                        <p className="text-xs text-gray-500 line-clamp-1">{p.description}</p>
+                                    </div>
+                                    <span className="text-sm text-emerald-400 font-mono flex-shrink-0 ml-2">R$ {Number(p.price).toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <Field label="Produtos / Serviços Principais">
                 <textarea
@@ -766,9 +861,84 @@ function Step4Canais({ form, set, addChannel, removeChannel, updateChannel }: an
 }
 
 function Step5Financeiro({ form, set, toggleArr }: any) {
+    const handleAddRule = () => {
+        set("deliveryFeeRules", [...form.deliveryFeeRules, { region: "", fee: 0 }]);
+    };
+    const handleUpdateRule = (index: number, field: string, value: any) => {
+        const newRules = [...form.deliveryFeeRules];
+        newRules[index] = { ...newRules[index], [field]: value };
+        set("deliveryFeeRules", newRules);
+    };
+    const handleRemoveRule = (index: number) => {
+        set("deliveryFeeRules", form.deliveryFeeRules.filter((_: any, i: number) => i !== index));
+    };
+
     return (
         <div className="space-y-6">
             <StepHeader icon={DollarSign} title="Financeiro" desc="Formas de pagamento e ticket médio." />
+
+            {(form.niche === "restaurante" || form.niche === "ecommerce") && (
+                <div className="bg-[#1a2235] border border-white/10 rounded-xl p-4 space-y-4">
+                    <label className="block text-sm font-medium text-emerald-300">Taxas de Entrega</label>
+                    <div className="flex gap-2">
+                        {["FIXED", "BAIRRO", "FREE"].map(type => (
+                            <button
+                                key={type}
+                                type="button"
+                                onClick={() => set("deliveryFeeType", type)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                    form.deliveryFeeType === type
+                                        ? "bg-emerald-900/50 border-emerald-500 text-emerald-300"
+                                        : "bg-[#111827] border-white/10 text-gray-400 hover:border-white/20"
+                                }`}
+                            >
+                                {type === "FIXED" ? "Taxa Fixa" : type === "BAIRRO" ? "Por Bairro" : "Frete Grátis"}
+                            </button>
+                        ))}
+                    </div>
+
+                    {form.deliveryFeeType === "BAIRRO" && (
+                        <div className="space-y-2 mt-3">
+                            <label className="block text-xs font-medium text-gray-400">Configurar Tabela de Bairros</label>
+                            {form.deliveryFeeRules.map((rule: any, idx: number) => (
+                                <div key={idx} className="flex gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        placeholder="Nome do Bairro"
+                                        value={rule.region}
+                                        onChange={e => handleUpdateRule(idx, "region", e.target.value)}
+                                        className={fieldCls(false) + " flex-1"}
+                                    />
+                                    <div className="relative w-28">
+                                        <span className="absolute left-3 top-2.5 text-xs text-gray-500">R$</span>
+                                        <input
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={rule.fee}
+                                            onChange={e => handleUpdateRule(idx, "fee", parseFloat(e.target.value))}
+                                            className={fieldCls(false) + " pl-8"}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveRule(idx)}
+                                        className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={handleAddRule}
+                                className="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 mt-2"
+                            >
+                                <Plus size={14} /> Adicionar Bairro
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Formas de Pagamento Aceitas</label>
@@ -805,6 +975,8 @@ function Step5Financeiro({ form, set, toggleArr }: any) {
 }
 
 function Step6IA({ form, set, toggleArr }: any) {
+    const [showAdvanced, setShowAdvanced] = useState(false);
+
     return (
         <div className="space-y-6">
             <StepHeader icon={Bot} title="IA do Bot" desc="Defina o nome, a personalidade e os módulos do agente." />
@@ -819,16 +991,26 @@ function Step6IA({ form, set, toggleArr }: any) {
                 />
             </Field>
 
-            <Field label="Personalidade / Instruções (opcional)"
-                   note="Deixe em branco para usar o template do nicho">
-                <textarea
-                    rows={5}
-                    value={form.systemPrompt}
-                    onChange={e => set("systemPrompt", e.target.value)}
-                    placeholder="Você é Ana, especialista em beleza da Estética Silva. Responda de forma simpática e profissional. Apresente os serviços, agende consultas e qualifique leads..."
-                    className={fieldCls(false) + " resize-none font-mono text-xs"}
-                />
-            </Field>
+            <div>
+                <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="text-xs font-medium text-gray-400 hover:text-emerald-400 transition-colors flex items-center gap-1 mb-2"
+                >
+                    {showAdvanced ? "Ocultar" : "Mostrar"} Instruções Avançadas da IA (System Prompt)
+                </button>
+                {showAdvanced && (
+                    <Field note="Instruções diretas para o modelo de IA. Deixe em branco para usar o padrão.">
+                        <textarea
+                            rows={5}
+                            value={form.systemPrompt}
+                            onChange={e => set("systemPrompt", e.target.value)}
+                            placeholder="Você é Ana, especialista em beleza... (Prompt de sistema bruto)"
+                            className={fieldCls(false) + " resize-none font-mono text-xs text-gray-300 bg-[#0b0f1a]"}
+                        />
+                    </Field>
+                )}
+            </div>
 
             <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Módulos Habilitados</label>

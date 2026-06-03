@@ -24,6 +24,12 @@ const EXTRACT_PROMPT = `Analise o conteúdo do site abaixo e retorne um JSON com
   "email": "email de contato principal, se encontrado",
   "cpfCnpj": "CPF ou CNPJ da empresa (sem formatação se possível), se encontrado",
   "suggestedBotName": "nome sugerido para o bot (ex: Atendente Digital do [Nome])",
+  "targetAudience": "perfil do público-alvo (ex: Jovens de 20-30 anos)",
+  "tone": "um de: Profissional | Descontraído | Divertido | Acolhedor | Luxuoso",
+  "persona": "estilo de atendimento e personalidade do bot (ex: Jovem, animado e focado em vendas rápidas)",
+  "productsServices": "lista geral ou texto corrido dos principais serviços prestados ou categorias de produtos",
+  "differentials": "o que faz a empresa ser única ou melhor que a concorrência",
+  "avgTicket": "ticket médio estimado, se deduzível (ex: R$ 50,00 ou Alto/Baixo)",
   "keyProducts": ["produto/serviço 1", "produto/serviço 2", "produto/serviço 3"]
 }
 Responda APENAS com o JSON, sem markdown.`;

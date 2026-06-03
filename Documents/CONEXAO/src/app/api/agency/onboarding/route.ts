@@ -57,6 +57,19 @@ export async function POST(req: Request) {
         channels = [],
         // Skip WhatsApp send (optional)
         skipSendAccess = false,
+        // Extended fields
+        targetAudience,
+        tone,
+        persona,
+        productsServices,
+        differentials,
+        paymentMethods,
+        avgTicket,
+        description,
+        keyProducts,
+        extractedProducts = [],
+        deliveryFeeType,
+        deliveryFeeRules,
     } = body;
 
     if (!name || !email || !phone) {
@@ -116,6 +129,29 @@ export async function POST(req: Request) {
             websiteUrl: websiteUrl || undefined,
             address: address || undefined,
             hours: hours || undefined,
+            description: description || undefined,
+            productsServices: productsServices || undefined,
+            paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : paymentMethods ? [paymentMethods] : [],
+            deliveryFeeType: deliveryFeeType || undefined,
+            deliveryFeeRules: deliveryFeeRules || undefined,
+            products: extractedProducts.length > 0 ? {
+                create: extractedProducts.map((p: any) => ({
+                    name: String(p.name).substring(0, 200),
+                    description: p.description ? String(p.description).substring(0, 500) : null,
+                    price: Number(p.price) || 0,
+                    salePrice: p.salePrice ? Number(p.salePrice) : null,
+                    active: true,
+                    stock: 999
+                }))
+            } : undefined,
+            onboardingData: {
+                targetAudience,
+                tone,
+                persona,
+                differentials,
+                keyProducts,
+                avgTicket,
+            },
             status: 'active',
             tenantId: clientId,
             sessionName: `bot_${clientId.slice(0, 8)}_${Date.now()}`,

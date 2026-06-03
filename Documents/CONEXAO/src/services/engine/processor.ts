@@ -249,7 +249,11 @@ export const MessageProcessor = {
 
             // 6. CRM Extraction & Contact Management
             let existingContact = await prisma.contact.findUnique({
-                where: { phone_botId: { phone: senderPhone, botId: bot.id } }
+                where: { phone_botId: { phone: senderPhone, botId: bot.id } },
+                include: {
+                    orders: { orderBy: { createdAt: 'desc' }, take: 5 },
+                    notes: { orderBy: { createdAt: 'desc' }, take: 5 }
+                }
             });
 
             if (!existingContact) {
@@ -478,6 +482,8 @@ export const MessageProcessor = {
                     name: existingContact.name,
                     email: existingContact.email,
                     company: (existingContact as any).company,
+                    notes: (existingContact as any).notes,
+                    orders: (existingContact as any).orders,
                     // Ad attribution — enriches agent context with lead origin
                     utmSource:    (existingContact as any).utmSource,
                     utmMedium:    (existingContact as any).utmMedium,
