@@ -1,7 +1,9 @@
 import * as cheerio from 'cheerio';
+import FirecrawlApp from '@mendable/firecrawl-js';
 
 const MAX_CONTENT_LENGTH = 8000; // Increased from 4000
 const FETCH_TIMEOUT_MS = 20000; // Increased from 10000
+const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || 'fc-ca0d960e8d124dfba344739c74ed6a21';
 
 export interface ScrapeResult {
     content: string;
@@ -17,6 +19,29 @@ export async function scrapeWebsite(url: string, retryCount = 0): Promise<Scrape
             return { content: '', title: '', success: false, error: 'Invalid protocol' };
         }
 
+        // 1. Try Firecrawl first
+        try {
+            console.log(`[Scraper] Attempting to scrape with Firecrawl: ${url}`);
+            const app = new FirecrawlApp({ apiKey: FIRECRAWL_API_KEY });
+            const scrapeResult = await app.scrapeUrl(url, { formats: ['markdown'] }) as any;
+            
+            if (scrapeResult.success && scrapeResult.markdown) {
+                console.log(`[Scraper] Firecrawl success for ${url}`);
+                const title = scrapeResult.metadata?.title || validUrl.hostname;
+                let content = scrapeResult.markdown.trim();
+                
+                if (content.length > MAX_CONTENT_LENGTH) {
+                    content = content.substring(0, MAX_CONTENT_LENGTH) + '\n[...conteúdo truncado]';
+                }
+                
+                return { content, title, success: true };
+            }
+        } catch (fcError: any) {
+            console.warn(`[Scraper] Firecrawl failed, falling back to Cheerio:`, fcError.message);
+        }
+
+        // 2. Fallback to Cheerio (fetch)
+        console.log(`[Scraper] Executing Cheerio fallback for ${url}`);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
