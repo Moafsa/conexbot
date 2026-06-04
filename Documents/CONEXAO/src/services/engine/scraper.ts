@@ -110,17 +110,18 @@ function parseHtml(html: string): ScrapeResult {
 
         // Smart extraction for Prices and Contacts
         const isPrice = /R\$\s*\d+/.test(text) || /\d{2,}\s*reais/i.test(text);
-        const isLabel = /^(Data|Local|Horário|Endereço|Tel|WhatsApp):/i.test(text);
+        const isLabel = /^(Data|Local|Horário|Endereço|Tel|WhatsApp|Bairro|CEP|Cidade|Estado):/i.test(text);
         const isContact = /\(?\d{2}\)?\s?\d{4,5}-?\d{4}/.test(text);
+        const isAddressKeyword = /rua|avenida|av\.|av |rodovia|bairro|centro|cep/i.test(text);
 
         // Keep meaningful content
-        if (['div', 'span'].includes(tag) && !isPrice && !isLabel && !isContact && text.length < 20) {
+        if (['div', 'span'].includes(tag) && !isPrice && !isLabel && !isContact && !isAddressKeyword && text.length < 15) {
             return;
         }
 
         const hasDirectText = $(el).contents().filter((_, node) => node.type === 'text' && $(node).text().trim().length > 0).length > 0;
 
-        if (!hasDirectText && !isPrice && !isContact) {
+        if (!hasDirectText && !isPrice && !isContact && !isAddressKeyword && !isLabel) {
             return;
         }
 
