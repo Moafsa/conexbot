@@ -18,7 +18,7 @@ const EXTRACT_PROMPT = `Analise o conteúdo do site abaixo e retorne um JSON com
   "businessName": "nome da empresa",
   "description": "descrição curta do negócio em até 2 frases",
   "niche": "um de: restaurante | clinica | ecommerce | salao | imobiliaria | generico",
-  "address": "endereço físico, se encontrado",
+  "address": "endereço físico completo (fique muito atento a linhas soltas contendo 'AV', 'Rua', bairros, cidades ou CEP, mesmo que a formatação esteja bagunçada), se encontrado",
   "hours": "horário de funcionamento, se encontrado",
   "phone": "telefone principal (sem formatação se possível), se encontrado",
   "email": "email de contato principal, se encontrado",
