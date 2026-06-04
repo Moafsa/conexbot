@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * /dashboard/agency/clients/new
@@ -226,8 +226,13 @@ export default function NewClientWizardPage() {
                     niche:            e.niche           || f.niche,
                     description:      e.description     || f.description,
                     address:          e.address         || f.address,
-                    // Step 3 - Produtos
+                    // Step 2 - Perfil do Público
+                    targetAudience:   e.targetAudience  || f.targetAudience,
+                    tone:             e.tone            || f.tone,
+                    persona:          e.persona         || f.persona,
+                    // Step 3 - Produtos e Diferenciais
                     productsServices: (e.keyProducts || []).join(", ") || f.productsServices,
+                    differentials:    e.differentials   || f.differentials,
                     // Step 4 - Canais
                     hours:            e.hours           || f.hours,
                     // Step 6 - IA do Bot
@@ -647,7 +652,7 @@ function Step2Publico({ form, set }: any) {
                 </div>
             </div>
 
-            <Field label="Estilo de Atendimento (Persona)" note="Como o bot se apresenta (ex: Jovem e descontraído, Atendente formal)">
+            <Field label="Estilo de Atendimento" note="Como o bot se apresenta (ex: Jovem e descontraído, Atendente formal)">
                 <input
                     type="text"
                     value={form.persona}

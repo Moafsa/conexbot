@@ -79,10 +79,18 @@ export async function POST(req: Request) {
             ],
             temperature: 0.2,
             response_format: { type: 'json_object' },
-            max_tokens: 600,
+            max_tokens: 3000,
         });
 
-        const extracted = JSON.parse(result.content || '{}');
+        let content = result?.content || '{}';
+        content = content.trim();
+        if (content.startsWith('```json')) {
+            content = content.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (content.startsWith('```')) {
+            content = content.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+
+        const extracted = JSON.parse(content);
 
         return NextResponse.json({
             success: true,

@@ -59,8 +59,8 @@ function parseHtml(html: string): ScrapeResult {
     const $ = cheerio.load(html);
 
     // Remove non-content elements
-    $('script, style, nav, footer, header, aside, iframe, noscript, svg, form, button, input').remove();
-    $('[role="navigation"], [role="banner"], [role="contentinfo"]').remove();
+    $('script, style, nav, iframe, noscript, svg, form, button, input').remove();
+    $('[role="navigation"], [role="banner"]').remove();
 
     // Extract Metadata
     const title = $('title').first().text().trim() ||
@@ -99,8 +99,8 @@ function parseHtml(html: string): ScrapeResult {
 
     // Extract headings, paragraphs, and lists
     $('h1, h2, h3, h4, h5, h6, p, li, td, th, blockquote, figcaption, div, span, strong, b').each((_, el) => {
-        // Skip if inside navigation or footer explicitly (though removed above, double check structural parents)
-        if ($(el).parents('nav, footer, header').length > 0) return;
+        // Skip if inside navigation explicitly
+        if ($(el).parents('nav').length > 0) return;
 
         const text = $(el).text().trim().replace(/\s+/g, ' ');
         const tag = (el as any).tagName?.toLowerCase() || '';
