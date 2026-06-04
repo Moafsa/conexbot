@@ -8,23 +8,23 @@ Vou te fornecer um texto que o usuário colou, que representa um cardápio de re
 Sua tarefa é extrair os itens e retornar um JSON com um array chamado "products".
 Cada produto deve ter o seguinte formato:
 {
-  "name": "Nome do produto/prato",
-  "description": "Descrição detalhada dos ingredientes ou do que é o serviço. Mantenha fiel ao texto original, mas formatado de forma limpa.",
-  "price": número (float, sem formatação de moeda, ex: 25.50),
+  "name": "Nome do produto/prato (inclua o nome da variação se houver, ex: 'Xis da Casa - Mini')",
+  "description": "Descrição detalhada dos ingredientes ou serviço.",
+  "price": número (float, ex: 25.50),
   "category": "Categoria inferida (ex: Bebidas, Lanches, Sobremesas)",
-  "salePrice": nulo ou número (se houver preço promocional)
+  "salePrice": nulo ou número
 }
 
 Regras:
-1. Ignore textos irrelevantes (endereços, telefones, mensagens de bom dia).
-2. Se o preço não for encontrado ou não estiver claro, use 0 ou tente deduzir.
-3. Responda APENAS com o JSON no formato:
+1. Ignore textos irrelevantes.
+2. Se o preço não for encontrado, use 0.
+3. IMPORTANTE: Se um produto tiver **variações de tamanho ou tipo** com preços diferentes (ex: Normal R$ 33 / Mini R$ 30), crie **produtos separados** para cada variação (ex: um produto "Xis - Normal" e outro "Xis - Mini"), copiando a mesma descrição para ambos, mas com seus respectivos preços.
+4. Responda APENAS com o JSON no formato:
 {
   "products": [
     { ... }
   ]
-}
-sem markdown, sem blocos de código (\`\`\`).`;
+}`;
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions) as any;
