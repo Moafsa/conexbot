@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import FirecrawlApp from '@mendable/firecrawl-js';
 
-const MAX_CONTENT_LENGTH = 8000; // Increased from 4000
+const MAX_CONTENT_LENGTH = 25000; // Increased from 8000 to keep footer data
 const FETCH_TIMEOUT_MS = 20000; // Increased from 10000
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || 'fc-ca0d960e8d124dfba344739c74ed6a21';
 
@@ -31,7 +31,9 @@ export async function scrapeWebsite(url: string, retryCount = 0): Promise<Scrape
                 let content = scrapeResult.markdown.trim();
                 
                 if (content.length > MAX_CONTENT_LENGTH) {
-                    content = content.substring(0, MAX_CONTENT_LENGTH) + '\n[...conteúdo truncado]';
+                    content = content.substring(0, Math.floor(MAX_CONTENT_LENGTH * 0.8)) + 
+                        '\n\n[...conteúdo truncado...]\n\n' + 
+                        content.substring(content.length - Math.floor(MAX_CONTENT_LENGTH * 0.2));
                 }
                 
                 return { content, title, success: true };
@@ -170,7 +172,9 @@ function parseHtml(html: string): ScrapeResult {
     // Truncate if too long (Smart truncation)
     if (content.length > MAX_CONTENT_LENGTH) {
         // Try to keep the beginning and end, or just cut
-        content = content.substring(0, MAX_CONTENT_LENGTH) + '\n[...conteúdo truncado]';
+        content = content.substring(0, Math.floor(MAX_CONTENT_LENGTH * 0.8)) + 
+            '\n\n[...conteúdo truncado...]\n\n' + 
+            content.substring(content.length - Math.floor(MAX_CONTENT_LENGTH * 0.2));
     }
 
     return { content, title, success: content.length > 0 };

@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     }
 
     // Extract structured info with AI
-    const truncatedContent = scrape.content.slice(0, 6000);
+    const truncatedContent = scrape.content.slice(0, 25000);
 
     try {
         // Build a minimal bot-like object for safeChatCompletion
