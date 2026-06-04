@@ -24,257 +24,278 @@ import { PhoneUtils } from '@/lib/phone-utils';
 import { ChatwootService } from '@/services/engine/chatwoot';
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions) as any;
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    try {
+        const session = await getServerSession(authOptions) as any;
+        if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    let tenantId = session.user.id;
-    if (!tenantId && session.user.email) {
-        const t = await prisma.tenant.findUnique({ where: { email: session.user.email }, select: { id: true } });
-        tenantId = t?.id;
-    }
-
-    const agency = await prisma.agency.findUnique({
-        where: { tenantId },
-        include: { tenant: true },
-    });
-    if (!agency) return NextResponse.json({ error: 'Not an agency' }, { status: 403 });
-
-    const body = await req.json();
-    const {
-        // Client data
-        name,
-        email,
-        phone,
-        cpfCnpj,
-        // Niche
-        niche = 'generico',
-        // Bot metadata
-        botName,
-        websiteUrl,
-        address,
-        hours,
-        // Multi-channel support
-        channels = [],
-        // Skip WhatsApp send (optional)
-        skipSendAccess = false,
-        // Extended fields
-        targetAudience,
-        tone,
-        persona,
-        productsServices,
-        differentials,
-        paymentMethods,
-        avgTicket,
-        description,
-        keyProducts,
-        extractedProducts = [],
-        deliveryFeeType,
-        deliveryFeeRules,
-    } = body;
-
-    if (!name || !email || !phone) {
-        return NextResponse.json({ error: 'name, email e phone são obrigatórios' }, { status: 400 });
-    }
-
-    const template = getNicheTemplate(niche);
-
-    // 1. Create or link client tenant
-    const existingTenant = await prisma.tenant.findUnique({ where: { email } });
-    let clientId: string;
-    const tempPassword = Math.random().toString(36).slice(-10);
-    const hashedPassword = await bcrypt.hash(tempPassword, 12);
-
-    if (existingTenant) {
-        if (existingTenant.agencyId && existingTenant.agencyId !== agency.id) {
-            return NextResponse.json({ error: 'Este e-mail já pertence a outra agência' }, { status: 409 });
+        let tenantId = session.user.id;
+        if (!tenantId && session.user.email) {
+            const t = await prisma.tenant.findUnique({ where: { email: session.user.email }, select: { id: true } });
+            tenantId = t?.id;
         }
-        await prisma.tenant.update({
-            where: { id: existingTenant.id },
-            data: { agencyId: agency.id, whatsapp: phone, cpfCnpj: cpfCnpj || undefined, password: hashedPassword },
+
+        const agency = await prisma.agency.findUnique({
+            where: { tenantId },
+            include: { tenant: true },
         });
-        clientId = existingTenant.id;
-    } else {
-        const newClient = await prisma.tenant.create({
-            data: {
-                email,
-                name,
-                password: hashedPassword,
-                role: 'USER',
-                agencyId: agency.id,
-                cpfCnpj: cpfCnpj || undefined,
-                whatsapp: phone,
-                usageCounter: {
-                    create: {
-                        messagesLimit: 5000,
-                        botsLimit: 1,
-                        periodEnd: new Date(Date.now() + 30 * 86_400_000),
+        if (!agency) return NextResponse.json({ error: 'Not an agency' }, { status: 403 });
+
+        const body = await req.json();
+        const {
+            // Client data
+            name,
+            email,
+            phone,
+            cpfCnpj,
+            // Niche
+            niche = 'generico',
+            // Bot metadata
+            botName,
+            websiteUrl,
+            address,
+            hours,
+            // Multi-channel support
+            channels = [],
+            // Skip WhatsApp send (optional)
+            skipSendAccess = false,
+            // Extended fields
+            targetAudience,
+            tone,
+            persona,
+            productsServices,
+            differentials,
+            paymentMethods,
+            avgTicket,
+            description,
+            keyProducts,
+            extractedProducts = [],
+            deliveryFeeType,
+            deliveryFeeRules,
+        } = body;
+
+        if (!name || !email || !phone) {
+            return NextResponse.json({ error: 'name, email e phone são obrigatórios' }, { status: 400 });
+        }
+
+        const template = getNicheTemplate(niche);
+
+        // 1. Create or link client tenant
+        const existingTenant = await prisma.tenant.findUnique({ where: { email } });
+        let clientId: string;
+        const tempPassword = Math.random().toString(36).slice(-10);
+        const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+        if (existingTenant) {
+            if (existingTenant.agencyId && existingTenant.agencyId !== agency.id) {
+                return NextResponse.json({ error: 'Este e-mail já pertence a outra agência' }, { status: 409 });
+            }
+            await prisma.tenant.update({
+                where: { id: existingTenant.id },
+                data: { agencyId: agency.id, whatsapp: phone, cpfCnpj: cpfCnpj || undefined, password: hashedPassword },
+            });
+            clientId = existingTenant.id;
+        } else {
+            const newClient = await prisma.tenant.create({
+                data: {
+                    email,
+                    name,
+                    password: hashedPassword,
+                    role: 'USER',
+                    agencyId: agency.id,
+                    cpfCnpj: cpfCnpj || undefined,
+                    whatsapp: phone,
+                    usageCounter: {
+                        create: {
+                            messagesLimit: 5000,
+                            botsLimit: 1,
+                            periodEnd: new Date(Date.now() + 30 * 86_400_000),
+                        },
                     },
                 },
-            },
-        });
-        clientId = newClient.id;
-    }
+            });
+            clientId = newClient.id;
+        }
 
-    // 2. Create Bot with niche template
-    const finalBotName = botName || `Bot ${template.label}`;
-    const bot = await prisma.bot.create({
-        data: {
-            name: finalBotName,
-            businessType: template.businessType,
-            niche: template.niche,
-            aiModel: template.aiModel,
-            aiProvider: 'openai',
-            modules: template.modules,
-            systemPrompt: template.systemPromptHint,
-            websiteUrl: websiteUrl || undefined,
-            address: address || undefined,
-            hours: hours || undefined,
-            description: description || undefined,
-            productsServices: productsServices || undefined,
-            paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : paymentMethods ? [paymentMethods] : [],
-            deliveryFeeType: deliveryFeeType || undefined,
-            deliveryFeeRules: deliveryFeeRules || undefined,
-            products: extractedProducts.length > 0 ? {
-                create: extractedProducts.map((p: any) => ({
-                    name: String(p.name).substring(0, 200),
-                    description: p.description ? String(p.description).substring(0, 500) : null,
-                    price: Number(p.price) || 0,
-                    salePrice: p.salePrice ? Number(p.salePrice) : null,
-                    active: true,
-                    stock: 999
-                }))
-            } : undefined,
-            onboardingData: {
-                targetAudience,
-                tone,
-                persona,
-                differentials,
-                keyProducts,
-                avgTicket,
-            },
-            status: 'active',
-            tenantId: clientId,
-            sessionName: `bot_${clientId.slice(0, 8)}_${Date.now()}`,
-        },
-    });
-
-    // 2a. Create BotChannels (multi-channel support)
-    if (Array.isArray(channels) && channels.length > 0) {
-        await prisma.botChannel.createMany({
-            data: channels.map((ch: any) => ({
-                botId: bot.id,
-                provider: ch.provider,
-                identifier: ch.identifier || undefined,
-                status: 'DISCONNECTED',
-            })),
-            skipDuplicates: true,
-        });
-    }
-
-    // 2b. Auto-provision Chatwoot account, user and API inbox
-    // Non-fatal: bot is created and fully functional even if Chatwoot provision fails
-    const appBaseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://app:3000';
-    const chatwootCreds = await ChatwootService.provisionForBot({
-        clientName: name,
-        clientEmail: email,
-        botId: bot.id,
-        botName: finalBotName,
-        appBaseUrl,
-        webhookToken: (bot as any).webhookToken || bot.id,
-    });
-    if (chatwootCreds) {
-        await prisma.bot.update({
-            where: { id: bot.id },
+        // 2. Create Bot with niche template
+        const finalBotName = botName || `Bot ${template.label}`;
+        const bot = await prisma.bot.create({
             data: {
-                chatwootUrl: chatwootCreds.chatwootUrl,
-                chatwootToken: chatwootCreds.chatwootToken,
-                chatwootAccountId: chatwootCreds.chatwootAccountId,
-                chatwootInboxId: chatwootCreds.chatwootInboxId,
-            } as any,
-        });
-    }
-
-    // 3. Create CRM pipeline + stages
-    const pipeline = await prisma.crmPipeline.create({
-        data: {
-            name: `Funil ${template.label}`,
-            botId: bot.id,
-            allowedAgents: [],
-        },
-    });
-
-    if (template.crmStages.length > 0) {
-        await prisma.crmStage.createMany({
-            data: template.crmStages.map(s => ({
-                name: s.name,
-                color: s.color,
-                order: s.order,
-                botId: bot.id,
-                pipelineId: pipeline.id,
-            })),
-        });
-    }
-
-    // 4. Create follow-up rules
-    if (template.followupRules.length > 0) {
-        await prisma.followupRule.createMany({
-            data: template.followupRules.map(r => ({
-                name: r.name,
-                triggerType: r.triggerType,
-                triggerDays: r.triggerDays,
-                triggerUnit: r.triggerUnit,
-                message: r.message,
+                name: finalBotName,
+                businessType: template.businessType,
+                niche: template.niche,
+                aiModel: template.aiModel,
+                aiProvider: 'openai',
+                modules: template.modules,
+                systemPrompt: template.systemPromptHint,
+                websiteUrl: websiteUrl || undefined,
+                address: address || undefined,
+                hours: hours || undefined,
+                description: description || undefined,
+                productsServices: productsServices || undefined,
+                paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : paymentMethods ? [paymentMethods] : [],
+                deliveryFeeType: deliveryFeeType || undefined,
+                deliveryFeeRules: deliveryFeeRules || undefined,
+                products: extractedProducts.length > 0 ? {
+                    create: extractedProducts.map((p: any) => ({
+                        name: String(p.name).substring(0, 200),
+                        description: p.description ? String(p.description).substring(0, 500) : null,
+                        price: Number(p.price) || 0,
+                        salePrice: p.salePrice ? Number(p.salePrice) : null,
+                        active: true,
+                        stock: 999
+                    }))
+                } : undefined,
+                onboardingData: {
+                    targetAudience,
+                    tone,
+                    persona,
+                    differentials,
+                    keyProducts,
+                    avgTicket,
+                },
+                status: 'active',
                 tenantId: clientId,
-                botId: bot.id,
-                active: true,
-            })),
+                sessionName: `bot_${clientId.slice(0, 8)}_${Date.now()}`,
+            },
         });
-    }
 
-    // 5. Send WhatsApp access credentials
-    let whatsappSent = false;
-    if (!skipSendAccess) {
-        const bots = await prisma.bot.findMany({ where: { tenantId } });
-        let dispatchBot = bots.find(b => b.businessType === 'SYSTEM_DISPATCH' && b.connectionStatus === 'CONNECTED');
-        if (!dispatchBot) dispatchBot = bots.find(b => b.connectionStatus === 'CONNECTED');
+        // 2a. Create BotChannels (multi-channel support)
+        if (Array.isArray(channels) && channels.length > 0) {
+            await prisma.botChannel.createMany({
+                data: channels.map((ch: any) => ({
+                    botId: bot.id,
+                    provider: ch.provider,
+                    identifier: ch.identifier || undefined,
+                    status: 'DISCONNECTED',
+                })),
+                skipDuplicates: true,
+            });
+        }
 
-        if (!dispatchBot) {
-            const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-            if (config?.systemBotId) {
-                dispatchBot = await prisma.bot.findUnique({ where: { id: config.systemBotId } }) ?? undefined;
+        // 2b. Auto-provision Chatwoot account, user and API inbox
+        // Non-fatal: bot is created and fully functional even if Chatwoot provision fails
+        const appBaseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://app:3000';
+        const chatwootCreds = await ChatwootService.provisionForBot({
+            clientName: name,
+            clientEmail: email,
+            botId: bot.id,
+            botName: finalBotName,
+            appBaseUrl,
+            webhookToken: (bot as any).webhookToken || bot.id,
+        });
+        if (chatwootCreds) {
+            await prisma.bot.update({
+                where: { id: bot.id },
+                data: {
+                    chatwootUrl: chatwootCreds.chatwootUrl,
+                    chatwootToken: chatwootCreds.chatwootToken,
+                    chatwootAccountId: chatwootCreds.chatwootAccountId,
+                    chatwootInboxId: chatwootCreds.chatwootInboxId,
+                } as any,
+            });
+        }
+
+        // 3. Create CRM pipeline + stages
+        const pipeline = await prisma.crmPipeline.create({
+            data: {
+                name: `Funil ${template.label}`,
+                botId: bot.id,
+                allowedAgents: [],
+            },
+        });
+
+        if (template.crmStages.length > 0) {
+            await prisma.crmStage.createMany({
+                data: template.crmStages.map(s => ({
+                    name: s.name,
+                    color: s.color,
+                    order: s.order,
+                    botId: bot.id,
+                    pipelineId: pipeline.id,
+                })),
+            });
+        }
+
+        // 4. Create follow-up rules
+        if (template.followupRules.length > 0) {
+            await prisma.followupRule.createMany({
+                data: template.followupRules.map(r => ({
+                    name: r.name,
+                    triggerType: r.triggerType,
+                    triggerDays: r.triggerDays,
+                    triggerUnit: r.triggerUnit,
+                    message: r.message,
+                    tenantId: clientId,
+                    botId: bot.id,
+                    active: true,
+                })),
+            });
+        }
+
+        // 5. Send WhatsApp access credentials
+        let whatsappSent = false;
+        if (!skipSendAccess) {
+            const bots = await prisma.bot.findMany({ where: { tenantId } });
+            let dispatchBot = bots.find(b => b.businessType === 'SYSTEM_DISPATCH' && b.connectionStatus === 'CONNECTED');
+            if (!dispatchBot) dispatchBot = bots.find(b => b.connectionStatus === 'CONNECTED');
+
+            if (!dispatchBot) {
+                const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                if (config?.systemBotId) {
+                    dispatchBot = await prisma.bot.findUnique({ where: { id: config.systemBotId } }) ?? undefined;
+                }
+            }
+
+            if (dispatchBot?.sessionName) {
+                const normalizedPhone = PhoneUtils.normalize(phone);
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
+                const msg =
+                    `*Olá, ${name}!* 🚀\n\n` +
+                    `Sua conta na plataforma *${agency.tenant?.name || 'Agência'}* foi configurada.\n\n` +
+                    `🔗 *Acesso:* ${appUrl}/auth/login\n` +
+                    `📧 *E-mail:* ${email}\n` +
+                    `🔑 *Senha Temporária:* ${tempPassword}\n\n` +
+                    `Seu bot *${finalBotName}* já está pré-configurado para o segmento de *${template.label}*. ` +
+                    `Acesse o painel para personalizar e conectar seu WhatsApp!\n\n` +
+                    `_Recomendamos alterar a senha após o primeiro acesso._`;
+                whatsappSent = await UzapiService.sendMessage(dispatchBot.sessionName, normalizedPhone, msg);
             }
         }
 
-        if (dispatchBot?.sessionName) {
-            const normalizedPhone = PhoneUtils.normalize(phone);
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
-            const msg =
-                `*Olá, ${name}!* 🚀\n\n` +
-                `Sua conta na plataforma *${agency.tenant?.name || 'Agência'}* foi configurada.\n\n` +
-                `🔗 *Acesso:* ${appUrl}/auth/login\n` +
-                `📧 *E-mail:* ${email}\n` +
-                `🔑 *Senha Temporária:* ${tempPassword}\n\n` +
-                `Seu bot *${finalBotName}* já está pré-configurado para o segmento de *${template.label}*. ` +
-                `Acesse o painel para personalizar e conectar seu WhatsApp!\n\n` +
-                `_Recomendamos alterar a senha após o primeiro acesso._`;
-            whatsappSent = await UzapiService.sendMessage(dispatchBot.sessionName, normalizedPhone, msg);
+        return NextResponse.json({
+            success: true,
+            clientId,
+            botId: bot.id,
+            pipelineId: pipeline.id,
+            tempPassword,
+            whatsappSent,
+            chatwootProvisioned: !!chatwootCreds,
+            chatwootAccountId: chatwootCreds?.chatwootAccountId ?? null,
+            template: {
+                niche: template.niche,
+                label: template.label,
+                stagesCreated: template.crmStages.length,
+                followupRulesCreated: template.followupRules.length,
+            },
+        });
+    } catch (error: any) {
+        console.error('[Onboarding API Error]', error);
+        
+        let errorMessage = 'Erro interno ao processar o onboarding.';
+        
+        // Prisma Unique Constraint
+        if (error.code === 'P2002') {
+            if (error.meta?.target?.includes('whatsapp')) {
+                errorMessage = 'Já existe um cliente cadastrado com este número de WhatsApp.';
+            } else if (error.meta?.target?.includes('email')) {
+                errorMessage = 'Já existe um cliente cadastrado com este E-mail.';
+            } else {
+                errorMessage = 'Registro duplicado encontrado no banco de dados.';
+            }
+        } else if (error.message) {
+            errorMessage = error.message;
         }
-    }
 
-    return NextResponse.json({
-        success: true,
-        clientId,
-        botId: bot.id,
-        pipelineId: pipeline.id,
-        tempPassword,
-        whatsappSent,
-        chatwootProvisioned: !!chatwootCreds,
-        chatwootAccountId: chatwootCreds?.chatwootAccountId ?? null,
-        template: {
-            niche: template.niche,
-            label: template.label,
-            stagesCreated: template.crmStages.length,
-            followupRulesCreated: template.followupRules.length,
-        },
-    });
+        return NextResponse.json({ error: errorMessage, details: error.message }, { status: 500 });
+    }
 }
