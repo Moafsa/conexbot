@@ -20,7 +20,7 @@ export async function GET(req: Request) {
                 id: botId, 
                 OR: [
                     { tenantId: (session.user as any).id },
-                    { tenant: { agency: { tenantId: (session.user as any).id } } }
+                    { tenant: { managedBy: { tenantId: (session.user as any).id } } }
                 ] 
             }
         });
