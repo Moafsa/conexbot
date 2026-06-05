@@ -17,7 +17,7 @@ interface ContactInfo {
     email?: string | null;
     company?: string | null;
     phone?: string | null;
-    notes?: any[];
+    notes?: string | null;
     orders?: any[];
     // Ad attribution — tells the agent where this lead came from
     utmSource?: string | null;
@@ -220,8 +220,8 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             `- Empresa: ${ci.company || 'não informado ainda'}`,
         ];
 
-        if (ci.notes && ci.notes.length > 0) {
-            contactLines.push(`- Anotações do Suporte: ${ci.notes.map((n: any) => `[${n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}] ${n.content}`).join(' | ')}`);
+        if (ci.notes) {
+            contactLines.push(`- Anotações do Suporte: ${ci.notes}`);
         }
 
         if (ci.orders && ci.orders.length > 0) {

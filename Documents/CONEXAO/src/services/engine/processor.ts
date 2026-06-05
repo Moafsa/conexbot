@@ -253,8 +253,7 @@ export const MessageProcessor = {
             let existingContact = await prisma.contact.findUnique({
                 where: { phone_botId: { phone: senderPhone, botId: bot.id } },
                 include: {
-                    orders: { orderBy: { createdAt: 'desc' }, take: 5 },
-                    notes: { orderBy: { createdAt: 'desc' }, take: 5 }
+                    orders: { orderBy: { createdAt: 'desc' }, take: 5 }
                 }
             });
 
