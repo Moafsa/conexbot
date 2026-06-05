@@ -163,7 +163,7 @@ export async function GET(req: Request) {
             whereCondition = {
                 OR: [
                     { tenantId },
-                    { tenant: { managedBy: tenantId } }
+                    { tenant: { managedBy: { tenantId } } }
                 ]
             };
         }
