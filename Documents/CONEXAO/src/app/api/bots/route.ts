@@ -155,10 +155,23 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
+        const session = await getServerSession(authOptions);
+        let whereCondition: any = { tenantId };
+
+        if (session?.user?.role === 'AGENCY' && tenantId === (session.user as any).id && !clientId) {
+            // Show agency's own bots PLUS all clients' bots
+            whereCondition = {
+                OR: [
+                    { tenantId },
+                    { tenant: { managedBy: tenantId } }
+                ]
+            };
+        }
+
         console.log('[API /bots GET] Using Effective TenantId:', tenantId);
 
         const bots = await prisma.bot.findMany({
-            where: { tenantId },
+            where: whereCondition,
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: { select: { conversations: true } },
