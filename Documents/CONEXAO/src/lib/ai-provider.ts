@@ -275,7 +275,10 @@ export async function safeChatCompletion(options: {
     for (const provider of providersToTry) {
         try {
             const resolveKey = (key: string, envName: string) => {
-                return (bot.tenant as any)[key] || bot.tenant.agency?.[key] || process.env[envName];
+                return (bot.tenant as any)[key] || 
+                       bot.tenant.agency?.[key] || 
+                       bot.tenant.managedBy?.[key] || 
+                       process.env[envName];
             };
 
             // Check if provider has API key
