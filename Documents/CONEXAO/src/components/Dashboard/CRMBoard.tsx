@@ -104,6 +104,7 @@ export function CRMBoard({ botId }: { botId: string }) {
                     setActivePipelineId(data[0].id);
                     setPipelineName(data[0].name);
                     setSelectedAgents(data[0].allowedAgents || []);
+                    setWorkingHoursEnd(data[0].bot?.crmWorkingHoursEnd || "18:00");
                 } else {
                     // Create default pipeline if none exists
                     await handleCreatePipeline("Funil de Vendas Principal");
@@ -188,7 +189,8 @@ export function CRMBoard({ botId }: { botId: string }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: pipelineName,
-                    allowedAgents: selectedAgents
+                    allowedAgents: selectedAgents,
+                    workingHoursEnd: workingHoursEnd
                 })
             });
             if (res.ok) {
@@ -337,6 +339,7 @@ export function CRMBoard({ botId }: { botId: string }) {
                                     setActivePipelineId(matched.id);
                                     setPipelineName(matched.name);
                                     setSelectedAgents(matched.allowedAgents || []);
+                                    setWorkingHoursEnd((matched as any).bot?.crmWorkingHoursEnd || "18:00");
                                 }
                             }}
                             className="bg-white/80 border border-gray-200 text-gray-800 text-sm font-black rounded-2xl px-4 py-2.5 outline-none shadow-sm focus:ring-2 focus:ring-indigo-500/30 transition-all cursor-pointer pr-10 appearance-none uppercase tracking-wider"

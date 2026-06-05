@@ -30,6 +30,9 @@ export async function GET(req: Request) {
             include: {
                 stages: {
                     orderBy: { order: 'asc' }
+                },
+                bot: {
+                    select: { crmWorkingHoursEnd: true }
                 }
             },
             orderBy: {

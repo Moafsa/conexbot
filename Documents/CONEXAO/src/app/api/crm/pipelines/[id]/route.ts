@@ -19,7 +19,7 @@ export async function PUT(req: Request, { params }: { params: any }) {
 
         const { id } = await params;
         const body = await req.json();
-        const { name, allowedAgents } = body;
+        const { name, allowedAgents, workingHoursEnd } = body;
 
         // Verify pipeline belongs to bot of tenant
         const pipeline = await prisma.crmPipeline.findFirst({
@@ -42,6 +42,13 @@ export async function PUT(req: Request, { params }: { params: any }) {
                 }
             }
         });
+
+        if (workingHoursEnd) {
+            await prisma.bot.update({
+                where: { id: pipeline.botId },
+                data: { crmWorkingHoursEnd: workingHoursEnd }
+            });
+        }
 
         return NextResponse.json(updated);
     } catch (error) {
