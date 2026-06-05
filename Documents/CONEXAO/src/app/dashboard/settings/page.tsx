@@ -96,7 +96,8 @@ function SettingsContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(profile)
             });
-            if (!res.ok) throw new Error("Erro ao salvar perfil");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Erro ao salvar perfil");
             await updateSession({ name: profile.name });
             setMessage({ type: 'success', text: "Perfil atualizado com sucesso!" });
             

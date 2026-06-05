@@ -11,15 +11,21 @@ export default function BotsPage() {
     const [loading, setLoading] = useState(true);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [isAgencyClient, setIsAgencyClient] = useState(false);
+    const [selectedClientId, setSelectedClientId] = useState<string>("");
+    const [agencyClients, setAgencyClients] = useState<any[]>([]);
+    const [isAgency, setIsAgency] = useState(false);
+    const [clientSearch, setClientSearch] = useState("");
+    const [showClientList, setShowClientList] = useState(false);
+    
     const router = useRouter();
     const searchParams = useSearchParams();
-    const clientId = searchParams.get("clientId");
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const fetchBots = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`/api/bots${clientId ? `?clientId=${clientId}` : ''}`);
+            const res = await fetch(`/api/bots${selectedClientId ? `?clientId=${selectedClientId}` : ''}`);
             const data = await res.json();
             if (Array.isArray(data)) {
                 // Filter out system bots from the general listing
@@ -175,6 +181,23 @@ export default function BotsPage() {
     }, []);
 
     useEffect(() => {
+        const id = searchParams.get("clientId");
+        if (id) setSelectedClientId(id);
+    }, [searchParams]);
+
+    const checkAgencyStatus = async () => {
+        try {
+            const res = await fetch("/api/agency/clients");
+            if (res.ok) {
+                const clients = await res.json();
+                setAgencyClients(clients);
+                setIsAgency(true);
+            }
+        } catch (e) {}
+    };
+
+    useEffect(() => {
+        checkAgencyStatus();
         fetchBots();
 
         // Fetch agency client context once
@@ -194,21 +217,95 @@ export default function BotsPage() {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
+    useEffect(() => {
+        // Run fetchBots whenever selectedClientId changes
+        // but avoid running it twice on mount (handled above)
+        if (selectedClientId !== searchParams.get("clientId")) {
+            fetchBots();
+        }
+    }, [selectedClientId]);
+
     return (
-        <div className="p-4 md:p-8 space-y-8" onClick={() => setOpenDropdown(null)}>
+        <div className="p-4 md:p-8 space-y-8" onClick={() => { setOpenDropdown(null); setShowClientList(false); }}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-3">
-                        {clientId && <Bot className="text-indigo-500 animate-pulse" />}
-                        {clientId ? 'Gerenciando Agentes do Cliente' : isAgencyClient ? 'Meu Agente' : 'Meus Agentes'}
+                        {selectedClientId && <Bot className="text-indigo-500 animate-pulse" />}
+                        {selectedClientId ? 'Gerenciando Agentes do Cliente' : isAgencyClient ? 'Meu Agente' : 'Meus Agentes'}
                     </h1>
                     <p className="text-gray-400">
-                        {clientId
-                            ? `Você está configurando a infraestrutura para o cliente ID: ${clientId}`
+                        {selectedClientId
+                            ? `Você está configurando a infraestrutura para o cliente ID: ${selectedClientId}`
                             : isAgencyClient
                                 ? 'Seu agente foi criado e configurado pela sua agência.'
                                 : 'Gerencie seus bots ativos e configurações.'}
                     </p>
+                    
+                    {isAgency && (
+                        <div className="mt-4 flex flex-col gap-2 relative z-[60]">
+                            <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Visualizando cliente:</span>
+                            <div className="relative group">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowClientList(!showClientList);
+                                        setOpenDropdown(null);
+                                    }}
+                                    className="w-full max-w-xs bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-indigo-400 font-bold outline-none flex items-center justify-between hover:border-indigo-500/50 transition-all"
+                                >
+                                    {selectedClientId 
+                                        ? agencyClients.find(c => c.id === selectedClientId)?.name || "Cliente Selecionado"
+                                        : "Minha Agência (Próprio)"}
+                                    <MoreVertical size={14} className="text-gray-500" />
+                                </button>
+
+                                {showClientList && (
+                                    <div 
+                                        className="absolute top-full left-0 mt-2 w-full max-w-xs bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-[500] p-2 animate-fade-in ring-1 ring-white/10"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="relative mb-2">
+                                            <input 
+                                                type="text"
+                                                placeholder="Buscar cliente..."
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-4 text-xs text-white outline-none focus:border-indigo-500/30"
+                                                value={clientSearch}
+                                                onChange={(e) => setClientSearch(e.target.value)}
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+                                            <button 
+                                                onClick={() => {
+                                                    setSelectedClientId("");
+                                                    setShowClientList(false);
+                                                }}
+                                                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all ${!selectedClientId ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                            >
+                                                Minha Agência (Próprio)
+                                            </button>
+                                            {agencyClients
+                                                .filter(c => (c.name || c.email).toLowerCase().includes(clientSearch.toLowerCase()))
+                                                .map(c => (
+                                                    <button 
+                                                        key={c.id}
+                                                        onClick={() => {
+                                                            setSelectedClientId(c.id);
+                                                            setShowClientList(false);
+                                                            setClientSearch("");
+                                                        }}
+                                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all ${selectedClientId === c.id ? 'bg-indigo-500/20 text-indigo-400' : 'text-gray-400 hover:bg-white/5'}`}
+                                                    >
+                                                        {c.name || c.email}
+                                                    </button>
+                                                ))
+                                            }
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
                     <button
@@ -221,7 +318,7 @@ export default function BotsPage() {
                     </button>
                     {/* Hide "Novo Agente" for agency clients — their bot was created via onboarding */}
                     {!isAgencyClient && (
-                        <Link href={`/dashboard/create-bot${clientId ? `?clientId=${clientId}` : ''}`} className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
+                        <Link href={`/dashboard/create-bot${selectedClientId ? `?clientId=${selectedClientId}` : ''}`} className="btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm sm:text-base h-11 sm:h-auto text-center">
                             <Plus size={18} />
                             <span>Novo Agente</span>
                         </Link>
@@ -271,7 +368,7 @@ export default function BotsPage() {
                                         >
                                             <div className="p-1">
                                                 <Link
-                                                    href={`/dashboard/bots/${bot.id}${clientId ? `?clientId=${clientId}` : ''}`}
+                                                    href={`/dashboard/bots/${bot.id}${selectedClientId ? `?clientId=${selectedClientId}` : ''}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Settings size={16} />
@@ -285,7 +382,7 @@ export default function BotsPage() {
                                                     Duplicar
                                                 </button>
                                                 <Link
-                                                    href={`/dashboard/create-bot?id=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`}
+                                                    href={`/dashboard/create-bot?id=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Edit size={16} />
@@ -374,7 +471,7 @@ export default function BotsPage() {
                                 {bot.sessionName ? (
                                     <>
                                         <Link
-                                            href={`/dashboard/bots/${bot.id}${clientId ? `?clientId=${clientId}` : ''}`}
+                                            href={`/dashboard/bots/${bot.id}${selectedClientId ? `?clientId=${selectedClientId}` : ''}`}
                                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                         >
                                             <MessageSquare size={16} />
@@ -384,7 +481,7 @@ export default function BotsPage() {
                                 ) : (
                                     <>
                                         <Link
-                                            href={`/dashboard/connect?botId=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`}
+                                            href={`/dashboard/connect?botId=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`}
                                             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors text-center"
                                         >
                                             Conectar WhatsApp
@@ -425,7 +522,7 @@ export default function BotsPage() {
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/dashboard/create-bot?id=${bot.id}${clientId ? `&clientId=${clientId}` : ''}`);
+                                        router.push(`/dashboard/create-bot?id=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`);
                                     }}
                                     title="Configurações Rápidas"
                                 >
