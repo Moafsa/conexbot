@@ -42,8 +42,9 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    let body;
     try {
-        const body = await req.json();
+        body = await req.json();
         const data = updateProfileSchema.parse(body);
 
         const tenant = await prisma.tenant.update({
@@ -57,11 +58,35 @@ export async function PUT(req: Request) {
         });
 
         return NextResponse.json(tenant);
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
         }
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        
+        let errorMessage = "Erro interno ao atualizar o perfil.";
+        
+        if (error.code === 'P2002') {
+            if (error.meta?.target?.includes('whatsapp')) {
+                errorMessage = 'Já existe um usuário cadastrado com este número de WhatsApp.';
+                try {
+                    const wp = body?.whatsapp;
+                    if (wp) {
+                        const existingOwner = await prisma.tenant.findUnique({ 
+                            where: { whatsapp: wp },
+                            select: { name: true, email: true }
+                        });
+                        if (existingOwner) {
+                            errorMessage = `O WhatsApp já existe e está sendo usado por ${existingOwner.name || 'Sem nome'} (${existingOwner.email}).`;
+                        }
+                    }
+                } catch (e) {}
+            } else if (error.meta?.target?.includes('email')) {
+                errorMessage = 'Já existe um usuário cadastrado com este E-mail.';
+            }
+        }
+        
+        console.error("API /settings/profile error:", error);
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 
