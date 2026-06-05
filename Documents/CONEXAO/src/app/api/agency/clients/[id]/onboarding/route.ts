@@ -192,11 +192,21 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
                 websiteUrl: websiteUrl || undefined,
                 address: address || undefined,
                 hours: hours || undefined,
+                workingHours: hours ? {
+                    Mon: hours || "09:00-18:00",
+                    Tue: hours || "09:00-18:00",
+                    Wed: hours || "09:00-18:00",
+                    Thu: hours || "09:00-18:00",
+                    Fri: hours || "09:00-18:00",
+                    Sat: hours || "09:00-12:00",
+                    Sun: "Closed"
+                } : undefined,
                 modules: modules || undefined,
                 systemPrompt: systemPrompt || undefined,
                 description: description || undefined,
                 productsServices: productsServices || undefined,
                 paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : paymentMethods ? [paymentMethods] : [],
+                enablePayments: paymentMethods && paymentMethods.length > 0 ? true : false,
                 deliveryFeeType: deliveryFeeType || undefined,
                 deliveryFeeRules: deliveryFeeRules || undefined,
                 products: extractedProducts.length > 0 ? {
