@@ -18,7 +18,9 @@ export async function GET(req: Request, { params }: { params: any }) {
         const bot = await prisma.bot.findUnique({
             where: { id },
             include: {
-                tenant: true,
+                tenant: {
+                    include: { agency: true }
+                },
                 _count: {
                     select: {
                         conversations: true,
@@ -33,7 +35,7 @@ export async function GET(req: Request, { params }: { params: any }) {
         }
 
         const isOwner = bot.tenantId === (session.user as any).id;
-        const isAgency = bot.tenant.agencyId === (session.user as any).id;
+        const isAgency = bot.tenant.agency?.tenantId === (session.user as any).id;
 
         if (!isOwner && !isAgency) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -57,7 +59,11 @@ export async function PUT(req: Request, { params }: { params: any }) {
         
         const existing = await prisma.bot.findUnique({
             where: { id },
-            include: { tenant: true }
+            include: { 
+                tenant: {
+                    include: { agency: true }
+                } 
+            }
         });
 
         if (!existing) {
@@ -65,7 +71,7 @@ export async function PUT(req: Request, { params }: { params: any }) {
         }
 
         const isOwner = existing.tenantId === (session.user as any).id;
-        const isAgency = existing.tenant.agencyId === (session.user as any).id;
+        const isAgency = existing.tenant.agency?.tenantId === (session.user as any).id;
 
         if (!isOwner && !isAgency) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -128,7 +134,11 @@ export async function DELETE(req: Request, { params }: { params: any }) {
         
         const existing = await prisma.bot.findUnique({
             where: { id },
-            include: { tenant: true }
+            include: { 
+                tenant: {
+                    include: { agency: true }
+                } 
+            }
         });
 
         if (!existing) {
@@ -136,7 +146,7 @@ export async function DELETE(req: Request, { params }: { params: any }) {
         }
 
         const isOwner = existing.tenantId === (session.user as any).id;
-        const isAgency = existing.tenant.agencyId === (session.user as any).id;
+        const isAgency = existing.tenant.agency?.tenantId === (session.user as any).id;
 
         if (!isOwner && !isAgency) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
