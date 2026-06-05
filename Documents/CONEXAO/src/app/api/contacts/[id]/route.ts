@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 async function requireContactForTenant(contactId: string, tenantId: string) {
     return prisma.contact.findFirst({
@@ -13,7 +14,10 @@ async function requireContactForTenant(contactId: string, tenantId: string) {
 export async function PUT(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
-        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        const urlObj = new URL(req.url);
+        const clientId = urlObj.searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
+        
         if (!session || !tenantId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -90,7 +94,10 @@ export async function PUT(req: Request, { params }: { params: any }) {
 export async function DELETE(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
-        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        const urlObj = new URL(req.url);
+        const clientId = urlObj.searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
+        
         if (!session || !tenantId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -114,13 +121,15 @@ export async function DELETE(req: Request, { params }: { params: any }) {
 export async function GET(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
-        const tenantId = (session?.user as { id?: string } | undefined)?.id;
+        const urlObj = new URL(req.url);
+        const clientId = urlObj.searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
+        
         if (!session || !tenantId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { id } = await params;
-        const urlObj = new URL(req.url);
         const botId = urlObj.searchParams.get('botId');
 
         const contact = await prisma.contact.findFirst({

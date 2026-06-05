@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function GET(req: Request) {
     try {
@@ -11,10 +12,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const tenantId = (session.user as any).id;
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get("clientId");
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!tenantId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
         const userEmail = session.user.email;
 
-        const { searchParams } = new URL(req.url);
+
         const botId = searchParams.get('botId');
         const pipelineId = searchParams.get('pipelineId');
         const search = searchParams.get('search') || '';

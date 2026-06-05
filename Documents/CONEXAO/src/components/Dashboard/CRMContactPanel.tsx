@@ -13,11 +13,12 @@ import { toast } from "sonner";
 interface CRMContactPanelProps {
     contactId: string;
     botId: string;
+    clientId?: string | null;
     onClose: () => void;
     onDeleted?: () => void;
 }
 
-export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }: CRMContactPanelProps) {
+export default function CRMContactPanel({ contactId, botId, clientId, onClose, onDeleted }: CRMContactPanelProps) {
     const [activeTab, setActiveTab] = useState<'chat' | 'data' | 'auto' | 'finance'>('chat');
     const [contact, setContact] = useState<any>(null);
     const [messages, setMessages] = useState<any[]>([]);
@@ -34,7 +35,8 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
     async function fetchContactData() {
         setLoading(true);
         try {
-            const res = await fetch(`/api/contacts/${contactId}?botId=${botId}`);
+            const query = clientId ? `&clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}?botId=${botId}${query}`);
             if (res.ok) {
                 const data = await res.json();
                 setContact(data);
@@ -45,7 +47,8 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
             }
 
             // Fetch bots for delegation
-            const botsRes = await fetch('/api/bots');
+            const q2 = clientId ? `?clientId=${clientId}` : '';
+            const botsRes = await fetch(`/api/bots${q2}`);
             if (botsRes.ok) setBots(await botsRes.json());
         } catch (error) {
             console.error("Error fetching contact detail", error);
@@ -57,7 +60,8 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
     const handleDelegate = async (botId: string) => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/contacts/${contactId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assignedBotId: botId === 'none' ? null : botId })
@@ -85,7 +89,8 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
         const newStatus = !contact.isBlocked;
         setSaving(true);
         try {
-            const res = await fetch(`/api/contacts/${contactId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isBlocked: newStatus })
@@ -106,8 +111,9 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
     const handleReleaseBot = async () => {
         setSaving(true);
         try {
+            const query = clientId ? `?clientId=${clientId}` : '';
             // First, unblock the contact
-            const resContact = await fetch(`/api/contacts/${contactId}`, {
+            const resContact = await fetch(`/api/contacts/${contactId}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isBlocked: false })
@@ -135,7 +141,8 @@ export default function CRMContactPanel({ contactId, botId, onClose, onDeleted }
         if (!confirm("Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.")) return;
 
         try {
-            const res = await fetch(`/api/contacts/${contactId}`, { method: 'DELETE' });
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}${query}`, { method: 'DELETE' });
             if (res.ok) {
                 toast.success("Lead excluído com sucesso");
                 onDeleted?.();

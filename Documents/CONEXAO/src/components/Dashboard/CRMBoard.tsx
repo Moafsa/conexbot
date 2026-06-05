@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     Users, DollarSign, MessageCircle, MoreHorizontal,
     TrendingUp, Phone, Mail, User, Settings2, Search,
@@ -45,6 +46,9 @@ interface Contact {
 }
 
 export function CRMBoard({ botId }: { botId: string }) {
+    const searchParams = useSearchParams();
+    const clientId = searchParams?.get("clientId");
+    
     const [pipelines, setPipelines] = useState<CrmPipeline[]>([]);
     const [activePipelineId, setActivePipelineId] = useState<string>("");
     const [stages, setStages] = useState<CrmStage[]>([]);
@@ -91,7 +95,8 @@ export function CRMBoard({ botId }: { botId: string }) {
 
     async function fetchPipelines() {
         try {
-            const res = await fetch(`/api/crm/pipelines?botId=${botId}`);
+            const query = clientId ? `&clientId=${clientId}` : '';
+            const res = await fetch(`/api/crm/pipelines?botId=${botId}${query}`);
             if (res.ok) {
                 const data = await res.json();
                 setPipelines(data);
@@ -111,7 +116,8 @@ export function CRMBoard({ botId }: { botId: string }) {
 
     async function fetchAgents() {
         try {
-            const res = await fetch(`/api/crm/agents?botId=${botId}`);
+            const query = clientId ? `&clientId=${clientId}` : '';
+            const res = await fetch(`/api/crm/agents?botId=${botId}${query}`);
             if (res.ok) {
                 const data = await res.json();
                 setAgents(data);
@@ -123,7 +129,8 @@ export function CRMBoard({ botId }: { botId: string }) {
 
     async function fetchStages() {
         try {
-            const res = await fetch(`/api/bots/${botId}/crm/stages?pipelineId=${activePipelineId}`);
+            const query = clientId ? `&clientId=${clientId}` : '';
+            const res = await fetch(`/api/bots/${botId}/crm/stages?pipelineId=${activePipelineId}${query}`);
             if (res.ok) {
                 const data = await res.json();
                 setStages(data);
@@ -136,7 +143,8 @@ export function CRMBoard({ botId }: { botId: string }) {
     async function fetchContacts(searchQuery = "") {
         setLoading(true);
         try {
-            const res = await fetch(`/api/contacts?botId=${botId}&pipelineId=${activePipelineId}&search=${encodeURIComponent(searchQuery)}`, { cache: 'no-store' });
+            const query = clientId ? `&clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts?botId=${botId}&pipelineId=${activePipelineId}&search=${encodeURIComponent(searchQuery)}${query}`, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 setContacts(data);
@@ -151,7 +159,8 @@ export function CRMBoard({ botId }: { botId: string }) {
     async function handleCreatePipeline(name: string) {
         if (!name.trim()) return;
         try {
-            const res = await fetch(`/api/crm/pipelines`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/crm/pipelines${query}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, botId })
@@ -173,7 +182,8 @@ export function CRMBoard({ botId }: { botId: string }) {
 
     async function handleUpdatePipeline() {
         try {
-            const res = await fetch(`/api/crm/pipelines/${activePipelineId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/crm/pipelines/${activePipelineId}${query}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -198,7 +208,8 @@ export function CRMBoard({ botId }: { botId: string }) {
         }
         if (!confirm("Tem certeza que deseja excluir este funil? Todos os estágios vinculados serão deletados!")) return;
         try {
-            const res = await fetch(`/api/crm/pipelines/${activePipelineId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/crm/pipelines/${activePipelineId}${query}`, {
                 method: "DELETE"
             });
             if (res.ok) {
@@ -218,7 +229,8 @@ export function CRMBoard({ botId }: { botId: string }) {
         ));
 
         try {
-            const res = await fetch(`/api/contacts/${contactId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -656,6 +668,7 @@ export function CRMBoard({ botId }: { botId: string }) {
                     <CRMContactPanel
                         contactId={selectedContactId}
                         botId={botId}
+                        clientId={clientId}
                         onClose={() => setSelectedContactId(null)}
                         onDeleted={() => {
                             setContacts(prev => prev.filter(c => c.id !== selectedContactId));

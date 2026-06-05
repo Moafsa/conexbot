@@ -3,16 +3,20 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const tenantId = (session?.user as any)?.id;
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get("clientId");
+        
+        const tenantId = await getEffectiveTenantId(clientId);
         if (!session || !tenantId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { searchParams } = new URL(req.url);
+
         const botId = searchParams.get('botId');
         if (!botId) {
             return NextResponse.json({ error: 'Missing botId' }, { status: 400 });
@@ -43,7 +47,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const tenantId = (session?.user as any)?.id;
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get("clientId");
+        
+        const tenantId = await getEffectiveTenantId(clientId);
         if (!session || !tenantId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

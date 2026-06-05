@@ -3,12 +3,27 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function GET(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
         const { searchParams } = new URL(req.url);
         const pipelineId = searchParams.get('pipelineId');
+        
+        const session = await getServerSession(authOptions);
+        const clientId = searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!session || !tenantId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
+        // Ensure bot belongs to tenantId
+        const bot = await prisma.bot.findFirst({ where: { id, tenantId } });
+        if (!bot) {
+            return NextResponse.json({ error: 'Not authorized for this bot' }, { status: 401 });
+        }
 
         const whereCondition: any = { botId: id };
 
@@ -81,7 +96,17 @@ export async function POST(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
         const session = await getServerSession(authOptions);
-        if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!session || !tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        
+        // Ensure bot belongs to tenantId
+        const bot = await prisma.bot.findFirst({ where: { id, tenantId } });
+        if (!bot) {
+            return NextResponse.json({ error: 'Not authorized for this bot' }, { status: 401 });
+        }
 
         const { name, color, order, description, pipelineId } = await req.json();
 
