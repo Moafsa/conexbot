@@ -77,6 +77,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
 
     const bot = client.bots[0];
+    let obData: any = {};
+    if (bot && bot.onboardingData) {
+        if (typeof bot.onboardingData === 'string') {
+            try { obData = JSON.parse(bot.onboardingData); } catch (e) {}
+        } else {
+            obData = bot.onboardingData;
+        }
+    }
 
     // Map to onboarding form structure
     return NextResponse.json({
@@ -103,15 +111,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         systemPrompt: bot?.systemPrompt || '',
         modules: bot?.modules || ['crm'],
         // Extended fields mapping
-        description: bot?.description || (bot as any)?.onboardingData?.description || '',
-        productsServices: bot?.productsServices || (bot as any)?.onboardingData?.productsServices || '',
-        paymentMethods: bot?.paymentMethods?.length ? bot.paymentMethods : ((bot as any)?.onboardingData?.paymentMethods || []),
-        targetAudience: (bot as any)?.onboardingData?.targetAudience || '',
-        tone: (bot as any)?.onboardingData?.tone || 'Profissional',
-        persona: (bot as any)?.onboardingData?.persona || '',
-        differentials: (bot as any)?.onboardingData?.differentials || '',
-        keyProducts: (bot as any)?.onboardingData?.keyProducts || '',
-        avgTicket: (bot as any)?.onboardingData?.avgTicket || '',
+        description: bot?.description || obData?.description || '',
+        productsServices: bot?.productsServices || obData?.productsServices || '',
+        paymentMethods: bot?.paymentMethods?.length ? bot.paymentMethods : (obData?.paymentMethods || []),
+        targetAudience: obData?.targetAudience || '',
+        tone: obData?.tone || 'Profissional',
+        persona: obData?.persona || '',
+        differentials: obData?.differentials || '',
+        keyProducts: obData?.keyProducts || '',
+        avgTicket: obData?.avgTicket || '',
         deliveryFeeType: bot?.deliveryFeeType || 'FIXED',
         deliveryFeeRules: bot?.deliveryFeeRules ? (typeof bot.deliveryFeeRules === 'string' ? JSON.parse(bot.deliveryFeeRules) : bot.deliveryFeeRules) : [],
     });
