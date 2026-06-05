@@ -371,7 +371,7 @@ export default function BotsPage() {
                                         >
                                             <div className="p-1">
                                                 <Link
-                                                    href={`/dashboard/bots/${bot.id}${selectedClientId ? `?clientId=${selectedClientId}` : ''}`}
+                                                    href={`/dashboard/bots/${bot.id}?clientId=${bot.tenantId}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Settings size={16} />
@@ -385,7 +385,7 @@ export default function BotsPage() {
                                                     Duplicar
                                                 </button>
                                                 <Link
-                                                    href={`/dashboard/create-bot?id=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`}
+                                                    href={`/dashboard/create-bot?id=${bot.id}&clientId=${bot.tenantId}`}
                                                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
                                                 >
                                                     <Edit size={16} />
@@ -474,7 +474,7 @@ export default function BotsPage() {
                                 {bot.sessionName ? (
                                     <>
                                         <Link
-                                            href={`/dashboard/bots/${bot.id}${selectedClientId ? `?clientId=${selectedClientId}` : ''}`}
+                                            href={`/dashboard/bots/${bot.id}?clientId=${bot.tenantId}`}
                                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                         >
                                             <MessageSquare size={16} />
@@ -484,7 +484,7 @@ export default function BotsPage() {
                                 ) : (
                                     <>
                                         <Link
-                                            href={`/dashboard/connect?botId=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`}
+                                            href={`/dashboard/connect?botId=${bot.id}&clientId=${bot.tenantId}`}
                                             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors text-center"
                                         >
                                             Conectar WhatsApp
@@ -525,7 +525,7 @@ export default function BotsPage() {
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/dashboard/create-bot?id=${bot.id}${selectedClientId ? `&clientId=${selectedClientId}` : ''}`);
+                                        router.push(`/dashboard/create-bot?id=${bot.id}&clientId=${bot.tenantId}`);
                                     }}
                                     title="Configurações Rápidas"
                                 >
