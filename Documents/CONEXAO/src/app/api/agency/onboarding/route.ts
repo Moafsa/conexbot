@@ -24,6 +24,7 @@ import { PhoneUtils } from '@/lib/phone-utils';
 import { ChatwootService } from '@/services/engine/chatwoot';
 
 export async function POST(req: Request) {
+    let requestPhone = '';
     try {
         const session = await getServerSession(authOptions) as any;
         if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -76,6 +77,8 @@ export async function POST(req: Request) {
         if (!name || !email || !phone) {
             return NextResponse.json({ error: 'name, email e phone são obrigatórios' }, { status: 400 });
         }
+        
+        requestPhone = phone;
 
         const template = getNicheTemplate(niche);
 
@@ -287,6 +290,19 @@ export async function POST(req: Request) {
         if (error.code === 'P2002') {
             if (error.meta?.target?.includes('whatsapp')) {
                 errorMessage = 'Já existe um cliente cadastrado com este número de WhatsApp.';
+                try {
+                    if (requestPhone) {
+                        const existingOwner = await prisma.tenant.findUnique({ 
+                            where: { whatsapp: requestPhone },
+                            select: { name: true, email: true }
+                        });
+                        if (existingOwner) {
+                            errorMessage = `O WhatsApp já existe e está sendo usado por ${existingOwner.name || 'Sem nome'} (${existingOwner.email}).`;
+                        }
+                    }
+                } catch (e) {
+                    // fall back to default errorMessage
+                }
             } else if (error.meta?.target?.includes('email')) {
                 errorMessage = 'Já existe um cliente cadastrado com este E-mail.';
             } else {
