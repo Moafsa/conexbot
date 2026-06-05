@@ -177,6 +177,12 @@ export async function getAiClient(options: {
             geminiApiKey?: string | null,
             openrouterApiKey?: string | null,
             anthropicApiKey?: string | null,
+        } | null,
+        managedBy?: {
+            openaiApiKey?: string | null,
+            geminiApiKey?: string | null,
+            openrouterApiKey?: string | null,
+            anthropicApiKey?: string | null,
         } | null
     }
 }) {
@@ -184,7 +190,10 @@ export async function getAiClient(options: {
     let model = options.model || 'gpt-4o-mini';
 
     const resolveKey = (key: string, envName: string) => {
-        return (options.tenant as any)[key] || options.tenant.agency?.[key as keyof typeof options.tenant.agency] || process.env[envName];
+        return (options.tenant as any)[key] || 
+               options.tenant.agency?.[key as keyof typeof options.tenant.agency] || 
+               options.tenant.managedBy?.[key as keyof typeof options.tenant.managedBy] || 
+               process.env[envName];
     };
 
     if (provider === 'anthropic') {
