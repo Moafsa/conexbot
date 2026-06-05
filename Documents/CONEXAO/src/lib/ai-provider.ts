@@ -345,9 +345,8 @@ export async function safeChatCompletion(options: {
         } catch (err: any) {
             console.error(`[SafeAI] Provider ${provider} failed:`, err.message);
             lastError = err;
-            if (err.message.includes('429') || err.message.includes('Quota') || err.message.includes('500')) {
-                continue;
-            }
+            // Fallback to next provider for ANY error (401 Auth, 429 Quota, 500, etc)
+            continue;
         }
     }
 
