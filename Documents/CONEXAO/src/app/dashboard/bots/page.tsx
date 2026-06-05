@@ -20,7 +20,6 @@ export default function BotsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const fetchBots = async () => {
         try {

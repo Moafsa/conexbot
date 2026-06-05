@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { updateBotSchema } from '@/lib/validations';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function GET(req: Request, { params }: { params: any }) {
     try {
@@ -13,7 +14,13 @@ export async function GET(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const tenantId = (session.user as any).id;
+        const url = new URL(req.url);
+        const clientId = url.searchParams.get("clientId");
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!tenantId) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
 
         const bot = await prisma.bot.findFirst({
             where: { id, tenantId },
@@ -46,7 +53,13 @@ export async function PUT(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const tenantId = (session.user as any).id;
+        const url = new URL(req.url);
+        const clientId = url.searchParams.get("clientId");
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!tenantId) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
 
         // Verify ownership
         const existing = await prisma.bot.findFirst({
@@ -111,7 +124,13 @@ export async function DELETE(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const tenantId = (session.user as any).id;
+        const url = new URL(req.url);
+        const clientId = url.searchParams.get("clientId");
+        const tenantId = await getEffectiveTenantId(clientId);
+        
+        if (!tenantId) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
 
         const existing = await prisma.bot.findFirst({
             where: { id, tenantId },

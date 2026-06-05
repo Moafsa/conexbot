@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
     ShoppingBag,
     MessageCircle,
@@ -31,6 +31,8 @@ export default function BotDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const botId = params.id as string;
+    const searchParams = useSearchParams();
+    const clientId = searchParams.get("clientId");
     const [activeTab, setActiveTab] = useState("overview");
     const [bot, setBot] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -42,12 +44,13 @@ export default function BotDetailsPage() {
 
     async function fetchBot() {
         try {
-            const res = await fetch(`/api/bots/${botId}`);
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/bots/${botId}${query}`);
             if (res.ok) {
                 const data = await res.json();
                 setBot(data);
             } else {
-                router.push("/dashboard/bots");
+                router.push(`/dashboard/bots${clientId ? `?clientId=${clientId}` : ''}`);
             }
         } catch (error) {
             console.error("Error fetching bot", error);
@@ -84,7 +87,8 @@ export default function BotDetailsPage() {
         const newStatus = bot.status === 'active' ? 'paused' : 'active';
         try {
             setLoading(true);
-            const res = await fetch(`/api/bots/${botId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/bots/${botId}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -110,12 +114,13 @@ export default function BotDetailsPage() {
 
         try {
             setLoading(true);
-            const res = await fetch(`/api/bots/${botId}`, {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/bots/${botId}${query}`, {
                 method: 'DELETE',
             });
 
             if (res.ok) {
-                router.push("/dashboard/bots");
+                router.push(`/dashboard/bots${clientId ? `?clientId=${clientId}` : ''}`);
             } else {
                 alert('Erro ao excluir agente.');
             }
@@ -139,7 +144,7 @@ export default function BotDetailsPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => router.push("/dashboard/bots")}
+                        onClick={() => router.push(`/dashboard/bots${clientId ? `?clientId=${clientId}` : ''}`)}
                         className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl transition-all text-gray-400 border border-white/5"
                     >
                         <ArrowLeft className="w-5 h-5" />
@@ -166,14 +171,14 @@ export default function BotDetailsPage() {
                         {bot.status === 'active' ? 'Ativo' : 'Pausado'}
                     </button>
                     <button
-                        onClick={() => router.push(`/dashboard/create-bot?id=${botId}`)}
+                        onClick={() => router.push(`/dashboard/create-bot?id=${botId}${clientId ? `&clientId=${clientId}` : ''}`)}
                         className="h-10 px-4 bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-bold rounded-xl border border-white/10 transition-all flex items-center gap-2"
                     >
                         <Settings size={14} />
                         Configurar
                     </button>
                     <button
-                        onClick={() => router.push("/dashboard/connect")}
+                        onClick={() => router.push(`/dashboard/connect${clientId ? `?clientId=${clientId}` : ''}`)}
                         className="h-10 px-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                     >
                         <RefreshCw size={14} />
