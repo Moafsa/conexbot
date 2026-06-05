@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface Bot {
     id: string;
     name: string;
+    tenantId: string;
 }
 
 interface CrmStage {
@@ -46,6 +47,11 @@ export function CRM() {
     const [selectedContactPanel, setSelectedContactPanel] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
+
+    const selectedBot = bots.find(b => b.id === selectedBotId);
+    const clientQuery = selectedBot?.tenantId ? `clientId=${selectedBot.tenantId}` : '';
+    const qStr = clientQuery ? `?${clientQuery}` : '';
+    const ampStr = clientQuery ? `&${clientQuery}` : '';
 
 
     useEffect(() => {
@@ -90,7 +96,7 @@ export function CRM() {
     async function fetchStages() {
         if (!selectedBotId) return;
         try {
-            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages`);
+            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages${qStr}`);
             if (res.ok) {
                 const data = await res.json();
                 setStages(data);
@@ -107,7 +113,7 @@ export function CRM() {
         if (!selectedBotId) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/contacts?botId=${selectedBotId}&search=${encodeURIComponent(searchQuery)}`);
+            const res = await fetch(`/api/contacts?botId=${selectedBotId}&search=${encodeURIComponent(searchQuery)}${ampStr}`);
             if (res.ok) {
                 const data = await res.json();
                 // Filter manually for safety if API doesn't support botId param yet
@@ -123,7 +129,7 @@ export function CRM() {
     async function handleAddStage() {
         if (!newStageName || !selectedBotId) return;
         try {
-            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages`, {
+            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages${qStr}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newStageName, order: stages.length, pipelineId: activePipelineId })
@@ -143,7 +149,7 @@ export function CRM() {
         if (!selectedBotId) return;
         if (!confirm("Tem certeza que deseja excluir esta coluna? Contatos nela ficarão sem estágio.")) return;
         try {
-            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages/${stageId}`, {
+            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages/${stageId}${qStr}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -158,7 +164,7 @@ export function CRM() {
     async function handleExport(stageId?: string) {
         if (!selectedBotId) return;
         try {
-            const url = `/api/bots/${selectedBotId}/crm/export` + (stageId ? `?stageId=${stageId}` : '');
+            const url = `/api/bots/${selectedBotId}/crm/export` + (stageId ? `?stageId=${stageId}${ampStr}` : `${qStr}`);
             window.open(url, '_blank');
         } catch (error) {
             toast.error("Erro ao exportar");
@@ -201,7 +207,7 @@ export function CRM() {
 
         // Save to backend
         try {
-            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages/reorder`, {
+            const res = await fetch(`/api/bots/${selectedBotId}/crm/stages/reorder${qStr}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ stages: updatedStages.map(s => ({ id: s.id, order: s.order })) })
@@ -231,7 +237,7 @@ export function CRM() {
         ));
 
         try {
-            const res = await fetch(`/api/contacts/${draggedContact}`, {
+            const res = await fetch(`/api/contacts/${draggedContact}${qStr}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -498,6 +504,8 @@ export function CRM() {
                 <div className="flex-shrink-0 h-full border-l border-gray-200 shadow-2xl z-20 bg-white">
                     <CRMContactPanel
                         contactId={selectedContactPanel!}
+                        botId={selectedBotId}
+                        clientId={selectedBot?.tenantId}
                         onClose={() => setSelectedContactPanel(null)}
                     />
                 </div>
