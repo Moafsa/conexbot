@@ -14,17 +14,11 @@ export async function GET(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const url = new URL(req.url);
-        const clientId = url.searchParams.get("clientId");
-        const tenantId = await getEffectiveTenantId(clientId);
         
-        if (!tenantId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
-
-        const bot = await prisma.bot.findFirst({
-            where: { id, tenantId },
+        const bot = await prisma.bot.findUnique({
+            where: { id },
             include: {
+                tenant: true,
                 _count: {
                     select: {
                         conversations: true,
@@ -36,6 +30,13 @@ export async function GET(req: Request, { params }: { params: any }) {
 
         if (!bot) {
             return NextResponse.json({ error: 'Agente não encontrado' }, { status: 404 });
+        }
+
+        const isOwner = bot.tenantId === (session.user as any).id;
+        const isAgency = bot.tenant.agencyId === (session.user as any).id;
+
+        if (!isOwner && !isAgency) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
         return NextResponse.json(bot);
@@ -53,21 +54,21 @@ export async function PUT(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const url = new URL(req.url);
-        const clientId = url.searchParams.get("clientId");
-        const tenantId = await getEffectiveTenantId(clientId);
         
-        if (!tenantId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
-
-        // Verify ownership
-        const existing = await prisma.bot.findFirst({
-            where: { id, tenantId },
+        const existing = await prisma.bot.findUnique({
+            where: { id },
+            include: { tenant: true }
         });
 
         if (!existing) {
             return NextResponse.json({ error: 'Agente não encontrado' }, { status: 404 });
+        }
+
+        const isOwner = existing.tenantId === (session.user as any).id;
+        const isAgency = existing.tenant.agencyId === (session.user as any).id;
+
+        if (!isOwner && !isAgency) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
         const body = await req.json();
@@ -124,27 +125,28 @@ export async function DELETE(req: Request, { params }: { params: any }) {
         }
 
         const { id } = await params;
-        const url = new URL(req.url);
-        const clientId = url.searchParams.get("clientId");
-        const tenantId = await getEffectiveTenantId(clientId);
         
-        if (!tenantId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
-
-        const existing = await prisma.bot.findFirst({
-            where: { id, tenantId },
+        const existing = await prisma.bot.findUnique({
+            where: { id },
+            include: { tenant: true }
         });
 
         if (!existing) {
             return NextResponse.json({ error: 'Agente não encontrado' }, { status: 404 });
         }
 
+        const isOwner = existing.tenantId === (session.user as any).id;
+        const isAgency = existing.tenant.agencyId === (session.user as any).id;
+
+        if (!isOwner && !isAgency) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
+
         await prisma.bot.delete({ where: { id } });
 
         // Decrement bot counter
         await prisma.usageCounter.updateMany({
-            where: { tenantId },
+            where: { tenantId: existing.tenantId },
             data: { botsUsed: { decrement: 1 } },
         });
 

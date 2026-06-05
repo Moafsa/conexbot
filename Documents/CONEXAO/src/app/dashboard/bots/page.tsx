@@ -74,7 +74,8 @@ export default function BotsPage() {
         }
 
         try {
-            const res = await fetch(`/api/bots/${id}`, {
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : '';
+            const res = await fetch(`/api/bots/${id}${query}`, {
                 method: 'DELETE',
             });
 
@@ -94,7 +95,8 @@ export default function BotsPage() {
     const handleClone = async (id: string) => {
         try {
             setLoading(true);
-            const res = await fetch(`/api/bots/${id}/clone`, {
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : '';
+            const res = await fetch(`/api/bots/${id}/clone${query}`, {
                 method: 'POST',
             });
 
@@ -119,7 +121,8 @@ export default function BotsPage() {
         const newStatus = currentStatus === 'active' ? 'paused' : 'active';
         try {
             setLoading(true);
-            const res = await fetch(`/api/bots/${id}`, {
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : '';
+            const res = await fetch(`/api/bots/${id}${query}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -144,7 +147,8 @@ export default function BotsPage() {
         if (!confirm('Deseja desconectar o WhatsApp deste agente?')) return;
         try {
             setLoading(true);
-            const res = await fetch('/api/whatsapp/disconnect', {
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : '';
+            const res = await fetch(`/api/whatsapp/disconnect${query}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ botId: id })

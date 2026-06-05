@@ -15,10 +15,17 @@ export async function PUT(req: Request, { params }: { params: any }) {
         // Verify ownership via product -> bot -> tenant
         const product = await prisma.product.findUnique({
             where: { id },
-            include: { bot: true }
+            include: { bot: { include: { tenant: true } } }
         });
 
-        if (!product || product.bot.tenantId !== (session.user as any).id) {
+        if (!product) {
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+        }
+
+        const isOwner = product.bot.tenantId === (session.user as any).id;
+        const isAgency = product.bot.tenant.agencyId === (session.user as any).id;
+
+        if (!isOwner && !isAgency) {
             return NextResponse.json({ error: 'Product not found or unauthorized' }, { status: 404 });
         }
 
@@ -55,10 +62,17 @@ export async function DELETE(req: Request, { params }: { params: any }) {
 
         const product = await prisma.product.findUnique({
             where: { id },
-            include: { bot: true }
+            include: { bot: { include: { tenant: true } } }
         });
 
-        if (!product || product.bot.tenantId !== (session.user as any).id) {
+        if (!product) {
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+        }
+
+        const isOwner = product.bot.tenantId === (session.user as any).id;
+        const isAgency = product.bot.tenant.agencyId === (session.user as any).id;
+
+        if (!isOwner && !isAgency) {
             return NextResponse.json({ error: 'Product not found or unauthorized' }, { status: 404 });
         }
 

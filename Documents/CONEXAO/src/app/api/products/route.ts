@@ -16,7 +16,13 @@ export async function GET(req: Request) {
 
         // Verify ownership
         const bot = await prisma.bot.findFirst({
-            where: { id: botId, tenantId: (session.user as any).id }
+            where: { 
+                id: botId, 
+                OR: [
+                    { tenantId: (session.user as any).id },
+                    { tenant: { agencyId: (session.user as any).id } }
+                ] 
+            }
         });
 
         if (!bot) return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
@@ -45,7 +51,13 @@ export async function POST(req: Request) {
 
         // Verify ownership
         const bot = await prisma.bot.findFirst({
-            where: { id: botId, tenantId: (session.user as any).id }
+            where: { 
+                id: botId, 
+                OR: [
+                    { tenantId: (session.user as any).id },
+                    { tenant: { agencyId: (session.user as any).id } }
+                ] 
+            }
         });
 
         if (!bot) return NextResponse.json({ error: 'Bot not found' }, { status: 404 });

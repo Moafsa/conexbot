@@ -116,7 +116,8 @@ export const MessageProcessor = {
                                 take: 1,
                                 include: { plan: true }
                             }, 
-                            usageCounter: true 
+                            usageCounter: true,
+                            agency: true
                         } 
                     },
                     media: true,

@@ -172,13 +172,23 @@ export async function getAiClient(options: {
         geminiApiKey?: string | null,
         openrouterApiKey?: string | null,
         anthropicApiKey?: string | null,
+        agency?: {
+            openaiApiKey?: string | null,
+            geminiApiKey?: string | null,
+            openrouterApiKey?: string | null,
+            anthropicApiKey?: string | null,
+        } | null
     }
 }) {
     const provider = options.provider || 'openai';
     let model = options.model || 'gpt-4o-mini';
 
+    const resolveKey = (key: string, envName: string) => {
+        return (options.tenant as any)[key] || options.tenant.agency?.[key as keyof typeof options.tenant.agency] || process.env[envName];
+    };
+
     if (provider === 'anthropic') {
-        const apiKey = options.tenant.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        const apiKey = resolveKey('anthropicApiKey', 'ANTHROPIC_API_KEY');
         if (!apiKey) throw new Error('Anthropic API Key not configured');
         let claudeModel = options.model || 'claude-3-5-sonnet-latest';
         if (claudeModel === 'claude-sonnet-4-5') {
@@ -191,7 +201,7 @@ export async function getAiClient(options: {
     }
 
     if (provider === 'openrouter') {
-        const apiKey = options.tenant.openrouterApiKey || process.env.OPENROUTER_API_KEY;
+        const apiKey = resolveKey('openrouterApiKey', 'OPENROUTER_API_KEY');
         if (!apiKey) throw new Error('OpenRouter API Key not configured');
         return {
             client: new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' }),
@@ -200,7 +210,7 @@ export async function getAiClient(options: {
     }
 
     if (provider === 'gemini') {
-        const apiKey = options.tenant.geminiApiKey || process.env.GEMINI_API_KEY;
+        const apiKey = resolveKey('geminiApiKey', 'GEMINI_API_KEY');
         if (!apiKey) throw new Error('Gemini API Key not configured');
 
         // Force upgrade legacy gemini models and fix invalid ones
@@ -221,7 +231,7 @@ export async function getAiClient(options: {
     }
 
     // Default: OpenAI
-    const apiKey = options.tenant.openaiApiKey || process.env.OPENAI_API_KEY;
+    const apiKey = resolveKey('openaiApiKey', 'OPENAI_API_KEY');
     if (!apiKey) throw new Error('OpenAI API Key not configured');
     return {
         client: new OpenAI({ apiKey }),
@@ -255,11 +265,15 @@ export async function safeChatCompletion(options: {
 
     for (const provider of providersToTry) {
         try {
+            const resolveKey = (key: string, envName: string) => {
+                return (bot.tenant as any)[key] || bot.tenant.agency?.[key] || process.env[envName];
+            };
+
             // Check if provider has API key
-            const hasKey = (provider === 'anthropic' && (bot.tenant.anthropicApiKey || process.env.ANTHROPIC_API_KEY)) ||
-                (provider === 'gemini' && (bot.tenant.geminiApiKey || process.env.GEMINI_API_KEY)) ||
-                (provider === 'openai' && (bot.tenant.openaiApiKey || process.env.OPENAI_API_KEY)) ||
-                (provider === 'openrouter' && (bot.tenant.openrouterApiKey || process.env.OPENROUTER_API_KEY));
+            const hasKey = (provider === 'anthropic' && resolveKey('anthropicApiKey', 'ANTHROPIC_API_KEY')) ||
+                (provider === 'gemini' && resolveKey('geminiApiKey', 'GEMINI_API_KEY')) ||
+                (provider === 'openai' && resolveKey('openaiApiKey', 'OPENAI_API_KEY')) ||
+                (provider === 'openrouter' && resolveKey('openrouterApiKey', 'OPENROUTER_API_KEY'));
 
             if (!hasKey) continue;
 
