@@ -2241,15 +2241,16 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                     placeholder="act_123456789" 
                                 />
                             </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-400">Pixel ID (Conversões)</label>
-                            <input 
-                                type="text" 
-                                value={settings.metaAdsPixelId}
-                                onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
-                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
-                                placeholder="123456789012345" 
-                            />
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Pixel ID (Conversões)</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.metaAdsPixelId}
+                                    onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
+                                    placeholder="123456789012345" 
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
