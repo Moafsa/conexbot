@@ -59,6 +59,8 @@ export interface BotContext {
     };
     coupons?: CouponInfo[];
     isMercadoLivre?: boolean;
+    deliveryFeeType?: string | null;
+    deliveryFeeRules?: any;
 }
 
 export function buildSystemPrompt(bot: BotContext): string {
@@ -208,6 +210,20 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
     if (bot.hours) businessLines.push(`- Horário: ${bot.hours}`);
     businessLines.push(`- Pagamentos: ${paymentList}`);
     if (bot.websiteUrl) businessLines.push(`- Site/Link: ${bot.websiteUrl}`);
+    
+    // Delivery info
+    if (bot.deliveryFeeType) {
+        if (bot.deliveryFeeType === 'FIXED') {
+            const fee = (bot.deliveryFeeRules && Array.isArray(bot.deliveryFeeRules) && bot.deliveryFeeRules[0]?.value) 
+                ? bot.deliveryFeeRules[0].value 
+                : 'Consultar com atendente';
+            businessLines.push(`- Taxa de Entrega: Fixa - R$ ${fee}`);
+        } else if (bot.deliveryFeeType === 'FREE') {
+            businessLines.push(`- Taxa de Entrega: Grátis`);
+        } else if (bot.deliveryFeeType === 'DISTANCE' || bot.deliveryFeeType === 'NEIGHBORHOOD') {
+            businessLines.push(`- Taxa de Entrega: Calculada por ${bot.deliveryFeeType === 'DISTANCE' ? 'distância' : 'bairro'}. Regras: ${JSON.stringify(bot.deliveryFeeRules)}`);
+        }
+    }
 
     sections.push(`═══ INFORMAÇÕES DO NEGÓCIO ═══\n\n${businessLines.join('\n')}`);
 

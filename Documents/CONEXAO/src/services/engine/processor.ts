@@ -479,6 +479,8 @@ export const MessageProcessor = {
                 mediaList: mediaList.length > 0 ? mediaList : undefined,
                 isWordpress: activeBot.isWordpress,
                 isMercadoLivre: !!activeBot.tenant.mlAccessToken,
+                deliveryFeeType: activeBot.deliveryFeeType,
+                deliveryFeeRules: activeBot.deliveryFeeRules,
                 contactInfo: {
                     name: existingContact.name,
                     email: existingContact.email,
