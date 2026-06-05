@@ -3,7 +3,7 @@ import FirecrawlApp from '@mendable/firecrawl-js';
 
 const MAX_CONTENT_LENGTH = 25000; // Increased from 8000 to keep footer data
 const FETCH_TIMEOUT_MS = 20000; // Increased from 10000
-const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || 'fc-ca0d960e8d124dfba344739c74ed6a21';
+const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY || '';
 
 export interface ScrapeResult {
     content: string;
