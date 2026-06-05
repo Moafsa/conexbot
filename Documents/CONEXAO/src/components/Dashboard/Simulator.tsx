@@ -130,10 +130,14 @@ export function Simulator({ botId }: { botId: string }) {
                 };
                 setMessages(prev => [...prev, botMsg]);
             } else {
-                console.error("Simulator error", await res.text());
+                const errData = await res.json().catch(() => null);
+                const errMsg = errData?.error || "Erro na IA ou chave de API inválida.";
+                console.error("Simulator error", errData);
+                toast.error(errMsg);
             }
         } catch (error) {
             console.error("Network error", error);
+            toast.error("Erro de conexão ao acessar o simulador.");
         } finally {
             setLoading(false);
         }
