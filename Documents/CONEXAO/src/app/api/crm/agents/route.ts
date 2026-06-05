@@ -48,7 +48,8 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Failed to fetch agents from Chatwoot' }, { status: response.status });
         }
 
-        const agents = await response.json();
+        const data = await response.json();
+        const agents = Array.isArray(data) ? data : (data.payload || []);
         return NextResponse.json(agents);
     } catch (error: any) {
         console.error('[API /api/crm/agents] Error:', error.message);
