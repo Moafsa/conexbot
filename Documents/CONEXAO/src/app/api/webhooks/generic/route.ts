@@ -81,7 +81,7 @@ export async function POST(req: Request) {
                 logToFile(`[Generic Webhook] Chatwoot AGENT reply → WhatsApp for ${customerPhone}: "${messageText.substring(0, 80)}"`);
                 // Forward the human agent's message to the customer on WhatsApp
                 try {
-                    const { UzapiService } = await import('@/services/whatsapp/uzapi');
+                    const { UzapiService } = await import('@/services/engine/uzapi');
                     await UzapiService.sendMessage(bot.sessionName || '', customerPhone.replace(/\D/g, ''), messageText);
                     return NextResponse.json({ status: 'forwarded_to_whatsapp' });
                 } catch (fwdErr: any) {

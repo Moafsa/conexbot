@@ -122,7 +122,16 @@ export const MessageProcessor = {
                         } 
                     },
                     media: true,
-                    products: { where: { active: true } }
+                    products: { 
+                        where: { active: true },
+                        include: { 
+                            category: true,
+                            addonGroups: {
+                                where: { active: true },
+                                include: { addons: { where: { active: true } } }
+                            }
+                        }
+                    }
                 },
             }) as any;
 
@@ -419,21 +428,45 @@ export const MessageProcessor = {
             // Decide if we should show prices based on stage
             const hidePrices = ['GREETING', 'SAUDAÇÃO', 'SAUDACAO', 'INÍCIO', 'LEAD', 'AWARENESS', 'NOVO'].includes(analysis.nextStage.toUpperCase().trim());
 
-            const productContext = bot.products.map((p: any) => {
-                const currentPrice = p.salePrice || p.price;
-                let priceMsg = "";
-                
-                if (hidePrices) {
-                    priceMsg = "[Preço Oculto nesta fase para focar na qualificação]";
-                } else {
-                    priceMsg = p.salePrice 
-                        ? `[OFERTA] Preço Original: R$ ${p.price.toFixed(2)} | Preço Promocional: R$ ${p.salePrice.toFixed(2)} 🔥` 
-                        : `R$ ${p.price.toFixed(2)}`;
+            // Group products by category
+            const groupedProducts: Record<string, any[]> = {};
+            for (const p of bot.products) {
+                const catName = p.category?.name || 'Sem Categoria';
+                if (!groupedProducts[catName]) groupedProducts[catName] = [];
+                groupedProducts[catName].push(p);
+            }
+
+            let productContext = "";
+            for (const [catName, prods] of Object.entries(groupedProducts)) {
+                productContext += `\n[CATEGORIA: ${catName.toUpperCase()}]\n`;
+                for (const p of prods) {
+                    const currentPrice = p.salePrice || p.price;
+                    let priceMsg = "";
+                    
+                    if (hidePrices) {
+                        priceMsg = "[Preço Oculto nesta fase para focar na qualificação]";
+                    } else {
+                        priceMsg = p.salePrice 
+                            ? `[OFERTA] De R$ ${p.price.toFixed(2)} por R$ ${p.salePrice.toFixed(2)}` 
+                            : `R$ ${p.price.toFixed(2)}`;
+                    }
+                    
+                    const couponInfo = p.allowCoupons ? "" : " [NÃO ACEITA CUPONS]";
+                    let addonsMsg = "";
+                    
+                    if (p.addonGroups && p.addonGroups.length > 0) {
+                        addonsMsg = "\n    Adicionais disponíveis para este item:";
+                        for (const group of p.addonGroups) {
+                            addonsMsg += `\n      - ${group.name} (Escolha de ${group.minSelect} a ${group.maxSelect}):`;
+                            for (const addon of group.addons) {
+                                addonsMsg += `\n        [ID Adicional: ${addon.id}] ${addon.name} (+ R$ ${addon.price.toFixed(2)})`;
+                            }
+                        }
+                    }
+
+                    productContext += `  - [ID Produto: ${p.id}] ${p.name}: ${priceMsg}${couponInfo} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'}) - ${p.description || ''}${addonsMsg}\n`;
                 }
-                
-                const couponInfo = p.allowCoupons ? "" : " [NÃO ACEITA CUPONS/DESCONTOS ADICIONAIS]";
-                return `- ${p.name}: ${priceMsg}${couponInfo} (${p.stock > 0 ? 'Em estoque' : 'Esgotado'})${p.externalUrl ? ` [Link: ${p.externalUrl}]` : ''} - ${p.description || ''}`;
-            }).join('\n');
+            }
 
             logToFile(`[Processor] Product Context: ${bot.products.length} products found.`);
             if (bot.products.length > 0) {
@@ -599,13 +632,48 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 produto_nome: { type: 'string', description: 'O nome do produto ou plano do catálogo que o cliente quer comprar.' },
                                 cliente_nome: { type: 'string', description: 'Nome completo do cliente.' },
                                 cliente_email: { type: 'string', description: 'E-mail do cliente.' },
-                                cliente_cpf: { type: 'string', description: 'CPF ou CNPJ do cliente.' }
+                                cliente_cpf: { type: 'string', description: 'CPF ou CNPJ do cliente.' },
+                                cupom_desconto: { type: 'string', description: 'Opcional. O cupom de desconto fornecido pelo cliente.' }
                             },
                             required: ['produto_nome', 'cliente_nome', 'cliente_email', 'cliente_cpf']
                         }
                     }
                 });
             }
+
+            // --- ADVANCED CART TOOLS ---
+            schedulingTools.push(
+                {
+                    type: 'function',
+                    function: {
+                        name: 'adicionar_ao_carrinho',
+                        description: 'Adiciona um produto oficial do cardápio e seus adicionais escolhidos ao carrinho do cliente. USE ISTO SEMPRE que o cliente pedir um item do cardápio, para calcular o subtotal com precisão e evitar que o cliente invente preços falsos.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                id_produto: { type: 'string', description: 'O ID exato do produto (listado no cardápio na seção CATÁLOGO DE PRODUTOS).' },
+                                quantidade: { type: 'number', description: 'A quantidade solicitada deste item.' },
+                                ids_adicionais: { type: 'array', items: { type: 'string' }, description: 'Lista de IDs exatos dos adicionais que o cliente quer incluir neste item (se houver).' }
+                            },
+                            required: ['id_produto', 'quantidade']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'finalizar_pedido',
+                        description: 'Fecha o carrinho do cliente e retorna o subtotal oficial exato (soma dos produtos, adicionais, taxa de entrega e descontos). USE ISTO quando o cliente quiser fechar o pedido, ou perguntar o total, ou quando pedir para aplicar um cupom ou calcular a tele-entrega.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                cupom: { type: 'string', description: 'Opcional. Código do cupom de desconto que o cliente quer usar.' },
+                                bairro_entrega: { type: 'string', description: 'Opcional. Nome do bairro para calcular a tele/taxa de entrega (caso o cliente tenha pedido entrega).' }
+                            }
+                        }
+                    }
+                }
+            );
 
             // --- MAESTRO ORCHESTRATION: Inject Collaborator Tools ---
             schedulingTools.push(
@@ -894,6 +962,85 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     }
                                 }
                             } catch (e: any) { toolResult = `Erro interno ao faturar: ${e.message}`; }
+                        } else if (name === 'adicionar_ao_carrinho') {
+                            try {
+                                const { CartService } = await import('./cart.service');
+                                const cartResult = await CartService.addToCart(
+                                    bot.id, 
+                                    senderPhone, 
+                                    args.id_produto, 
+                                    args.quantidade || 1, 
+                                    args.ids_adicionais || []
+                                );
+                                toolResult = cartResult.message;
+                            } catch (e: any) {
+                                toolResult = `Erro ao adicionar ao carrinho: ${e.message}`;
+                            }
+                        } else if (name === 'finalizar_pedido') {
+                            try {
+                                const { CartService } = await import('./cart.service');
+                                const summary = await CartService.getCartSummary(bot.id, senderPhone);
+                                if (summary.items.length === 0) {
+                                    toolResult = "O carrinho está vazio. Peça para o cliente escolher produtos do catálogo primeiro.";
+                                } else {
+                                    let deliveryFee = 0;
+                                    let deliveryMsg = "";
+                                    let discountValue = 0;
+                                    let discountMsg = "";
+
+                                    // Calcula Frete (Tele)
+                                    if (bot.deliveryFeeType === 'FIXED') {
+                                        deliveryFee = Number(bot.deliveryFeeRules?.[0]?.value) || 0;
+                                        deliveryMsg = `\nTaxa de Entrega Fixa: R$ ${deliveryFee.toFixed(2)}`;
+                                    } else if (bot.deliveryFeeType === 'NEIGHBORHOOD' && args.bairro_entrega) {
+                                        const rules = (bot.deliveryFeeRules as any[]) || [];
+                                        const foundRule = rules.find((r: any) => 
+                                            r.neighborhood?.toLowerCase() === args.bairro_entrega.toLowerCase()
+                                        );
+                                        if (foundRule) {
+                                            deliveryFee = Number(foundRule.value) || 0;
+                                            deliveryMsg = `\nTaxa de Entrega para ${args.bairro_entrega}: R$ ${deliveryFee.toFixed(2)}`;
+                                        } else {
+                                            deliveryMsg = `\n[Atenção] Bairro '${args.bairro_entrega}' não encontrado nas regras de entrega. Informe o cliente.`;
+                                        }
+                                    } else if (bot.deliveryFeeType === 'DISTANCE' || bot.deliveryFeeType === 'NEIGHBORHOOD') {
+                                        deliveryMsg = `\nTaxa de Entrega a calcular (Peça o bairro/endereço do cliente para calcular exato usando a função finalizar_pedido passando o bairro)`;
+                                    } else if (bot.deliveryFeeType === 'FREE') {
+                                        deliveryMsg = `\nTaxa de Entrega: Grátis`;
+                                    }
+
+                                    // Aplica Cupom (Promoção/Desconto)
+                                    if (args.cupom) {
+                                        const coupon = await prisma.coupon.findUnique({
+                                            where: { botId_code: { botId: bot.id, code: args.cupom.toUpperCase() } }
+                                        });
+
+                                        if (coupon && coupon.active) {
+                                            const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
+                                            const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
+                                            
+                                            if (!isExpired && !isLimitReached) {
+                                                if (coupon.type === 'PERCENTAGE') {
+                                                    discountValue = summary.total * (coupon.value / 100);
+                                                    discountMsg = `\nDesconto (Cupom ${coupon.code} - ${coupon.value}%): -R$ ${discountValue.toFixed(2)}`;
+                                                } else {
+                                                    discountValue = coupon.value;
+                                                    discountMsg = `\nDesconto (Cupom ${coupon.code}): -R$ ${discountValue.toFixed(2)}`;
+                                                }
+                                            } else {
+                                                discountMsg = `\n[Atenção] Cupom expirado ou limite de usos atingido.`;
+                                            }
+                                        } else {
+                                            discountMsg = `\n[Atenção] Cupom '${args.cupom}' não encontrado ou inativo.`;
+                                        }
+                                    }
+
+                                    const finalTotal = Math.max(0, summary.total - discountValue) + deliveryFee;
+                                    toolResult = `CARRINHO OFICIAL:\nTotal dos Itens: R$ ${summary.total.toFixed(2)}${discountMsg}${deliveryMsg}\nValor Final (Total a Pagar): R$ ${finalTotal.toFixed(2)}.\nEste é o valor oficial no banco de dados. Fale para o cliente confirmar o pedido. Se ele quiser pagar, use a função 'gerar_fatura'.`;
+                                }
+                            } catch (e: any) {
+                                toolResult = `Erro ao visualizar o carrinho oficial: ${e.message}`;
+                            }
                         } else if (name === 'listar_colaboradores') {
                             try {
                                 const whereClause: any = { botId: bot.id, contactType: { not: 'CUSTOMER' } };

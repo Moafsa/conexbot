@@ -242,6 +242,9 @@ model Bot {
   marketingPosts          MarketingPost[]
   orders                  Order[]
   products                Product[]
+  productCategories       ProductCategory[]
+  productAddonGroups      ProductAddonGroup[]
+  carts                   Cart[]
   smtpConfigs             SmtpConfig[]
 }
 
@@ -383,8 +386,95 @@ model Product {
   externalUrl   String?
   billingPeriod BillingPeriod?
   type          ProductType    @default(SINGLE)
+  categoryId    String?
+  category      ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  addonGroups   ProductAddonGroup[]
   orderItems    OrderItem[]
+  cartItems     CartItem[]
   bot           Bot            @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model ProductCategory {
+  id        String    @id @default(uuid())
+  botId     String
+  name      String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bot       Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  products  Product[]
+}
+
+model ProductAddonGroup {
+  id        String         @id @default(uuid())
+  botId     String
+  name      String         // e.g., "Adicionais", "Turbine seu Lanche"
+  minSelect Int            @default(0)
+  maxSelect Int?           // null means unlimited
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  bot       Bot            @relation(fields: [botId], references: [id], onDelete: Cascade)
+  addons    ProductAddon[]
+  products  Product[]
+}
+
+model ProductAddon {
+  id        String            @id @default(uuid())
+  groupId   String
+  name      String
+  price     Float
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  group     ProductAddonGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  cartItems CartItemAddon[]
+  orderItems OrderItemAddon[]
+}
+
+model Cart {
+  id           String     @id @default(uuid())
+  botId        String
+  contactPhone String
+  status       String     @default("ACTIVE") // ACTIVE, ABANDONED, COMPLETED
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  items        CartItem[]
+  bot          Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId, contactPhone])
+}
+
+model CartItem {
+  id        String          @id @default(uuid())
+  cartId    String
+  productId String
+  quantity  Int
+  unitPrice Float           // Base price at the moment of adding
+  createdAt DateTime        @default(now())
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  addons    CartItemAddon[]
+}
+
+model CartItemAddon {
+  id         String       @id @default(uuid())
+  cartItemId String
+  addonId    String
+  unitPrice  Float        // Addon price at the moment of adding
+  quantity   Int          @default(1)
+  cartItem   CartItem     @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  addon      ProductAddon @relation(fields: [addonId], references: [id], onDelete: Cascade)
+}
+
+model OrderItemAddon {
+  id          String       @id @default(uuid())
+  orderItemId String
+  addonId     String
+  unitPrice   Float
+  quantity    Int          @default(1)
+  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  addon       ProductAddon @relation(fields: [addonId], references: [id], onDelete: Cascade)
 }
 
 model Coupon {
@@ -434,6 +524,7 @@ model OrderItem {
   productId String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  addons    OrderItemAddon[]
 }
 
 model Contact {

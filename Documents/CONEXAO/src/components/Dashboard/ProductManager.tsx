@@ -24,6 +24,9 @@ export function ProductManager({ botId }: { botId: string }) {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
+    const [magicText, setMagicText] = useState("");
+    const [isImporting, setIsImporting] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
  
     // Form State
@@ -57,6 +60,31 @@ export function ProductManager({ botId }: { botId: string }) {
             console.error("Failed to fetch products", error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleMagicImport() {
+        if (!magicText) return;
+        setIsImporting(true);
+        try {
+            const res = await fetch("/api/products/magic-import", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ botId, text: magicText }),
+            });
+            if (res.ok) {
+                setIsMagicModalOpen(false);
+                setMagicText("");
+                fetchProducts();
+            } else {
+                const errorData = await res.json();
+                alert(`Erro ao importar: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Error on magic import", error);
+            alert("Erro na requisição. Verifique o console.");
+        } finally {
+            setIsImporting(false);
         }
     }
 
@@ -130,17 +158,28 @@ export function ProductManager({ botId }: { botId: string }) {
                     <Package className="w-5 h-5 text-indigo-600" />
                     Catálogo de Produtos
                 </h2>
-                <button
-                    onClick={() => {
-                        setEditingProduct(null);
-                        setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
-                        setIsModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-                >
-                    <Plus className="w-4 h-4" />
-                    Novo Produto
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                            setMagicText("");
+                            setIsMagicModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-lg hover:from-purple-600 hover:to-indigo-700 transition shadow-md"
+                    >
+                        ✨ Importar Cardápio Mágico
+                    </button>
+                    <button
+                        onClick={() => {
+                            setEditingProduct(null);
+                            setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
+                            setIsModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition shadow-md"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Novo Produto
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -369,6 +408,56 @@ export function ProductManager({ botId }: { botId: string }) {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Magic Import Modal */}
+            {isMagicModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 relative">
+                        <button
+                            onClick={() => setIsMagicModalOpen(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                            disabled={isImporting}
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            ✨ Importar Cardápio Mágico
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Cole o cardápio do seu restaurante (mesmo que seja um texto bagunçado de WhatsApp ou PDF copiado). A Inteligência Artificial vai organizar categorias, produtos, preços e adicionais automaticamente!
+                        </p>
+
+                        <div className="space-y-4">
+                            <textarea
+                                value={magicText}
+                                onChange={(e) => setMagicText(e.target.value)}
+                                disabled={isImporting}
+                                className="w-full h-64 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                placeholder={`Ex:\nHAMBÚRGUERES\nX-Salada - R$ 25,00\n(Acompanha pão, carne, queijo, alface, tomate)\n\nAdicionais:\nBacon - R$ 5,00\nOvo - R$ 2,00\n\nBEBIDAS\nCoca-Cola Lata - R$ 6,00`}
+                            />
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMagicModalOpen(false)}
+                                    disabled={isImporting}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition text-sm disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleMagicImport}
+                                    disabled={isImporting || !magicText}
+                                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {isImporting ? "Importando (pode demorar um pouco)..." : "Começar Mágica ✨"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
