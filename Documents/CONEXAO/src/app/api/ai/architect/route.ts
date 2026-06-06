@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 - Nome: ${existingBot.name}
 - Tipo: ${existingBot.businessType}
 - Descrição: ${existingBot.description}
-- Personalidade Atual: ${existingBot.systemPrompt?.substring(0, 500)}...
+- Personalidade Atual (System Prompt): ${existingBot.systemPrompt || "Vazio"}
 `;
             }
         }
@@ -136,6 +136,7 @@ DIRETRIZES DE SEGURANÇA (ANTI-ALUCINAÇÃO):
 
 DIRETRIZES PARA 'extractedData.systemPrompt' (A PERSONALIDADE DO BOT):
 - Deve ser UM TEXTO LONGO e DETALHADO (mínimo 3 parágrafos).
+- IMPORTANTE: Se houver uma "Personalidade Atual" no Estado Atual do Bot (edição), VOCÊ DEVE PRESERVAR as regras e o comportamento original. APENAS adicione, ajuste ou remova a parte específica que o usuário pediu na conversa atual. NÃO zere ou reescreva apagando o que já estava configurado!
 - Deve começar com: "Você é [Nome], especialista em [Descrição do Produto/Serviço] da [Empresa]."
 - Deve conter a regra: "Responda APENAS sobre [Tópicos específicos do negócio]. Se perguntarem sobre outros assuntos, diga educadamente que não sabe."
 - Deve incorporar TODAS as informações específicas fornecidas (preços, datas, locais, diferenciais).
