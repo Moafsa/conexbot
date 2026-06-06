@@ -258,6 +258,11 @@ export function ProductManager({ botId }: { botId: string }) {
                                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                                     <td className="py-3 px-4 text-gray-600">
                                         <div className="font-bold text-gray-900">{p.name}</div>
+                                        {p.description && (
+                                            <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={p.description}>
+                                                {p.description}
+                                            </div>
+                                        )}
                                         {p.category && (
                                             <div className="text-xs text-indigo-600 font-semibold mt-1">
                                                 {p.category.name}

@@ -24,7 +24,7 @@ export async function POST(req: Request) {
                 id: botId, 
                 OR: [
                     { tenantId: (session.user as any).id },
-                    { tenant: { agencyId: (session.user as any).id } }
+                    { tenant: { managedBy: { tenantId: (session.user as any).id } } }
                 ] 
             }
         });
