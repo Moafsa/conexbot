@@ -32,6 +32,11 @@ export function ProductManager({ botId }: { botId: string }) {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
+    const [magicText, setMagicText] = useState("");
+    const [isImporting, setIsImporting] = useState(false);
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     const [formData, setFormData] = useState({
         name: "",
         price: "",
