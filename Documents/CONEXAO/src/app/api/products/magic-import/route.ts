@@ -93,9 +93,7 @@ Sempre retorne apenas o JSON, sem markdown backticks.`
                 const categoryRecord = await tx.productCategory.create({
                     data: {
                         botId,
-                        name: cat.name,
-                        description: cat.description,
-                        order: orderIndex++
+                        name: cat.name
                     }
                 });
 
