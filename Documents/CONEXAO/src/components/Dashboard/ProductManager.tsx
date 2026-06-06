@@ -159,7 +159,7 @@ export function ProductManager({ botId }: { botId: string }) {
                 name: g.name,
                 minSelect: g.minSelect || 0,
                 maxSelect: g.maxSelect || 1,
-                addons: g.addons.map(a => ({ id: a.id, name: a.name, price: a.price }))
+                addons: g.addons ? g.addons.map((a: any) => ({ id: a.id, name: a.name, price: a.price })) : []
             })) : []
         });
         setIsModalOpen(true);
@@ -232,10 +232,10 @@ export function ProductManager({ botId }: { botId: string }) {
                                             </div>
                                         )}
                                         {p.addonGroups && p.addonGroups.length > 0 && (
-                                            <div className="mt-1 text-xs text-gray-500">
-                                                <span className="font-semibold text-gray-700">Adicionais:</span>{" "}
-                                                {p.addonGroups.map(g => `${g.name} (${g.addons.length})`).join(", ")}
-                                            </div>
+                                              <div className="mt-1 text-xs text-gray-500">
+                                                  <span className="font-semibold text-gray-700">Adicionais:</span>{" "}
+                                                  {p.addonGroups.map(g => `${g.name} (${g.addons?.length || 0})`).join(", ")}
+                                              </div>
                                         )}
                                     </td>
                                     <td className="py-3 px-4 text-gray-600">
@@ -246,13 +246,13 @@ export function ProductManager({ botId }: { botId: string }) {
                                     <td className="py-3 px-4 text-gray-600">
                                         <div className="flex flex-col">
                                             {p.salePrice ? (
-                                                <>
-                                                    <span className="text-xs text-red-500 line-through">R$ {p.price.toFixed(2)}</span>
-                                                    <span className="font-bold text-green-600">R$ {p.salePrice.toFixed(2)}</span>
-                                                </>
-                                            ) : (
-                                                <span>R$ {p.price.toFixed(2)}</span>
-                                            )}
+                                                  <>
+                                                      <span className="text-xs text-red-500 line-through">R$ {Number(p.price || 0).toFixed(2)}</span>
+                                                      <span className="font-bold text-green-600">R$ {Number(p.salePrice || 0).toFixed(2)}</span>
+                                                  </>
+                                              ) : (
+                                                  <span>R$ {Number(p.price || 0).toFixed(2)}</span>
+                                              )}
                                         </div>
                                     </td>
                                     <td className="py-3 px-4 text-gray-600">
