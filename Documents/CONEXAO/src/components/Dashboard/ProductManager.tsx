@@ -32,13 +32,6 @@ export function ProductManager({ botId }: { botId: string }) {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
-    const [magicText, setMagicText] = useState("");
-    const [isImporting, setIsImporting] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
- 
-    // Form State
     const [formData, setFormData] = useState({
         name: "",
         price: "",
@@ -52,6 +45,8 @@ export function ProductManager({ botId }: { botId: string }) {
         billingPeriod: "MONTHLY",
         iterations: "",
         allowCoupons: true,
+        categoryName: "",
+        addonGroups: [] as { id?: string; name: string; minSelect: number; maxSelect: number; addons: { id?: string; name: string; price: number }[] }[]
     });
 
     useEffect(() => {
@@ -112,6 +107,8 @@ export function ProductManager({ botId }: { botId: string }) {
                 salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
                 stock: parseInt(formData.stock),
                 iterations: formData.iterations ? parseInt(formData.iterations) : null,
+                categoryName: formData.categoryName,
+                addonGroups: formData.addonGroups
             };
 
             const res = await fetch(url, {
@@ -123,7 +120,7 @@ export function ProductManager({ botId }: { botId: string }) {
             if (res.ok) {
                 setIsModalOpen(false);
                 setEditingProduct(null);
-                setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
+                setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true, categoryName: "", addonGroups: [] });
                 fetchProducts();
             }
         } catch (error) {
@@ -156,6 +153,14 @@ export function ProductManager({ botId }: { botId: string }) {
             billingPeriod: product.billingPeriod || "MONTHLY",
             iterations: product.iterations?.toString() || "",
             allowCoupons: product.allowCoupons !== false, // Default to true if undefined
+            categoryName: product.category?.name || "",
+            addonGroups: product.addonGroups ? product.addonGroups.map(g => ({
+                id: g.id,
+                name: g.name,
+                minSelect: g.minSelect || 0,
+                maxSelect: g.maxSelect || 1,
+                addons: g.addons.map(a => ({ id: a.id, name: a.name, price: a.price }))
+            })) : []
         });
         setIsModalOpen(true);
     }
@@ -180,7 +185,7 @@ export function ProductManager({ botId }: { botId: string }) {
                     <button
                         onClick={() => {
                             setEditingProduct(null);
-                            setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true });
+                            setFormData({ name: "", price: "", salePrice: "", description: "", stock: "0", sku: "", imageUrl: "", videoUrl: "", type: "SINGLE", billingPeriod: "MONTHLY", iterations: "", allowCoupons: true, categoryName: "", addonGroups: [] });
                             setIsModalOpen(true);
                         }}
                         className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 transition shadow-md"
@@ -303,7 +308,7 @@ export function ProductManager({ botId }: { botId: string }) {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
                         <button
                             onClick={() => setIsModalOpen(false)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -438,6 +443,103 @@ export function ProductManager({ botId }: { botId: string }) {
                                 <label htmlFor="allowCoupons" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                                     Permitir uso de cupons neste produto
                                 </label>
+                            </div>
+
+                            <div className="border-t border-gray-200 pt-4 mt-4">
+                                <h4 className="text-md font-bold text-gray-800 mb-2">Categoria</h4>
+                                <input 
+                                    type="text" 
+                                    value={formData.categoryName} 
+                                    onChange={(e) => setFormData({...formData, categoryName: e.target.value})} 
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 text-sm" 
+                                    placeholder="Ex: Hambúrgueres, Bebidas..." 
+                                />
+                            </div>
+
+                            <div className="border-t border-gray-200 pt-4 mt-4 space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-md font-bold text-gray-800">Grupos de Adicionais</h4>
+                                    <button type="button" onClick={() => {
+                                        setFormData({
+                                            ...formData, 
+                                            addonGroups: [...formData.addonGroups, { name: "", minSelect: 0, maxSelect: 1, addons: [] }]
+                                        })
+                                    }} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 font-medium">
+                                        + Novo Grupo
+                                    </button>
+                                </div>
+                                
+                                {formData.addonGroups.map((group, gIndex) => (
+                                    <div key={gIndex} className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <input 
+                                                type="text" 
+                                                value={group.name} 
+                                                onChange={(e) => {
+                                                    const newGroups = [...formData.addonGroups];
+                                                    newGroups[gIndex].name = e.target.value;
+                                                    setFormData({...formData, addonGroups: newGroups});
+                                                }} 
+                                                className="border border-gray-300 rounded px-2 py-1 text-sm flex-1 mr-2" 
+                                                placeholder="Nome do grupo (Ex: Escolha o ponto)" 
+                                            />
+                                            <button type="button" onClick={() => {
+                                                const newGroups = formData.addonGroups.filter((_, i) => i !== gIndex);
+                                                setFormData({...formData, addonGroups: newGroups});
+                                            }} className="text-red-500 hover:text-red-700"><Trash className="w-4 h-4" /></button>
+                                        </div>
+                                        <div className="flex gap-2 mb-3">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold">Mínimo Permitido</label>
+                                                <input type="number" value={group.minSelect} onChange={e => {
+                                                    const newGroups = [...formData.addonGroups];
+                                                    newGroups[gIndex].minSelect = parseInt(e.target.value) || 0;
+                                                    setFormData({...formData, addonGroups: newGroups});
+                                                }} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold">Máximo Permitido</label>
+                                                <input type="number" value={group.maxSelect} onChange={e => {
+                                                    const newGroups = [...formData.addonGroups];
+                                                    newGroups[gIndex].maxSelect = parseInt(e.target.value) || 1;
+                                                    setFormData({...formData, addonGroups: newGroups});
+                                                }} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2 pl-2 border-l-2 border-gray-200">
+                                            {group.addons.map((addon, aIndex) => (
+                                                <div key={aIndex} className="flex gap-2 items-center">
+                                                    <input type="text" value={addon.name} onChange={e => {
+                                                        const newGroups = [...formData.addonGroups];
+                                                        newGroups[gIndex].addons[aIndex].name = e.target.value;
+                                                        setFormData({...formData, addonGroups: newGroups});
+                                                    }} className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" placeholder="Nome (Ex: Bacon)" />
+                                                    <div className="relative w-24">
+                                                        <span className="absolute left-2 top-1.5 text-xs text-gray-400">R$</span>
+                                                        <input type="number" step="0.01" value={addon.price} onChange={e => {
+                                                            const newGroups = [...formData.addonGroups];
+                                                            newGroups[gIndex].addons[aIndex].price = parseFloat(e.target.value) || 0;
+                                                            setFormData({...formData, addonGroups: newGroups});
+                                                        }} className="w-full border border-gray-300 rounded pl-6 pr-2 py-1 text-xs" placeholder="0.00" />
+                                                    </div>
+                                                    <button type="button" onClick={() => {
+                                                        const newGroups = [...formData.addonGroups];
+                                                        newGroups[gIndex].addons = newGroups[gIndex].addons.filter((_, i) => i !== aIndex);
+                                                        setFormData({...formData, addonGroups: newGroups});
+                                                    }} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                                                </div>
+                                            ))}
+                                            <button type="button" onClick={() => {
+                                                const newGroups = [...formData.addonGroups];
+                                                newGroups[gIndex].addons.push({ name: "", price: 0 });
+                                                setFormData({...formData, addonGroups: newGroups});
+                                            }} className="text-xs text-indigo-600 font-medium mt-2 flex items-center gap-1">
+                                                <Plus className="w-3 h-3" /> Adicionar Ingrediente
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="flex justify-end gap-2 pt-4">

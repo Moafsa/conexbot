@@ -52,7 +52,7 @@ export async function POST(req: Request) {
         if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { botId, name, price, salePrice, description, sku, stock, imageUrl, type, billingPeriod, iterations } = body;
+        const { botId, name, price, salePrice, description, sku, stock, imageUrl, type, billingPeriod, iterations, categoryName, addonGroups } = body;
         if (!botId || !name || price === undefined) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
@@ -70,9 +70,23 @@ export async function POST(req: Request) {
 
         if (!bot) return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
 
+        let categoryId = undefined;
+        if (categoryName && categoryName.trim() !== '') {
+            let cat = await prisma.productCategory.findFirst({
+                where: { botId, name: categoryName.trim() }
+            });
+            if (!cat) {
+                cat = await prisma.productCategory.create({
+                    data: { botId, name: categoryName.trim(), active: true }
+                });
+            }
+            categoryId = cat.id;
+        }
+
         const product = await prisma.product.create({
             data: {
                 botId,
+                categoryId,
                 name,
                 price: parseFloat(price),
                 salePrice: salePrice ? parseFloat(salePrice) : null,
@@ -83,7 +97,23 @@ export async function POST(req: Request) {
                 type: type || 'SINGLE',
                 billingPeriod: billingPeriod as any,
                 allowCoupons: body.allowCoupons !== undefined ? body.allowCoupons : true,
-                iterations: iterations ? parseInt(iterations.toString()) : null
+                iterations: iterations ? parseInt(iterations.toString()) : null,
+                addonGroups: {
+                    create: (addonGroups || []).map((group: any) => ({
+                        botId,
+                        name: group.name,
+                        minSelect: group.minSelect,
+                        maxSelect: group.maxSelect,
+                        active: true,
+                        addons: {
+                            create: (group.addons || []).map((addon: any) => ({
+                                name: addon.name,
+                                price: addon.price,
+                                active: true
+                            }))
+                        }
+                    }))
+                }
             }
         });
 

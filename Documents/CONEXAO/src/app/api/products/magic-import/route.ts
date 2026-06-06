@@ -116,29 +116,26 @@ Sempre retorne apenas o JSON, sem markdown backticks.`
                     });
 
                     const addonGroups = prod.addonGroups || [];
-                    let groupOrder = 0;
                     for (const group of addonGroups) {
                         const groupRecord = await tx.productAddonGroup.create({
                             data: {
-                                productId: productRecord.id,
+                                botId,
+                                products: { connect: { id: productRecord.id } },
                                 name: group.name,
                                 minSelect: group.minSelect || 0,
                                 maxSelect: group.maxSelect || 10,
-                                active: true,
-                                order: groupOrder++
+                                active: true
                             }
                         });
 
                         const addons = group.addons || [];
-                        let addonOrder = 0;
                         for (const addon of addons) {
                             await tx.productAddon.create({
                                 data: {
                                     groupId: groupRecord.id,
                                     name: addon.name,
                                     price: Number(addon.price) || 0,
-                                    active: true,
-                                    order: addonOrder++
+                                    active: true
                                 }
                             });
                         }

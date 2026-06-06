@@ -29,22 +29,102 @@ export async function PUT(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: 'Product not found or unauthorized' }, { status: 404 });
         }
 
-        const updated = await prisma.product.update({
-            where: { id },
-            data: {
-                name: body.name,
-                description: body.description,
-                price: body.price !== undefined ? parseFloat(body.price) : undefined,
-                salePrice: body.salePrice !== undefined ? (body.salePrice ? parseFloat(body.salePrice) : null) : undefined,
-                stock: body.stock !== undefined ? parseInt(body.stock) : undefined,
-                sku: body.sku,
-                imageUrl: body.imageUrl,
-                active: body.active,
-                allowCoupons: body.allowCoupons,
-                type: body.type,
-                billingPeriod: body.billingPeriod,
-                iterations: body.iterations !== undefined ? (body.iterations ? parseInt(body.iterations.toString()) : null) : undefined
+        let categoryId = undefined;
+        if (body.categoryName !== undefined) {
+            if (body.categoryName.trim() === '') {
+                categoryId = null;
+            } else {
+                let cat = await prisma.productCategory.findFirst({
+                    where: { botId: product.botId, name: body.categoryName.trim() }
+                });
+                if (!cat) {
+                    cat = await prisma.productCategory.create({
+                        data: { botId: product.botId, name: body.categoryName.trim(), active: true }
+                    });
+                }
+                categoryId = cat.id;
             }
+        }
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const updProduct = await tx.product.update({
+                where: { id },
+                data: {
+                    categoryId: categoryId !== undefined ? categoryId : undefined,
+                    name: body.name,
+                    description: body.description,
+                    price: body.price !== undefined ? parseFloat(body.price) : undefined,
+                    salePrice: body.salePrice !== undefined ? (body.salePrice ? parseFloat(body.salePrice) : null) : undefined,
+                    stock: body.stock !== undefined ? parseInt(body.stock) : undefined,
+                    sku: body.sku,
+                    imageUrl: body.imageUrl,
+                    active: body.active,
+                    allowCoupons: body.allowCoupons,
+                    type: body.type,
+                    billingPeriod: body.billingPeriod,
+                    iterations: body.iterations !== undefined ? (body.iterations ? parseInt(body.iterations.toString()) : null) : undefined
+                }
+            });
+
+            if (body.addonGroups) {
+                const existingGroups = await tx.productAddonGroup.findMany({
+                    where: { products: { some: { id } } },
+                    include: { addons: true }
+                });
+
+                const incomingGroupIds = body.addonGroups.map((g: any) => g.id).filter(Boolean);
+                
+                // Soft delete groups not in payload
+                const groupsToDeactivate = existingGroups.filter(g => !incomingGroupIds.includes(g.id));
+                for (const g of groupsToDeactivate) {
+                    await tx.productAddonGroup.update({ where: { id: g.id }, data: { active: false } });
+                }
+
+                for (const group of body.addonGroups) {
+                    let groupId = group.id;
+                    if (groupId) {
+                        await tx.productAddonGroup.update({
+                            where: { id: groupId },
+                            data: { name: group.name, minSelect: group.minSelect, maxSelect: group.maxSelect, active: true }
+                        });
+                    } else {
+                        const newGroup = await tx.productAddonGroup.create({
+                            data: {
+                                botId: product.botId,
+                                name: group.name,
+                                minSelect: group.minSelect,
+                                maxSelect: group.maxSelect,
+                                active: true,
+                                products: { connect: { id } }
+                            }
+                        });
+                        groupId = newGroup.id;
+                    }
+
+                    const incomingAddonIds = group.addons.map((a: any) => a.id).filter(Boolean);
+                    const existingAddons = existingGroups.find(g => g.id === groupId)?.addons || [];
+                    
+                    // Soft delete addons not in payload
+                    const addonsToDeactivate = existingAddons.filter(a => !incomingAddonIds.includes(a.id));
+                    for (const a of addonsToDeactivate) {
+                        await tx.productAddon.update({ where: { id: a.id }, data: { active: false } });
+                    }
+
+                    for (const addon of group.addons) {
+                        if (addon.id) {
+                            await tx.productAddon.update({
+                                where: { id: addon.id },
+                                data: { name: addon.name, price: addon.price, active: true }
+                            });
+                        } else {
+                            await tx.productAddon.create({
+                                data: { groupId, name: addon.name, price: addon.price, active: true }
+                            });
+                        }
+                    }
+                }
+            }
+            return updProduct;
         });
 
         return NextResponse.json(updated);
