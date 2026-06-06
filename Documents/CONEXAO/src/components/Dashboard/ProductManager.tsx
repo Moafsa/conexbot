@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash, Edit, Package, X } from "lucide-react";
+import { Plus, Trash, Edit, Package, X, Search } from "lucide-react";
 
 interface Product {
     id: string;
@@ -36,6 +36,7 @@ export function ProductManager({ botId }: { botId: string }) {
     const [isImporting, setIsImporting] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [searchQuery, setSearchQuery] = useState("");
     const itemsPerPage = 10;
     const [formData, setFormData] = useState({
         name: "",
@@ -71,6 +72,12 @@ export function ProductManager({ botId }: { botId: string }) {
             setLoading(false);
         }
     }
+
+    const filteredProducts = products.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (p.category?.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.description || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     async function handleMagicImport() {
         if (!magicText) return;
@@ -157,7 +164,7 @@ export function ProductManager({ botId }: { botId: string }) {
             type: product.type,
             billingPeriod: product.billingPeriod || "MONTHLY",
             iterations: product.iterations?.toString() || "",
-            allowCoupons: product.allowCoupons !== false, // Default to true if undefined
+            allowCoupons: product.allowCoupons !== false,
             categoryName: product.category?.name || "",
             addonGroups: product.addonGroups ? product.addonGroups.map(g => ({
                 id: g.id,
@@ -201,17 +208,37 @@ export function ProductManager({ botId }: { botId: string }) {
                 </div>
             </div>
 
+            <div className="mb-6 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                    type="text"
+                    placeholder="Buscar produtos por nome, categoria ou descrição..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setCurrentPage(1);
+                    }}
+                    className="pl-10 block w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+            </div>
+
             {loading ? (
                 <p className="text-gray-500 text-center py-4">Carregando catálogo...</p>
-            ) : products.length === 0 ? (
+            ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-2">Nenhum produto cadastrado.</p>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="text-indigo-600 font-medium hover:underline"
-                    >
-                        Cadastre o primeiro!
-                    </button>
+                    <p className="text-gray-500 mb-2">
+                        {searchQuery ? "Nenhum produto encontrado com essa busca." : "Nenhum produto cadastrado."}
+                    </p>
+                    {!searchQuery && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="text-indigo-600 font-medium hover:underline"
+                        >
+                            Cadastre o primeiro!
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="overflow-x-auto">
@@ -227,7 +254,7 @@ export function ProductManager({ botId }: { botId: string }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((p) => (
+                            {filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((p) => (
                                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                                     <td className="py-3 px-4 text-gray-600">
                                         <div className="font-bold text-gray-900">{p.name}</div>
@@ -283,11 +310,10 @@ export function ProductManager({ botId }: { botId: string }) {
                         </tbody>
                     </table>
                     
-                    {/* Paginação */}
-                    {products.length > itemsPerPage && (
+                    {!loading && filteredProducts.length > itemsPerPage && (
                         <div className="flex justify-between items-center py-4 px-2 border-t border-gray-100">
                             <span className="text-sm text-gray-500">
-                                Mostrando {((currentPage - 1) * itemsPerPage) + 1} até {Math.min(currentPage * itemsPerPage, products.length)} de {products.length} produtos
+                                Mostrando {((currentPage - 1) * itemsPerPage) + 1} até {Math.min(currentPage * itemsPerPage, filteredProducts.length)} de {filteredProducts.length} produtos
                             </span>
                             <div className="flex gap-2">
                                 <button
@@ -298,8 +324,8 @@ export function ProductManager({ botId }: { botId: string }) {
                                     Anterior
                                 </button>
                                 <button
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(products.length / itemsPerPage)))}
-                                    disabled={currentPage === Math.ceil(products.length / itemsPerPage)}
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredProducts.length / itemsPerPage)))}
+                                    disabled={currentPage === Math.ceil(filteredProducts.length / itemsPerPage)}
                                     className="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 disabled:opacity-50 hover:bg-gray-50"
                                 >
                                     Próxima
