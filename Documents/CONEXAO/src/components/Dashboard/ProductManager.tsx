@@ -35,6 +35,8 @@ export function ProductManager({ botId }: { botId: string }) {
     const [magicText, setMagicText] = useState("");
     const [isImporting, setIsImporting] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
  
     // Form State
     const [formData, setFormData] = useState({
@@ -215,7 +217,7 @@ export function ProductManager({ botId }: { botId: string }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {products.map((p) => (
+                            {products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((p) => (
                                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                                     <td className="py-3 px-4 text-gray-600">
                                         <div className="font-bold text-gray-900">{p.name}</div>
@@ -270,6 +272,31 @@ export function ProductManager({ botId }: { botId: string }) {
                             ))}
                         </tbody>
                     </table>
+                    
+                    {/* Paginação */}
+                    {products.length > itemsPerPage && (
+                        <div className="flex justify-between items-center py-4 px-2 border-t border-gray-100">
+                            <span className="text-sm text-gray-500">
+                                Mostrando {((currentPage - 1) * itemsPerPage) + 1} até {Math.min(currentPage * itemsPerPage, products.length)} de {products.length} produtos
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 disabled:opacity-50 hover:bg-gray-50"
+                                >
+                                    Anterior
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(products.length / itemsPerPage)))}
+                                    disabled={currentPage === Math.ceil(products.length / itemsPerPage)}
+                                    className="px-3 py-1 border border-gray-200 rounded text-sm text-gray-600 disabled:opacity-50 hover:bg-gray-50"
+                                >
+                                    Próxima
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
