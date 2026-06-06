@@ -29,6 +29,14 @@ export async function GET(req: Request) {
 
         const products = await prisma.product.findMany({
             where: { botId },
+            include: {
+                category: true,
+                addonGroups: {
+                    include: {
+                        addons: true
+                    }
+                }
+            },
             orderBy: { createdAt: 'desc' }
         });
 

@@ -18,6 +18,13 @@ interface Product {
     type: 'SINGLE' | 'RECURRING';
     billingPeriod?: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | null;
     iterations?: number | null;
+    category?: { id: string; name: string } | null;
+    addonGroups?: {
+        id: string;
+        name: string;
+        maxChoices: number;
+        addons: { id: string; name: string; price: number }[];
+    }[];
 }
 
 export function ProductManager({ botId }: { botId: string }) {
@@ -210,6 +217,20 @@ export function ProductManager({ botId }: { botId: string }) {
                         <tbody>
                             {products.map((p) => (
                                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="py-3 px-4 text-gray-600">
+                                        <div className="font-bold text-gray-900">{p.name}</div>
+                                        {p.category && (
+                                            <div className="text-xs text-indigo-600 font-semibold mt-1">
+                                                {p.category.name}
+                                            </div>
+                                        )}
+                                        {p.addonGroups && p.addonGroups.length > 0 && (
+                                            <div className="mt-1 text-xs text-gray-500">
+                                                <span className="font-semibold text-gray-700">Adicionais:</span>{" "}
+                                                {p.addonGroups.map(g => `${g.name} (${g.addons.length})`).join(", ")}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="py-3 px-4 text-gray-600">
                                         <span className={`px-2 py-1 rounded-full text-xs ${p.type === 'RECURRING' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                             {p.type === 'RECURRING' ? 'Assinatura' : 'Único'}
