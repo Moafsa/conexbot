@@ -6,6 +6,7 @@ import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
 import { PhoneUtils } from '@/lib/phone-utils';
 import { acquireLock, releaseLock } from '@/lib/redis';
+import { GoogleMeasurementService } from '../marketing/google-measurement-service';
 
 async function detectAiMessage(text: string, bot?: any): Promise<boolean> {
     if (!text) return false;
@@ -296,6 +297,17 @@ export const MessageProcessor = {
                         }),
                     } as any
                 });
+
+                // Server-Side Tracking for GA4
+                GoogleMeasurementService.sendEvent({
+                    tenantId: bot.tenantId,
+                    eventName: 'generate_lead',
+                    userData: { phone: senderPhone },
+                    customData: {
+                        lead_source: adAttr?.utmSource || channel,
+                        campaign: adAttr?.utmCampaign
+                    }
+                }).catch(err => logToFile(`[Processor] GA4 Error (Lead): ${err?.message || err}`));
             } else if (adAttr && !(existingContact as any).entrySource) {
                 // Update attribution on existing contact only if not already set (first-touch model)
                 await prisma.contact.update({
@@ -949,6 +961,22 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                                     items: { create: { productId: (matchedProduct as any).id, quantity: 1, unitPrice: finalPrice } } 
                                                 } as any
                                             });
+
+                                            // Server-Side Tracking for GA4 (Purchase/Order Created)
+                                            GoogleMeasurementService.sendEvent({
+                                                tenantId: bot.tenantId,
+                                                eventName: 'purchase',
+                                                userData: { 
+                                                    phone: senderPhone,
+                                                    email: args.cliente_email
+                                                },
+                                                customData: {
+                                                    value: finalPrice,
+                                                    currency: 'BRL',
+                                                    items: [{ item_id: (matchedProduct as any).id, item_name: matchedProduct.name, price: finalPrice }]
+                                                }
+                                            }).catch(err => logToFile(`[Processor] GA4 Error (Purchase): ${err?.message || err}`));
+
                                             toolResult = `Fatura gerada com sucesso!${discountDetail} Link de pagamento: ${payment.url}. Use apenas este link e envie para o cliente para ele continuar o pagamento.`;
                                         } else {
                                             const err = (payment.error || '').toLowerCase();

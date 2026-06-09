@@ -70,7 +70,7 @@ function MarketingContent() {
         { id: "leads", label: "Conversas com Leads", icon: History },
         { id: "seo", label: "SEO & Keywords", icon: SearchCode },
         { id: "content", label: "Criador de Posts", icon: Sparkles },
-        { id: "ads", label: "Anúncios (Meta Ads)", icon: Target },
+        { id: "ads", label: "Gestor de Anúncios", icon: Target },
         { id: "settings", label: "Integrações", icon: Settings },
     ];
 
@@ -289,8 +289,9 @@ function MarketingContent() {
             <div className="mt-8">
                 {activeTab === "overview" && <OverviewTab stats={{
                     postsCount: data.postsCount,
-                    adsInsights: data.insights,
-                    activeCampaigns: data.campaigns.filter((c: any) => c.status === 'ACTIVE').length,
+                    metaInsights: data.insights,
+                    metaCampaigns: data.campaigns,
+                    googleAds: data.googleAds,
                     recentPosts: data.recentPosts || []
                 }} refresh={fetchMarketingData} onEdit={(post: any) => {
                     setEditingPost(post);
@@ -479,10 +480,51 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
 }
 
 function OverviewTab({ stats, refresh, onEdit }: any) {
+    const [platformFilter, setPlatformFilter] = useState("ALL"); // ALL, META, GOOGLE
+
     const postsCount = stats.postsCount || 0;
-    const spend = stats.adsInsights?.spend || "0";
-    const ctr = stats.adsInsights?.inline_link_click_ctr || "0.00";
     const recentPosts = stats.recentPosts || [];
+
+    // Parse Meta
+    const metaCampaigns = stats.metaCampaigns || [];
+    const metaInsights = stats.metaInsights || { spend: 0, impressions: 0, clicks: 0 };
+    const metaSpend = metaInsights.spend || 0;
+    const metaImpressions = metaInsights.impressions || 0;
+    const metaClicks = metaInsights.clicks || 0;
+    const metaActiveCount = metaCampaigns.filter((c: any) => c.status === 'ACTIVE').length;
+
+    // Parse Google
+    const googleCampaigns = stats.googleAds || [];
+    const googleSpend = googleCampaigns.reduce((acc: number, cur: any) => acc + (cur.metrics?.cost_micros ? cur.metrics.cost_micros / 1000000 : 0), 0);
+    const googleImpressions = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.impressions || 0), 0);
+    const googleClicks = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.clicks || 0), 0);
+    const googleActiveCount = googleCampaigns.filter((c: any) => c.campaign?.status === 'ENABLED').length;
+
+    // Calculo Dinâmico
+    let displaySpend = 0;
+    let displayImpressions = 0;
+    let displayClicks = 0;
+    let displayActiveCampaigns = 0;
+
+    if (platformFilter === "ALL") {
+        displaySpend = metaSpend + googleSpend;
+        displayImpressions = metaImpressions + googleImpressions;
+        displayClicks = metaClicks + googleClicks;
+        displayActiveCampaigns = metaActiveCount + googleActiveCount;
+    } else if (platformFilter === "META") {
+        displaySpend = metaSpend;
+        displayImpressions = metaImpressions;
+        displayClicks = metaClicks;
+        displayActiveCampaigns = metaActiveCount;
+    } else if (platformFilter === "GOOGLE") {
+        displaySpend = googleSpend;
+        displayImpressions = googleImpressions;
+        displayClicks = googleClicks;
+        displayActiveCampaigns = googleActiveCount;
+    }
+
+    const displayCtr = displayImpressions > 0 ? ((displayClicks / displayImpressions) * 100) : 0;
+
 
     // Paginação
     const [draftPage, setDraftPage] = useState(1);
@@ -544,11 +586,33 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
 
     return (
         <div className="space-y-8">
+            {/* Filtros de Plataforma */}
+            <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
+                <button 
+                    onClick={() => setPlatformFilter("ALL")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "ALL" ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Target size={16} /> Tudo Junto
+                </button>
+                <button 
+                    onClick={() => setPlatformFilter("META")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "META" ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Facebook size={16} /> Meta Ads
+                </button>
+                <button 
+                    onClick={() => setPlatformFilter("GOOGLE")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "GOOGLE" ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Search size={16} /> Google Ads
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard 
-                    title="Ativos na Meta" 
-                    value={stats.activeCampaigns} 
-                    change="Campanhas" 
+                    title="Campanhas Ativas" 
+                    value={displayActiveCampaigns} 
+                    change={platformFilter === "ALL" ? "Total Geral" : platformFilter === "META" ? "Meta" : "Google"} 
                     icon={TrendingUp} 
                     color="text-emerald-400" 
                 />
@@ -561,14 +625,14 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
                 />
                 <StatCard 
                     title="CTR Médio" 
-                    value={`${parseFloat(ctr).toFixed(2)}%`} 
-                    change="Marketing API" 
+                    value={`${displayCtr.toFixed(2)}%`} 
+                    change="Média" 
                     icon={Target} 
                     color="text-amber-400" 
                 />
                 <StatCard 
                     title="Investimento" 
-                    value={`R$ ${parseFloat(spend).toFixed(2)}`} 
+                    value={`R$ ${displaySpend.toFixed(2)}`} 
                     change="Total Gasto" 
                     icon={Zap} 
                     color="text-purple-400" 
@@ -1891,11 +1955,73 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
         fetchAds();
     }, [selectedClientId]);
 
-    const spend = data.insights?.spend || "0.00";
-    const ctr = data.insights?.inline_link_click_ctr || "0.00";
+    const [platformFilter, setPlatformFilter] = useState("ALL"); // ALL, META, GOOGLE
+
+    const metaCampaigns = data.campaigns || [];
+    const metaSpend = data.insights?.spend ? parseFloat(data.insights.spend) : 0;
+    const metaCtr = data.insights?.inline_link_click_ctr ? parseFloat(data.insights.inline_link_click_ctr) : 0;
+
+    const googleCampaigns = data.googleAds || [];
+    const googleSpend = googleCampaigns.reduce((acc: number, cur: any) => acc + (cur.metrics?.cost_micros ? cur.metrics.cost_micros / 1000000 : 0), 0);
+    const googleImpressions = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.impressions || 0), 0);
+    const googleClicks = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.clicks || 0), 0);
+    const googleCtr = googleImpressions > 0 ? (googleClicks / googleImpressions) * 100 : 0;
+
+    // Normalize lists
+    const normMeta = metaCampaigns.map((c: any) => ({...c, _platform: "META"}));
+    const normGoogle = googleCampaigns.map((c: any) => ({
+         id: c.campaign?.id,
+         name: c.campaign?.name,
+         status: c.campaign?.status === "ENABLED" ? "ACTIVE" : c.campaign?.status,
+         objective: "SEARCH",
+         daily_budget: null,
+         _platform: "GOOGLE",
+         metrics: c.metrics
+    }));
+
+    let displaySpend = 0;
+    let displayCtr = 0;
+    let displayCampaigns: any[] = [];
+
+    if (platformFilter === "ALL") {
+        displaySpend = metaSpend + googleSpend;
+        // Simple avg for display
+        displayCtr = (metaCtr + googleCtr) / ((googleCtr > 0 && metaCtr > 0) ? 2 : 1);
+        displayCampaigns = [...normMeta, ...normGoogle];
+    } else if (platformFilter === "META") {
+        displaySpend = metaSpend;
+        displayCtr = metaCtr;
+        displayCampaigns = normMeta;
+    } else if (platformFilter === "GOOGLE") {
+        displaySpend = googleSpend;
+        displayCtr = googleCtr;
+        displayCampaigns = normGoogle;
+    }
 
     return (
         <div className="space-y-6">
+            {/* Filtros de Plataforma */}
+            <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
+                <button 
+                    onClick={() => setPlatformFilter("ALL")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "ALL" ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Target size={16} /> Tudo Junto
+                </button>
+                <button 
+                    onClick={() => setPlatformFilter("META")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "META" ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Facebook size={16} /> Meta Ads
+                </button>
+                <button 
+                    onClick={() => setPlatformFilter("GOOGLE")}
+                    className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${platformFilter === "GOOGLE" ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Search size={16} /> Google Ads
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
@@ -1903,7 +2029,7 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                     </div>
                     <div>
                         <p className="text-gray-500 text-sm">Campanhas Ativas</p>
-                        <p className="text-xl font-bold">{data.campaigns.filter((c: any) => c.status === 'ACTIVE').length}</p>
+                        <p className="text-xl font-bold">{displayCampaigns.filter((c: any) => c.status === 'ACTIVE').length}</p>
                     </div>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-4">
@@ -1912,7 +2038,7 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                     </div>
                     <div>
                         <p className="text-gray-500 text-sm">Gasto Total</p>
-                        <p className="text-xl font-bold">R$ {parseFloat(spend).toFixed(2)}</p>
+                        <p className="text-xl font-bold">R$ {displaySpend.toFixed(2)}</p>
                     </div>
                 </div>
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-4">
@@ -1921,7 +2047,7 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                     </div>
                     <div>
                         <p className="text-gray-500 text-sm">CTR Médio</p>
-                        <p className="text-xl font-bold">{parseFloat(ctr).toFixed(2)}%</p>
+                        <p className="text-xl font-bold">{displayCtr.toFixed(2)}%</p>
                     </div>
                 </div>
             </div>
@@ -2029,7 +2155,7 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
 
                 <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-lg font-bold">Gerenciador de Anúncios (Meta Ads)</h3>
+                    <h3 className="text-lg font-bold">Gerenciador de Anúncios (Meta & Google)</h3>
                     <button 
                         onClick={() => setShowCampaignModal(true)}
                         className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-xl text-sm font-bold flex items-center gap-2"
@@ -2044,17 +2170,17 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                         <div className="flex items-center justify-center py-12">
                             <Sparkles className="animate-spin text-blue-500" size={32} />
                         </div>
-                    ) : data.campaigns.length === 0 ? (
+                    ) : displayCampaigns.length === 0 ? (
                         <div className="text-center py-12 bg-black/20 rounded-2xl border border-dashed border-white/10">
-                            <p className="text-gray-500">Nenhuma campanha encontrada ou conta não integrada.</p>
+                            <p className="text-gray-500">Nenhuma campanha encontrada para a plataforma selecionada.</p>
                             <p className="text-xs text-gray-600 mt-1">Configure seu Token e ID da Conta na aba de Integrações.</p>
                         </div>
                     ) : (
-                        data.campaigns.map((camp: any) => (
-                            <div key={camp.id} className="bg-[#0b0f1a] border border-white/5 rounded-2xl p-4 flex flex-col gap-4 hover:border-blue-500/30 transition-all">
+                        displayCampaigns.map((camp: any) => (
+                            <div key={camp.id} className={`bg-[#0b0f1a] border border-white/5 rounded-2xl p-4 flex flex-col gap-4 transition-all ${camp._platform === 'GOOGLE' ? 'hover:border-red-500/30' : 'hover:border-blue-500/30'}`}>
                                 <div className="flex items-center gap-4">
                                     <div className="w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center shrink-0">
-                                        <Instagram size={24} className="text-gray-400" />
+                                        {camp._platform === 'GOOGLE' ? <Search size={24} className="text-red-400" /> : <Instagram size={24} className="text-blue-400" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-bold truncate text-lg">{camp.name}</h4>
@@ -2063,7 +2189,8 @@ function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBots }: a
                                                 {camp.status}
                                             </span>
                                             <span className="text-xs text-gray-500">Objetivo: {camp.objective}</span>
-                                            {camp.daily_budget && <span className="text-xs text-gray-500">Orçamento: R$ {(camp.daily_budget / 100).toFixed(2)}/dia</span>}
+                                            {camp.daily_budget !== null && <span className="text-xs text-gray-500">Orçamento: R$ {(camp.daily_budget / 100).toFixed(2)}/dia</span>}
+                                            {camp._platform === 'GOOGLE' && <span className="text-[10px] font-black uppercase text-red-500 bg-red-500/10 px-2 rounded-lg">Google Ads</span>}
                                         </div>
                                     </div>
                                     <div className="text-right flex items-center gap-6">
@@ -2125,6 +2252,9 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
         metaAdsAccountId: "",
         metaAdsPixelId: "",
         googleAdsCustomerId: "",
+        googleAdsRefreshToken: "",
+        ga4MeasurementId: "",
+        ga4ApiSecret: "",
         semrushApiKey: "",
         dataForSeoApiKey: ""
     });
@@ -2249,6 +2379,82 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                     onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
                                     className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
                                     placeholder="123456789012345" 
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Google Ads & GA4 Settings */}
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+                    <h3 className="text-xl font-bold flex items-center gap-3">
+                        <Target className="text-red-500" size={24} />
+                        Google Ads & GA4
+                    </h3>
+                    <div className="space-y-4">
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-400">
+                                Conecte sua conta do Google Ads para permitir o envio de eventos (GA4) e a gestão de anúncios pelo Maestro.
+                            </p>
+                            
+                            {settings.googleAdsRefreshToken ? (
+                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                                            <CheckCircle2 size={16} className="text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-white">Google Ads Conectado</p>
+                                            <p className="text-[10px] text-emerald-400 uppercase tracking-widest">Token Ativo</p>
+                                        </div>
+                                    </div>
+                                    <a 
+                                        href={`/api/integrations/google/connect${selectedClientId ? `?clientId=${selectedClientId}` : ""}`}
+                                        className="text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        Reconectar
+                                    </a>
+                                </div>
+                            ) : (
+                                <a 
+                                    href={`/api/integrations/google/connect${selectedClientId ? `?clientId=${selectedClientId}` : ""}`}
+                                    className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-2xl font-bold transition-all shadow-lg shadow-red-500/20"
+                                >
+                                    <Target size={18} />
+                                    Conectar Google Ads
+                                </a>
+                            )}
+                        </div>
+                        
+                        <div className="pt-4 border-t border-white/5 space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">Google Ads Customer ID</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.googleAdsCustomerId}
+                                    onChange={e => setSettings({...settings, googleAdsCustomerId: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-500/50" 
+                                    placeholder="123-456-7890" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">GA4 Measurement ID</label>
+                                <input 
+                                    type="text" 
+                                    value={settings.ga4MeasurementId}
+                                    onChange={e => setSettings({...settings, ga4MeasurementId: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-500/50" 
+                                    placeholder="G-XXXXXXX" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-400">GA4 API Secret</label>
+                                <input 
+                                    type="password" 
+                                    value={settings.ga4ApiSecret}
+                                    onChange={e => setSettings({...settings, ga4ApiSecret: e.target.value})}
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-500/50" 
+                                    placeholder="Para Measurement Protocol" 
                                 />
                             </div>
                         </div>

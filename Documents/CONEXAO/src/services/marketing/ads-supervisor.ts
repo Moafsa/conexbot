@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { MarketingIAService } from "./marketing-ia-service";
 import { logToFile } from "../engine/logger";
+import { MetaAdsService } from "./meta-ads-service";
+import { GoogleAdsService } from "./google-ads-service";
 
 export const AdsSupervisorService = {
     /**
@@ -77,15 +79,42 @@ export const AdsSupervisorService = {
 
         logToFile(`[AdsSupervisor] Selecionado Post ID ${bestPost.id} para impulsionamento automático.`);
 
-        // 3. Criação de campanha na Meta (Real)
+        // 3. Criação de campanha na Meta e/ou Google Ads
         const campaignName = `[AUTO] Otimização - ${bot.name} - ${new Date().toLocaleDateString()}`;
         
         try {
-            const externalId = await MetaAdsService.createCampaign(bot.tenantId, {
-                name: campaignName,
-                objective: bot.adsObjective || "OUTREACH",
-                dailyBudget: bot.adsDailyBudget * 100 // Meta usa centavos
-            });
+            let metaExternalId = null;
+            let googleExternalId = null;
+
+            // Tentativa Meta Ads
+            if (bot.tenant?.facebookPageId) {
+                try {
+                    metaExternalId = await MetaAdsService.createCampaign(bot.tenantId, {
+                        name: campaignName,
+                        objective: bot.adsObjective || "OUTREACH",
+                        dailyBudget: bot.adsDailyBudget * 100 // Meta usa centavos
+                    });
+                } catch (e: any) {
+                    logToFile(`[AdsSupervisor] Falha ao criar na Meta: ${e.message}`);
+                }
+            }
+
+            // Tentativa Google Ads
+            if (bot.tenant?.googleAdsCustomerId) {
+                try {
+                    const gadsRes = await GoogleAdsService.createCampaign(bot.tenantId, {
+                        name: campaignName,
+                        budgetMicros: bot.adsDailyBudget * 1000000 // Google usa micros
+                    });
+                    googleExternalId = gadsRes.externalId;
+                } catch (e: any) {
+                    logToFile(`[AdsSupervisor] Falha ao criar no Google Ads: ${e.message}`);
+                }
+            }
+
+            if (!metaExternalId && !googleExternalId) {
+                throw new Error("Não foi possível criar a campanha em nenhuma plataforma (Meta ou Google). Verifique as credenciais.");
+            }
 
             // Criar registro da campanha no banco
             const campaign = await prisma.marketingCampaign.create({
@@ -96,7 +125,7 @@ export const AdsSupervisorService = {
                     status: "ACTIVE",
                     botId: bot.id,
                     tenantId: bot.tenantId,
-                    externalId: externalId
+                    externalId: metaExternalId || googleExternalId || ""
                 }
             });
 
