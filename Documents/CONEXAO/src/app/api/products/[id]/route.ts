@@ -74,15 +74,24 @@ export async function PUT(req: Request, { params }: { params: any }) {
 
                 const incomingGroupIds = body.addonGroups.map((g: any) => g.id).filter(Boolean);
                 
-                // Soft delete groups not in payload
-                const groupsToDeactivate = existingGroups.filter(g => !incomingGroupIds.includes(g.id));
-                for (const g of groupsToDeactivate) {
-                    await tx.productAddonGroup.update({ where: { id: g.id }, data: { active: false } });
+                // Disconnect groups not in payload instead of soft deleting them globally
+                const groupsToDisconnect = existingGroups.filter(g => !incomingGroupIds.includes(g.id));
+                for (const g of groupsToDisconnect) {
+                    await tx.product.update({ where: { id }, data: { addonGroups: { disconnect: { id: g.id } } } });
                 }
 
                 for (const group of body.addonGroups) {
                     let groupId = group.id;
                     if (groupId) {
+                        const isAlreadyConnected = existingGroups.find(g => g.id === groupId);
+                        if (!isAlreadyConnected) {
+                            // Connect to this product
+                            await tx.product.update({
+                                where: { id },
+                                data: { addonGroups: { connect: { id: groupId } } }
+                            });
+                        }
+                        
                         await tx.productAddonGroup.update({
                             where: { id: groupId },
                             data: { name: group.name, minSelect: group.minSelect, maxSelect: group.maxSelect, active: true }
@@ -101,7 +110,8 @@ export async function PUT(req: Request, { params }: { params: any }) {
                         groupId = newGroup.id;
                     }
 
-                    const incomingAddonIds = group.addons.map((a: any) => a.id).filter(Boolean);
+                    const addonsList = group.addons || [];
+                    const incomingAddonIds = addonsList.map((a: any) => a.id).filter(Boolean);
                     const existingAddons = existingGroups.find(g => g.id === groupId)?.addons || [];
                     
                     // Soft delete addons not in payload
@@ -110,17 +120,27 @@ export async function PUT(req: Request, { params }: { params: any }) {
                         await tx.productAddon.update({ where: { id: a.id }, data: { active: false } });
                     }
 
-                    for (const addon of group.addons) {
+                    for (const addon of addonsList) {
+                        const addonName = addon.name.trim();
                         if (addon.id) {
                             await tx.productAddon.update({
                                 where: { id: addon.id },
-                                data: { name: addon.name, price: addon.price, active: true }
+                                data: { name: addonName, price: addon.price, active: true }
                             });
                         } else {
                             await tx.productAddon.create({
-                                data: { groupId, name: addon.name, price: addon.price, active: true }
+                                data: { groupId, name: addonName, price: addon.price, active: true }
                             });
                         }
+                        
+                        // Sync price globally for this bot
+                        await tx.productAddon.updateMany({
+                            where: {
+                                name: { equals: addonName, mode: 'insensitive' },
+                                group: { botId: product.botId }
+                            },
+                            data: { price: addon.price }
+                        });
                     }
                 }
             }
