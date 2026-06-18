@@ -99,7 +99,7 @@ export async function POST(req: Request) {
                 allowCoupons: body.allowCoupons !== undefined ? body.allowCoupons : true,
                 iterations: iterations ? parseInt(iterations.toString()) : null,
                 addonGroups: {
-                    create: (addonGroups || []).map((group: any) => ({
+                    create: (addonGroups || []).filter((g: any) => !g.id).map((group: any) => ({
                         botId,
                         name: group.name,
                         minSelect: group.minSelect,
@@ -112,10 +112,29 @@ export async function POST(req: Request) {
                                 active: true
                             }))
                         }
-                    }))
+                    })),
+                    connect: (addonGroups || []).filter((g: any) => !!g.id).map((group: any) => ({ id: group.id }))
                 }
             }
         });
+
+        // Sync global addon prices
+        if (addonGroups && addonGroups.length > 0) {
+            for (const group of addonGroups) {
+                if (group.addons) {
+                    for (const addon of group.addons) {
+                        const addonName = addon.name.trim();
+                        await prisma.productAddon.updateMany({
+                            where: {
+                                name: { equals: addonName, mode: 'insensitive' },
+                                group: { botId }
+                            },
+                            data: { price: addon.price }
+                        });
+                    }
+                }
+            }
+        }
 
         return NextResponse.json(product);
     } catch (error) {

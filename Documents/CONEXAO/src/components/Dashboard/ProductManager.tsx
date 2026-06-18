@@ -38,6 +38,9 @@ export function ProductManager({ botId }: { botId: string }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [searchQuery, setSearchQuery] = useState("");
     const itemsPerPage = 10;
+    const [globalGroups, setGlobalGroups] = useState<any[]>([]);
+    const [uniqueAddons, setUniqueAddons] = useState<any[]>([]);
+    const [isSelectingGroup, setIsSelectingGroup] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         price: "",
@@ -57,6 +60,8 @@ export function ProductManager({ botId }: { botId: string }) {
 
     useEffect(() => {
         fetchProducts();
+        fetchGlobalGroups();
+        fetchUniqueAddons();
     }, [botId]);
 
     async function fetchProducts() {
@@ -70,6 +75,30 @@ export function ProductManager({ botId }: { botId: string }) {
             console.error("Failed to fetch products", error);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function fetchGlobalGroups() {
+        try {
+            const res = await fetch(`/api/products/addon-groups?botId=${botId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setGlobalGroups(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch global groups", error);
+        }
+    }
+
+    async function fetchUniqueAddons() {
+        try {
+            const res = await fetch(`/api/products/addons/unique?botId=${botId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUniqueAddons(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch unique addons", error);
         }
     }
 
@@ -495,14 +524,48 @@ export function ProductManager({ botId }: { botId: string }) {
                             <div className="border-t border-gray-200 pt-4 mt-4 space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h4 className="text-md font-bold text-gray-800">Grupos de Adicionais</h4>
-                                    <button type="button" onClick={() => {
-                                        setFormData({
-                                            ...formData, 
-                                            addonGroups: [...formData.addonGroups, { name: "", minSelect: 0, maxSelect: 1, addons: [] }]
-                                        })
-                                    }} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 font-medium">
-                                        + Novo Grupo
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <div className="relative">
+                                            <button type="button" onClick={() => setIsSelectingGroup(!isSelectingGroup)} className="text-xs bg-white border border-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-50 font-medium">
+                                                Importar Grupo Existente
+                                            </button>
+                                            {isSelectingGroup && (
+                                                <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 shadow-lg rounded-lg z-10 py-1 max-h-48 overflow-y-auto">
+                                                    {globalGroups.length === 0 ? (
+                                                        <div className="px-3 py-2 text-xs text-gray-500">Nenhum grupo encontrado no catálogo.</div>
+                                                    ) : (
+                                                        globalGroups.map(g => (
+                                                            <button 
+                                                                key={g.id} 
+                                                                type="button" 
+                                                                onClick={() => {
+                                                                    if (!formData.addonGroups.find((ag: any) => ag.id === g.id)) {
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            addonGroups: [...formData.addonGroups, { ...g, addons: g.addons || [] }]
+                                                                        });
+                                                                    }
+                                                                    setIsSelectingGroup(false);
+                                                                }}
+                                                                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                                                            >
+                                                                <div className="font-bold">{g.name}</div>
+                                                                <div className="text-[10px] text-gray-500">{g.addons?.length || 0} ingredientes</div>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button type="button" onClick={() => {
+                                            setFormData({
+                                                ...formData, 
+                                                addonGroups: [...formData.addonGroups, { name: "", minSelect: 0, maxSelect: 1, addons: [] }]
+                                            })
+                                        }} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 font-medium">
+                                            + Novo Grupo
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 {formData.addonGroups.map((group, gIndex) => (
@@ -519,6 +582,11 @@ export function ProductManager({ botId }: { botId: string }) {
                                                 className="border border-gray-300 rounded px-2 py-1 text-sm flex-1 mr-2" 
                                                 placeholder="Nome do grupo (Ex: Escolha o ponto)" 
                                             />
+                                            {group.id && (
+                                                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-full mr-2 self-center whitespace-nowrap" title="Este grupo é global e alterações refletirão em todos os produtos que o utilizam">
+                                                    Grupo Vinculado
+                                                </span>
+                                            )}
                                             <button type="button" onClick={() => {
                                                 const newGroups = formData.addonGroups.filter((_, i) => i !== gIndex);
                                                 setFormData({...formData, addonGroups: newGroups});
@@ -546,11 +614,26 @@ export function ProductManager({ botId }: { botId: string }) {
                                         <div className="space-y-2 pl-2 border-l-2 border-gray-200">
                                             {group.addons.map((addon, aIndex) => (
                                                 <div key={aIndex} className="flex gap-2 items-center">
-                                                    <input type="text" value={addon.name} onChange={e => {
-                                                        const newGroups = [...formData.addonGroups];
-                                                        newGroups[gIndex].addons[aIndex].name = e.target.value;
-                                                        setFormData({...formData, addonGroups: newGroups});
-                                                    }} className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" placeholder="Nome (Ex: Bacon)" />
+                                                    <input 
+                                                        type="text" 
+                                                        value={addon.name} 
+                                                        onChange={e => {
+                                                            const newGroups = [...formData.addonGroups];
+                                                            const newName = e.target.value;
+                                                            newGroups[gIndex].addons[aIndex].name = newName;
+                                                            
+                                                            // Auto-fill price if ingredient exists
+                                                            const existingAddon = uniqueAddons.find(a => a.name.toLowerCase() === newName.toLowerCase().trim());
+                                                            if (existingAddon && newGroups[gIndex].addons[aIndex].price === 0) {
+                                                                newGroups[gIndex].addons[aIndex].price = existingAddon.price;
+                                                            }
+                                                            
+                                                            setFormData({...formData, addonGroups: newGroups});
+                                                        }} 
+                                                        list="unique-addons-list"
+                                                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" 
+                                                        placeholder="Nome (Ex: Bacon)" 
+                                                    />
                                                     <div className="relative w-24">
                                                         <span className="absolute left-2 top-1.5 text-xs text-gray-400">R$</span>
                                                         <input type="number" step="0.01" value={addon.price} onChange={e => {
@@ -593,6 +676,12 @@ export function ProductManager({ botId }: { botId: string }) {
                                     Salvar Produto
                                 </button>
                             </div>
+                            
+                            <datalist id="unique-addons-list">
+                                {uniqueAddons.map((a, i) => (
+                                    <option key={i} value={a.name} />
+                                ))}
+                            </datalist>
                         </form>
                     </div>
                 </div>

@@ -68,3 +68,55 @@ export function startMessageWorker(concurrency = 4): Worker<MessageJob> {
 
     return worker;
 }
+
+// ─── AUDIT / RAIO-X QUEUE ─────────────────────────────────────────────
+
+export interface AuditJob {
+    clientId: string;
+    agencyId: string;
+}
+
+const AUDIT_QUEUE_NAME = 'audit-processing';
+let auditQueue: Queue<AuditJob> | null = null;
+
+export function getAuditQueue(): Queue<AuditJob> {
+    if (!auditQueue) {
+        auditQueue = new Queue<AuditJob>(AUDIT_QUEUE_NAME, {
+            connection: getRedis(),
+            defaultJobOptions: {
+                attempts: 1, // Let's not retry AI tasks blindly to save money
+                removeOnComplete: 100,
+                removeOnFail: 500,
+            },
+        });
+    }
+    return auditQueue;
+}
+
+export async function enqueueAudit(job: AuditJob): Promise<string> {
+    const queue = getAuditQueue();
+    const result = await queue.add('audit', job);
+    return result.id as string;
+}
+
+export function startAuditWorker(concurrency = 2): Worker<AuditJob> {
+    const worker = new Worker<AuditJob>(
+        AUDIT_QUEUE_NAME,
+        async (job: Job<AuditJob>) => {
+            const { processAuditJob } = await import('@/workers/audit-worker');
+            await processAuditJob(job);
+        },
+        {
+            connection: getRedis(),
+            concurrency,
+        }
+    );
+
+    worker.on('failed', (job, err) => {
+        const logger = require('@/lib/logger').logger;
+        logger.error({ jobId: job?.id, err }, `[AuditWorker] Job falhou`);
+    });
+
+    return worker;
+}
+

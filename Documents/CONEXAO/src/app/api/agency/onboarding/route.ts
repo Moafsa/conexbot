@@ -148,16 +148,6 @@ export async function POST(req: Request) {
                 enablePayments: paymentMethods && paymentMethods.length > 0 ? true : false,
                 deliveryFeeType: deliveryFeeType || undefined,
                 deliveryFeeRules: deliveryFeeRules || undefined,
-                products: extractedProducts.length > 0 ? {
-                    create: extractedProducts.map((p: any) => ({
-                        name: String(p.name).substring(0, 200),
-                        description: p.description ? String(p.description).substring(0, 500) : null,
-                        price: Number(p.price) || 0,
-                        salePrice: p.salePrice ? Number(p.salePrice) : null,
-                        active: true,
-                        stock: 999
-                    }))
-                } : undefined,
                 onboardingData: {
                     targetAudience,
                     tone,
@@ -171,6 +161,52 @@ export async function POST(req: Request) {
                 sessionName: `bot_${clientId.slice(0, 8)}_${Date.now()}`,
             },
         });
+
+        // 2.1 Create Products and AddonGroups
+        if (extractedProducts && extractedProducts.length > 0) {
+            await prisma.$transaction(async (tx) => {
+                for (const prod of extractedProducts) {
+                    const productRecord = await tx.product.create({
+                        data: {
+                            botId: bot.id,
+                            name: String(prod.name).substring(0, 200),
+                            description: prod.description ? String(prod.description).substring(0, 500) : null,
+                            price: Number(prod.price) || 0,
+                            salePrice: prod.salePrice ? Number(prod.salePrice) : null,
+                            type: 'SINGLE',
+                            stock: 999,
+                            active: true
+                        }
+                    });
+
+                    const addonGroups = prod.addonGroups || [];
+                    for (const group of addonGroups) {
+                        const groupRecord = await tx.productAddonGroup.create({
+                            data: {
+                                botId: bot.id,
+                                products: { connect: { id: productRecord.id } },
+                                name: group.name,
+                                minSelect: Number(group.minSelect) || 0,
+                                maxSelect: Number(group.maxSelect) || 10,
+                                active: true
+                            }
+                        });
+
+                        const addons = group.addons || [];
+                        for (const addon of addons) {
+                            await tx.productAddon.create({
+                                data: {
+                                    groupId: groupRecord.id,
+                                    name: addon.name,
+                                    price: Number(addon.price) || 0,
+                                    active: true
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+        }
 
         // 2a. Create BotChannels (multi-channel support)
         if (Array.isArray(channels) && channels.length > 0) {

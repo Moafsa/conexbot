@@ -33,16 +33,13 @@ export async function GET(req: Request) {
     
     const redirectUri = `${finalAppUrl}/api/integrations/facebook/callback`;
     
-    // Scopes for ads and pages and instagram
+    // Scopes for ads and pages
     const scope = [
         "ads_management",
         "ads_read",
         "business_management",
         "pages_show_list",
         "pages_read_engagement",
-        "pages_manage_posts",
-        "instagram_basic",
-        "instagram_content_publish",
         "public_profile"
     ].join(",");
 

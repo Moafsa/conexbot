@@ -15,6 +15,7 @@ export default function AdminSettingsPage() {
         elevenLabsApiKey: '',
         googleClientId: '',
         googleClientSecret: '',
+        googleAdsDeveloperToken: '',
         systemName: 'ConextBot',
         maintenanceMode: false,
         logoColoredUrl: '',
@@ -169,6 +170,12 @@ export default function AdminSettingsPage() {
                                     value={settings.googleClientSecret}
                                     onChange={v => setSettings({ ...settings, googleClientSecret: v })}
                                     placeholder="GOCSPX-..."
+                                />
+                                <SettingInput
+                                    label="Google Ads Developer Token"
+                                    value={settings.googleAdsDeveloperToken}
+                                    onChange={v => setSettings({ ...settings, googleAdsDeveloperToken: v })}
+                                    placeholder="Ex: a1b2c3d4e5f6g7h8i9j0k"
                                 />
                             </div>
 

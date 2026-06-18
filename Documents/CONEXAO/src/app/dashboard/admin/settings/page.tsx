@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Save, Loader2, Check, AlertCircle, Zap, Mail, Smartphone, Globe, Shield } from "lucide-react";
+import { Save, Loader2, Check, AlertCircle, Zap, Mail, Smartphone, Globe, Shield, Facebook } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function AdminSettingsPage() {
@@ -30,7 +30,10 @@ export default function AdminSettingsPage() {
         smtpUser: "",
         smtpPass: "",
         smtpFrom: "",
-        systemBotId: ""
+        systemBotId: "",
+        metaAppId: "",
+        metaAppSecret: "",
+        metaVerifyToken: ""
     });
 
     const [systemBot, setSystemBot] = useState<{ status: string, botName?: string, botId?: string } | null>(null);
@@ -201,6 +204,29 @@ export default function AdminSettingsPage() {
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">ElevenLabs Key</label>
                             <input type="password" value={config.elevenLabsApiKey} onChange={e => setConfig({...config, elevenLabsApiKey: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Meta App Config */}
+                <section className="glass rounded-3xl p-8 space-y-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Facebook size={20} className="text-blue-500" />
+                        Integração Meta (Facebook/Instagram)
+                    </h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Meta App ID</label>
+                            <input value={config.metaAppId || ''} onChange={e => setConfig({...config, metaAppId: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Meta App Secret</label>
+                            <input type="password" value={config.metaAppSecret || ''} onChange={e => setConfig({...config, metaAppSecret: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Webhook Verify Token</label>
+                            <input type="password" value={config.metaVerifyToken || ''} onChange={e => setConfig({...config, metaVerifyToken: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <p className="text-[10px] text-gray-500 mt-1">Token usado para validar o recebimento de webhooks do Facebook.</p>
                         </div>
                     </div>
                 </section>

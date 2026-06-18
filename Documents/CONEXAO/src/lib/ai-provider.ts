@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { logger } from './logger';
 
 // ─── Anthropic / Claude Wrapper ─────────────────────────────────────────────
 // Translates OpenAI-compatible message format to Anthropic Messages API
@@ -295,7 +296,7 @@ export async function safeChatCompletion(options: {
                 tenant: bot.tenant
             });
 
-            console.log(`[SafeAI] Attempting ${provider} with model ${model}`);
+            logger.info({ provider, model, botId: bot.id }, `[SafeAI] Attempting ${provider} with model ${model}`);
             
             const completionOptions: any = {
                 model,
@@ -310,7 +311,7 @@ export async function safeChatCompletion(options: {
             // so the fallback to OpenAI/OpenRouter is visible in logs rather than silent.
             if (provider === 'gemini' && tools && tools.length > 0) {
                 if (provider === bot.aiProvider) {
-                    console.warn(
+                    logger.warn({ botId: bot.id, botName: bot.name, toolsCount: tools.length },
                         `[SafeAI] WARNING: Bot "${bot.name}" has Gemini as primary provider but ` +
                         `this request requires tool calling (${tools.length} tool(s)). ` +
                         `Gemini does not support tools — falling back to next provider. ` +
@@ -327,7 +328,7 @@ export async function safeChatCompletion(options: {
             }
 
             const completion = await client.chat.completions.create(completionOptions);
-            console.log(`[SafeAI] [${provider}] Raw Completion Choices:`, JSON.stringify(completion.choices, null, 2));
+            logger.debug({ provider, choicesLength: completion.choices?.length }, `[SafeAI] [${provider}] Raw Completion Choices received`);
 
             const content = completion.choices[0]?.message?.content;
             const toolCalls = completion.choices[0]?.message?.tool_calls;
@@ -343,7 +344,7 @@ export async function safeChatCompletion(options: {
             }
 
         } catch (err: any) {
-            console.error(`[SafeAI] Provider ${provider} failed:`, err.message);
+            logger.error({ err, provider, botId: bot.id }, `[SafeAI] Provider ${provider} failed: ${err.message}`);
             lastError = err;
             // Fallback to next provider for ANY error (401 Auth, 429 Quota, 500, etc)
             continue;

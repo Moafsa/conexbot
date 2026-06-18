@@ -86,24 +86,49 @@ export default function ClientAuditPage() {
                 headers: { "Content-Type": "application/json" }
             });
             const data = await res.json();
-            if (res.ok && data.success) {
-                setAudit({
-                    scores: data.scores,
-                    overallScore: data.overallScore,
-                    report: data.report,
-                    missions: data.missions,
-                    createdAt: new Date().toISOString()
-                });
-                // Recarregar os dados para atualizar o histórico de auditorias
-                refreshData();
+            if (res.ok && data.success && data.jobId) {
+                pollAuditStatus(data.jobId);
             } else {
-                setError(data.error || "Ocorreu um erro durante a auditoria.");
+                setError(data.error || "Ocorreu um erro ao iniciar a auditoria.");
+                setAuditing(false);
             }
         } catch (e) {
-            setError("Erro ao se conectar ao servidor durante o Raio-X.");
-        } finally {
+            setError("Erro ao se conectar ao servidor durante o início do Raio-X.");
             setAuditing(false);
         }
+    };
+
+    const pollAuditStatus = (jobId: string) => {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/agency/clients/${clientId}/audit/status/${jobId}`);
+                const data = await res.json();
+
+                if (data.status === 'COMPLETED') {
+                    clearInterval(interval);
+                    setAudit({
+                        scores: data.scores,
+                        overallScore: data.overallScore,
+                        report: data.report,
+                        missions: data.missions,
+                        createdAt: new Date().toISOString()
+                    });
+                    setAuditing(false);
+                    refreshData();
+                } else if (data.status === 'FAILED') {
+                    clearInterval(interval);
+                    setError(data.error || 'Falha ao processar a auditoria no background.');
+                    setAuditing(false);
+                } else if (data.status === 'NOT_FOUND') {
+                    clearInterval(interval);
+                    setError('Job de auditoria perdido ou não encontrado.');
+                    setAuditing(false);
+                }
+                // Se for PROCESSING, aguarda o próximo tick (3 segundos)
+            } catch (err) {
+                console.error("Erro ao checar status do Raio-X", err);
+            }
+        }, 3000);
     };
 
     const handlePrint = () => {

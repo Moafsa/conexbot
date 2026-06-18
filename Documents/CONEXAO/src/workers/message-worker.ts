@@ -8,28 +8,31 @@
  * The worker scales independently from the Next.js web process.
  */
 import 'dotenv/config';
-import { startMessageWorker } from '@/lib/queue';
+import { startMessageWorker, startAuditWorker } from '@/lib/queue';
+import { logger } from '@/lib/logger';
 
 const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '4', 10);
 
-console.log(`[Worker] Starting message worker (concurrency=${concurrency})...`);
+logger.info(`[Worker] Starting workers (concurrency=${concurrency})...`);
 
-const worker = startMessageWorker(concurrency);
+const msgWorker = startMessageWorker(concurrency);
+const auditWorker = startAuditWorker(2);
 
-worker.on('ready', () => {
-    console.log('[Worker] Ready. Listening for jobs...');
+msgWorker.on('ready', () => {
+    logger.info('[Worker] Message worker ready. Listening for jobs...');
 });
 
-worker.on('completed', (job) => {
-    console.log(`[Worker] Job ${job.id} completed for ${job.data.senderPhone}`);
+msgWorker.on('completed', (job) => {
+    logger.info(`[Worker] Job ${job.id} completed for ${job.data.senderPhone}`);
 });
 
-worker.on('failed', (job, err) => {
-    console.error(`[Worker] Job ${job?.id} failed after ${job?.attemptsMade} attempts:`, err.message);
+msgWorker.on('failed', (job, err) => {
+    logger.error(`[Worker] Job ${job?.id} failed after ${job?.attemptsMade} attempts: ${err.message}`);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('[Worker] SIGTERM received, shutting down gracefully...');
-    await worker.close();
+    logger.info('[Worker] SIGTERM received, shutting down gracefully...');
+    await msgWorker.close();
+    await auditWorker.close();
     process.exit(0);
 });

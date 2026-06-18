@@ -4,6 +4,7 @@ import { buildSystemPrompt, buildConversationMessages } from './prompts';
 import { logToFile } from './logger';
 import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
+import { logger } from '@/lib/logger';
 import { PhoneUtils } from '@/lib/phone-utils';
 import { acquireLock, releaseLock } from '@/lib/redis';
 import { GoogleMeasurementService } from '../marketing/google-measurement-service';
@@ -52,8 +53,8 @@ async function detectAiMessage(text: string, bot?: any): Promise<boolean> {
                 logToFile(`[AI-Scout] IA DETECTADA com sucesso via LLM.`);
                 return true;
             }
-        } catch (e) {
-            console.error('[AI-Scout] Error:', e);
+        } catch (e: any) {
+            logger.error({ err: e }, '[AI-Scout] Error processing background AI task');
         }
     }
 
@@ -228,8 +229,8 @@ export const MessageProcessor = {
                 try {
                     const description = await VisionService.analyze(options.mediaPath, messageText, bot);
                     contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\nLegenda: "${messageText}"\nDescrição da IA: ${description}`;
-                } catch (e) {
-                    console.error('Vision analysis failed:', e);
+                } catch (e: any) {
+                    logger.error({ err: e }, 'Vision analysis failed');
                     contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\n(Erro ao analisar imagem)`;
                 }
             } else if (options.inputType === 'audio') {
@@ -1206,7 +1207,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                 });
             }
 
-            VectorService.addDocument(bot.id, `User: ${messageText}`, { type: 'chat_history', conversationId: conversation.id }).catch(e => console.error('Vector save error:', e));
+            VectorService.addDocument(bot.id, `User: ${messageText}`, { type: 'chat_history', conversationId: conversation.id }).catch(e => logger.error({ err: e }, 'Vector save error'));
 
             // 13. Outbound Webhook / Middleware Notification
             if (bot.webhookUrl) {
@@ -1340,10 +1341,10 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                     // Threshold alerts only on new session increments
                     if (counter.messagesLimit > 0 && newUsed >= counter.messagesLimit * 0.9 && !counter.warned90) {
-                        NotificationService.notifyLimit(bot.tenantId, 'warning', newUsed, counter.messagesLimit).catch(e => console.error('Notify Error:', e));
+                        NotificationService.notifyLimit(bot.tenantId, 'warning', newUsed, counter.messagesLimit).catch(e => logger.error({ err: e }, 'Notify Error'));
                     }
                     if (counter.messagesLimit > 0 && newUsed >= counter.messagesLimit && !counter.warned100) {
-                        NotificationService.notifyLimit(bot.tenantId, 'critical', newUsed, counter.messagesLimit).catch(e => console.error('Notify Error:', e));
+                        NotificationService.notifyLimit(bot.tenantId, 'critical', newUsed, counter.messagesLimit).catch(e => logger.error({ err: e }, 'Notify Error'));
                     }
                 } else {
                     logToFile(`[Processor] Existing session for ${senderPhone} (within 24h). No usage incremented.`);

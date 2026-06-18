@@ -12,14 +12,26 @@ Cada produto deve ter o seguinte formato:
   "description": "Descrição detalhada dos ingredientes ou serviço.",
   "price": número (float, ex: 25.50),
   "category": "Categoria inferida (ex: Bebidas, Lanches, Sobremesas)",
-  "salePrice": nulo ou número
+  "salePrice": nulo ou número,
+  "addonGroups": [
+    {
+      "name": "Nome do grupo (ex: Adicionais, Escolha o sabor, Bebidas)",
+      "minSelect": 0,
+      "maxSelect": 10,
+      "addons": [
+        { "name": "Bacon", "price": 2.50 },
+        { "name": "Ao Ponto", "price": 0.00 }
+      ]
+    }
+  ]
 }
 
 Regras:
 1. Ignore textos irrelevantes.
 2. Se o preço não for encontrado, use 0.
 3. IMPORTANTE: Se um produto tiver **variações de tamanho ou tipo** com preços diferentes (ex: Normal R$ 33 / Mini R$ 30), crie **produtos separados** para cada variação (ex: um produto "Xis - Normal" e outro "Xis - Mini"), copiando a mesma descrição para ambos, mas com seus respectivos preços.
-4. Responda APENAS com o JSON no formato:
+4. IMPORTANTE: Extraia ingredientes cobrados à parte, escolhas obrigatórias ou opcionais estruturando-os dentro de "addonGroups". Não coloque os adicionais dentro da "description" se eles tiverem valores separados.
+5. Responda APENAS com o JSON no formato:
 {
   "products": [
     { ... }

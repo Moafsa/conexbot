@@ -151,117 +151,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             return NextResponse.json({ error: 'Cliente não encontrado ou não pertence a esta agência.' }, { status: 404 });
         }
 
-        const botInfo = client.bots?.[0];
-        const channelsList = botInfo?.channels || [];
-        const socialChannels = channelsList.map(c => `[${c.provider.toUpperCase()}]: ${c.identifier || 'Não informado'}`).join('\n');
-
-        let contentToAnalyze = `
-Nome da Empresa: ${client.name}
-Nicho de Negócio: ${botInfo?.niche || 'Não informado'}
-Descrição de Onboarding: ${botInfo?.description || 'Não informada'}
-Principais Produtos/Serviços: ${botInfo?.productsServices || 'Não informado'}
-Diferenciais Informados: ${botInfo?.differentials || 'Não informados'}
-Formas de Pagamento: ${Array.isArray(botInfo?.paymentMethods) ? botInfo?.paymentMethods.join(', ') : 'Não informado'}
-Endereço: ${botInfo?.address || 'Não informado'}
-Horários: ${botInfo?.hours || 'Não informado'}
-
-CANAIS OPERACIONAIS E REDES SOCIAIS CONFIGURADAS:
-${socialChannels || 'Nenhuma rede social/canal configurado no onboarding.'}
-`;
-
-        // 2. Realizar scraping do site do cliente se existir
-        let scrapedText = '';
-        let wasScraped = false;
-
-        if (botInfo?.websiteUrl) {
-            console.log(`[RaioX] Iniciando scraping do site do cliente: ${botInfo.websiteUrl}`);
-            try {
-                const scrapeResult = await scrapeWebsite(botInfo.websiteUrl);
-                if (scrapeResult.success && scrapeResult.content) {
-                    scrapedText = scrapeResult.content.slice(0, 10000); // limita a 10k caracteres para economizar tokens
-                    wasScraped = true;
-                    console.log(`[RaioX] Scraping concluído com sucesso. Tamanho: ${scrapeResult.content.length}`);
-                }
-            } catch (err) {
-                console.error(`[RaioX] Falha ao fazer scrape do site:`, err);
-            }
-        }
-
-        if (wasScraped) {
-            contentToAnalyze += `\nCONTEÚDO RASPADO (SCRAPED) DO WEBSITE OFICIAL (${botInfo?.websiteUrl}):\n${scrapedText}\n`;
-        } else {
-            contentToAnalyze += `\n(Nota: Website oficial (${botInfo?.websiteUrl || 'Não informado'}) não respondeu ou não foi configurado. Diagnóstico do site gerado com base nos metadados de onboarding)\n`;
-        }
-
-        // 3. Preparar o bot mock para safeChatCompletion usando chaves da agência
-        const botMock = {
-            name: "Conselho Diretor de Auditoria",
-            aiProvider: 'openai',
-            aiModel: 'gpt-4o-mini', // Modelo rápido e excelente para structured JSON
-            tenant: {
-                openaiApiKey: agency.tenant.openaiApiKey || client.openaiApiKey || undefined,
-                geminiApiKey: agency.tenant.geminiApiKey || client.geminiApiKey || undefined,
-                openrouterApiKey: agency.tenant.openrouterApiKey || client.openrouterApiKey || undefined,
-                anthropicApiKey: agency.tenant.anthropicApiKey || client.anthropicApiKey || undefined,
-            }
-        };
-
-        console.log(`[RaioX] Chamando o conselho de IAs para auditoria do cliente "${client.name}"`);
-
-        // 4. Executar a chamada estruturada da IA
-        const completion = await safeChatCompletion({
-            bot: botMock,
-            messages: [
-                { role: 'system', content: AUDIT_PROMPT },
-                { role: 'user', content: `DADOS DO CLIENTE PARA ANÁLISE:\n${contentToAnalyze}` }
-            ],
-            temperature: 0.3,
-            response_format: { type: 'json_object' }
-        });
-
-        // 5. Tratar e parsear a resposta
-        let parsedResult;
-        try {
-            parsedResult = JSON.parse(completion.content || '{}');
-        } catch (e) {
-            console.error("[RaioX] Erro ao parsear o JSON da auditoria:", completion.content);
-            throw new Error("A IA não retornou um JSON de auditoria válido.");
-        }
-
-        // Garantir que todos os campos existem
-        const scores = parsedResult.scores || { copy: 50, brand: 50, traffic: 50, data: 50, strategy: 50 };
-        const overallScore = parsedResult.overallScore || Math.round(Object.values(scores).reduce((a: any, b: any) => a + b, 0) / 5);
-        const report = parsedResult.report || {};
-        const missions = parsedResult.missions || [];
-
-        // 6. Salvar ou atualizar o Raio-X no banco de dados (ClientAudit)
-        // Guardamos as auditorias anteriores, gerando uma evolução histórica!
-        const audit = await prisma.clientAudit.create({
-            data: {
-                clientId: client.id,
-                agencyId: agency.id,
-                scores: scores as any,
-                report: report as any,
-                missions: missions as any,
-                overallScore: overallScore
-            }
-        });
-
-        console.log(`[RaioX] Auditoria criada com sucesso no banco! ID: ${audit.id}, Score: ${overallScore}`);
+        // 2. Colocar na fila do BullMQ
+        const { enqueueAudit } = await import('@/lib/queue');
+        const jobId = await enqueueAudit({ clientId, agencyId: agency.id });
 
         return NextResponse.json({
             success: true,
-            auditId: audit.id,
-            scores,
-            overallScore,
-            report,
-            missions
+            jobId,
+            message: 'Auditoria enviada para processamento em background.'
         });
 
     } catch (error: any) {
-        console.error(`[RaioX] Erro crítico ao gerar Raio-X do cliente:`, error);
+        console.error(`[RaioX] Erro ao enviar Raio-X para fila:`, error);
         return NextResponse.json({ 
-            error: 'Erro interno ao realizar o Raio-X do cliente.', 
+            error: 'Erro interno ao iniciar o Raio-X.', 
             details: error.message 
         }, { status: 500 });
     }
