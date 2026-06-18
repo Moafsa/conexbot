@@ -195,6 +195,18 @@ export default function ClientAuditPage() {
                         <p className="text-gray-400 text-sm leading-relaxed max-w-md mx-auto">
                             Dispare o scanner do conselho de IAs. O site de **{client?.name}** será analisado para gerar um diagnóstico completo e a trilha de missões de crescimento.
                         </p>
+                        {client?.bots?.[0] && (
+                            <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 p-4 rounded-xl text-xs mt-4 max-w-md mx-auto text-left">
+                                <div className="flex items-center gap-2 font-bold mb-1">
+                                    <Sparkles size={14} />
+                                    Alvo da Auditoria:
+                                </div>
+                                <p className="text-gray-300">Bot: <span className="text-white font-medium">{client.bots[0].name}</span></p>
+                                {(client.bots[0].websiteUrl || client.bots[0].sessionName) && (
+                                    <p className="text-gray-300 truncate">Site/Origem: <span className="text-white font-medium">{client.bots[0].websiteUrl || client.bots[0].sessionName}</span></p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-[#0b0f1a] border border-white/5 rounded-2xl p-4 text-xs text-gray-500 text-left space-y-2">

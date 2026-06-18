@@ -169,6 +169,7 @@ export async function POST(req: Request) {
                     include: {
                         channels: true
                     },
+                    orderBy: { createdAt: 'desc' },
                     take: 1
                 },
                 clientAudits: {

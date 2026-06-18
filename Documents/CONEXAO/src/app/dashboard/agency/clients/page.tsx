@@ -238,7 +238,7 @@ export default function AgencyClientsPage() {
     };
 
     const handleRemoveClient = async (clientId: string) => {
-        if (!confirm("Tem certeza que deseja remover este cliente da sua agência? Ele perderá acesso aos planos da agência, mas os dados do sistema serão mantidos.")) return;
+        if (!confirm("Atenção: Ao remover este cliente da sua agência, o cadastro e os dados dele CONTINUARÃO no sistema (nada será apagado), mas ele será desvinculado da sua gestão. Deseja continuar?")) return;
         
         try {
             const res = await fetch(`/api/agency/clients/${clientId}`, {

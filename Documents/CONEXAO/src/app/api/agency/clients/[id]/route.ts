@@ -30,6 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             },
             usageCounter: true,
             bots: {
+                orderBy: { createdAt: 'desc' },
                 take: 1
             },
             clientAudits: {
