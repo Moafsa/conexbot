@@ -15,8 +15,10 @@ export async function GET(req: Request) {
         const tenant = await prisma.tenant.findUnique({
             where,
             select: {
-                googleAdsDeveloperToken: true,
                 googleAdsCustomerId: true,
+                ga4MeasurementId: true,
+                ga4ApiSecret: true,
+                googleAdsRefreshToken: true,
                 semrushApiKey: true,
                 dataForSeoApiKey: true,
                 metaAdsToken: true,
@@ -24,9 +26,19 @@ export async function GET(req: Request) {
                 metaAdsPixelId: true,
             }
         });
+        
+        // Fetch the global config to optionally provide the developer token to the UI if needed
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: "system" },
+            select: { googleAdsDeveloperToken: true }
+        });
 
-        return NextResponse.json(tenant);
+        return NextResponse.json({
+            ...tenant,
+            googleAdsDeveloperToken: globalConfig?.googleAdsDeveloperToken || null
+        });
     } catch (error) {
+        console.error("GET Marketing Settings Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -39,15 +51,19 @@ export async function PUT(req: Request) {
         const { searchParams } = new URL(req.url);
         const clientId = searchParams.get("clientId");
         const body = await req.json();
-        const { googleAdsDeveloperToken, googleAdsCustomerId, semrushApiKey, dataForSeoApiKey, metaAdsToken, metaAdsAccountId, metaAdsPixelId } = body;
+        
+        // googleAdsDeveloperToken should not be saved in Tenant. It is managed in GlobalConfig (superadmin)
+        const { googleAdsCustomerId, ga4MeasurementId, ga4ApiSecret, googleAdsRefreshToken, semrushApiKey, dataForSeoApiKey, metaAdsToken, metaAdsAccountId, metaAdsPixelId } = body;
 
         const where = clientId ? { id: clientId } : { email: session.user.email };
 
         await prisma.tenant.update({
             where,
             data: {
-                googleAdsDeveloperToken,
                 googleAdsCustomerId,
+                ga4MeasurementId,
+                ga4ApiSecret,
+                googleAdsRefreshToken,
                 semrushApiKey,
                 dataForSeoApiKey,
                 metaAdsToken,
@@ -58,6 +74,7 @@ export async function PUT(req: Request) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
+        console.error("PUT Marketing Settings Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
