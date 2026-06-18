@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const origin = new URL(req.url).origin;
     const redirectUri = `${finalAppUrl}/api/integrations/facebook/callback`;
     
-    let finalRedirect = `${origin}/dashboard/marketing`;
+    let finalRedirect = `${finalAppUrl}/dashboard/marketing`;
 
     if (error) {
         return NextResponse.redirect(new URL(`${finalRedirect}?error=${error}`, req.url));
