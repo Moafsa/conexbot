@@ -2259,6 +2259,10 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
         dataForSeoApiKey: ""
     });
     const [loading, setLoading] = useState(true);
+    const [adAccounts, setAdAccounts] = useState<any[]>([]);
+    const [pixels, setPixels] = useState<any[]>([]);
+    const [fetchingAccounts, setFetchingAccounts] = useState(false);
+    const [fetchingPixels, setFetchingPixels] = useState(false);
 
     useEffect(() => {
         const query = selectedClientId ? `?clientId=${selectedClientId}` : "";
@@ -2269,6 +2273,34 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                 setLoading(false);
             });
     }, [selectedClientId]);
+
+    useEffect(() => {
+        if (settings.metaAdsToken) {
+            setFetchingAccounts(true);
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : "";
+            fetch(`/api/integrations/facebook/accounts${query}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.accounts) setAdAccounts(data.accounts);
+                })
+                .finally(() => setFetchingAccounts(false));
+        }
+    }, [settings.metaAdsToken, selectedClientId]);
+
+    useEffect(() => {
+        if (settings.metaAdsToken && settings.metaAdsAccountId) {
+            setFetchingPixels(true);
+            const query = `?adAccountId=${settings.metaAdsAccountId}${selectedClientId ? `&clientId=${selectedClientId}` : ""}`;
+            fetch(`/api/integrations/facebook/accounts${query}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.pixels) setPixels(data.pixels);
+                })
+                .finally(() => setFetchingPixels(false));
+        } else {
+            setPixels([]);
+        }
+    }, [settings.metaAdsAccountId, settings.metaAdsToken, selectedClientId]);
 
     const handleSave = async () => {
         setLoading(true);
@@ -2362,24 +2394,60 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-400">Ad Account ID</label>
-                                <input 
-                                    type="text" 
-                                    value={settings.metaAdsAccountId}
-                                    onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
-                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
-                                    placeholder="act_123456789" 
-                                />
+                                <label className="text-sm font-medium text-gray-400 flex justify-between">
+                                    <span>Ad Account ID</span>
+                                    {fetchingAccounts && <span className="text-xs text-blue-400">Buscando contas...</span>}
+                                </label>
+                                {adAccounts.length > 0 ? (
+                                    <select 
+                                        value={settings.metaAdsAccountId}
+                                        onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50"
+                                    >
+                                        <option value="">Selecione uma conta de anúncios...</option>
+                                        {adAccounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({acc.id})
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type="text" 
+                                        value={settings.metaAdsAccountId}
+                                        onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
+                                        placeholder="act_123456789" 
+                                    />
+                                )}
                             </div>
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-400">Pixel ID (Conversões)</label>
-                                <input 
-                                    type="text" 
-                                    value={settings.metaAdsPixelId}
-                                    onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
-                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
-                                    placeholder="123456789012345" 
-                                />
+                                <label className="text-sm font-medium text-gray-400 flex justify-between">
+                                    <span>Pixel ID (Conversões)</span>
+                                    {fetchingPixels && <span className="text-xs text-blue-400">Buscando pixels...</span>}
+                                </label>
+                                {pixels.length > 0 ? (
+                                    <select 
+                                        value={settings.metaAdsPixelId}
+                                        onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50"
+                                    >
+                                        <option value="">Selecione um pixel (Opcional)...</option>
+                                        {pixels.map(px => (
+                                            <option key={px.id} value={px.id}>
+                                                {px.name} ({px.id})
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type="text" 
+                                        value={settings.metaAdsPixelId}
+                                        onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
+                                        placeholder="123456789012345" 
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>
