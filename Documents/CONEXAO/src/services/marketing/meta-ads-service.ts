@@ -130,5 +130,84 @@ export const MetaAdsService = {
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
         return data.id;
+    },
+
+    /**
+     * Atualiza uma campanha na Meta.
+     */
+    async updateCampaign(tenantId: string, campaignId: string, params: { name?: string, status?: string, dailyBudget?: number }) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true }
+        });
+
+        if (!tenant?.metaAdsToken) throw new Error("Meta Ads não configurado");
+
+        const url = `https://graph.facebook.com/v22.0/${campaignId}`;
+        
+        const body: any = { access_token: tenant.metaAdsToken };
+        if (params.name) body.name = params.name;
+        if (params.status) body.status = params.status;
+        if (params.dailyBudget !== undefined) body.daily_budget = params.dailyBudget;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.success;
+    },
+
+    /**
+     * Atualiza um anúncio na Meta (apenas nome e status, criativo não pode ser editado).
+     */
+    async updateAd(tenantId: string, adId: string, params: { name?: string, status?: string }) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true }
+        });
+
+        if (!tenant?.metaAdsToken) throw new Error("Meta Ads não configurado");
+
+        const url = `https://graph.facebook.com/v22.0/${adId}`;
+        
+        const body: any = { access_token: tenant.metaAdsToken };
+        if (params.name) body.name = params.name;
+        if (params.status) body.status = params.status;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.success;
+    },
+
+    /**
+     * Deleta um anúncio na Meta.
+     */
+    async deleteAd(tenantId: string, adId: string) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true }
+        });
+
+        if (!tenant?.metaAdsToken) throw new Error("Meta Ads não configurado");
+
+        const url = `https://graph.facebook.com/v22.0/${adId}?access_token=${tenant.metaAdsToken}`;
+        
+        const res = await fetch(url, {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.success;
     }
 };
