@@ -2302,6 +2302,23 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
         }
     }, [settings.metaAdsAccountId, settings.metaAdsToken, selectedClientId]);
 
+    const updateSettingAndSave = async (key: string, value: string) => {
+        const newSettings = { ...settings, [key]: value };
+        setSettings(newSettings);
+        
+        try {
+            const query = selectedClientId ? `?clientId=${selectedClientId}` : "";
+            await fetch(`/api/settings/marketing${query}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newSettings)
+            });
+            // Auto-saved silently
+        } catch (error) {
+            console.error("Erro no auto-save:", error);
+        }
+    };
+
     const handleSave = async () => {
         setLoading(true);
         try {
@@ -2401,7 +2418,7 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                 {adAccounts.length > 0 ? (
                                     <select 
                                         value={settings.metaAdsAccountId}
-                                        onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
+                                        onChange={e => updateSettingAndSave('metaAdsAccountId', e.target.value)}
                                         className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50"
                                     >
                                         <option value="">Selecione uma conta de anúncios...</option>
@@ -2415,7 +2432,7 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                     <input 
                                         type="text" 
                                         value={settings.metaAdsAccountId}
-                                        onChange={e => setSettings({...settings, metaAdsAccountId: e.target.value})}
+                                        onChange={e => updateSettingAndSave('metaAdsAccountId', e.target.value)}
                                         className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
                                         placeholder="act_123456789" 
                                     />
@@ -2429,7 +2446,7 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                 {pixels.length > 0 ? (
                                     <select 
                                         value={settings.metaAdsPixelId}
-                                        onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
+                                        onChange={e => updateSettingAndSave('metaAdsPixelId', e.target.value)}
                                         className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50"
                                     >
                                         <option value="">Selecione um pixel (Opcional)...</option>
@@ -2443,7 +2460,7 @@ function SettingsTab({ selectedClientId }: { selectedClientId?: string }) {
                                     <input 
                                         type="text" 
                                         value={settings.metaAdsPixelId}
-                                        onChange={e => setSettings({...settings, metaAdsPixelId: e.target.value})}
+                                        onChange={e => updateSettingAndSave('metaAdsPixelId', e.target.value)}
                                         className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-blue-500/50" 
                                         placeholder="123456789012345" 
                                     />
