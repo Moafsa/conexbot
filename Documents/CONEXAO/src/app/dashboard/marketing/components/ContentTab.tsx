@@ -169,7 +169,7 @@ export function ContentTab({ bots, loadingBots, selectedClientId }: any) {
 
             {/* TAB: STUDIO (SPLIT VIEW) */}
             {activeTab === 'STUDIO' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-320px)] min-h-[500px]">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px] 2xl:h-[700px]">
                     {/* LEFT: CHAT INTERFACE */}
                     <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col h-full">
                         <div className="flex items-center gap-3 mb-6 border-b border-white/10 pb-4">
