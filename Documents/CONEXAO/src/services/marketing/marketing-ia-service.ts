@@ -189,7 +189,7 @@ export const MarketingIAService = {
             result = { caption: rawContent, hashtags: [], imagePrompt: theme };
         }
 
-        // 3. Gerar Imagem com GPT Image 2 (Snapshot 2026-04-21)
+        // 3. Gerar Imagem com GPT Image 2 (DALL-E 3)
         let finalImageUrl = null;
         
         if (videoUrl) {
@@ -197,65 +197,34 @@ export const MarketingIAService = {
         } else {
             try {
                 let baseAssetUrl = null;
-                // Refinamos o prompt para garantir fotorrealismo e design de agência fiel aos fatos
                 const professionalPrompt = `Professional advertising graphic design about: ${result.imagePrompt}. Use clean, modern layout. Cinematic lighting, high-end commercial photography, 8k. MANDATORY: Write all text on the image in Portuguese (Brazil). Ensure a polished, professional agency-grade finish.`;
-                let imageBuffer: Buffer | null = null;
+                
+                console.log("[MarketingIA] Gerando imagem com DALL-E 3");
+                
+                // Fallback to max 1000 chars for DALL-E 3 prompt limit
+                const safePrompt = professionalPrompt.substring(0, 1000);
 
-                if (baseImageUrls.length > 0) {
-                    console.log("[MarketingIA] Usando API de Respostas para geração multimodal (High Fidelity)");
-                    
-                    const response = await (client as any).responses.create({
-                        model: "gpt-5.5",
-                        input: [
-                            {
-                                role: "user",
-                                content: [
-                                    { type: "input_text", text: professionalPrompt },
-                                    ...processedImageUrls.map(url => ({
-                                        type: "input_image",
-                                        image_url: url
-                                    }))
-                                ]
-                            }
-                        ],
-                        tools: [{ type: "image_generation", quality: "high", size: "1024x1024" }]
-                    });
+                const response = await client.images.generate({
+                    model: "dall-e-3",
+                    prompt: safePrompt,
+                    n: 1,
+                    size: "1024x1024",
+                    response_format: "b64_json"
+                });
 
-                    const imageData = response.output
-                        .filter((o: any) => o.type === "image_generation_call")
-                        .map((o: any) => o.result)[0];
-
-                    if (imageData) {
-                        imageBuffer = Buffer.from(imageData, 'base64');
-                        const filename = `marketing/${tenantId}/${Date.now()}-ai.png`;
-                        baseAssetUrl = await StorageService.uploadFile(imageBuffer, filename, "image/png");
-                    }
-                } else {
-                    console.log("[MarketingIA] Usando API de Respostas para geração simples (High Fidelity)");
-                    const response = await (client as any).responses.create({
-                        model: "gpt-5.5",
-                        input: [{ role: "user", content: [{ type: "input_text", text: professionalPrompt }] }],
-                        tools: [{ type: "image_generation", quality: "high", size: "1024x1024" }]
-                    });
-
-                    const imageData = response.output
-                        .filter((o: any) => o.type === "image_generation_call")
-                        .map((o: any) => o.result)[0];
-
-                    if (imageData) {
-                        imageBuffer = Buffer.from(imageData, 'base64');
-                        const filename = `marketing/${tenantId}/${Date.now()}-ai.png`;
-                        baseAssetUrl = await StorageService.uploadFile(imageBuffer, filename, "image/png");
-                    }
+                const b64 = response.data[0].b64_json;
+                if (b64) {
+                    const imageBuffer = Buffer.from(b64, 'base64');
+                    const filename = `marketing/${tenantId}/${Date.now()}-ai.png`;
+                    baseAssetUrl = await StorageService.uploadFile(imageBuffer, filename, "image/png");
                 }
 
                 if (baseAssetUrl) {
                     console.log(`[MarketingIA] Imagem nativa gerada com sucesso: ${baseAssetUrl}`);
-                    // BYPASS: Usamos a imagem direta da IA, sem o "compositor" antigo que estragava o design
                     finalImageUrl = baseAssetUrl;
                 }
-            } catch (e) {
-                console.error("[MarketingIA] Erro crítico no fluxo de design:", e);
+            } catch (e: any) {
+                console.error("[MarketingIA] Erro crítico no fluxo de design (DALL-E 3):", e.response?.data || e.message);
                 finalImageUrl = baseImageUrls[0] || null;
             }
         }
