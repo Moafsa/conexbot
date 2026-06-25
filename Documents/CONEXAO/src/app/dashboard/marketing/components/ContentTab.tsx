@@ -140,6 +140,25 @@ export function ContentTab({ bots, loadingBots, selectedClientId }: any) {
         }
     };
 
+    const handleGenerateImage = async (postId: string) => {
+        setFetchingPosts(true);
+        try {
+            const res = await fetch(`/api/marketing/posts/${postId}/generate-image`, { method: "POST" });
+            if (res.ok) {
+                alert("Imagem gerada com sucesso!");
+                fetchPosts();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Erro ao gerar imagem.");
+                setFetchingPosts(false);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de comunicação com o servidor.");
+            setFetchingPosts(false);
+        }
+    };
+
     const drafts = posts.filter(p => p.status === 'DRAFT');
     const scheduled = posts.filter(p => p.status === 'SCHEDULED' || p.status === 'PUBLISHED');
 
@@ -350,12 +369,28 @@ export function ContentTab({ bots, loadingBots, selectedClientId }: any) {
                                     <span className="text-[10px] font-black uppercase bg-white/10 text-gray-300 px-3 py-1 rounded-full mb-3 inline-block">
                                         Rascunho
                                     </span>
+                                    {post.imageUrl ? (
+                                        <div className="h-40 w-full relative mb-3 rounded-xl overflow-hidden border border-white/10">
+                                            <img src={post.imageUrl} className="w-full h-full object-cover" alt="Post AI" />
+                                        </div>
+                                    ) : (
+                                        <div className="h-40 w-full relative mb-3 rounded-xl border border-dashed border-white/10 flex items-center justify-center bg-black/20">
+                                            <ImageIcon size={24} className="text-gray-600 mb-2" />
+                                            <p className="text-xs text-gray-500 text-center px-4">Sem imagem gerada ainda</p>
+                                        </div>
+                                    )}
                                     <p className="text-sm text-gray-300 line-clamp-4">{previewText}</p>
                                 </div>
-                                <div className="flex gap-2 border-t border-white/10 pt-4 mt-auto">
+                                <div className="flex gap-2 border-t border-white/10 pt-4 mt-auto flex-wrap">
+                                    <button 
+                                        onClick={() => handleGenerateImage(post.id)}
+                                        className="flex-1 min-w-[100px] py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Sparkles size={14} /> Gerar Imagem
+                                    </button>
                                     <button 
                                         onClick={() => handlePublishPost(post)}
-                                        className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                                        className="flex-1 min-w-[100px] py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
                                     >
                                         <CheckCircle size={14} /> Aprovar
                                     </button>
