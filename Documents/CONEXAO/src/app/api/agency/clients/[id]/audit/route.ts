@@ -114,14 +114,14 @@ Estrutura do JSON de Resposta:
 }
 `;
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const session = await getServerSession(authOptions) as any;
         if (!session?.user) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const clientId = params.id;
+        const { id: clientId } = await params;
 
         // 1. Validar se o solicitante é uma agência e gerencia este cliente
         const agency = await prisma.agency.findUnique({
@@ -142,6 +142,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
                     include: {
                         channels: true
                     },
+                    orderBy: { createdAt: 'desc' },
                     take: 1
                 }
             }

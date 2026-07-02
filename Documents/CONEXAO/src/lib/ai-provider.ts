@@ -83,7 +83,7 @@ export class GeminiWrapper {
     chat = {
         completions: {
             create: async (body: any) => {
-                let model = body.model || 'gemini-1.5-flash';
+                let model = body.model || 'gemini-2.5-flash';
                 model = model.replace(/^models\//, '');
                 let systemContent = "";
                 const contents = body.messages.map((m: any) => {
@@ -223,15 +223,15 @@ export async function getAiClient(options: {
         const apiKey = resolveKey('geminiApiKey', 'GEMINI_API_KEY');
         if (!apiKey) throw new Error('Gemini API Key not configured');
 
-        // Force upgrade legacy gemini models and fix invalid ones
-        if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model.includes('gemini-2.0') || model.includes('2.5')) {
-            if (!model.includes('flash') && !model.includes('pro')) {
-                model = 'gemini-1.5-flash';
-            } else if (model.includes('2.5')) {
-                model = 'gemini-2.0-flash'; // 2.5 doesn't exist yet, use 2.0
-            }
+        // Force upgrade legacy/deprecated gemini models (gemini-1.5-flash-latest retorna 404)
+        if (model.includes('gemini-1.5-flash-latest') || model.includes('gemini-1.0') || !model.includes('gemini-2')) {
+            model = 'gemini-2.5-flash';
+        } else if (model.includes('2.5')) {
+            model = 'gemini-2.5-flash';
+        } else if (model.includes('2.0')) {
+            model = 'gemini-2.5-flash';
         } else {
-            model = 'gemini-1.5-flash';
+            model = 'gemini-2.5-flash';
         }
 
         return {

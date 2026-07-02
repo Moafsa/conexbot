@@ -7,6 +7,11 @@ class Conext_Licensing {
 
     private static $api_url = 'https://app.conext.click'; // URL da plataforma Conext
 
+    /** URL do site sem barra final — alinha com a normalização no servidor de licenças */
+    private static function site_url_for_license_api() {
+        return untrailingslashit(get_site_url());
+    }
+
     /**
      * Busca os planos disponíveis diretamente no SaaS
      */
@@ -63,7 +68,7 @@ class Conext_Licensing {
         $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
             'body' => json_encode([
                 'licenseKey' => $key,
-                'siteUrl' => get_site_url()
+                'siteUrl' => self::site_url_for_license_api(),
             ]),
             'headers' => ['Content-Type' => 'application/json']
         ]);
@@ -143,7 +148,7 @@ class Conext_Licensing {
         $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
             'body' => json_encode([
                 'licenseKey' => $key,
-                'siteUrl' => get_site_url()
+                'siteUrl' => self::site_url_for_license_api(),
             ]),
             'headers' => ['Content-Type' => 'application/json']
         ]);

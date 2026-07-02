@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, Image as ImageIcon, Video, Calendar, ArrowUpRight, Zap, RefreshCw, PenTool, Trash2, CheckCircle2, Plus, Instagram, Settings, ArrowLeft, Upload, Clock } from "lucide-react";
+import { Sparkles, Image as ImageIcon, Video, Calendar, ArrowUpRight, Zap, RefreshCw, PenTool, Trash2, CheckCircle2, Plus, Instagram, Settings, ArrowLeft, Upload, Clock, Heart, MessageCircle, ThumbsUp, MessageSquare, Share2, Send, Bookmark } from "lucide-react";
 import { uploadMarketingMedia } from "@/app/actions/marketing-actions";
 
-export function ContentTab({ bots, loadingBots }: any) {
+export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate, onClearPrefilledDate }: any) {
     const [theme, setTheme] = useState("");
     const [tone, setTone] = useState("Profissional");
     const [platform, setPlatform] = useState("Instagram Feed");
@@ -22,6 +22,15 @@ export function ContentTab({ bots, loadingBots }: any) {
     const [editedCaption, setEditedCaption] = useState("");
     const [scheduleDate, setScheduleDate] = useState("");
     const [savingDraft, setSavingDraft] = useState(false);
+    const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
+    const [previewPlatform, setPreviewPlatform] = useState<"instagram" | "facebook">("instagram");
+
+    useEffect(() => {
+        if (prefilledDate) {
+            setScheduleDate(prefilledDate);
+            if (onClearPrefilledDate) onClearPrefilledDate();
+        }
+    }, [prefilledDate]);
 
     const [baseImages, setBaseImages] = useState<string[]>([]);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -191,6 +200,7 @@ export function ContentTab({ bots, loadingBots }: any) {
 
     const openDraftEditor = (draft: any) => {
         setSelectedDraft(draft);
+        setEditorMode("edit");
         
         let parsedData: any = null;
         try {
@@ -212,7 +222,7 @@ export function ContentTab({ bots, loadingBots }: any) {
         // Se for estruturado, precisamos preservar a estrutura e atualizar apenas a caption
         try {
             if (selectedDraft.content && (selectedDraft.content.trim().startsWith('{') || selectedDraft.content.trim().startsWith('['))) {
-                let parsed = JSON.parse(selectedDraft.content);
+                const parsed = JSON.parse(selectedDraft.content);
                 parsed.caption = editedCaption;
                 newContent = JSON.stringify(parsed);
             } else {
@@ -560,6 +570,7 @@ export function ContentTab({ bots, loadingBots }: any) {
                     </div>
                 ) : (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                        {/* Editor Header */}
                         <div className="flex items-center justify-between">
                             <button onClick={() => setSelectedDraft(null)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
                                 <ArrowLeft size={16} /> Voltar para Fila
@@ -569,74 +580,254 @@ export function ContentTab({ bots, loadingBots }: any) {
                             </span>
                         </div>
 
-                        {/* Imagem do Draft com Opção de Troca */}
-                        <div className="relative aspect-square rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group bg-black">
-                            {selectedDraft.mediaType === "VIDEO" || selectedDraft.videoUrl ? (
-                                <video src={selectedDraft.videoUrl || selectedDraft.imageUrl} controls className="w-full h-full object-contain" />
-                            ) : (
-                                <img 
-                                    src={selectedDraft.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} 
-                                    alt="Preview" 
-                                    className="w-full h-full object-contain"
-                                />
-                            )}
-                            
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
-                                <label className="bg-white text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer hover:bg-gray-200 transition-colors shadow-xl">
-                                    {savingDraft ? <RefreshCw className="animate-spin" size={18} /> : <Upload size={18} />}
-                                    Substituir Mídia
-                                    <input type="file" hidden accept="image/*,video/*" onChange={handleReplaceDraftImage} />
-                                </label>
-                                <p className="text-white text-xs font-bold bg-black/50 px-3 py-1 rounded-full border border-white/20">A IA gerou isso. Clique acima para trocar.</p>
-                            </div>
+                        {/* Editor Mode Selector tabs */}
+                        <div className="flex items-center gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl w-full">
+                            <button
+                                onClick={() => setEditorMode("edit")}
+                                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                                    editorMode === "edit"
+                                    ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/10"
+                                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                                }`}
+                            >
+                                Editar Conteúdo
+                            </button>
+                            <button
+                                onClick={() => setEditorMode("preview")}
+                                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                                    editorMode === "preview"
+                                    ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/10"
+                                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                                }`}
+                            >
+                                Preview do Feed
+                            </button>
                         </div>
 
-                        {/* Editor de Texto */}
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Editar Legenda & Hashtags</h4>
-                                {editedCaption !== (
-                                    selectedDraft.content?.trim().startsWith('{') 
-                                        ? JSON.parse(selectedDraft.content).caption 
-                                        : selectedDraft.content
-                                ) && (
-                                    <button onClick={handleSaveDraft} disabled={savingDraft} className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-3 py-2 rounded-md font-bold uppercase flex items-center gap-1 transition-colors border border-emerald-500/30">
-                                        {savingDraft ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar Edições
+                        {editorMode === "edit" ? (
+                            <>
+                                {/* Imagem do Draft com Opção de Troca */}
+                                <div className="relative aspect-square rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl group bg-black">
+                                    {selectedDraft.mediaType === "VIDEO" || selectedDraft.videoUrl ? (
+                                        <video src={selectedDraft.videoUrl || selectedDraft.imageUrl} controls className="w-full h-full object-contain" />
+                                    ) : (
+                                        <img 
+                                            src={selectedDraft.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} 
+                                            alt="Preview" 
+                                            className="w-full h-full object-contain"
+                                        />
+                                    )}
+                                    
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
+                                        <label className="bg-white text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 cursor-pointer hover:bg-gray-200 transition-colors shadow-xl">
+                                            {savingDraft ? <RefreshCw className="animate-spin" size={18} /> : <Upload size={18} />}
+                                            Substituir Mídia
+                                            <input type="file" hidden accept="image/*,video/*" onChange={handleReplaceDraftImage} />
+                                        </label>
+                                        <p className="text-white text-xs font-bold bg-black/50 px-3 py-1 rounded-full border border-white/20">A IA gerou isso. Clique acima para trocar.</p>
+                                    </div>
+                                </div>
+
+                                {/* Editor de Texto */}
+                                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Editar Legenda & Hashtags</h4>
+                                        {editedCaption !== (
+                                            selectedDraft.content?.trim().startsWith('{') 
+                                                ? JSON.parse(selectedDraft.content).caption 
+                                                : selectedDraft.content
+                                        ) && (
+                                            <button onClick={handleSaveDraft} disabled={savingDraft} className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-3 py-2 rounded-md font-bold uppercase flex items-center gap-1 transition-colors border border-emerald-500/30">
+                                                {savingDraft ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar Edições
+                                            </button>
+                                        )}
+                                    </div>
+                                    <textarea 
+                                        value={editedCaption}
+                                        onChange={(e) => setEditedCaption(e.target.value)}
+                                        rows={8}
+                                        placeholder="A legenda do post aparece aqui para você editar livremente antes de aprovar..."
+                                        className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-sm text-gray-200 focus:border-emerald-500/50 outline-none custom-scrollbar transition-colors leading-relaxed"
+                                    />
+                                </div>
+
+                                {/* Painel de Agendamento */}
+                                <div className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-2xl p-6 space-y-4 shadow-xl">
+                                    <h4 className="text-sm font-bold flex items-center gap-2 text-emerald-400">
+                                        <Calendar size={18} /> Agendamento e Publicação
+                                    </h4>
+                                    <p className="text-xs text-gray-400">Escolha a data e hora para publicar automaticamente. Se deixar vazio, o post será enviado agora.</p>
+                                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                                        <input 
+                                            type="datetime-local"
+                                            value={scheduleDate}
+                                            onChange={(e) => setScheduleDate(e.target.value)}
+                                            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 transition-colors"
+                                        />
+                                        <button 
+                                            onClick={handleScheduleOrPublish}
+                                            disabled={loading}
+                                            className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 disabled:opacity-50 text-black font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 py-3"
+                                        >
+                                            {loading ? <RefreshCw size={16} className="animate-spin" /> : (scheduleDate ? <Clock size={16}/> : <Instagram size={16} />)}
+                                            {scheduleDate ? "Agendar Publicação" : "Publicar Agora"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="space-y-6">
+                                {/* Feed platform toggle */}
+                                <div className="flex items-center gap-2 p-1 bg-[#0b0f1a] border border-white/5 rounded-xl w-fit">
+                                    <button
+                                        onClick={() => setPreviewPlatform("instagram")}
+                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                                            previewPlatform === "instagram"
+                                            ? "bg-gradient-to-r from-pink-500 to-amber-500 text-white"
+                                            : "text-gray-400 hover:text-white"
+                                        }`}
+                                    >
+                                        Instagram
                                     </button>
-                                )}
-                            </div>
-                            <textarea 
-                                value={editedCaption}
-                                onChange={(e) => setEditedCaption(e.target.value)}
-                                rows={8}
-                                placeholder="A legenda do post aparece aqui para você editar livremente antes de aprovar..."
-                                className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-sm text-gray-200 focus:border-emerald-500/50 outline-none custom-scrollbar transition-colors leading-relaxed"
-                            />
-                        </div>
+                                    <button
+                                        onClick={() => setPreviewPlatform("facebook")}
+                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                                            previewPlatform === "facebook"
+                                            ? "bg-blue-600 text-white"
+                                            : "text-gray-400 hover:text-white"
+                                        }`}
+                                    >
+                                        Facebook
+                                    </button>
+                                </div>
 
-                        {/* Painel de Agendamento */}
-                        <div className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-2xl p-6 space-y-4 shadow-xl">
-                            <h4 className="text-sm font-bold flex items-center gap-2 text-emerald-400">
-                                <Calendar size={18} /> Agendamento e Publicação
-                            </h4>
-                            <p className="text-xs text-gray-400">Escolha a data e hora para publicar automaticamente. Se deixar vazio, o post será enviado agora.</p>
-                            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                                <input 
-                                    type="datetime-local"
-                                    value={scheduleDate}
-                                    onChange={(e) => setScheduleDate(e.target.value)}
-                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 transition-colors"
-                                />
-                                <button 
-                                    onClick={handleScheduleOrPublish}
-                                    disabled={loading}
-                                    className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 disabled:opacity-50 text-black font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 py-3"
-                                >
-                                    {loading ? <RefreshCw size={16} className="animate-spin" /> : (scheduleDate ? <Clock size={16}/> : <Instagram size={16} />)}
-                                    {scheduleDate ? "Agendar Publicação" : "Publicar Agora"}
-                                </button>
+                                {/* Phone Frame Simulator */}
+                                <div className="mx-auto w-full max-w-[340px] border-8 border-gray-800 bg-[#0b0f1a] rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+                                    {/* Phone Notch/Status Bar */}
+                                    <div className="bg-gray-800 w-24 h-4 mx-auto rounded-b-xl mb-2"></div>
+                                    
+                                    {/* Mockup Body */}
+                                    <div className="bg-[#121824] text-white text-xs select-none">
+                                        {previewPlatform === "instagram" ? (
+                                            <div className="flex flex-col">
+                                                {/* IG Header */}
+                                                <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+                                                    <span className="font-bold tracking-wide">Instagram</span>
+                                                </div>
+                                                
+                                                {/* IG User info */}
+                                                <div className="flex items-center justify-between px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-500 to-purple-600 flex items-center justify-center p-[2px]">
+                                                            <div className="w-full h-full bg-[#121824] rounded-full flex items-center justify-center font-black text-[10px] text-emerald-400">
+                                                                {(selectedDraft.bot?.name?.[0] || 'C').toUpperCase()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-[10px]">{selectedDraft.bot?.name || "Minha Marca"}</span>
+                                                            <span className="text-[8px] text-gray-400">Patrocinado</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="font-bold text-[14px]">•••</span>
+                                                </div>
+
+                                                {/* IG Post Image */}
+                                                <div className="aspect-square w-full bg-black flex items-center justify-center overflow-hidden">
+                                                    {selectedDraft.mediaType === "VIDEO" || selectedDraft.videoUrl ? (
+                                                        <video src={selectedDraft.videoUrl || selectedDraft.imageUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                                                    ) : (
+                                                        <img src={selectedDraft.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} alt="Mockup" className="w-full h-full object-cover" />
+                                                    )}
+                                                </div>
+
+                                                {/* IG Actions */}
+                                                <div className="flex items-center justify-between px-3 py-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <Heart size={16} className="text-gray-300 hover:text-red-500 cursor-pointer" />
+                                                        <MessageCircle size={16} className="text-gray-300" />
+                                                        <Send size={16} className="text-gray-300" />
+                                                    </div>
+                                                    <Bookmark size={16} className="text-gray-300" />
+                                                </div>
+
+                                                {/* IG Likes */}
+                                                <div className="px-3 py-1 font-bold text-[9px]">
+                                                    Curtido por conext.ai e outras 142 pessoas
+                                                </div>
+
+                                                {/* IG Caption */}
+                                                <div className="px-3 pb-4 space-y-1">
+                                                    <p className="text-[10px] leading-relaxed">
+                                                        <span className="font-bold mr-1.5">{selectedDraft.bot?.name || "Minha Marca"}</span>
+                                                        {editedCaption.split('\n').map((line, lIdx) => (
+                                                            <span key={lIdx} className="block mt-0.5">
+                                                                {line.split(' ').map((word, wIdx) => {
+                                                                    if (word.startsWith('#') || word.startsWith('@')) {
+                                                                        return <span key={wIdx} className="text-blue-400 font-medium mr-1">{word} </span>;
+                                                                    }
+                                                                    return <span key={wIdx}>{word} </span>;
+                                                                })}
+                                                            </span>
+                                                        ))}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                {/* FB Header info */}
+                                                <div className="flex items-center gap-2 px-3 py-3">
+                                                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-black text-xs text-white">
+                                                        {(selectedDraft.bot?.name?.[0] || 'C').toUpperCase()}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-[11px] text-blue-400">{selectedDraft.bot?.name || "Minha Marca"}</span>
+                                                        <span className="text-[8px] text-gray-500 flex items-center gap-1">Agora mesmo • 🌐</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* FB Caption */}
+                                                <div className="px-3 pb-2 text-[10px] leading-relaxed text-gray-200">
+                                                    {editedCaption.split('\n').map((line, lIdx) => (
+                                                        <span key={lIdx} className="block mt-0.5">
+                                                            {line.split(' ').map((word, wIdx) => {
+                                                                if (word.startsWith('#') || word.startsWith('@')) {
+                                                                    return <span key={wIdx} className="text-blue-400 font-bold mr-1">{word} </span>;
+                                                                }
+                                                                return <span key={wIdx}>{word} </span>;
+                                                            })}
+                                                        </span>
+                                                    ))}
+                                                </div>
+
+                                                {/* FB Image */}
+                                                <div className="w-full bg-black flex items-center justify-center overflow-hidden border-y border-white/5">
+                                                    {selectedDraft.mediaType === "VIDEO" || selectedDraft.videoUrl ? (
+                                                        <video src={selectedDraft.videoUrl || selectedDraft.imageUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                                                    ) : (
+                                                        <img src={selectedDraft.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'} alt="Mockup" className="w-full. h-full object-cover" />
+                                                    )}
+                                                </div>
+
+                                                {/* FB Action Buttons */}
+                                                <div className="grid grid-cols-3 border-t border-white/5 py-1 text-center text-gray-400 text-[10px] font-bold">
+                                                    <div className="flex items-center justify-center gap-1 py-1 hover:bg-white/5 rounded-lg cursor-pointer">
+                                                        <ThumbsUp size={12} /> Curtir
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-1 py-1 hover:bg-white/5 rounded-lg cursor-pointer">
+                                                        <MessageSquare size={12} /> Comentar
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-1 py-1 hover:bg-white/5 rounded-lg cursor-pointer">
+                                                        <Share2 size={12} /> Compartilhar
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Bottom Home Indicator */}
+                                    <div className="bg-gray-800 w-32 h-1 mx-auto rounded-full my-2"></div>
+                                </div>
                             </div>
-                        </div>
+                        )}
                         
                         {/* Espaço morto de baixo */}
                         <div className="pb-10"></div>

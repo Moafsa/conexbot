@@ -68,20 +68,28 @@ async function main() {
     console.log(`Product processed: ${product.name}`);
 
     for (const planData of plans) {
-      await prisma.plan.upsert({
-        where: { name: planData.name }, // This assumes plan names are unique globally, which might not be true in real scenarios, but for seeding official ones it's fine.
-        update: {
-          price: planData.price,
-          messageLimit: planData.messageLimit,
-          botLimit: planData.botLimit,
-          trialDays: planData.trialDays,
-          productCatalogId: product.id
-        },
-        create: {
-          ...planData,
-          productCatalogId: product.id
-        }
+      const existing = await prisma.plan.findFirst({
+        where: { name: planData.name },
       });
+      if (existing) {
+        await prisma.plan.update({
+          where: { id: existing.id },
+          data: {
+            price: planData.price,
+            messageLimit: planData.messageLimit,
+            botLimit: planData.botLimit,
+            trialDays: planData.trialDays,
+            productCatalogId: product.id,
+          },
+        });
+      } else {
+        await prisma.plan.create({
+          data: {
+            ...planData,
+            productCatalogId: product.id,
+          },
+        });
+      }
       console.log(`  - Plan processed: ${planData.name}`);
     }
   }

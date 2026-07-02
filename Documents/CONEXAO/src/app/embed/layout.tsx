@@ -77,6 +77,7 @@ export default function EmbedLayout({
                 <div className="flex items-center gap-8">
                     <div className="flex items-center gap-2">
                         <img src="https://bs3.conext.click/media/system/logo-white-1773758797708-logo-white.png" alt="ConextBot" className="h-7 w-auto" />
+                        <span className="text-lg font-black tracking-tighter text-white">CONEXT<span className="text-purple-500 text-xs shadow-sm">.click</span></span>
                     </div>
                     
                     <nav className="hidden sm:flex items-center gap-1">

@@ -15,6 +15,11 @@ export interface MessageJob {
 
 const QUEUE_NAME = 'message-processing';
 
+const JOB_RETENTION = {
+    removeOnComplete: { count: 50, age: 3600 },
+    removeOnFail: { count: 100, age: 86_400 },
+} as const;
+
 let messageQueue: Queue<MessageJob> | null = null;
 
 export function getMessageQueue(): Queue<MessageJob> {
@@ -24,8 +29,7 @@ export function getMessageQueue(): Queue<MessageJob> {
             defaultJobOptions: {
                 attempts: 3,
                 backoff: { type: 'exponential', delay: 2000 },
-                removeOnComplete: 100,
-                removeOnFail: 500,
+                ...JOB_RETENTION,
             },
         });
     }
@@ -59,6 +63,7 @@ export function startMessageWorker(concurrency = 4): Worker<MessageJob> {
         {
             connection: getRedis(),
             concurrency,
+            ...JOB_RETENTION,
         }
     );
 
@@ -85,8 +90,7 @@ export function getAuditQueue(): Queue<AuditJob> {
             connection: getRedis(),
             defaultJobOptions: {
                 attempts: 1, // Let's not retry AI tasks blindly to save money
-                removeOnComplete: 100,
-                removeOnFail: 500,
+                ...JOB_RETENTION,
             },
         });
     }
@@ -109,6 +113,7 @@ export function startAuditWorker(concurrency = 2): Worker<AuditJob> {
         {
             connection: getRedis(),
             concurrency,
+            ...JOB_RETENTION,
         }
     );
 

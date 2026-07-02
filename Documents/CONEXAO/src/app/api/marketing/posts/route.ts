@@ -10,10 +10,20 @@ export async function GET(req: Request) {
         const tenantId = await getEffectiveTenantId(clientId);
         if (!tenantId) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
+        const limitParam = url.searchParams.get("limit");
+        const limit = limitParam ? Math.min(Math.max(parseInt(limitParam), 1), 100) : 20;
+
+        const status = url.searchParams.get("status");
+
+        const whereClause: any = { tenantId };
+        if (status) {
+            whereClause.status = status;
+        }
+
         const posts = await prisma.marketingPost.findMany({
-            where: { tenantId },
+            where: whereClause,
             orderBy: { createdAt: "desc" },
-            take: 20,
+            take: limit,
             include: { bot: { select: { name: true } } }
         });
 

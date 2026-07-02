@@ -4,15 +4,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
-export async function GET(req: Request, { params }: { params: { id: string, jobId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string, jobId: string }> }) {
     try {
         const session = await getServerSession(authOptions) as any;
         if (!session?.user) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const clientId = params.id;
-        const jobId = params.jobId;
+        const { id: clientId, jobId } = await params;
 
         // Validar permissão
         const agency = await prisma.agency.findUnique({

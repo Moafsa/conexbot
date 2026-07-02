@@ -70,20 +70,26 @@ export async function GET() {
 
             const planResults = [];
             for (const planData of plans) {
-                const plan = await prisma.plan.upsert({
+                const existing = await prisma.plan.findFirst({
                     where: { name: planData.name },
-                    update: {
-                        price: planData.price,
-                        messageLimit: planData.messageLimit,
-                        botLimit: planData.botLimit,
-                        trialDays: planData.trialDays,
-                        productCatalogId: product.id
-                    },
-                    create: {
-                        ...planData,
-                        productCatalogId: product.id
-                    }
                 });
+                const plan = existing
+                    ? await prisma.plan.update({
+                        where: { id: existing.id },
+                        data: {
+                            price: planData.price,
+                            messageLimit: planData.messageLimit,
+                            botLimit: planData.botLimit,
+                            trialDays: planData.trialDays,
+                            productCatalogId: product.id,
+                        },
+                    })
+                    : await prisma.plan.create({
+                        data: {
+                            ...planData,
+                            productCatalogId: product.id,
+                        },
+                    });
                 planResults.push(plan.name);
             }
             results.push({ product: product.name, plans: planResults });

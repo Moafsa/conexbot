@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
     // Parse composite state: tenantId__accountId__shopUrl__wpRedirectUri or tenantId__shopUrl__wpRedirectUri
     const parts = state.split("__");
-    let tenantId = parts[0];
+    const tenantId = parts[0];
     let accountId: string | null = null;
     let shopUrl: string | null = null;
     let wpRedirectUri: string | null = null;

@@ -247,6 +247,7 @@ model Bot {
   productCategories       ProductCategory[]
   productAddonGroups      ProductAddonGroup[]
   carts                   Cart[]
+  vectorStores            VectorStore[]
   smtpConfigs             SmtpConfig[]
 }
 
@@ -943,4 +944,14 @@ enum FunnelStage {
   CUSTOMER
   SUPPORT
   CHURNED
+}
+
+model VectorStore {
+  id        String                       @id @default(uuid())
+  content   String
+  metadata  Json?
+  embedding Unsupported("vector(1536)")?
+  botId     String
+  createdAt DateTime                     @default(now())
+  bot       Bot                          @relation(fields: [botId], references: [id], onDelete: Cascade)
 }

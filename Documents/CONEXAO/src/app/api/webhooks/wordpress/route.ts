@@ -3,19 +3,7 @@ import { NextResponse } from 'next/server';
 import { MessageProcessor } from '@/services/engine/processor';
 import prisma from '@/lib/prisma';
 import { verifyWpToken } from '@/lib/wp-token';
-import fs from 'fs';
-import path from 'path';
-
-function logToFile(msg: string) {
-    const timestamp = new Date().toISOString();
-    const line = `[${timestamp}] ${msg}\n`;
-    const logPath = process.platform === 'win32' ? path.join(process.cwd(), 'debug-today.log') : '/tmp/debug-today.log';
-    try {
-        fs.appendFileSync(logPath, line);
-    } catch (e) {
-        console.error('Failed to log to file:', e);
-    }
-}
+import { logToFile } from '@/services/engine/logger';
 
 export async function POST(req: Request) {
     try {

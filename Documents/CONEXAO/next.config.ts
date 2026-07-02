@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
     eslint: {
         ignoreDuringBuilds: true,
     },
+    async redirects() {
+        return [
+            { source: '/logo-colored.png', destination: '/logo-colored.svg', permanent: false },
+        ];
+    },
     /* config options here */
     experimental: {
         serverActions: {
@@ -25,7 +30,23 @@ const nextConfig: NextConfig = {
                     {
                         key: 'Content-Security-Policy',
                         value: "frame-ancestors *",
-                    }
+                    },
+                    {
+                        key: 'X-Content-Type-Options',
+                        value: 'nosniff',
+                    },
+                    {
+                        key: 'Referrer-Policy',
+                        value: 'strict-origin-when-cross-origin',
+                    },
+                    {
+                        key: 'Permissions-Policy',
+                        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+                    },
+                    {
+                        key: 'Strict-Transport-Security',
+                        value: 'max-age=31536000; includeSubDomains',
+                    },
                 ],
             },
             {

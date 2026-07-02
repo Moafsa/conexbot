@@ -15,8 +15,7 @@ export async function GET(req: Request) {
             MetaAdsService.listCampaigns(tenantId),
             MetaAdsService.getInsights(tenantId),
             MetaAdsService.getAccountBalance(tenantId).catch(() => null),
-            // Tenta Google Ads se configurado
-            require("@/services/marketing/google-ads-service").GoogleAdsService.getCampaignInsights(tenantId).catch(() => null)
+            GoogleAdsService.getCampaignInsights(tenantId).catch(() => null)
         ]);
 
         return NextResponse.json({ 

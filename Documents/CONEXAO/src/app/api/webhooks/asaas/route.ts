@@ -162,10 +162,17 @@ export async function POST(req: Request) {
             });
 
             if (subscription) {
-                await prisma.subscription.update({
-                    where: { id: subscription.id },
-                    data: { status: 'PAST_DUE' },
+                // Só marca PAST_DUE se o pagamento em questão ainda não foi quitado
+                // (evita webhook atrasado sobrescrever ACTIVE após quitação manual no superadmin)
+                const paymentRecord = await prisma.payment.findUnique({
+                    where: { externalId: externalId },
                 });
+                if (!paymentRecord || (paymentRecord.status !== 'PAID' && paymentRecord.status !== 'RECEIVED' && paymentRecord.status !== 'CONFIRMED')) {
+                    await prisma.subscription.update({
+                        where: { id: subscription.id },
+                        data: { status: 'PAST_DUE' },
+                    });
+                }
             }
         }
 

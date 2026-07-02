@@ -46,7 +46,10 @@ export default function AgendaDocsPage() {
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xs border-4 border-white/5 shadow-2xl">01.</div>
                         <div>
                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-3">Horário de Disponibilidade</h4>
-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">"Segunda a Sexta, das 09h às 18h". Configure os limites de atuação do bot em **Configurações &gt; Geral**.</p>
+                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
+                                <span className="not-italic">&quot;Segunda a Sexta, das 09h às 18h&quot;</span>. Configure os limites de atuação do bot em{' '}
+                                <strong className="not-italic">Configurações &gt; Geral</strong>.
+                            </p>
                         </div>
                     </div>
 
@@ -54,7 +57,9 @@ export default function AgendaDocsPage() {
                         <div className="w-10 h-10 rounded-full bg-purple-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xs border-4 border-white/5 shadow-2xl">02.</div>
                         <div>
                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-3">Vínculo Google Calendar</h4>
-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Em **Meus Bots &gt; Google Setup**, autorize o acesso à sua conta. Isso permitirá a leitura e escrita automática de eventos.</p>
+                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
+                                Em <strong className="not-italic">Meus Bots &gt; Google Setup</strong>, autorize o acesso à sua conta. Isso permitirá a leitura e escrita automática de eventos.
+                            </p>
                         </div>
                     </div>
 

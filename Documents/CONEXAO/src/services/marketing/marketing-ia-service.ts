@@ -542,8 +542,6 @@ export const MarketingIAService = {
      */
     async generateRecommendations(tenantId: string) {
         try {
-            const { MetaAdsService } = require("./meta-ads-service");
-            
             // 1. Coleta de dados reais
             const [insights, keywordHistory, recentPosts] = await Promise.all([
                 MetaAdsService.getInsights(tenantId).catch(() => null),

@@ -40,7 +40,8 @@ function ErrorBanner() {
     );
 }
 
-export default function FinancePage() {
+function FinancePageContent() {
+    const searchParams = useSearchParams();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -67,6 +68,13 @@ export default function FinancePage() {
         }, 300);
         return () => clearTimeout(timeout);
     }, [ordersPage, ordersSearch]);
+
+    useEffect(() => {
+        const q = searchParams.get('search') || searchParams.get('clientEmail');
+        if (q) {
+            setOrdersSearch(q);
+        }
+    }, [searchParams]);
 
     const fetchOrders = async (page = 1, search = '') => {
         setTableLoading(true);
@@ -170,7 +178,8 @@ export default function FinancePage() {
     }
 
     const { summary, asaas, subscriptions, invoices } = stats || {};
-    const subscription = subscriptions?.find((s: any) => s.type !== 'WRITER_PLUGIN') || subscriptions?.[0];
+    const subscription =
+        subscriptions?.find((s: any) => s.type !== "WRITER_PLUGIN") ?? subscriptions?.[0];
 
     return (
         <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
@@ -268,6 +277,7 @@ export default function FinancePage() {
                                 <Receipt size={20} className="text-purple-400" />
                                 Assinatura
                             </h3>
+                        </div>
                         <div className="space-y-6">
                             {(subscriptions && subscriptions.length > 0) ? (
                                 subscriptions.map((sub: any) => (
@@ -318,7 +328,6 @@ export default function FinancePage() {
                             >
                                 Alterar Plano / Upgrade
                             </button>
-                        </div>
                         </div>
                     </div>
 
@@ -553,6 +562,18 @@ export default function FinancePage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function FinancePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 className="animate-spin text-white/30" size={32} />
+            </div>
+        }>
+            <FinancePageContent />
+        </Suspense>
     );
 }
 

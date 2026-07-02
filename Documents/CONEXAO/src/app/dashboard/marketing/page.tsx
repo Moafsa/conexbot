@@ -1,6 +1,7 @@
 "use client";
 import { ContentTab } from './components/ContentTab';
 import { AdsTab } from './components/AdsTab';
+import { CalendarTab } from './components/CalendarTab';
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
@@ -61,6 +62,7 @@ function MarketingContent() {
     const [showCampaignModal, setShowCampaignModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingPost, setEditingPost] = useState<any>(null);
+    const [prefilledDate, setPrefilledDate] = useState("");
 
     useEffect(() => {
         const id = searchParams.get("clientId");
@@ -69,6 +71,7 @@ function MarketingContent() {
 
     const tabs = [
         { id: "overview", label: "Visão Geral", icon: BarChart3 },
+        { id: "calendar", label: "Calendário", icon: Calendar },
         { id: "leads", label: "Conversas com Leads", icon: History },
         { id: "seo", label: "SEO & Keywords", icon: SearchCode },
         { id: "content", label: "Criador de Posts", icon: Sparkles },
@@ -81,7 +84,7 @@ function MarketingContent() {
             const query = selectedClientId ? `?clientId=${selectedClientId}` : "";
             const res = await fetch(`/api/bots${query}`);
             const data = await res.json();
-            if (res.ok) setBots(data);
+            if (res.ok) setBots(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Erro ao buscar bots:", error);
         } finally {
@@ -105,12 +108,12 @@ function MarketingContent() {
             const recsData = recsRes.ok ? await recsRes.json() : { recommendations: [] };
 
             setData({
-                campaigns: adsData.campaigns || [],
+                campaigns: Array.isArray(adsData.campaigns) ? adsData.campaigns : [],
                 insights: adsData.insights || null,
-                googleAds: adsData.googleAds || null,
+                googleAds: Array.isArray(adsData.googleAds) ? adsData.googleAds : null,
                 postsCount: statsData.postsCount || 0,
-                recentPosts: postsData,
-                recommendations: recsData.recommendations || []
+                recentPosts: Array.isArray(postsData) ? postsData : [],
+                recommendations: Array.isArray(recsData.recommendations) ? recsData.recommendations : []
             });
         } catch (error) {
             console.error("Erro ao buscar dados de marketing:", error);
@@ -122,7 +125,7 @@ function MarketingContent() {
             const res = await fetch("/api/agency/clients");
             if (res.ok) {
                 const clients = await res.json();
-                setAgencyClients(clients);
+                setAgencyClients(Array.isArray(clients) ? clients : []);
                 setIsAgency(true);
             }
         } catch (e) {
@@ -294,14 +297,37 @@ function MarketingContent() {
                     metaInsights: data.insights,
                     metaCampaigns: data.campaigns,
                     googleAds: data.googleAds,
-                    recentPosts: data.recentPosts || []
+                    recentPosts: data.recentPosts || [],
+                    recommendations: data.recommendations || [],
                 }} refresh={fetchMarketingData} onEdit={(post: any) => {
                     setEditingPost(post);
                     setShowEditModal(true);
                 }} />}
+                {activeTab === "calendar" && (
+                    <CalendarTab 
+                        selectedClientId={selectedClientId}
+                        bots={bots}
+                        onEditPost={(post: any) => {
+                            setEditingPost(post);
+                            setShowEditModal(true);
+                        }}
+                        onNavigateToCreate={(date: string) => {
+                            setPrefilledDate(date);
+                            setActiveTab("content");
+                        }}
+                    />
+                )}
                 {activeTab === "leads" && <LeadsConversationTab bots={bots} loadingBots={loadingBots} />}
                 {activeTab === "seo" && <SEOTab />}
-                {activeTab === "content" && <ContentTab bots={bots} loadingBots={loadingBots} selectedClientId={selectedClientId} />}
+                {activeTab === "content" && (
+                    <ContentTab 
+                        bots={bots} 
+                        loadingBots={loadingBots} 
+                        selectedClientId={selectedClientId} 
+                        prefilledDate={prefilledDate}
+                        onClearPrefilledDate={() => setPrefilledDate("")}
+                    />
+                )}
                 {activeTab === "ads" && <AdsTab selectedClientId={selectedClientId} setShowCampaignModal={setShowCampaignModal} bots={bots} loadingBots={loadingBots} agencyClients={agencyClients} />}
                 {activeTab === "settings" && <SettingsTab selectedClientId={selectedClientId} />}
             </div>
@@ -483,20 +509,23 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
 
 function OverviewTab({ stats, refresh, onEdit }: any) {
     const [platformFilter, setPlatformFilter] = useState("ALL"); // ALL, META, GOOGLE
+    const [draftPage, setDraftPage] = useState(1);
+    const [historyPage, setHistoryPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
 
     const postsCount = stats.postsCount || 0;
-    const recentPosts = stats.recentPosts || [];
+    const recentPosts = Array.isArray(stats.recentPosts) ? stats.recentPosts : [];
 
-    // Parse Meta
-    const metaCampaigns = stats.metaCampaigns || [];
+    // Parse Meta (API returns numeric fields as strings)
+    const metaCampaigns = Array.isArray(stats.metaCampaigns) ? stats.metaCampaigns : [];
     const metaInsights = stats.metaInsights || { spend: 0, impressions: 0, clicks: 0 };
-    const metaSpend = metaInsights.spend || 0;
-    const metaImpressions = metaInsights.impressions || 0;
-    const metaClicks = metaInsights.clicks || 0;
+    const metaSpend = Number(metaInsights.spend || 0);
+    const metaImpressions = Number(metaInsights.impressions || 0);
+    const metaClicks = Number(metaInsights.clicks || 0);
     const metaActiveCount = metaCampaigns.filter((c: any) => c.status === 'ACTIVE').length;
 
     // Parse Google
-    const googleCampaigns = stats.googleAds || [];
+    const googleCampaigns = Array.isArray(stats.googleAds) ? stats.googleAds : [];
     const googleSpend = googleCampaigns.reduce((acc: number, cur: any) => acc + (cur.metrics?.cost_micros ? cur.metrics.cost_micros / 1000000 : 0), 0);
     const googleImpressions = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.impressions || 0), 0);
     const googleClicks = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.clicks || 0), 0);
@@ -526,12 +555,6 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
     }
 
     const displayCtr = displayImpressions > 0 ? ((displayClicks / displayImpressions) * 100) : 0;
-
-
-    // Paginação
-    const [draftPage, setDraftPage] = useState(1);
-    const [historyPage, setHistoryPage] = useState(1);
-    const ITEMS_PER_PAGE = 5;
 
     const drafts = recentPosts.filter((p: any) => p.status === 'DRAFT');
     const history = recentPosts.filter((p: any) => p.status !== 'DRAFT');
@@ -1149,7 +1172,7 @@ function SEOTab() {
                             className="flex-1 bg-transparent border-none outline-none px-4 text-white placeholder:text-gray-600"
                         />
                         <button 
-                            onClick={handleSearch}
+                            onClick={() => handleSearch()}
                             disabled={loading}
                             className="bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 disabled:opacity-50"
                         >

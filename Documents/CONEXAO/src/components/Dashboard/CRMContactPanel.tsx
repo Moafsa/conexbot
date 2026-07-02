@@ -239,13 +239,36 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                 </div>
                             ) : (
                                 messages.map((msg: any) => (
-                                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                            ? 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
-                                            : 'bg-indigo-600 text-white rounded-tr-none shadow-lg'
-                                            }`}>
+                                    <div
+                                        key={msg.id}
+                                        className={`flex ${
+                                            msg.role === 'user'
+                                                ? 'justify-start'
+                                                : msg.role === 'system'
+                                                  ? 'justify-center'
+                                                  : 'justify-end'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                                                msg.role === 'user'
+                                                    ? 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
+                                                    : msg.role === 'system'
+                                                      ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-center'
+                                                      : 'bg-indigo-600 text-white rounded-tr-none shadow-lg'
+                                            }`}
+                                        >
                                             {msg.content}
-                                            <p className={`text-[9px] mt-1 ${msg.role === 'user' ? 'text-gray-400' : 'text-indigo-200'}`}>
+                                            <p
+                                                className={`text-[9px] mt-1 ${
+                                                    msg.role === 'user'
+                                                        ? 'text-gray-400'
+                                                        : msg.role === 'system'
+                                                          ? 'text-amber-600'
+                                                          : 'text-indigo-200'
+                                                }`}
+                                            >
+                                                {msg.role === 'system' ? 'Registro CRM · ' : ''}
                                                 {new Date(msg.createdAt).toLocaleTimeString()}
                                             </p>
                                         </div>

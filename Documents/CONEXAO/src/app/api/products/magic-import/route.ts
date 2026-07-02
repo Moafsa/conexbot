@@ -4,7 +4,13 @@ import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const dynamic = 'force-dynamic';
+
+function getOpenAI() {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API Key not configured');
+    return new OpenAI({ apiKey });
+}
 
 export async function POST(req: Request) {
     try {
@@ -32,7 +38,7 @@ export async function POST(req: Request) {
         if (!bot) return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
 
         // Call OpenAI to structure the menu
-        const response = await openai.chat.completions.create({
+        const response = await getOpenAI().chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
                 {
@@ -88,7 +94,6 @@ Sempre retorne apenas o JSON, sem markdown backticks.`
         
         // Begin Database Transaction to insert everything
         await prisma.$transaction(async (tx) => {
-            let orderIndex = 0;
             for (const cat of categories) {
                 const categoryRecord = await tx.productCategory.create({
                     data: {

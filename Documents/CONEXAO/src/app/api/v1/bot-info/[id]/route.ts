@@ -1,19 +1,22 @@
 export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(req: Request, { params }: { params: any }) {
+export async function GET(
+    _req: NextRequest,
+    context: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params;
-        
+        const { id } = await context.params;
+
         const bot = await prisma.bot.findUnique({
             where: { id },
             select: {
                 id: true,
                 name: true,
                 businessType: true,
-                status: true
-            }
+                status: true,
+            },
         });
 
         if (!bot) {

@@ -1,6 +1,12 @@
 # Override para produção: app Next.js + rede Traefik
 # Uso: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
-# Definir CONEXBOT_DOMAIN (ex: conexbot.seudominio.com) e .env com segredos
+# Definir CONEXBOT_DOMAIN (ex.: app.conext.click) e .env com segredos
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
 
 services:
   app:
@@ -9,11 +15,13 @@ services:
       dockerfile: Dockerfile
     container_name: conext-app
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-password123}@postgres:5432/conext_db?schema=public
+      REDIS_URL: redis://redis:6379
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-with-openssl-rand-base64-32}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.conext.click}
       UZAPI_URL: http://uzapi:8080
@@ -21,7 +29,6 @@ services:
       WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
       INTERNAL_WEBHOOK_URL: http://app:3000
       NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL:-https://app.conext.click}
-      REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -38,6 +45,8 @@ services:
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: media
+      CHATWOOT_BASE_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
+      CHATWOOT_SUPERADMIN_TOKEN: ${CHATWOOT_SUPERADMIN_TOKEN:-}
     networks:
       - default
       - proxy
@@ -50,6 +59,45 @@ services:
       - "traefik.http.services.conexbot.loadbalancer.server.port=3000"
     command: sh -c "prisma migrate deploy && exec node server.js"
 
+  message-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: conexao-worker
+    container_name: conext-worker
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-password123}@postgres:5432/conext_db?schema=public
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-with-openssl-rand-base64-32}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.conext.click}
+      UZAPI_URL: http://uzapi:8080
+      UZAPI_SECRET_KEY: ${UZAPI_SECRET_KEY:-admin_token_123}
+      WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
+      INTERNAL_WEBHOOK_URL: http://app:3000
+      NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL:-https://app.conext.click}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_URL: https://bs3.conext.click
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: media
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: https://bs3.conext.click
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: media
+      WORKER_CONCURRENCY: "4"
+
   minio:
     networks:
       - default
@@ -59,6 +107,69 @@ services:
     networks:
       - default
       - proxy
+
+  chatwoot-web:
+    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
+    container_name: conext-chatwoot-web
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: production
+      NODE_ENV: production
+      INSTALLATION_ENV: docker
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:-51fc1fb0019b047767bc67088a675893fa0fb6ac37e3205ec4ebadd3d59ea646}
+      FRONTEND_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      REDIS_URL: redis://redis:6379/1
+      ACTIVE_STORAGE_SERVICE: local
+    volumes:
+      - chatwoot_storage:/app/storage
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.chatwoot.rule=Host(`woot.conext.click`)"
+      - "traefik.http.routers.chatwoot.entrypoints=web"
+      - "traefik.http.services.chatwoot.loadbalancer.server.port=3000"
+    command: sh -c "rm -f tmp/pids/server.pid && bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
+
+  chatwoot-worker:
+    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
+    container_name: conext-chatwoot-worker
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: production
+      NODE_ENV: production
+      INSTALLATION_ENV: docker
+      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:-51fc1fb0019b047767bc67088a675893fa0fb6ac37e3205ec4ebadd3d59ea646}
+      FRONTEND_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: chatwoot_production
+      POSTGRES_USERNAME: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      REDIS_URL: redis://redis:6379/1
+      ACTIVE_STORAGE_SERVICE: local
+    volumes:
+      - chatwoot_storage:/app/storage
+    networks:
+      - default
+    command: bundle exec sidekiq -C config/sidekiq.yml
 
 networks:
   proxy:

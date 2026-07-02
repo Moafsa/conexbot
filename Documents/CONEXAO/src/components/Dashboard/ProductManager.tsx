@@ -22,8 +22,10 @@ interface Product {
     addonGroups?: {
         id: string;
         name: string;
-        maxChoices: number;
-        addons: { id: string; name: string; price: number }[];
+        minSelect?: number;
+        maxSelect?: number;
+        maxChoices?: number;
+        addons?: { id: string; name: string; price: number }[];
     }[];
 }
 
@@ -198,9 +200,9 @@ export function ProductManager({ botId }: { botId: string }) {
             addonGroups: product.addonGroups ? product.addonGroups.map(g => ({
                 id: g.id,
                 name: g.name,
-                minSelect: g.minSelect || 0,
-                maxSelect: g.maxSelect || 1,
-                addons: g.addons ? g.addons.map((a: any) => ({ id: a.id, name: a.name, price: a.price })) : []
+                minSelect: g.minSelect ?? 0,
+                maxSelect: g.maxSelect ?? g.maxChoices ?? 1,
+                addons: g.addons ? g.addons.map((a) => ({ id: a.id, name: a.name, price: a.price })) : []
             })) : []
         });
         setIsModalOpen(true);

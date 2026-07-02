@@ -99,10 +99,28 @@ export default function ClientAuditPage() {
     };
 
     const pollAuditStatus = (jobId: string) => {
+        let attempts = 0;
+        const maxAttempts = 60; // ~3 minutes at 3s intervals
+
         const interval = setInterval(async () => {
+            attempts++;
+            if (attempts > maxAttempts) {
+                clearInterval(interval);
+                setError('A auditoria está demorando mais que o esperado. Tente novamente em alguns instantes.');
+                setAuditing(false);
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/agency/clients/${clientId}/audit/status/${jobId}`);
                 const data = await res.json();
+
+                if (!res.ok) {
+                    clearInterval(interval);
+                    setError(data.error || 'Erro ao consultar status da auditoria.');
+                    setAuditing(false);
+                    return;
+                }
 
                 if (data.status === 'COMPLETED') {
                     clearInterval(interval);

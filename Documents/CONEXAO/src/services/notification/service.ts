@@ -41,7 +41,7 @@ export class NotificationService {
     }
 
     /**
-     * Sends a WhatsApp message using a specific bot's session
+     * WhatsApp usando uma sessão UzAPI específica (ex.: o próprio bot em transbordo).
      */
     static async sendWhatsAppAsBot(botSessionName: string, to: string, message: string) {
         try {
@@ -70,25 +70,58 @@ export class NotificationService {
     }
 
     /**
-     * Sends a WhatsApp message using the System Bot
+     * WhatsApp genérico (alertas de limite, etc.): usa o bot de sistema do admin.
      */
-    static async sendWhatsApp(to: string, message: string) {
+    static async sendWhatsApp(to: string, message: string): Promise<boolean> {
         try {
             const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-            if (!config || !config.systemBotId) {
+            if (!config?.systemBotId) {
                 console.warn('[NotificationService] System Bot not configured');
                 return false;
             }
 
-            const bot = await prisma.bot.findUnique({ where: { id: config.systemBotId } });
-            if (!bot || !bot.sessionName) {
+            const sysBot = await prisma.bot.findUnique({ where: { id: config.systemBotId } });
+            if (!sysBot?.sessionName) {
                 console.warn('[NotificationService] System Bot or session not found');
                 return false;
             }
 
-            return this.sendWhatsAppAsBot(bot.sessionName, to, message);
+            return this.sendWhatsAppAsBot(sysBot.sessionName, to, message);
         } catch (error) {
             console.error('[NotificationService] WhatsApp Error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Transbordo humano (chamar_humano): sempre pela sessão UzAPI do bot que está na conversa — não usa bot de sistema.
+     */
+    static async sendHandoffWhatsAppFromBotSession(
+        sessionName: string,
+        to: string,
+        message: string
+    ): Promise<boolean> {
+        try {
+            const token = sessionName?.trim();
+            if (!token) {
+                console.warn('[NotificationService] Handoff WhatsApp: bot sem sessionName (conecte o bot na UzAPI)');
+                return false;
+            }
+            const cleanTo = PhoneUtils.normalizeBrazilWhatsAppE164(to);
+            if (!cleanTo) {
+                console.warn('[NotificationService] Handoff WhatsApp: número vazio após normalização');
+                return false;
+            }
+            const remoteJid = `${cleanTo}@s.whatsapp.net`;
+            const sent = await UzapiService.sendMessage(token, remoteJid, message);
+            if (!sent) {
+                console.warn('[NotificationService] Handoff WhatsApp falhou (UzAPI — use a sessão deste mesmo bot)');
+                return false;
+            }
+            console.log('[NotificationService] Handoff WhatsApp: enviado com sucesso');
+            return true;
+        } catch (error) {
+            console.error('[NotificationService] Handoff WhatsApp Error:', error);
             return false;
         }
     }

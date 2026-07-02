@@ -67,7 +67,7 @@ import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
-import { format, addHours } from 'date-fns';
+import { format, addMinutes } from 'date-fns';
 import { mercadoLivreTools } from './mcp/mercadolivre';
 
 const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
@@ -815,44 +815,91 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                             } catch (e: any) { toolResult = `Erro ao agendar: ${e.message}`; }
                         } else if (name === 'chamar_humano') {
                             try {
-                                if (handoffDone || (conversation.pausedUntil && new Date(conversation.pausedUntil) > new Date())) {
+                                if (handoffDone) {
                                     toolResult = "Atendimento humano já solicitado. O bot está pausado e aguardando um atendente.";
-                                    handoffDone = true;
                                 } else {
                                     logToFile(`[Processor] Handoff requested: ${args.motivo}`);
                                     const humanStage = await prisma.crmStage.findFirst({
                                         where: { botId: bot.id, name: { contains: 'HUMAN', mode: 'insensitive' } }
                                     });
+                                    const humanStageName = humanStage?.name || 'ATENDIMENTO HUMANO';
                                     await prisma.contact.update({
                                         where: { id: existingContact.id },
-                                        data: { 
-                                            funnelStage: humanStage?.name || 'ATENDIMENTO HUMANO',
-                                            stageId: humanStage?.id || undefined
-                                        }
+                                        data: {
+                                            funnelStage: humanStageName,
+                                            stageId: humanStage?.id || undefined,
+                                            lastAiInsight: `Transbordo humano: ${args.motivo}`,
+                                            lastActive: new Date(),
+                                        },
                                     });
-                                    // SILENCER
-                                    const pauseMinutes = typeof (bot as any).handoffPause === 'number' ? (bot as any).handoffPause : 1440;
-                                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
+                                    // Bot silenciado por N minutos (configurável por bot.handoffPause; default 1440 = 24h)
+                                    (existingContact as { funnelStage?: string }).funnelStage = humanStageName;
+                                    const pauseMinutes = Number((bot as any).handoffPause ?? 1440);
+                                    const pausedUntil = addMinutes(new Date(), Number.isFinite(pauseMinutes) && pauseMinutes > 0 ? pauseMinutes : 1440);
                                     await prisma.conversation.update({
                                         where: { id: conversation.id },
-                                        data: { pausedUntil } as any
+                                        data: { pausedUntil } as any,
                                     });
                                     const title = `🚨 Atendimento Humano Solicitado`;
                                     const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
-                                    
-                                    const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
+                                    const channels = (bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'])
+                                        .map((c: string) => c.trim().toUpperCase())
+                                        .filter(Boolean);
                                     const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
                                     const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
 
                                     if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
-                                    
+                                    let whatsappHandoffOk = true;
                                     if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
-                                        await NotificationService.sendWhatsAppAsBot(identifier, whatsappNotifyTarget, message);
+                                        const last4 = String(whatsappNotifyTarget).replace(/\D/g, '').slice(-4);
+                                        const sessionForHandoff = bot.sessionName || identifier;
+                                        console.log(
+                                            `[Processor] chamar_humano: WhatsApp -> ****${last4} | sessão UzAPI do bot: ${sessionForHandoff ? `"${sessionForHandoff}"` : 'VAZIO (conecte o WhatsApp deste bot)'}`
+                                        );
+                                        whatsappHandoffOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
+                                            sessionForHandoff,
+                                            whatsappNotifyTarget,
+                                            message
+                                        );
+                                        if (!whatsappHandoffOk) {
+                                            console.warn(
+                                                '[Processor] chamar_humano: WhatsApp ao humano falhou — use a sessão deste bot (mesmo que atende o cliente) na UzAPI.'
+                                            );
+                                        }
+                                    } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
+                                        console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');
+                                        whatsappHandoffOk = false;
+                                    } else if (!channels.includes('WHATSAPP')) {
+                                        console.warn(
+                                            `[Processor] chamar_humano: canal WHATSAPP desligado (notifyChannels="${(bot as { notifyChannels?: string }).notifyChannels || '—'}") — não envia WhatsApp ao humano.`
+                                        );
+                                    }
+                                    {
+                                        const destDigits = whatsappNotifyTarget?.replace(/\D/g, '') || '';
+                                        const destMask = destDigits ? `****${destDigits.slice(-4)}` : '—';
+                                        let envioLinha: string;
+                                        if (!channels.includes('WHATSAPP')) {
+                                            envioLinha = 'WhatsApp ao atendente: não (canal WHATSAPP desligado no bot).';
+                                        } else if (!whatsappNotifyTarget) {
+                                            envioLinha = 'WhatsApp ao atendente: não (sem número transbordo/perfil).';
+                                        } else if (whatsappHandoffOk) {
+                                            envioLinha = `WhatsApp ao atendente: enviado para ${destMask}.`;
+                                        } else {
+                                            envioLinha = `WhatsApp ao atendente: não entregue (destino ${destMask}; sessão UzAPI do bot ou API).`;
+                                        }
+                                        await prisma.message.create({
+                                            data: {
+                                                conversationId: conversation.id,
+                                                role: 'system',
+                                                content: `[Para o humano — texto enviado / previsto]\n${message}\n\n${envioLinha}`,
+                                            },
+                                        });
                                     }
                                     if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
-                                    
+                                    toolResult = whatsappHandoffOk
+                                        ? "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado."
+                                        : "Seu pedido foi registrado no painel (notificação interna). O WhatsApp ao atendente não foi entregue: verifique o número de transbordo/perfil e se este bot está conectado na UzAPI (mesma sessão do atendimento). O bot foi pausado.";
                                     handoffDone = true;
-                                    toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
                                 }
                             } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
                         } else if (name === 'gerar_fatura') {
@@ -1354,8 +1401,18 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
             return { text: cleanResponse, media: mediaMatches.map((m: any) => m[1]) };
 
         } catch (error: any) {
-            logToFile(`[Processor] ERROR: ${error?.message || error}`);
-            return null;
+            const raw = error?.message || String(error);
+            console.error('[Processor] ERROR:', raw);
+            logToFile(`[Processor] ERROR: ${raw}`);
+            const isAiQuota =
+                /429|quota|All AI providers|rate limit|exceeded|billing|Gemini API Error|insufficient|resource_exhausted/i.test(
+                    raw
+                );
+            return {
+                text: isAiQuota
+                    ? 'O serviço de IA está indisponível agora (limite de uso ou quota excedida). Confira as chaves de API no painel (OpenAI / Gemini / OpenRouter) ou tente de novo em alguns minutos.'
+                    : 'Erro ao processar a mensagem. Tente novamente em instantes.',
+            };
         }
     },
 };

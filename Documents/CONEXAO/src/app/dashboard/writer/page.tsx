@@ -25,12 +25,12 @@ export default async function WriterDashboardPage() {
 
     const tenant = await prisma.tenant.findUnique({
         where: { email: session.user.email },
-        include: { 
+        include: {
             subscriptions: {
-                include: { licenseKeys: true, plan: true }
-            }, 
-            usageCounter: true 
-        }
+                include: { licenseKeys: true, plan: true },
+            },
+            usageCounter: true,
+        },
     });
 
     if (!tenant) return <div className="p-8 text-white">Tenant não encontrado.</div>;

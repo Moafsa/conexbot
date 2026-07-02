@@ -1,12 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useParams } from 'next/navigation';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+}
+
+function getOrCreateSessionId(botId: string): string {
+    const key = `conext_session_${botId}`;
+    let sId = localStorage.getItem(key);
+    if (!sId) {
+        sId = Math.random().toString(36).substring(2, 15);
+        localStorage.setItem(key, sId);
+    }
+    return sId;
 }
 
 export default function WebChatWidget() {
@@ -17,64 +27,69 @@ export default function WebChatWidget() {
     const [loading, setLoading] = useState(false);
     const [botName, setBotName] = useState('Assistente IA');
     const [sessionId, setSessionId] = useState('');
+    /** Mesmo valor que o estado, preenchido antes do paint — evita enviar com "" e gravar em remoteId errado (ex.: web_user). */
+    const sessionIdRef = useRef<string>('');
+    const [sessionReady, setSessionReady] = useState(false);
     const [userContext, setUserContext] = useState<{ name?: string, email?: string }>({});
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    useLayoutEffect(() => {
+        if (typeof window === 'undefined' || !botId) return;
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const wpName = searchParams.get('name');
+        const wpEmail = searchParams.get('email');
+
+        if (wpName || wpEmail) {
+            setUserContext({ name: wpName || undefined, email: wpEmail || undefined });
+        }
+
+        const sId = getOrCreateSessionId(botId);
+        sessionIdRef.current = sId;
+        setSessionId(sId);
+        setSessionReady(true);
+    }, [botId]);
+
     useEffect(() => {
-        // Inicializar ID de sessão único
-        if (typeof window !== 'undefined') {
-            const searchParams = new URLSearchParams(window.location.search);
-            const wpName = searchParams.get('name');
-            const wpEmail = searchParams.get('email');
-            
-            if (wpName || wpEmail) {
-                setUserContext({ name: wpName || undefined, email: wpEmail || undefined });
-            }
+        if (!sessionReady || !botId) return;
 
-            let sId = localStorage.getItem(`conext_session_${botId}`);
-            if (!sId) {
-                sId = Math.random().toString(36).substring(2, 15);
-                localStorage.setItem(`conext_session_${botId}`, sId);
-            }
-            setSessionId(sId);
-            
-            // Buscar informações do bot
-            fetch(`/api/v1/bot-info/${botId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.name) setBotName(data.name);
-                })
-                .catch(err => console.error('Error fetching bot info:', err));
+        const searchParams = new URLSearchParams(window.location.search);
+        const wpName = searchParams.get('name');
+        const sId = sessionIdRef.current;
 
-            // Buscar histórico de mensagens
-            fetch(`/api/v1/webchat/history?botId=${botId}&sessionId=${sId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.messages && data.messages.length > 0) {
-                        setMessages(data.messages.map((m: any) => ({
-                            role: m.role,
-                            content: m.content,
-                            timestamp: new Date(m.timestamp)
-                        })));
-                    } else {
-                        // Mensagem de boas-vindas se não houver histórico
-                        setMessages([{
-                            role: 'assistant',
-                            content: wpName ? `Olá ${wpName}! Como posso ajudar você hoje?` : 'Olá! Como posso ajudar você hoje?',
-                            timestamp: new Date()
-                        }]);
-                    }
-                })
-                .catch(err => {
-                    console.error('Error fetching history:', err);
+        fetch(`/api/v1/bot-info/${botId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.name) setBotName(data.name);
+            })
+            .catch(err => console.error('Error fetching bot info:', err));
+
+        fetch(`/api/v1/webchat/history?botId=${encodeURIComponent(botId)}&sessionId=${encodeURIComponent(sId)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.messages && data.messages.length > 0) {
+                    setMessages(data.messages.map((m: any) => ({
+                        role: m.role,
+                        content: m.content,
+                        timestamp: new Date(m.timestamp)
+                    })));
+                } else {
                     setMessages([{
                         role: 'assistant',
-                        content: 'Olá! Como posso ajudar você hoje?',
+                        content: wpName ? `Olá ${wpName}! Como posso ajudar você hoje?` : 'Olá! Como posso ajudar você hoje?',
                         timestamp: new Date()
                     }]);
-                });
-        }
-    }, [botId]);
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching history:', err);
+                setMessages([{
+                    role: 'assistant',
+                    content: 'Olá! Como posso ajudar você hoje?',
+                    timestamp: new Date()
+                }]);
+            });
+    }, [botId, sessionReady]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -83,7 +98,10 @@ export default function WebChatWidget() {
     }, [messages]);
 
     const handleSend = async () => {
-        if (!input.trim() || loading) return;
+        if (!input.trim() || loading || !sessionReady) return;
+
+        const sid = sessionIdRef.current || sessionId;
+        if (!sid) return;
 
         const userMsg: Message = {
             role: 'user',
@@ -102,7 +120,7 @@ export default function WebChatWidget() {
                 body: JSON.stringify({
                     botId,
                     message: userMsg.content,
-                    sessionId,
+                    sessionId: sid,
                     contactInfo: userContext
                 })
             });
@@ -178,14 +196,16 @@ export default function WebChatWidget() {
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-1 pl-4 focus-within:ring-2 focus-within:ring-violet-500/20 transition-all">
                     <input 
                         className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 py-2"
-                        placeholder="Digite sua mensagem..."
+                        placeholder={sessionReady ? 'Digite sua mensagem...' : 'Carregando...'}
                         value={input}
+                        disabled={!sessionReady || loading}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     />
                     <button 
                         onClick={handleSend}
-                        className="w-9 h-9 bg-violet-600 rounded-full flex items-center justify-center text-white hover:bg-violet-700 transition-colors"
+                        disabled={!sessionReady || loading}
+                        className="w-9 h-9 bg-violet-600 rounded-full flex items-center justify-center text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
                     >
                         <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                     </button>

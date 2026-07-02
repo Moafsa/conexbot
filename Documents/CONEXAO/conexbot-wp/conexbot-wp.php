@@ -3,7 +3,7 @@
  * Plugin Name: Conexbot Automação & CRM (WhatsApp)
  * Plugin URI: https://app.conext.click
  * Description: Integre perfeitamente a Inteligência Artificial Conexão ao seu WooCommerce. O Bot mapeia seu estoque e interage com clientes via Chat e WhatsApp.
- * Version: 1.0.72
+ * Version: 1.0.73
  * Author: Conext
  * License: GPLv2 or later
  * Text Domain: conexbot-wp
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 // 1. Constantes e Inclusões
-define('CONEXBOT_WP_VERSION', '1.0.72');
+define('CONEXBOT_WP_VERSION', '1.0.73');
 define('CONEXBOT_WP_PLUGIN_FILE', __FILE__);
 define('CONEXBOT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CONEXBOT_API_URL', 'https://app.conext.click/api/v1/wp');
@@ -225,8 +225,7 @@ add_action('wp_footer', function () {
  * Hook para quando um novo comentário é inserido
  */
 add_action('wp_insert_comment', 'conexbot_on_new_comment', 10, 2);
-function conexbot_on_new_comment($comment_ID, $comment)
-{
+function conexbot_on_new_comment($comment_ID, $comment) {
     // Evitar loop: meta is_conexbot_reply só existe DEPOIS que wp_insert_comment retorna;
     // o hook wp_insert_comment dispara antes, então precisamos deste flag na inserção via AJAX.
     if (!empty($GLOBALS['conexbot_inserting_bot_reply'])) {

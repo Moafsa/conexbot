@@ -1,19 +1,52 @@
 import { logToFile } from './logger';
 
+/**
+ * URL pública do WordPress (ajax). Preferir campo do bot; senão derivar do primeiro produto com link absoluto.
+ */
+function resolveWordPressBaseUrl(bot: any): string | null {
+    const direct = (bot.websiteUrl || '').trim();
+    if (direct) {
+        return direct.replace(/\/$/, '');
+    }
+    const products = bot.products as Array<{ externalUrl?: string | null }> | undefined;
+    if (products?.length) {
+        for (const p of products) {
+            const u = p?.externalUrl;
+            if (!u || typeof u !== 'string' || !u.startsWith('http')) continue;
+            try {
+                const parsed = new URL(u);
+                return `${parsed.protocol}//${parsed.host}`;
+            } catch {
+                continue;
+            }
+        }
+    }
+    return null;
+}
+
 export const WordpressService = {
     /**
      * Envia uma resposta da IA de volta para o WordPress
      */
     async sendReply(bot: any, postId: number, parentId: number, message: string): Promise<boolean> {
-        if (!bot.websiteUrl) {
-            logToFile(`[WordpressService] Error: Bot ${bot.id} has no websiteUrl`);
+        const baseUrl = resolveWordPressBaseUrl(bot);
+        if (!baseUrl) {
+            const msg = `[WordpressService] Error: Bot ${bot.id} has no websiteUrl and no product URL to infer site`;
+            logToFile(msg);
+            console.error(msg);
             return false;
         }
 
-        const token = bot.webhookToken || bot.id; // Usar webhookToken como segredo compartilhado
-        const ajaxUrl = `${bot.websiteUrl.replace(/\/$/, '')}/wp-admin/admin-ajax.php`;
+        if (!(bot.websiteUrl || '').trim()) {
+            logToFile(`[WordpressService] Using inferred base URL from catalog: ${baseUrl}`);
+        }
 
-        logToFile(`[WordpressService] Sending reply to ${bot.websiteUrl} (Post: ${postId}, Parent: ${parentId})`);
+        // O plugin WP valida contra conexbot_bot_id (UUID) ou conexbot_api_token (CONEXT).
+        // webhookToken existe no Prisma mas não é salvo no WordPress — priorizar bot.id.
+        const token = bot.id || bot.webhookToken;
+        const ajaxUrl = `${baseUrl}/wp-admin/admin-ajax.php`;
+
+        logToFile(`[WordpressService] Sending reply to ${baseUrl} (Post: ${postId}, Parent: ${parentId})`);
 
         try {
             const formData = new URLSearchParams();
