@@ -31,16 +31,48 @@ export const KnowledgeService = {
             const knowledgeBase = bot.knowledgeBase || '';
             const filesContent = bot.media.map(m => m.extractedText as string);
 
-            // 2. Chunking
+            // 2. Query ClientAudits (Raio-X) and ClientTasks for Graph RAG context
+            const clientAudits = await prisma.clientAudit.findMany({
+                where: { clientId: bot.tenantId },
+                orderBy: { createdAt: 'desc' },
+                take: 3
+            });
+
+            const clientTasks = await prisma.clientTask.findMany({
+                where: { clientId: bot.tenantId },
+                orderBy: { status: 'asc' },
+                take: 10
+            });
+
+            let auditsText = '';
+            for (const audit of clientAudits) {
+                auditsText += `Relatório de Raio-X (Auditoria) do dia ${audit.createdAt.toLocaleDateString()}:\n`;
+                auditsText += `Pontuação Geral de Marketing: ${audit.overallScore}/100\n`;
+                if (audit.report) {
+                    const r = audit.report as any;
+                    if (r.copy) auditsText += `- Copy Squad Feedback: Problemas: ${JSON.stringify(r.copy.problems || [])}. Soluções: ${JSON.stringify(r.copy.solutions || [])}\n`;
+                    if (r.brand) auditsText += `- Brand Squad Feedback: Problemas: ${JSON.stringify(r.brand.problems || [])}. Soluções: ${JSON.stringify(r.brand.solutions || [])}\n`;
+                    if (r.traffic) auditsText += `- Traffic Masters Feedback: Problemas: ${JSON.stringify(r.traffic.problems || [])}. Soluções: ${JSON.stringify(r.traffic.solutions || [])}\n`;
+                    if (r.strategy) auditsText += `- Hormozi Squad Feedback: Problemas: ${JSON.stringify(r.strategy.problems || [])}. Soluções: ${JSON.stringify(r.strategy.solutions || [])}\n`;
+                }
+                auditsText += '\n';
+            }
+
+            let tasksText = '';
+            for (const task of clientTasks) {
+                tasksText += `- Tarefa da Agência: "${task.title}" para o Squad "${task.squadId}" pelo Agente "${task.agentId}" está com Status "${task.status}". Descrição: ${task.description || 'Nenhuma'}\n`;
+            }
+
+            // 3. Chunking
             const chunks = chunkKnowledge(knowledgeBase, scrapedContent, filesContent);
             console.log(`[KnowledgeService] Generated ${chunks.length} chunks for bot ${botId}`);
 
-            // 3. Extract Graph triples for Graph RAG (Graphify)
-            const combinedText = `${knowledgeBase}\n\n${scrapedContent}`;
+            // 4. Extract Graph triples for Graph RAG (Graphify)
+            const combinedText = `${knowledgeBase}\n\n${scrapedContent}\n\n${auditsText}\n\n${tasksText}`;
             const graphTriples = await GraphRAGHelper.extractTriples(combinedText);
-            console.log(`[KnowledgeService] Extracted ${graphTriples.length} Graph RAG relations`);
+            console.log(`[KnowledgeService] Extracted ${graphTriples.length} Graph RAG relations including audits/tasks`);
 
-            // 4. Clear existing vectors for this bot
+            // 5. Clear existing vectors for this bot
             await prisma.$executeRaw`
                 DELETE FROM "VectorStore" WHERE "botId" = ${botId}
             `;
