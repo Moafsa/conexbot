@@ -76,5 +76,61 @@ export const VectorService = {
     `;
 
         return results as Array<{ id: string; content: string; metadata: any; similarity: number }>;
+    },
+
+    /**
+     * Graph RAG (Graphify): Search similar and traverse the graph to get adjacent triples
+     */
+    async searchSimilarGraph(botId: string, query: string, limit = 3) {
+        const initialResults = await this.searchSimilar(botId, query, limit);
+        if (initialResults.length === 0) return [];
+
+        const finalResults = [...initialResults];
+        const visitedEntities = new Set<string>();
+
+        // Collect matching entities from relation metadata to find neighbors
+        for (const item of initialResults) {
+            const meta = item.metadata as any;
+            if (meta && meta.type === 'relation') {
+                if (meta.sourceEntity) visitedEntities.add(meta.sourceEntity.toLowerCase().trim());
+                if (meta.targetEntity) visitedEntities.add(meta.targetEntity.toLowerCase().trim());
+            }
+        }
+
+        if (visitedEntities.size > 0) {
+            try {
+                // Fetch adjacent connections from the graph store
+                // We use prisma.$queryRaw to search matching entities within the jsonb metadata object
+                const entityList = Array.from(visitedEntities);
+                
+                // Fetch neighboring relations sharing source or target entities
+                const neighbors: any[] = await prisma.$queryRaw`
+                    SELECT id, content, metadata, 1.0 as similarity
+                    FROM "VectorStore"
+                    WHERE "botId" = ${botId}
+                      AND (
+                        metadata->>'sourceEntity' = ANY(${entityList})
+                        OR metadata->>'targetEntity' = ANY(${entityList})
+                      )
+                    LIMIT 6
+                `;
+
+                // Add non-duplicate neighbors to context
+                for (const neighbor of neighbors) {
+                    if (!finalResults.some(r => r.id === neighbor.id)) {
+                        finalResults.push({
+                            id: neighbor.id,
+                            content: `Conexão do Grafo: ${neighbor.content}`,
+                            metadata: neighbor.metadata,
+                            similarity: neighbor.similarity
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("[VectorService] Graph traversal error:", err);
+            }
+        }
+
+        return finalResults;
     }
 };

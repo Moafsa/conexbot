@@ -3,6 +3,7 @@
 import { StorageService } from "@/lib/storage";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { optimizeMedia } from "@/lib/media-optimizer";
 
 export async function uploadMarketingMedia(formData: FormData) {
     const session = await getServerSession(authOptions);
@@ -16,8 +17,16 @@ export async function uploadMarketingMedia(formData: FormData) {
     const uploadPromises = files.map(async (file) => {
         const buffer = Buffer.from(await file.arrayBuffer());
         const sanitizedName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-        const filename = `marketing/${session.user.id}/${Date.now()}-${sanitizedName}`;
-        const url = await StorageService.uploadFile(buffer, filename, file.type);
+        
+        // Compress images and PDFs before uploading
+        const { buffer: optimizedBuffer, mimetype: newMimetype, filename: newFilename } = await optimizeMedia(
+            buffer, 
+            file.type, 
+            sanitizedName
+        );
+        
+        const filename = `marketing/${session.user.id}/${Date.now()}-${newFilename}`;
+        const url = await StorageService.uploadFile(optimizedBuffer, filename, newMimetype);
         return url;
     });
 

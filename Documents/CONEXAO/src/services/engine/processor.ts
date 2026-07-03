@@ -430,8 +430,8 @@ export const MessageProcessor = {
             existingContact.funnelStage = analysis.nextStage;
             (existingContact as any).assignedBotId = analysis.assignedBotId || (existingContact as any).assignedBotId;
 
-            // 8. RAG Context
-            const vectorResults = await VectorService.searchSimilar(bot.id, messageText, 3);
+            // 8. RAG Context (Graph RAG / Graphify active)
+            const vectorResults = await VectorService.searchSimilarGraph(bot.id, messageText, 3);
             const vectorContext = vectorResults.map(r => r.content).join('\n\n');
 
             const materialsText = bot.media.filter((m: any) => m.extractedText).map((m: any) => m.extractedText).join('\n');

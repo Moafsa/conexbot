@@ -2,6 +2,7 @@
 import prisma from '@/lib/prisma';
 import { VectorService } from './vector';
 import { chunkKnowledge } from './knowledge-rag';
+import { GraphRAGHelper } from './graph-rag-helper';
 
 export const KnowledgeService = {
     /**
@@ -34,22 +35,39 @@ export const KnowledgeService = {
             const chunks = chunkKnowledge(knowledgeBase, scrapedContent, filesContent);
             console.log(`[KnowledgeService] Generated ${chunks.length} chunks for bot ${botId}`);
 
-            if (chunks.length === 0) {
-                console.log(`[KnowledgeService] No content to index for bot ${botId}`);
-                return;
-            }
+            // 3. Extract Graph triples for Graph RAG (Graphify)
+            const combinedText = `${knowledgeBase}\n\n${scrapedContent}`;
+            const graphTriples = await GraphRAGHelper.extractTriples(combinedText);
+            console.log(`[KnowledgeService] Extracted ${graphTriples.length} Graph RAG relations`);
 
-            // 3. Clear existing vectors for this bot
+            // 4. Clear existing vectors for this bot
             await prisma.$executeRaw`
                 DELETE FROM "VectorStore" WHERE "botId" = ${botId}
             `;
             console.log(`[KnowledgeService] Old vectors cleared`);
 
-            // 4. Generate and save new embeddings
+            // 5. Generate and save new embeddings
             let count = 0;
+            
+            // Index standard chunks
             for (const chunk of chunks) {
                 await VectorService.addDocument(botId, chunk, {
                     source: 'reindex',
+                    type: 'chunk',
+                    timestamp: new Date().toISOString()
+                });
+                count++;
+            }
+
+            // Index Graph RAG relationships
+            for (const rel of graphTriples) {
+                const relationText = `Grafo: [${rel.source}] --(${rel.predicate})--> [${rel.target}] : ${rel.context}`;
+                await VectorService.addDocument(botId, relationText, {
+                    source: 'graph-rag',
+                    type: 'relation',
+                    sourceEntity: rel.source.toLowerCase().trim(),
+                    predicate: rel.predicate.toLowerCase().trim(),
+                    targetEntity: rel.target.toLowerCase().trim(),
                     timestamp: new Date().toISOString()
                 });
                 count++;

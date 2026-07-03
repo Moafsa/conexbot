@@ -3,6 +3,7 @@ import { StorageService } from "@/lib/storage";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { optimizeMedia } from "@/lib/media-optimizer";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,8 +23,16 @@ export async function POST(req: Request) {
         const uploadPromises = files.map(async (file) => {
             const buffer = Buffer.from(await file.arrayBuffer());
             const sanitizedName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-            const filename = `marketing/${session.user.id}/${Date.now()}-${sanitizedName}`;
-            const url = await StorageService.uploadFile(buffer, filename, file.type);
+            
+            // Compress images and PDFs before uploading
+            const { buffer: optimizedBuffer, mimetype: newMimetype, filename: newFilename } = await optimizeMedia(
+                buffer, 
+                file.type, 
+                sanitizedName
+            );
+
+            const filename = `marketing/${(session.user as any).id}/${Date.now()}-${newFilename}`;
+            const url = await StorageService.uploadFile(optimizedBuffer, filename, newMimetype);
             return url;
         });
 
