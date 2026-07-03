@@ -1,0 +1,22 @@
+On branch main
+Your branch is ahead of 'origin/main' by 43 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   conexbot-wp/conexbot-wp.php
+	modified:   docker-compose.production.yml
+	modified:   src/app/api/webhooks/whatsapp/route.ts
+	modified:   src/services/engine/buffering.ts
+	modified:   src/services/engine/processor.ts
+	modified:   src/services/engine/uzapi.ts
+	modified:   src/services/engine/wordpress.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	_backup_servidor_20260327-164540/
+	src/services/engine/outbound/
+	../../RESTAURAR-BACKUP.md
+
+no changes added to commit (use "git add" and/or "git commit -a")

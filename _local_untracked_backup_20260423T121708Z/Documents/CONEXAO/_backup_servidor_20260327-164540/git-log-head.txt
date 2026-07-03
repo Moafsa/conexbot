@@ -1,0 +1,5 @@
+aae77c4 fix(wordpress): inferir URL do site pelos produtos quando websiteUrl vazio; log webhook em /tmp
+8263c47 Merge branch 'main' of https://github.com/Moafsa/conexbot
+76f9790 sync: update wordpress webhook and plugin with server refinements
+1a76b12 fix(wordpress): comentários — resolver bot (UUID/CONEXT) e AJAX aceitar UUID do bot na resposta IA
+215d507 fix(webchat): sessão estável antes de enviar — histórico bate com o CRM após F5

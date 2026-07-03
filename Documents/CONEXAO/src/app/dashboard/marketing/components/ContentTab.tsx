@@ -1,17 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, Image as ImageIcon, Video, Calendar, ArrowUpRight, Zap, RefreshCw, PenTool, Trash2, CheckCircle2, Plus, Instagram, Settings, ArrowLeft, Upload, Clock, Heart, MessageCircle, ThumbsUp, MessageSquare, Share2, Send, Bookmark } from "lucide-react";
+import { Sparkles, Image as ImageIcon, Video, Calendar, ArrowUpRight, Zap, RefreshCw, PenTool, Trash2, CheckCircle2, Plus, Instagram, Settings, HardDrive, ArrowLeft, Upload, Clock, Heart, MessageCircle, ThumbsUp, MessageSquare, Share2, Send, Bookmark } from "lucide-react";
 import { uploadMarketingMedia } from "@/app/actions/marketing-actions";
 
 export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate, onClearPrefilledDate }: any) {
     const [theme, setTheme] = useState("");
     const [tone, setTone] = useState("Profissional");
-    const [platform, setPlatform] = useState("Instagram Feed");
+    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["Instagram Feed"]);
     const [botId, setBotId] = useState("");
     const [postFormat, setPostFormat] = useState("SINGLE");
     const [activeSlide, setActiveSlide] = useState(0);
     const [loading, setLoading] = useState(false);
+
+    // Creation Modes
+    const [creationMode, setCreationMode] = useState<"manual" | "ai">("manual");
+    const [manualCaption, setManualCaption] = useState("");
+    const [manualFirstComment, setManualFirstComment] = useState("");
     
     // Draft Queue State
     const [drafts, setDrafts] = useState<any[]>([]);
@@ -20,10 +25,31 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
 
     // Editor State
     const [editedCaption, setEditedCaption] = useState("");
+    const [firstComment, setFirstComment] = useState("");
     const [scheduleDate, setScheduleDate] = useState("");
     const [savingDraft, setSavingDraft] = useState(false);
     const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
     const [previewPlatform, setPreviewPlatform] = useState<"instagram" | "facebook">("instagram");
+
+    // Canva and Cloud Media state
+    const [canvaModalOpen, setCanvaModalOpen] = useState(false);
+    const [cloudModalOpen, setCloudModalOpen] = useState(false);
+    const [cloudTab, setCloudTab] = useState<"drive" | "dropbox" | "onedrive">("drive");
+    const [cloudUrl, setCloudUrl] = useState("");
+
+    const parseCloudUrl = (url: string): string => {
+        if (url.includes("drive.google.com")) {
+            const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match) {
+                return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+            }
+        } else if (url.includes("dropbox.com")) {
+            return url.replace("?dl=0", "").replace("&dl=0", "") + (url.includes("?") ? "&raw=1" : "?raw=1");
+        } else if (url.includes("onedrive.live.com")) {
+            return url.replace("/redir?", "/download?").replace("/view.aspx", "");
+        }
+        return url;
+    };
 
     useEffect(() => {
         if (prefilledDate) {
@@ -121,7 +147,7 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
             if (data.urls && data.urls.length > 0) {
                 if (type === 'video') {
                     setVideoUrl(data.urls[0]);
-                    setPlatform("Instagram Reels");
+                    setSelectedPlatforms(["Instagram Reels"]);
                 } else {
                     setBaseImages([...baseImages, ...data.urls]);
                 }
@@ -141,26 +167,37 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
         if (!theme || !botId) return alert("Selecione um bot e digite um tema!");
         setLoading(true);
         try {
-            const res = await fetch("/api/marketing/generate-post", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    theme, 
-                    tone, 
-                    platform, 
-                    botId, 
-                    baseImageUrls: baseImages,
-                    videoUrl: videoUrl,
-                    postFormat
-                })
-            });
-            const data = await res.json();
-            if (res.ok && data.id) {
-                setDrafts([data, ...drafts]);
-                openDraftEditor(data);
-                setBaseImages([]);
+            let lastGeneratedPost = null;
+            for (const plat of selectedPlatforms) {
+                const res = await fetch("/api/marketing/generate-post", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        theme, 
+                        tone, 
+                        platform: plat, 
+                        botId, 
+                        baseImageUrls: baseImages,
+                        videoUrl: videoUrl,
+                        postFormat
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.id) {
+                    lastGeneratedPost = data;
+                    setDrafts(prev => [data, ...prev]);
+                } else {
+                    console.error(`Erro ao gerar para ${plat}:`, data.error);
+                }
             }
-            else alert(data.error || "Erro desconhecido ao gerar post");
+            if (lastGeneratedPost) {
+                openDraftEditor(lastGeneratedPost);
+                setBaseImages([]);
+                setVideoUrl(null);
+                setTheme("");
+            } else {
+                alert("Falha ao gerar posts. Verifique suas credenciais da OpenAI.");
+            }
         } catch (error) {
             console.error(error);
             alert("Erro crítico de comunicação com a IA.");
@@ -183,7 +220,7 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
                     count: automation.batchSize, 
                     theme: automation.topic,
                     tone,
-                    platform
+                    platform: selectedPlatforms[0] || "Instagram Feed"
                 })
             });
             const data = await res.json();
@@ -196,6 +233,98 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSaveManualDraft = async () => {
+        if (!botId) return alert("Selecione um bot primeiro!");
+        if (!manualCaption) return alert("Digite uma legenda para o post!");
+        
+        setLoading(true);
+        try {
+            const contentPayload = JSON.stringify({
+                caption: manualCaption,
+                firstComment: manualFirstComment
+            });
+            
+            let lastSaved = null;
+            for (const plat of selectedPlatforms) {
+                const res = await fetch("/api/marketing/posts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        botId,
+                        content: contentPayload,
+                        imageUrl: baseImages[0] || null,
+                        videoUrl: videoUrl || null,
+                        mediaType: videoUrl ? "VIDEO" : "IMAGE",
+                        platform: plat.toUpperCase(),
+                        status: "DRAFT"
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.id) {
+                    lastSaved = data;
+                    setDrafts(prev => [data, ...prev]);
+                }
+            }
+            if (lastSaved) {
+                alert("Rascunho manual salvo com sucesso!");
+                openDraftEditor(lastSaved);
+                setManualCaption("");
+                setManualFirstComment("");
+                setBaseImages([]);
+                setVideoUrl(null);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRefineManualCaption = async () => {
+        if (!manualCaption) return alert("Digite algum texto para melhorar!");
+        setLoading(true);
+        try {
+            const res = await fetch("/api/marketing/refine", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ caption: manualCaption, tone })
+            });
+            const data = await res.json();
+            if (res.ok && data.refinedCaption) {
+                setManualCaption(data.refinedCaption);
+            } else {
+                alert(data.error || "Erro ao melhorar legenda");
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInstantPreview = () => {
+        if (!manualCaption) return alert("Escreva uma legenda primeiro para ver o preview!");
+        
+        const selectedBot = bots?.find((b: any) => b.id === botId) || { name: "Minha Marca" };
+        
+        const mockDraft = {
+            id: "temp_preview",
+            content: JSON.stringify({
+                caption: manualCaption,
+                firstComment: manualFirstComment
+            }),
+            imageUrl: baseImages[0] || null,
+            videoUrl: videoUrl || null,
+            mediaType: videoUrl ? "VIDEO" : "IMAGE",
+            platform: selectedPlatforms[0] || "Instagram Feed",
+            bot: selectedBot,
+            createdAt: new Date().toISOString()
+        };
+        
+        setSelectedDraft(mockDraft);
+        setEditorMode("preview");
     };
 
     const openDraftEditor = (draft: any) => {
@@ -211,6 +340,7 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
 
         const captionText = parsedData ? parsedData.caption : draft.content;
         setEditedCaption(captionText);
+        setFirstComment(parsedData ? parsedData.firstComment || "" : "");
         setScheduleDate("");
     };
 
@@ -219,15 +349,11 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
         setSavingDraft(true);
         
         let newContent = selectedDraft.content;
-        // Se for estruturado, precisamos preservar a estrutura e atualizar apenas a caption
         try {
-            if (selectedDraft.content && (selectedDraft.content.trim().startsWith('{') || selectedDraft.content.trim().startsWith('['))) {
-                const parsed = JSON.parse(selectedDraft.content);
-                parsed.caption = editedCaption;
-                newContent = JSON.stringify(parsed);
-            } else {
-                newContent = editedCaption;
-            }
+            newContent = JSON.stringify({
+                caption: editedCaption,
+                firstComment: firstComment
+            });
         } catch(e) {
             newContent = editedCaption;
         }
@@ -317,18 +443,44 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* LEFT COLUMN: Generator Form */}
+            {/* LEFT COLUMN: Generator & Creator Form */}
             <div className="space-y-8">
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-6">
+                <div className="bg-[#121824] border border-white/10 rounded-3xl p-8 space-y-6">
                     <div className="space-y-4">
                         <h2 className="text-2xl font-bold flex items-center gap-3">
                             <Sparkles size={24} className="text-emerald-400" />
-                            Criar Novo Conteúdo
+                            Criador de Publicações
                         </h2>
-                        <p className="text-gray-400">Dê um tema e a IA criará a imagem e o texto otimizado.</p>
+                        <p className="text-gray-400 text-sm">Crie seu post manualmente ou gere conteúdos estratégicos com inteligência artificial.</p>
                     </div>
 
-                    <div className="space-y-4">
+                    {/* Creation Mode Selector Tabs */}
+                    <div className="flex gap-2 p-1 bg-black/45 rounded-2xl border border-white/5">
+                        <button
+                            type="button"
+                            onClick={() => setCreationMode("manual")}
+                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${
+                                creationMode === "manual"
+                                ? "bg-emerald-500 text-black shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                        >
+                            📝 Criar Direto
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setCreationMode("ai")}
+                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${
+                                creationMode === "ai"
+                                ? "bg-emerald-500 text-black shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                        >
+                            🤖 Gerar com IA
+                        </button>
+                    </div>
+
+                    <div className="space-y-4 pt-2">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-400">Atendente Responsável</label>
                             <select 
@@ -370,75 +522,168 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
                                     <span className={`text-[8px] uppercase font-bold mt-1 ${videoUrl ? 'text-blue-400' : 'text-gray-500 group-hover:text-blue-400'}`}>{videoUrl ? 'Vídeo OK' : 'Vídeo'}</span>
                                     <input type="file" hidden accept="video/*" onChange={(e) => handleMediaUpload(e, 'video')} />
                                 </label>
+                                <button 
+                                    onClick={() => setCanvaModalOpen(true)}
+                                    type="button"
+                                    className="w-16 h-16 rounded-lg border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-sky-500/50 hover:bg-sky-500/5 transition-all group"
+                                >
+                                    <span className="text-gray-500 group-hover:text-sky-400 text-sm font-bold">🎨</span>
+                                    <span className="text-[8px] text-gray-500 uppercase font-bold group-hover:text-sky-400 mt-1">Canva</span>
+                                </button>
+                                <button 
+                                    onClick={() => setCloudModalOpen(true)}
+                                    type="button"
+                                    className="w-16 h-16 rounded-lg border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
+                                >
+                                    <HardDrive size={20} className="text-gray-500 group-hover:text-emerald-400" />
+                                    <span className="text-[8px] text-gray-500 uppercase font-bold group-hover:text-emerald-400 mt-1">Nuvem</span>
+                                </button>
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-400">Sobre o que é o post?</label>
-                            <textarea 
-                                rows={3}
-                                value={theme}
-                                onChange={(e) => setTheme(e.target.value)}
-                                placeholder="Descreva o tema, produto ou promoção..."
-                                className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white focus:border-emerald-500/50 outline-none transition-all"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-400">Formato do Conteúdo</label>
-                            <select 
-                                value={postFormat}
-                                onChange={(e) => setPostFormat(e.target.value)}
-                                className="w-full bg-[#0b0f1a] border border-emerald-500/20 rounded-2xl p-3 text-emerald-400 font-bold focus:border-emerald-500/50 outline-none transition-all"
-                            >
-                                <option value="SINGLE">Post Único (Imagem + Legenda)</option>
-                                <option value="CAROUSEL">Carrossel Multislide (Vários Slides)</option>
-                                <option value="VIDEO_SCRIPT">Roteiro de Vídeo (Reels/TikTok/Shorts)</option>
-                            </select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-400">Tom de Voz</label>
-                                <select 
-                                    value={tone}
-                                    onChange={(e) => setTone(e.target.value)}
-                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-3 text-white focus:border-emerald-500/50 outline-none transition-all"
-                                >
-                                    <option>Profissional</option>
-                                    <option>Descontraído</option>
-                                    <option>Urgente/Vendas</option>
-                                    <option>Inspirador</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-400">Plataforma</label>
-                                <select 
-                                    value={platform}
-                                    onChange={(e) => {
-                                        setPlatform(e.target.value);
-                                        if (e.target.value.includes("Reels")) {
-                                            setPostFormat("VIDEO_SCRIPT");
-                                        }
-                                    }}
-                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-3 text-white focus:border-emerald-500/50 outline-none transition-all"
-                                >
-                                    <option>Instagram Feed</option>
-                                    <option>Instagram Stories</option>
-                                    <option>Instagram Reels</option>
-                                    <option>Facebook Feed</option>
-                                </select>
+                            <label className="text-sm font-medium text-gray-400">Canais de Publicação</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { id: "Instagram Feed", label: "Instagram Feed" },
+                                    { id: "Instagram Reels", label: "Instagram Reels" },
+                                    { id: "Instagram Stories", label: "Instagram Stories" },
+                                    { id: "Facebook Feed", label: "Facebook Feed" },
+                                    { id: "LinkedIn Feed", label: "LinkedIn Feed" },
+                                    { id: "Google Business", label: "Google Business" }
+                                ].map((plat) => {
+                                    const isChecked = selectedPlatforms.includes(plat.id);
+                                    return (
+                                        <button
+                                            key={plat.id}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isChecked) {
+                                                    if (selectedPlatforms.length > 1) {
+                                                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== plat.id));
+                                                    }
+                                                } else {
+                                                    setSelectedPlatforms([...selectedPlatforms, plat.id]);
+                                                    if (plat.id.includes("Reels")) {
+                                                        setPostFormat("VIDEO_SCRIPT");
+                                                    }
+                                                }
+                                            }}
+                                            className={`py-2 px-2.5 rounded-xl border text-[10px] font-black transition-all truncate text-left ${
+                                                isChecked 
+                                                ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
+                                                : "bg-[#0b0f1a] border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
+                                            }`}
+                                        >
+                                            {plat.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        <button 
-                            onClick={handleGenerate}
-                            disabled={loading}
-                            className="w-full py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] disabled:opacity-50"
-                        >
-                            {loading ? <Sparkles className="animate-spin" size={22} /> : <Sparkles size={22} />}
-                            {loading ? "Gerando Mágica..." : "Gerar Post com IA"}
-                        </button>
+                        {creationMode === "manual" ? (
+                            <>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-400">Legenda da Publicação</label>
+                                    <textarea 
+                                        rows={4}
+                                        value={manualCaption}
+                                        onChange={(e) => setManualCaption(e.target.value)}
+                                        placeholder="Digite a legenda que será publicada..."
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white focus:border-emerald-500/50 outline-none transition-all text-sm leading-relaxed"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-400">Primeiro Comentário (Opcional)</label>
+                                    <textarea 
+                                        rows={2}
+                                        value={manualFirstComment}
+                                        onChange={(e) => setManualFirstComment(e.target.value)}
+                                        placeholder="Tags ou comentários de engajamento..."
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-3 text-white focus:border-emerald-500/50 outline-none transition-all text-xs"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        type="button"
+                                        onClick={handleRefineManualCaption}
+                                        disabled={loading || !manualCaption}
+                                        className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        <Sparkles size={14} className="text-emerald-400" /> Melhorar com IA
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={handleInstantPreview}
+                                        disabled={!manualCaption}
+                                        className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        Ver Preview
+                                    </button>
+                                </div>
+
+                                <button 
+                                    onClick={handleSaveManualDraft}
+                                    disabled={loading || !manualCaption}
+                                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-black rounded-2xl font-black text-sm transition-all transform hover:scale-[1.01] shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {loading ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                                    Salvar como Rascunho
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-400">Sobre o que é o post?</label>
+                                    <textarea 
+                                        rows={3}
+                                        value={theme}
+                                        onChange={(e) => setTheme(e.target.value)}
+                                        placeholder="Descreva o tema, produto ou promoção..."
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-4 text-white focus:border-emerald-500/50 outline-none transition-all text-sm leading-relaxed"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-400">Formato do Conteúdo</label>
+                                    <select 
+                                        value={postFormat}
+                                        onChange={(e) => setPostFormat(e.target.value)}
+                                        className="w-full bg-[#0b0f1a] border border-emerald-500/20 rounded-2xl p-3 text-emerald-400 font-bold focus:border-emerald-500/50 outline-none transition-all"
+                                    >
+                                        <option value="SINGLE">Post Único (Imagem + Legenda)</option>
+                                        <option value="CAROUSEL">Carrossel Multislide (Vários Slides)</option>
+                                        <option value="VIDEO_SCRIPT">Roteiro de Vídeo (Reels/TikTok/Shorts)</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-400">Tom de Voz</label>
+                                    <select 
+                                        value={tone}
+                                        onChange={(e) => setTone(e.target.value)}
+                                        className="w-full bg-[#0b0f1a] border border-white/10 rounded-2xl p-3 text-white focus:border-emerald-500/50 outline-none transition-all"
+                                    >
+                                        <option>Profissional</option>
+                                        <option>Descontraído</option>
+                                        <option>Urgente/Vendas</option>
+                                        <option>Inspirador</option>
+                                    </select>
+                                </div>
+
+                                <button 
+                                    onClick={handleGenerate}
+                                    disabled={loading}
+                                    className="w-full py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] disabled:opacity-50"
+                                >
+                                    {loading ? <Sparkles className="animate-spin" size={22} /> : <Sparkles size={22} />}
+                                    {loading ? "Gerando Mágica..." : "Gerar Post com IA"}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -632,11 +877,15 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
                                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Editar Legenda & Hashtags</h4>
-                                        {editedCaption !== (
+                                        {(editedCaption !== (
                                             selectedDraft.content?.trim().startsWith('{') 
                                                 ? JSON.parse(selectedDraft.content).caption 
                                                 : selectedDraft.content
-                                        ) && (
+                                        ) || firstComment !== (
+                                            selectedDraft.content?.trim().startsWith('{') 
+                                                ? JSON.parse(selectedDraft.content).firstComment || "" 
+                                                : ""
+                                        )) && (
                                             <button onClick={handleSaveDraft} disabled={savingDraft} className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-3 py-2 rounded-md font-bold uppercase flex items-center gap-1 transition-colors border border-emerald-500/30">
                                                 {savingDraft ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar Edições
                                             </button>
@@ -649,6 +898,18 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
                                         placeholder="A legenda do post aparece aqui para você editar livremente antes de aprovar..."
                                         className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-sm text-gray-200 focus:border-emerald-500/50 outline-none custom-scrollbar transition-colors leading-relaxed"
                                     />
+                                    {selectedDraft.platform?.toLowerCase().includes("instagram") && (
+                                        <div className="space-y-2 pt-2 border-t border-white/5">
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Primeiro Comentário Automático</label>
+                                            <textarea 
+                                                value={firstComment}
+                                                onChange={(e) => setFirstComment(e.target.value)}
+                                                rows={3}
+                                                placeholder="Cole suas hashtags ou primeiro comentário de engajamento aqui..."
+                                                className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs text-gray-300 focus:border-emerald-500/50 outline-none leading-relaxed"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Painel de Agendamento */}
@@ -834,6 +1095,122 @@ export function ContentTab({ bots, loadingBots, selectedClientId, prefilledDate,
                     </div>
                 )}
             </div>
+
+            {/* Canva Integration Modal */}
+            {canvaModalOpen && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-[#121824] border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-sky-400 flex items-center gap-2">
+                                🎨 Canva Workspace
+                            </h3>
+                            <button onClick={() => setCanvaModalOpen(false)} className="text-gray-400 hover:text-white">
+                                <Plus className="rotate-45" size={24} />
+                            </button>
+                        </div>
+                        <p className="text-sm text-gray-400 leading-relaxed">
+                            Crie sua arte no Canva e traga diretamente para a agência. Clique no botão abaixo para abrir o editor e depois insira o link da imagem compartilhada.
+                        </p>
+                        <div className="space-y-4">
+                            <button 
+                                onClick={() => window.open("https://canva.com", "_blank")}
+                                className="w-full py-3 bg-[#8b3dff] hover:bg-[#7a2ff0] rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2"
+                            >
+                                Abrir Editor do Canva
+                            </button>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Link de Compartilhamento da Imagem</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Cole aqui o link direto da imagem exportada..."
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-cyan-500/50 text-sm"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const val = e.currentTarget.value.trim();
+                                            if (val) {
+                                                setBaseImages([...baseImages, val]);
+                                                setCanvaModalOpen(false);
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cloud Import Modal */}
+            {cloudModalOpen && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-[#121824] border border-white/10 rounded-3xl max-w-lg w-full p-6 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                                ☁️ Importar Mídia da Nuvem
+                            </h3>
+                            <button onClick={() => setCloudModalOpen(false)} className="text-gray-400 hover:text-white">
+                                <Plus className="rotate-45" size={24} />
+                            </button>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex gap-2 p-1 bg-black/35 rounded-xl border border-white/5">
+                            {(["drive", "dropbox", "onedrive"] as const).map(tab => (
+                                <button
+                                    key={tab}
+                                    type="button"
+                                    onClick={() => { setCloudTab(tab); setCloudUrl(""); }}
+                                    className={`flex-1 py-2 text-xs font-bold rounded-lg capitalize transition-all ${
+                                        cloudTab === tab 
+                                        ? "bg-emerald-500 text-black shadow-lg" 
+                                        : "text-gray-400 hover:text-white"
+                                    }`}
+                                >
+                                    {tab === "drive" ? "Google Drive" : tab}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="space-y-4">
+                            <p className="text-xs text-gray-400 leading-relaxed">
+                                Cole o link de compartilhamento público do seu arquivo na nuvem. Nós faremos a otimização e importação automática para o seu post.
+                            </p>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase">Link de Compartilhamento</label>
+                                <input 
+                                    type="text" 
+                                    value={cloudUrl}
+                                    onChange={(e) => setCloudUrl(e.target.value)}
+                                    placeholder={
+                                        cloudTab === "drive" ? "https://drive.google.com/file/d/..." :
+                                        cloudTab === "dropbox" ? "https://www.dropbox.com/s/..." :
+                                        "https://1drv.ms/..."
+                                    }
+                                    className="w-full bg-[#0b0f1a] border border-white/10 rounded-xl p-3 text-white outline-none focus:border-emerald-500/50 text-xs"
+                                />
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    if (cloudUrl.trim()) {
+                                        const directUrl = parseCloudUrl(cloudUrl.trim());
+                                        if (cloudUrl.toLowerCase().includes(".mp4") || cloudUrl.toLowerCase().includes("video")) {
+                                            setVideoUrl(directUrl);
+                                        } else {
+                                            setBaseImages([...baseImages, directUrl]);
+                                        }
+                                        setCloudModalOpen(false);
+                                        setCloudUrl("");
+                                    }
+                                }}
+                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-black font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/10"
+                            >
+                                Importar Arquivo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

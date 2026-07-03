@@ -19,13 +19,19 @@ export async function GET(req: Request) {
         const results = [];
         for (const post of toPublish) {
             try {
-                const mediaId = await MetaPostService.publishToInstagram(post.id);
+                let mediaId;
+                const platformUpper = (post.platform || "").toUpperCase();
+                if (platformUpper.includes("FACEBOOK")) {
+                    mediaId = await MetaPostService.publishToFacebook(post.id);
+                } else {
+                    mediaId = await MetaPostService.publishToInstagram(post.id);
+                }
                 results.push({ id: post.id, status: "SUCCESS", mediaId });
             } catch (err: any) {
                 console.error(`[Cron] Erro ao publicar post ${post.id}:`, err.message);
                 await prisma.marketingPost.update({
                     where: { id: post.id },
-                    data: { status: "FAILED" }
+                    data: { status: "FAILED", rejectionReason: err.message }
                 });
                 results.push({ id: post.id, status: "FAILED", error: err.message });
             }

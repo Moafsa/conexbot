@@ -15,15 +15,22 @@ export const MetaPostService = {
         }
 
         // 1. Criar Container de Mídia
-        const igAccountId = "ME"; // O usuário deve ter vinculado o Instagram à Página
-        // Idealmente, pegamos o ig_business_account_id salvo no Tenant ou BotChannel
-        
-        // Mocking the flow for now as we need the specific IG Account ID
-        const igUserId = "YOUR_INSTAGRAM_BUSINESS_ID"; 
+        const igUserId = post.tenant.metaAdsAccountId || "YOUR_INSTAGRAM_BUSINESS_ID"; 
 
         const containerUrl = `https://graph.facebook.com/v22.0/${igUserId}/media`;
+        
+        let captionText = post.content;
+        let firstComment = "";
+        try {
+            if (post.content.trim().startsWith('{')) {
+                const parsed = JSON.parse(post.content);
+                captionText = parsed.caption || captionText;
+                firstComment = parsed.firstComment || "";
+            }
+        } catch (e) {}
+
         const params: Record<string, string> = {
-            caption: post.content,
+            caption: captionText,
             access_token: post.tenant.metaAdsToken
         };
 
@@ -67,7 +74,85 @@ export const MetaPostService = {
             }
         });
 
+        // 3. Se houver primeiro comentário (Instagram), comentar na mídia publicada
+        if (firstComment) {
+            try {
+                const commentUrl = `https://graph.facebook.com/v22.0/${publishData.id}/comments`;
+                await fetch(commentUrl, {
+                    method: "POST",
+                    body: new URLSearchParams({
+                        message: firstComment,
+                        access_token: post.tenant.metaAdsToken
+                    })
+                });
+            } catch (err: any) {
+                console.error("[MetaPostService] Falha ao publicar primeiro comentário no Instagram:", err.message);
+            }
+        }
+
         return publishData.id;
+    },
+
+    /**
+     * Publica um post (imagem/vídeo + legenda) no Facebook Page.
+     */
+    async publishToFacebook(postId: string) {
+        const post = await prisma.marketingPost.findUnique({
+            where: { id: postId },
+            include: { tenant: true }
+        });
+
+        if (!post || (!post.imageUrl && !post.videoUrl) || !post.tenant.metaAdsToken) {
+            throw new Error("Post incompleto ou token Meta não configurado.");
+        }
+
+        // O ID da página deve estar no metaAdsAccountId ou similar do Tenant
+        const pageId = post.tenant.metaAdsAccountId || "me";
+
+        const url = post.mediaType === "VIDEO" || post.videoUrl
+            ? `https://graph.facebook.com/v22.0/${pageId}/videos`
+            : `https://graph.facebook.com/v22.0/${pageId}/photos`;
+
+        let captionText = post.content;
+        try {
+            if (post.content.trim().startsWith('{')) {
+                const parsed = JSON.parse(post.content);
+                captionText = parsed.caption || captionText;
+            }
+        } catch (e) {}
+
+        const params: Record<string, string> = {
+            access_token: post.tenant.metaAdsToken
+        };
+
+        if (post.mediaType === "VIDEO" || post.videoUrl) {
+            params.file_url = post.videoUrl!;
+            params.description = captionText;
+        } else {
+            params.url = post.imageUrl!;
+            params.message = captionText;
+        }
+
+        const res = await fetch(url, {
+            method: "POST",
+            body: new URLSearchParams(params)
+        });
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error.message);
+
+        const publishedMediaId = data.id || data.post_id;
+
+        await prisma.marketingPost.update({
+            where: { id: postId },
+            data: { 
+                status: "PUBLISHED", 
+                publishedAt: new Date(),
+                metaMediaId: publishedMediaId
+            }
+        });
+
+        return publishedMediaId;
     },
 
     /**

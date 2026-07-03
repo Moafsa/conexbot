@@ -1,0 +1,372 @@
+diff --git a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
+index 71d43a2..5e668c9 100644
+--- a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
++++ b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
+@@ -165,7 +165,11 @@ add_action('wp_footer', function() {
+  */
+ add_action('wp_insert_comment', 'conexbot_on_new_comment', 10, 2);
+ function conexbot_on_new_comment($comment_ID, $comment) {
+-    // Evitar loop infinito (não notificar se o autor for o próprio bot)
++    // Evitar loop: meta is_conexbot_reply só existe DEPOIS que wp_insert_comment retorna;
++    // o hook wp_insert_comment dispara antes, então precisamos deste flag na inserção via AJAX.
++    if (! empty($GLOBALS['conexbot_inserting_bot_reply'])) {
++        return;
++    }
+     if (get_comment_meta($comment_ID, 'is_conexbot_reply', true)) {
+         return;
+     }
+@@ -238,10 +242,12 @@ function conexbot_ai_reply_callback() {
+         'comment_approved'     => 1,
+     ];
+ 
++    $GLOBALS['conexbot_inserting_bot_reply'] = true;
+     $comment_id = wp_insert_comment($comment_data);
++    unset($GLOBALS['conexbot_inserting_bot_reply']);
+ 
+     if ($comment_id) {
+-        // Marcar este comentário como sendo do Bot para evitar recursividade
++        // Marcar este comentário como sendo do Bot (útil se outro código notificar depois)
+         add_comment_meta($comment_id, 'is_conexbot_reply', '1');
+         wp_send_json_success(['comment_id' => $comment_id]);
+     } else {
+diff --git a/Documents/CONEXAO/docker-compose.production.yml b/Documents/CONEXAO/docker-compose.production.yml
+index c4732f1..1d20129 100644
+--- a/Documents/CONEXAO/docker-compose.production.yml
++++ b/Documents/CONEXAO/docker-compose.production.yml
+@@ -1,6 +1,6 @@
+ # Override para produção: app Next.js + rede Traefik
+ # Uso: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+-# Definir CONEXBOT_DOMAIN (ex: conexbot.seudominio.com) e .env com segredos
++# Definir CONEXBOT_DOMAIN (ex.: app.conext.click) e .env com segredos
+ 
+ services:
+   app:
+diff --git a/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts b/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
+index b97d755..b94e3e7 100644
+--- a/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
++++ b/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
+@@ -96,7 +96,9 @@ export async function POST(req: Request) {
+             const fromMe = info.FromMe || info.fromMe || false;
+ 
+             const cleanPhone = PhoneUtils.normalize(senderPhone);
+-            logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
++            /** JID do chat (WuzAPI Info.Chat) — usar no envio; normalize() pode alterar o número internacional */
++            const chatJid = String(info.Chat || info.chat || senderPhone || '').trim();
++            logToFile(`Processing message: From=${senderPhone}, Chat=${chatJid}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
+ 
+             const isGroup = senderPhone.includes('@g.us');
+             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
+@@ -244,7 +246,7 @@ export async function POST(req: Request) {
+ 
+                         if (transcription) {
+                             const { BufferingService } = await import('@/services/engine/buffering');
+-                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
++                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio', chatJid).catch(err => {
+                                 logToFile(`BUFFER ERROR (Audio): ${err?.message || err}`);
+                             });
+                         }
+@@ -377,7 +379,7 @@ export async function POST(req: Request) {
+                         // Passar direto ao Processor (evita race com buffer que recebia "")
+                         const textToProcess = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${description}`;
+                         logToFile(`Sending image description (${textToProcess.length} chars) to Processor for ${cleanPhone}`);
+-                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image' }).catch(err => {
++                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image', whatsappChatJid: chatJid }).catch(err => {
+                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
+                         });
+                     } else {
+@@ -390,12 +392,12 @@ export async function POST(req: Request) {
+                 // Text Message Handling with Smart Buffering
+                 try {
+                     const { BufferingService } = await import('@/services/engine/buffering');
+-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp');
++                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', chatJid);
+                     logToFile(`Message buffered for ${cleanPhone}`);
+                 } catch (e: any) {
+                     logToFile(`BUFFER ERROR: ${e.message}`);
+                     // Fallback to direct processing if buffering fails
+-                    MessageProcessor.process(sessionName, cleanPhone, messageBody).catch(err => {
++                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', whatsappChatJid: chatJid }).catch(err => {
+                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
+                     });
+                 }
+diff --git a/Documents/CONEXAO/src/services/engine/buffering.ts b/Documents/CONEXAO/src/services/engine/buffering.ts
+index aa96aa5..bcffa4e 100644
+--- a/Documents/CONEXAO/src/services/engine/buffering.ts
++++ b/Documents/CONEXAO/src/services/engine/buffering.ts
+@@ -5,9 +5,11 @@ interface BufferedChat {
+     messages: string[];
+     timer: NodeJS.Timeout | null;
+     sessionName: string;
+-    contactId: string; // phone
++    contactId: string; // phone normalizado (CRM)
+     channel: 'whatsapp' | 'simulator';
+     hadAudio: boolean; // se alguma mensagem veio de áudio, responder com TTS
++    /** Info.Chat do WuzAPI — envio da resposta deve usar este JID */
++    whatsappChatJid?: string;
+ }
+ 
+ // In-memory storage for active buffers
+@@ -19,7 +21,7 @@ export const BufferingService = {
+      * Add a message to the buffer.
+      * If a timer exists, clear it and restart (debounce).
+      */
+-    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
++    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text', whatsappChatJid?: string) {
+         const key = `${sessionName}:${contactId}`;
+ 
+         // Get bot configuration for buffer delay
+@@ -42,7 +44,8 @@ export const BufferingService = {
+             }
+             console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately (${contentToProcess.length} chars).`);
+             MessageProcessor.process(sessionName, contactId, contentToProcess, channel, 'sessionName', { 
+-                inputType: inputType as any 
++                inputType: inputType as any,
++                whatsappChatJid,
+             }).catch(err => console.error('[Buffering] Immediate process error:', err));
+             return;
+         }
+@@ -56,9 +59,12 @@ export const BufferingService = {
+                 sessionName,
+                 contactId,
+                 channel,
+-                hadAudio: false
++                hadAudio: false,
++                whatsappChatJid: whatsappChatJid || undefined,
+             };
+             activeBuffers.set(key, buffer);
++        } else if (whatsappChatJid && !buffer.whatsappChatJid) {
++            buffer.whatsappChatJid = whatsappChatJid;
+         }
+ 
+         // Add message part
+@@ -112,7 +118,7 @@ export const BufferingService = {
+             combinedText,
+             buffer.channel,
+             'sessionName',
+-            { inputType: flushInputType as any }
++            { inputType: flushInputType as any, whatsappChatJid: buffer.whatsappChatJid }
+         ).catch(err => console.error('[Buffering] Process error:', err));
+     }
+ };
+diff --git a/Documents/CONEXAO/src/services/engine/processor.ts b/Documents/CONEXAO/src/services/engine/processor.ts
+index 9315ffe..5724a9a 100644
+--- a/Documents/CONEXAO/src/services/engine/processor.ts
++++ b/Documents/CONEXAO/src/services/engine/processor.ts
+@@ -1,8 +1,8 @@
+ import OpenAI from 'openai';
+ import prisma from '@/lib/prisma';
+ import { buildSystemPrompt, buildConversationMessages } from './prompts';
+-import { UzapiService } from './uzapi';
+ import { logToFile } from './logger';
++import { deliverAssistantOutbound } from './outbound/deliver-assistant';
+ import { NotificationService } from '../notification/service';
+ import { PhoneUtils } from '@/lib/phone-utils';
+ 
+@@ -42,10 +42,6 @@ import { ChatwootService } from './chatwoot';
+ import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
+ import { format } from 'date-fns';
+ 
+-import fs from 'fs';
+-import path from 'path';
+-
+-
+ const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
+ const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
+ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
+@@ -53,27 +49,28 @@ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b
+ const processingLocks = new Map<string, Promise<any>>();
+ 
+ export const MessageProcessor = {
+-    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
++    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+         const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
+-        console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
+-        // Concurrency Lock: prevent same phone processing parallelly
+-        const existingLock = processingLocks.get(senderPhone);
++        // Lock por canal + identificador: WhatsApp e WordPress nunca competem pela mesma chave
++        const lockKey = `${channel}:${senderPhone}`;
++        console.log(`[Processor] DEBUG: Processing message from ${lockKey} (V3-RECURSIVE-HACK)`);
++        const existingLock = processingLocks.get(lockKey);
+         if (existingLock) {
+-            logToFile(`[Processor] WAITING for existing lock: ${senderPhone}`);
++            logToFile(`[Processor] WAITING for existing lock: ${lockKey}`);
+             await existingLock;
+         }
+ 
+         const currentProcess = this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
+-        processingLocks.set(senderPhone, currentProcess);
++        processingLocks.set(lockKey, currentProcess);
+ 
+         try {
+             return await currentProcess;
+         } finally {
+-            processingLocks.delete(senderPhone);
++            processingLocks.delete(lockKey);
+         }
+     },
+ 
+-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
++    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+         try {
+             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
+ 
+@@ -708,59 +705,15 @@ export const MessageProcessor = {
+                 }
+             }
+ 
+-            // 14. Primary Channel Sending
+-            if (channel === 'whatsapp' && bot.sessionName) {
+-                if (options.inputType === 'audio') {
+-                    const { VoiceService } = await import('./voice');
+-                    try {
+-                        const audioPath = await VoiceService.speak(
+-                            cleanResponse,
+-                            bot.tenant?.openaiApiKey,
+-                            (bot.tenant as any)?.elevenLabsApiKey,
+-                            bot.voiceId
+-                        );
+-
+-                        const hasElevenLabs = !!(bot.tenant as any)?.elevenLabsApiKey;
+-                        const hasVoiceId = !!bot.voiceId;
+-                        logToFile(`[Processor] TTS Config: elevenLabs=${hasElevenLabs}, voiceId=${hasVoiceId}`);
+-                        if (!hasElevenLabs || !hasVoiceId) {
+-                            logToFile(`[Processor] HINT: Configure Dashboard -> Settings -> AI (ElevenLabs API Key) and Edit Bot -> Voice ID for audio replies.`);
+-                        }
+-
+-                        const audioBuffer = fs.readFileSync(audioPath);
+-                        // Ensure correct extension and mimetype for WuzAPI
+-                        const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
+-                        const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');
+-
+-                        if (sent) {
+-                            logToFile(`[Processor] Audio reply sent successfully.`);
+-                        } else {
+-                            logToFile(`[Processor] sendMedia (audio) returned false; falling back to text.`);
+-                            await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
+-                        }
+-                    } catch (e: any) {
+-                        logToFile(`[Processor] TTS or send failed: ${e.message}; sending text fallback.`);
+-                        await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
+-                    }
+-                } else {
+-                    await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
+-                }
+-
+-                for (const match of mediaMatches as any[]) {
+-                    const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
+-                    if (media) await UzapiService.sendMedia(bot.sessionName, senderPhone, media.type, media.url, media.description || media.filename);
+-                }
+-            } else if (channel === 'wordpress') {
+-                const { WordpressService } = await import('./wordpress');
+-                // senderPhone contains "wp_post_{postId}_comment_{commentId}"
+-                const parts = senderPhone.split('_');
+-                const postId = parseInt(parts[2]);
+-                const commentId = parseInt(parts[4]);
+-                
+-                if (!isNaN(postId) && !isNaN(commentId)) {
+-                    await WordpressService.sendReply(bot, postId, commentId, cleanResponse);
+-                }
+-            }
++            // 14. Entrega por canal (WhatsApp ‖ WordPress — ver outbound/deliver-assistant.ts)
++            await deliverAssistantOutbound({
++                channel,
++                bot,
++                remoteId: senderPhone,
++                cleanResponse,
++                mediaMatches: mediaMatches as RegExpMatchArray[],
++                options,
++            });
+ 
+             // 15. Subscription Autonomy (Cancellation & Status)
+             const CANCELLATION_KEYWORDS = /(cancelar|encerrar|parar|desistir).*(assinatura|plano|serviço|mensalidade)/i;
+diff --git a/Documents/CONEXAO/src/services/engine/uzapi.ts b/Documents/CONEXAO/src/services/engine/uzapi.ts
+index ca55293..fa84be6 100644
+--- a/Documents/CONEXAO/src/services/engine/uzapi.ts
++++ b/Documents/CONEXAO/src/services/engine/uzapi.ts
+@@ -1,3 +1,5 @@
++import { logToFile } from './logger';
++
+ const UZAPI_URL = process.env.UZAPI_URL || 'http://127.0.0.1:21465';
+ const ADMIN_TOKEN =
+     process.env.UZAPI_SECRET_KEY ||
+@@ -5,6 +7,18 @@ const ADMIN_TOKEN =
+     process.env.API_KEY ||
+     'admin_token_123';
+ 
++/**
++ * WuzAPI costuma esperar JID (ex.: 5511999999999@s.whatsapp.net).
++ * O processor grava contatos só com dígitos; notificações do sistema já usam @s.whatsapp.net.
++ */
++function formatRecipientJid(to: string): string {
++    const t = String(to).trim();
++    if (!t) return t;
++    if (t.includes('@')) return t;
++    const digits = t.replace(/\D/g, '');
++    return digits ? `${digits}@s.whatsapp.net` : t;
++}
++
+ export const UzapiService = {
+     // Helper: Ensure user exists in WuzAPI
+     async ensureUser(sessionName: string, webhookUrl: string): Promise<boolean> {
+@@ -68,6 +82,7 @@ export const UzapiService = {
+ 
+     async sendMessage(sessionName: string, to: string, text: string): Promise<boolean> {
+         try {
++            const phone = formatRecipientJid(to);
+             const res = await fetch(`${UZAPI_URL}/chat/send/text`, {
+                 method: 'POST',
+                 headers: {
+@@ -75,19 +90,25 @@ export const UzapiService = {
+                     'Token': sessionName,
+                 },
+                 body: JSON.stringify({
+-                    Phone: to,
++                    Phone: phone,
+                     Body: text,
+                 }),
+             });
+ 
+             if (!res.ok) {
+-                console.error('UZAPI send error:', await res.text());
++                const errBody = await res.text();
++                console.error('UZAPI send error:', errBody);
++                logToFile(
++                    `[UZAPI] sendMessage failed session=${sessionName} to=${phone} status=${res.status} body=${errBody.slice(0, 300)}`,
++                    'Uzapi'
++                );
+                 return false;
+             }
+ 
+             return true;
+         } catch (error) {
+             console.error('UZAPI connection error:', error);
++            logToFile(`[UZAPI] sendMessage exception: ${error}`, 'Uzapi');
+             return false;
+         }
+     },
+@@ -105,8 +126,9 @@ export const UzapiService = {
+                     : (type === 'video') ? 'chat/send/video'
+                         : 'chat/send/image';
+ 
++            const phone = formatRecipientJid(to);
+             const body: Record<string, string> = {
+-                Phone: to,
++                Phone: phone,
+                 [type === 'audio' ? 'Audio' : 'Url']: url,
+             };
+ 
+diff --git a/Documents/CONEXAO/src/services/engine/wordpress.ts b/Documents/CONEXAO/src/services/engine/wordpress.ts
+index 334ee87..4cf5809 100644
+--- a/Documents/CONEXAO/src/services/engine/wordpress.ts
++++ b/Documents/CONEXAO/src/services/engine/wordpress.ts
+@@ -41,7 +41,9 @@ export const WordpressService = {
+             logToFile(`[WordpressService] Using inferred base URL from catalog: ${baseUrl}`);
+         }
+ 
+-        const token = bot.webhookToken || bot.id; // Usar webhookToken como segredo compartilhado
++        // O plugin WP valida contra conexbot_bot_id (UUID) ou conexbot_api_token (CONEXT).
++        // webhookToken existe no Prisma mas não é salvo no WordPress — priorizar bot.id.
++        const token = bot.id || bot.webhookToken;
+         const ajaxUrl = `${baseUrl}/wp-admin/admin-ajax.php`;
+ 
+         logToFile(`[WordpressService] Sending reply to ${baseUrl} (Post: ${postId}, Parent: ${parentId})`);
