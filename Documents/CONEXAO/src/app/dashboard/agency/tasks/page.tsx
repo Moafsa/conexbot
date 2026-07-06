@@ -4,15 +4,15 @@ import { useState, useEffect } from "react";
 import {
     ClipboardList, CheckCircle2, Loader2, Plus, Calendar, Trash2,
     X, AlertTriangle, ShieldCheck, Tag, Info, ArrowRight, ArrowLeft,
-    Building2
+    Building2, ChevronLeft
 } from "lucide-react";
 
 // Pre-defined columns
 const COLUMNS = [
-    { id: "PENDING", label: "A Fazer", color: "border-orange-500/20 text-orange-400 bg-orange-500/5" },
-    { id: "IN_PROGRESS", label: "Em Execução", color: "border-blue-500/20 text-blue-400 bg-blue-500/5" },
-    { id: "APPROVED", label: "Aprovado p/ Cliente", color: "border-yellow-500/20 text-yellow-400 bg-yellow-500/5" },
-    { id: "COMPLETED", label: "Concluído", color: "border-emerald-500/20 text-emerald-400 bg-emerald-500/5" }
+    { id: "PENDING", label: "A Fazer", color: "border-orange-500/20 text-orange-400 bg-orange-500/5", icon: "📋" },
+    { id: "IN_PROGRESS", label: "Em Execução", color: "border-blue-500/20 text-blue-400 bg-blue-500/5", icon: "⚡" },
+    { id: "APPROVED", label: "Aprovado p/ Cliente", color: "border-yellow-500/20 text-yellow-400 bg-yellow-500/5", icon: "👍" },
+    { id: "COMPLETED", label: "Concluído", color: "border-emerald-500/20 text-emerald-400 bg-emerald-500/5", icon: "✅" }
 ];
 
 const SQUAD_COLORS: Record<string, string> = {
@@ -35,6 +35,7 @@ export default function KanbanBoardPage() {
 
     const [selectedTask, setSelectedTask] = useState<any>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [expandedColumn, setExpandedColumn] = useState<string>("PENDING");
 
     // Form inputs for new task
     const [newTitle, setNewTitle] = useState("");
@@ -250,21 +251,90 @@ export default function KanbanBoardPage() {
                     <p className="text-gray-400 text-xs mt-3">Carregando tarefas operacionais...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+                <div className="flex flex-row items-stretch gap-5 overflow-x-auto pb-6 select-none min-h-[70vh] scrollbar-thin scrollbar-thumb-white/10">
                     {COLUMNS.map((col) => {
                         const colTasks = tasks.filter(t => t.status === col.id);
+                        const isExpanded = expandedColumn === col.id;
+                        
                         return (
-                            <div key={col.id} className="bg-white/5 border border-white/10 rounded-[32px] p-6 space-y-4 shadow-xl">
+                            <div 
+                                key={col.id} 
+                                className={`transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col relative rounded-[32px] border border-white/10 shadow-xl overflow-hidden bg-white/5 ${
+                                    isExpanded ? "w-[346px] min-w-[346px]" : "w-[72px] min-w-[72px] cursor-pointer hover:bg-white/10"
+                                }`}
+                                onClick={() => {
+                                    if (!isExpanded) {
+                                        setExpandedColumn(col.id);
+                                    }
+                                }}
+                            >
                                 {/* Header da Coluna */}
-                                <div className={`flex justify-between items-center pb-2 border-b border-white/5 ${col.color.split(' ')[1]}`}>
-                                    <h3 className="font-extrabold text-sm uppercase tracking-wider">{col.label}</h3>
-                                    <span className="bg-white/5 text-gray-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                                        {colTasks.length}
-                                    </span>
+                                <div 
+                                    className={`relative select-none transition-all duration-300 ${
+                                        isExpanded 
+                                            ? "h-[68px] w-full px-6 py-4 flex items-center justify-between border-b border-white/5" 
+                                            : "h-[346px] w-[68px] flex items-center justify-center"
+                                    }`}
+                                >
+                                    {isExpanded ? (
+                                        <div className="flex items-center justify-between w-full">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="text-lg">{col.icon}</span>
+                                                <h3 className={`font-extrabold text-sm uppercase tracking-wider ${col.color.split(' ')[1]}`}>
+                                                    {col.label}
+                                                </h3>
+                                                <span className="bg-white/5 text-gray-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                                                    {colTasks.length}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Collapse button */}
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    // Find next column to expand to avoid having none expanded
+                                                    const idx = COLUMNS.findIndex(c => c.id === col.id);
+                                                    const nextIdx = (idx + 1) % COLUMNS.length;
+                                                    setExpandedColumn(COLUMNS[nextIdx].id);
+                                                }}
+                                                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        // Collapsed Header Layout (Rotated 90 degrees)
+                                        <div 
+                                            style={{
+                                                width: '346px',
+                                                height: '68px',
+                                                transform: 'rotate(90deg)',
+                                                transformOrigin: '34px 34px',
+                                            }}
+                                            className="absolute top-0 left-0 flex items-center justify-between px-6 py-4 w-full h-full"
+                                        >
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="text-lg rotate-[-90deg]">{col.icon}</span>
+                                                <h3 className={`font-extrabold text-sm uppercase tracking-wider ${col.color.split(' ')[1]}`}>
+                                                    {col.label}
+                                                </h3>
+                                                <span className="bg-white/5 text-gray-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                                                    {colTasks.length}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Counter-rotated Expand Arrow */}
+                                            <ChevronLeft size={16} className="text-gray-500 rotate-[-90deg]" />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Cards da Coluna */}
-                                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                                <div 
+                                    className={`flex-1 p-6 space-y-4 overflow-y-auto transition-all duration-300 ${
+                                        isExpanded ? "opacity-100 block" : "opacity-0 hidden"
+                                    }`}
+                                >
                                     {colTasks.length === 0 ? (
                                         <div className="border border-dashed border-white/5 rounded-2xl p-6 text-center text-[10px] text-gray-600 leading-relaxed">
                                             Sem tarefas nesta coluna.
@@ -275,7 +345,10 @@ export default function KanbanBoardPage() {
                                             return (
                                                 <div
                                                     key={task.id}
-                                                    onClick={() => setSelectedTask(task)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedTask(task);
+                                                    }}
                                                     className="bg-[#0b0f1a]/80 border border-white/5 hover:border-emerald-500/20 rounded-2xl p-4 space-y-3 cursor-pointer hover:bg-[#0b0f1a]/60 transition-all duration-200 group"
                                                 >
                                                     <div className="flex justify-between items-start gap-2">
