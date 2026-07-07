@@ -17,7 +17,7 @@ export async function GET(req: Request) {
         const offers = await prisma.digitalOffer.findMany({
             where: {
                 bot: {
-                    tenantId: session.user.id
+                    tenantId: (session.user as any).id
                 },
                 ...(botId ? { botId } : {})
             },
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         const bot = await prisma.bot.findFirst({
             where: {
                 id: botId,
-                tenantId: session.user.id
+                tenantId: (session.user as any).id
             }
         });
 
