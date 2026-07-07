@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: "Oferta não encontrada" }, { status: 404 });
         }
 
-        if (offer.bot.tenantId !== session.user.id) {
+        if (offer.bot.tenantId !== (session.user as any).id) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
         }
 
@@ -57,7 +57,7 @@ export async function PUT(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: "Oferta não encontrada" }, { status: 404 });
         }
 
-        if (existing.bot.tenantId !== session.user.id) {
+        if (existing.bot.tenantId !== (session.user as any).id) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
         }
 
@@ -115,7 +115,7 @@ export async function DELETE(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: "Oferta não encontrada" }, { status: 404 });
         }
 
-        if (existing.bot.tenantId !== session.user.id) {
+        if (existing.bot.tenantId !== (session.user as any).id) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
         }
 
