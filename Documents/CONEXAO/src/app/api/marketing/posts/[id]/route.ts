@@ -30,7 +30,8 @@ export async function PATCH(
     if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
-    const { content, imageUrl } = await req.json();
+    const body = await req.json();
+    const { content, imageUrl, status, scheduledAt, platform, title } = body;
 
     try {
         const isVideo = imageUrl?.toLowerCase().endsWith('.mp4') || 
@@ -40,7 +41,11 @@ export async function PATCH(
         const post = await prisma.marketingPost.update({
             where: { id, tenantId },
             data: { 
-                content,
+                ...(content !== undefined && { content }),
+                ...(status !== undefined && { status }),
+                ...(scheduledAt !== undefined && { scheduledAt: scheduledAt ? new Date(scheduledAt) : null }),
+                ...(platform !== undefined && { platform }),
+                ...(title !== undefined && { title }),
                 ...(imageUrl && { 
                     imageUrl: isVideo ? null : imageUrl,
                     videoUrl: isVideo ? imageUrl : null,

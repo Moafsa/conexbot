@@ -2,6 +2,7 @@
 import { ContentTab } from './components/ContentTab';
 import { AdsTab } from './components/AdsTab';
 import { CalendarTab } from './components/CalendarTab';
+import WorkflowTab from './components/WorkflowTab';
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
@@ -29,7 +30,8 @@ import {
     CheckCircle2,
     Check,
     Trash2,
-    ChevronRight
+    ChevronRight,
+    ClipboardList
 } from "lucide-react";
 import { uploadMarketingMedia } from "@/app/actions/marketing-actions";
 
@@ -71,6 +73,7 @@ function MarketingContent() {
 
     const tabs = [
         { id: "overview", label: "Visão Geral", icon: BarChart3 },
+        { id: "workflow", label: "Fluxo de Posts", icon: ClipboardList },
         { id: "calendar", label: "Calendário", icon: Calendar },
         { id: "leads", label: "Conversas com Leads", icon: History },
         { id: "seo", label: "SEO & Keywords", icon: SearchCode },
@@ -303,6 +306,17 @@ function MarketingContent() {
                     setEditingPost(post);
                     setShowEditModal(true);
                 }} />}
+                {activeTab === "workflow" && (
+                    <WorkflowTab 
+                        selectedClientId={selectedClientId} 
+                        bots={bots} 
+                        onEditPost={(post: any) => {
+                            setEditingPost(post);
+                            setShowEditModal(true);
+                        }}
+                        refreshAll={fetchMarketingData}
+                    />
+                )}
                 {activeTab === "calendar" && (
                     <CalendarTab 
                         selectedClientId={selectedClientId}
