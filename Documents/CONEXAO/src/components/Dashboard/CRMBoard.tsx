@@ -6,7 +6,7 @@ import {
     Users, DollarSign, MessageCircle, MoreHorizontal,
     TrendingUp, Phone, Mail, User, Settings2, Search,
     ShieldAlert, Plus, Trash2, Clock, Check, AlertCircle,
-    RefreshCw, MessageSquare
+    RefreshCw, MessageSquare, ChevronLeft
 } from "lucide-react";
 import CRMContactPanel from "./CRMContactPanel";
 import { toast } from "sonner";
@@ -58,6 +58,19 @@ export function CRMBoard({ botId }: { botId: string }) {
     const [draggedContact, setDraggedContact] = useState<string | null>(null);
     const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [expandedStageId, setExpandedStageId] = useState<string>("");
+
+    const getStageIcon = (name: string) => {
+        const n = name.toUpperCase();
+        if (n.includes("NOVO") || n.includes("LEAD") || n.includes("NEW")) return "🆕";
+        if (n.includes("CONTATO") || n.includes("CONTACT") || n.includes("CHAT") || n.includes("ATENDIMENTO")) return "📞";
+        if (n.includes("QUALIFICADO") || n.includes("QUALIFIED") || n.includes("INTERESSADO")) return "⭐️";
+        if (n.includes("PROPOSTA") || n.includes("PROPOSAL") || n.includes("ENVIADA")) return "📩";
+        if (n.includes("CLIENTE") || n.includes("CUSTOMER")) return "👤";
+        if (n.includes("FECHADO") || n.includes("GANHO") || n.includes("CLOSED") || n.includes("WON")) return "🤝";
+        if (n.includes("PERDIDO") || n.includes("LOST") || n.includes("REJEITADO")) return "❌";
+        return "📁";
+    };
     
     // settings
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -135,6 +148,9 @@ export function CRMBoard({ botId }: { botId: string }) {
             if (res.ok) {
                 const data = await res.json();
                 setStages(data);
+                if (data && data.length > 0) {
+                    setExpandedStageId(data[0].id);
+                }
             }
         } catch (error) {
             console.error("Error fetching stages", error);
@@ -427,30 +443,86 @@ export function CRMBoard({ botId }: { botId: string }) {
             ) : (
                 <div className="relative flex h-[calc(100vh-250px)] min-h-[500px] overflow-hidden">
                     <div className={`flex-1 overflow-x-auto pb-4 transition-all duration-300 ${selectedContactId ? 'pr-[450px]' : ''}`}>
-                        <div className="flex gap-6 h-full p-2">
+                        <div className="flex gap-4 h-full p-2 items-stretch select-none">
                         {stages.map(stage => {
                             const stageContacts = contacts.filter(c => c.stageId === stage.id);
+                            const isExpanded = expandedStageId === stage.id;
+                            const stageIcon = getStageIcon(stage.name);
 
                             return (
                                 <div
                                     key={stage.id}
-                                    className="flex-1 min-w-[320px] max-w-[360px] flex flex-col rounded-3xl border border-gray-200/60 bg-white/60 backdrop-blur-sm overflow-hidden shadow-sm"
+                                    className={`transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col relative rounded-3xl border border-gray-200/60 bg-white/60 backdrop-blur-sm overflow-hidden shadow-sm ${
+                                        isExpanded ? "w-[346px] min-w-[346px]" : "w-[72px] min-w-[72px] cursor-pointer hover:bg-white/80"
+                                    }`}
+                                    onClick={() => {
+                                        if (!isExpanded) {
+                                            setExpandedStageId(stage.id);
+                                        }
+                                    }}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, stage)}
                                 >
-                                    {/* Column Header */}
-                                    <div className="p-4 flex justify-between items-center bg-white/80 border-b border-gray-100">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stage.color || '#6366f1' }} />
-                                            <h3 className="font-extrabold text-gray-800 text-[10px] uppercase tracking-wider truncate">{stage.name}</h3>
-                                        </div>
-                                        <span className="bg-gray-100 px-2 py-0.5 rounded-full text-[9px] font-black text-gray-600 border border-gray-200">
-                                            {stageContacts.length}
-                                        </span>
+                                    {/* Header da Coluna */}
+                                    <div 
+                                        className={`relative select-none transition-all duration-300 ${
+                                            isExpanded 
+                                                ? "h-[56px] w-full px-4 py-3 flex items-center justify-between bg-white/80 border-b border-gray-100" 
+                                                : "h-[346px] w-[56px] flex items-center justify-center bg-white/80"
+                                        }`}
+                                    >
+                                        {isExpanded ? (
+                                            <div className="flex items-center justify-between w-full">
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <span className="text-sm shrink-0">{stageIcon}</span>
+                                                    <h3 className="font-extrabold text-gray-800 text-[10px] uppercase tracking-wider truncate">{stage.name}</h3>
+                                                    <span className="bg-gray-100 px-2 py-0.5 rounded-full text-[9px] font-black text-gray-600 border border-gray-200">
+                                                        {stageContacts.length}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* Collapse button */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const idx = stages.findIndex(s => s.id === stage.id);
+                                                        const nextIdx = (idx + 1) % stages.length;
+                                                        setExpandedStageId(stages[nextIdx].id);
+                                                    }}
+                                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+                                                >
+                                                    <ChevronLeft size={14} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            // Collapsed Header Layout (Rotated 90 degrees)
+                                            <div 
+                                                style={{
+                                                    width: '346px',
+                                                    height: '56px',
+                                                    transform: 'rotate(90deg)',
+                                                    transformOrigin: '28px 28px',
+                                                }}
+                                                className="absolute top-0 left-0 flex items-center justify-between px-6 py-3 w-full h-full"
+                                            >
+                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                    <span className="text-sm shrink-0 rotate-[-90deg]">{stageIcon}</span>
+                                                    <h3 className="font-extrabold text-gray-800 text-[10px] uppercase tracking-wider truncate">{stage.name}</h3>
+                                                    <span className="bg-gray-100 px-2 py-0.5 rounded-full text-[9px] font-black text-gray-600 border border-gray-200">
+                                                        {stageContacts.length}
+                                                    </span>
+                                                </div>
+                                                <ChevronLeft size={14} className="text-gray-400 rotate-[-90deg]" />
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Column Content */}
-                                    <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar bg-gray-50/30">
+                                    <div 
+                                        className={`flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar bg-gray-50/30 transition-all duration-300 ${
+                                            isExpanded ? "opacity-100 block" : "opacity-0 hidden"
+                                        }`}
+                                    >
                                         {stageContacts.map(contact => {
                                             const slaStatus = getSlaStatus(contact.slaExpiresAt);
                                             const slaBorderColor = 
@@ -463,7 +535,10 @@ export function CRMBoard({ botId }: { botId: string }) {
                                                     key={contact.id}
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, contact.id)}
-                                                    onClick={() => setSelectedContactId(contact.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedContactId(contact.id);
+                                                    }}
                                                     className={`group relative bg-white p-4 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 ${selectedContactId === contact.id ? 'border-indigo-500 ring-4 ring-indigo-500/10' : slaBorderColor}`}
                                                 >
                                                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

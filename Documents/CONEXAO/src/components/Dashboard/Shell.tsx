@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Sidebar from "./Sidebar";
+import { Menu } from "lucide-react";
 
 interface ShellProps {
     children: React.ReactNode;
@@ -11,16 +15,41 @@ interface ShellProps {
 }
 
 export default function Shell({ children, branding, alertBanner, userPlans, isImpersonating, isAgencyClient, agencyInfo }: ShellProps) {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     return (
         <div className="h-screen w-full bg-black text-white flex flex-col overflow-hidden">
             {alertBanner}
-            <div className="flex flex-1 overflow-hidden min-h-0">
+            
+            {/* Mobile Header with Hamburger Menu */}
+            <div className="md:hidden flex items-center justify-between px-6 py-4 bg-[#0f172a] border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-3">
+                    <img 
+                        src={branding?.logoWhiteUrl || branding?.logoColoredUrl || "/logo.png"} 
+                        className="h-8 w-auto shrink-0 object-contain" 
+                        alt="Logo" 
+                    />
+                    <span className="font-bold text-sm text-white truncate max-w-[150px]">
+                        {branding?.systemName || "Conext Bot"}
+                    </span>
+                </div>
+                <button 
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl border border-white/10 transition-colors"
+                >
+                    <Menu size={20} />
+                </button>
+            </div>
+
+            <div className="flex flex-1 overflow-hidden min-h-0 relative">
                 <Sidebar
                     branding={branding}
                     userPlans={userPlans}
                     isImpersonating={isImpersonating}
                     isAgencyClient={isAgencyClient}
                     agencyInfo={agencyInfo}
+                    isOpenOnMobile={mobileMenuOpen}
+                    onCloseMobile={() => setMobileMenuOpen(false)}
                 />
                 <main className="flex-1 min-w-0 relative overflow-y-auto overflow-x-hidden h-full flex flex-col min-h-0 custom-scrollbar-white">
                     {/* Background Orbs for Dashboard internal feel */}

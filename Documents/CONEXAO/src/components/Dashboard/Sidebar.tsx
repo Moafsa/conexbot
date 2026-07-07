@@ -6,12 +6,14 @@ import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
 import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList } from "lucide-react";
 
-export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo }: {
+export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo, isOpenOnMobile, onCloseMobile }: {
     branding?: any;
     userPlans?: { hasPrimary: boolean; hasWriter: boolean };
     isImpersonating?: boolean;
     isAgencyClient?: boolean;
     agencyInfo?: { name: string; whatsapp: string | null; email: string | null } | null;
+    isOpenOnMobile?: boolean;
+    onCloseMobile?: () => void;
 }) {
     const pathname = usePathname();
     const { data: session } = useSession();
@@ -172,74 +174,90 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
     }
  
     return (
-        <aside className={`h-full bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? 'w-20' : 'w-64'}`}>
-            {isImpersonating && (
-                <div className="bg-red-600 p-2 text-center text-[10px] font-black uppercase tracking-tighter">
-                    {collapsed ? "MODO SUPORTE" : "Modo Suporte Ativo"}
-                    {!collapsed && (
-                        <button 
-                            onClick={handleStopImpersonating}
-                            className="block w-full mt-1 bg-white text-red-600 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors"
-                        >
-                            Sair
-                        </button>
-                    )}
-                </div>
+        <>
+            {/* Overlay de fundo escuro no mobile */}
+            {isOpenOnMobile && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
+                    onClick={onCloseMobile}
+                />
             )}
-            {/* Brand */}
-            <div className="h-24 flex items-center justify-center border-b border-white/5 relative px-4 text-center">
-                {!collapsed && (
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <img src={logo} className="h-12 w-auto shrink-0 object-contain" alt="Logo" />
-                        <h1 className="font-bold text-xl tracking-tighter text-white truncate">
-                            {firstName}<span className="text-[#00a884]">{lastName}</span>
-                        </h1>
+            
+            <aside 
+                className={`h-full bg-[#0f172a] border-r border-white/10 transition-all duration-300 flex flex-col shrink-0 
+                    fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0
+                    ${isOpenOnMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} 
+                    ${collapsed ? 'w-20' : 'w-64'}
+                `}
+            >
+                {isImpersonating && (
+                    <div className="bg-red-600 p-2 text-center text-[10px] font-black uppercase tracking-tighter">
+                        {collapsed ? "MODO SUPORTE" : "Modo Suporte Ativo"}
+                        {!collapsed && (
+                            <button 
+                                onClick={handleStopImpersonating}
+                                className="block w-full mt-1 bg-white text-red-600 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors"
+                            >
+                                Sair
+                            </button>
+                        )}
                     </div>
                 )}
-                {collapsed && <img src={logo} className="h-12 w-auto object-contain" alt="Logo" />}
- 
-                <button
-                    onClick={() => setCollapsed(!collapsed)}
-                    className="absolute -right-3 top-8 bg-[#00a884] rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-[#008f6f] transition-colors text-white shadow-lg border border-[#0f172a]"
-                >
-                    {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-                </button>
-            </div>
- 
-            {/* Menu */}
-            <nav className="flex-1 py-6 px-3 space-y-5 overflow-y-auto">
-                {menuCategories.map((cat, catIdx) => (
-                    <div key={catIdx} className="space-y-1.5">
-                        {cat.category && !collapsed && (
-                            <p className="text-[10px] font-black tracking-widest text-[#00a884] uppercase px-4 opacity-50 select-none">
-                                {cat.category}
-                            </p>
-                        )}
-                        {cat.items.map((item) => {
-                            const isActive = pathname === item.href;
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all group ${isActive
-                                        ? "bg-[#00a884]/10 border border-[#00a884]/20 text-[#00a884]"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                        }`}
-                                >
-                                    <span className={`text-xl transition-transform group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
-                                        <item.icon size={20} />
-                                    </span>
-                                    <span className={`font-medium whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-                                        {item.label}
-                                    </span>
-                                    {isActive && !collapsed && (
-                                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a884] shadow-[0_0_5px_#00a884]" />
-                                    )}
-                                </Link>
-                            );
-                        })}
-                    </div>
-                ))}
+                {/* Brand */}
+                <div className="h-24 flex items-center justify-center border-b border-white/5 relative px-4 text-center">
+                    {!collapsed && (
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <img src={logo} className="h-12 w-auto shrink-0 object-contain" alt="Logo" />
+                            <h1 className="font-bold text-xl tracking-tighter text-white truncate">
+                                {firstName}<span className="text-[#00a884]">{lastName}</span>
+                            </h1>
+                        </div>
+                    )}
+                    {collapsed && <img src={logo} className="h-12 w-auto object-contain" alt="Logo" />}
+     
+                    <button
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="absolute -right-3 top-8 bg-[#00a884] rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-[#008f6f] transition-colors text-white shadow-lg border border-[#0f172a] md:flex hidden"
+                    >
+                        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                    </button>
+                </div>
+     
+                {/* Menu */}
+                <nav className="flex-1 py-6 px-3 space-y-5 overflow-y-auto">
+                    {menuCategories.map((cat, catIdx) => (
+                        <div key={catIdx} className="space-y-1.5">
+                            {cat.category && !collapsed && (
+                                <p className="text-[10px] font-black tracking-widest text-[#00a884] uppercase px-4 opacity-50 select-none">
+                                    {cat.category}
+                                </p>
+                            )}
+                            {cat.items.map((item) => {
+                                const isActive = pathname === item.href;
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={onCloseMobile}
+                                        className={`flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all group ${isActive
+                                            ? "bg-[#00a884]/10 border border-[#00a884]/20 text-[#00a884]"
+                                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                            }`}
+                                    >
+                                        <span className={`text-xl transition-transform group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
+                                            <item.icon size={20} />
+                                        </span>
+                                        <span className={`font-medium whitespace-nowrap overflow-hidden transition-all ${collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
+                                            {item.label}
+                                        </span>
+                                        {isActive && !collapsed && (
+                                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00a884] shadow-[0_0_5px_#00a884]" />
+                                        )}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    ))}
             </nav>
  
             {/* User / Footer */}
@@ -340,5 +358,6 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
                 </button>
             </div>
         </aside>
+        </>
     );
 }

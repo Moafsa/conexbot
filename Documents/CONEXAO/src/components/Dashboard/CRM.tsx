@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Building2, Phone, Mail, MoreHorizontal, Download, Plus, Settings2, Trash2, Search } from "lucide-react";
+import { User, Building2, Phone, Mail, MoreHorizontal, Download, Plus, Settings2, Trash2, Search, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
 interface Bot {
@@ -47,6 +47,19 @@ export function CRM() {
     const [selectedContactPanel, setSelectedContactPanel] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
+    const [expandedStageId, setExpandedStageId] = useState<string>("");
+
+    const getStageIcon = (name: string) => {
+        const n = name.toUpperCase();
+        if (n.includes("NOVO") || n.includes("LEAD") || n.includes("NEW")) return "🆕";
+        if (n.includes("CONTATO") || n.includes("CONTACT") || n.includes("CHAT") || n.includes("ATENDIMENTO")) return "📞";
+        if (n.includes("QUALIFICADO") || n.includes("QUALIFIED") || n.includes("INTERESSADO")) return "⭐️";
+        if (n.includes("PROPOSTA") || n.includes("PROPOSAL") || n.includes("ENVIADA")) return "📩";
+        if (n.includes("CLIENTE") || n.includes("CUSTOMER")) return "👤";
+        if (n.includes("FECHADO") || n.includes("GANHO") || n.includes("CLOSED") || n.includes("WON")) return "🤝";
+        if (n.includes("PERDIDO") || n.includes("LOST") || n.includes("REJEITADO")) return "❌";
+        return "📁";
+    };
 
     const selectedBot = bots.find(b => b.id === selectedBotId);
     const clientQuery = selectedBot?.tenantId ? `clientId=${selectedBot.tenantId}` : '';
@@ -100,6 +113,9 @@ export function CRM() {
             if (res.ok) {
                 const data = await res.json();
                 setStages(data);
+                if (data && data.length > 0) {
+                    setExpandedStageId(data[0].id);
+                }
                 // Track which pipeline is active so new stages go to the right pipeline
                 const pipelineIdFromHeader = res.headers.get('x-pipeline-id');
                 setActivePipelineId(pipelineIdFromHeader || null);
@@ -329,52 +345,99 @@ export function CRM() {
                         </div>
                     )}
                     {bots.length > 0 && (
-                        <div className="flex gap-4 min-w-max h-full min-h-0">
+                        <div className="flex gap-4 h-full p-2 items-stretch select-none">
                             {stages.map((stage) => {
                                 const stageContacts = grouped[stage.id] || [];
+                                const isExpanded = expandedStageId === stage.id;
+                                const stageIcon = getStageIcon(stage.name);
 
                                 return (
                                     <div
                                         key={stage.id}
-                                        draggable
-                                        onDragStart={(e) => handleStageDragStart(e, stage.id)}
-                                        onDragOver={handleStageDragOver}
-                                        onDrop={(e) => handleStageDrop(e, stage.id)}
-                                        onDragEnd={() => setDraggedStage(null)}
-                                        className={`w-80 flex-shrink-0 flex flex-col rounded-xl border border-gray-200 h-full bg-white shadow-sm overflow-hidden transition-all ${draggedStage === stage.id ? 'opacity-50 scale-[0.98] cursor-grabbing' : 'cursor-grab'}`}
+                                        className={`transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col relative rounded-xl border border-gray-200 h-full bg-white shadow-sm overflow-hidden ${
+                                            isExpanded ? "w-[346px] min-w-[346px]" : "w-[72px] min-w-[72px] cursor-pointer hover:bg-gray-50"
+                                        }`}
+                                        onClick={() => {
+                                            if (!isExpanded) {
+                                                setExpandedStageId(stage.id);
+                                            }
+                                        }}
                                     >
                                         {/* Column Header */}
-
-                                        <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <div className={`w-2 h-2 rounded-full bg-${stage.color}-500 flex-shrink-0`} />
-                                                <h3 className="font-bold text-gray-700 text-xs uppercase tracking-wider truncate" title={stage.name}>
-                                                    {stage.name}
-                                                </h3>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-400 border border-gray-100 mr-2">
-                                                    {stageContacts.length}
-                                                </span>
-                                                <button
-                                                    onClick={() => handleExport(stage.id)}
-                                                    className="p-1 text-gray-400 hover:text-indigo-600 transition"
-                                                    title="Exportar coluna"
+                                        <div 
+                                            className={`relative select-none transition-all duration-300 ${
+                                                isExpanded 
+                                                    ? "h-[52px] w-full px-4 py-3 flex items-center justify-between bg-gray-50 border-b border-gray-100" 
+                                                    : "h-[346px] w-[52px] flex items-center justify-center bg-gray-50"
+                                            }`}
+                                        >
+                                            {isExpanded ? (
+                                                <div className="flex items-center justify-between w-full">
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <span className="text-sm shrink-0">{stageIcon}</span>
+                                                        <h3 className="font-bold text-gray-700 text-xs uppercase tracking-wider truncate" title={stage.name}>
+                                                            {stage.name}
+                                                        </h3>
+                                                        <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-400 border border-gray-100">
+                                                            {stageContacts.length}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleExport(stage.id); }}
+                                                            className="p-1 text-gray-400 hover:text-indigo-600 transition"
+                                                            title="Exportar coluna"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteStage(stage.id); }}
+                                                            className="p-1 text-gray-400 hover:text-red-500 transition"
+                                                            title="Deletar coluna"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const idx = stages.findIndex(s => s.id === stage.id);
+                                                                const nextIdx = (idx + 1) % stages.length;
+                                                                setExpandedStageId(stages[nextIdx].id);
+                                                            }}
+                                                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition-colors ml-1"
+                                                        >
+                                                            <ChevronLeft size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                // Collapsed vertical header
+                                                <div
+                                                    style={{
+                                                        width: '346px',
+                                                        height: '52px',
+                                                        transform: 'rotate(90deg)',
+                                                        transformOrigin: '26px 26px',
+                                                    }}
+                                                    className="absolute top-0 left-0 flex items-center justify-between px-6 py-3 w-full h-full"
                                                 >
-                                                    <Download className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteStage(stage.id)}
-                                                    className="p-1 text-gray-400 hover:text-red-500 transition"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <span className="text-sm shrink-0 rotate-[-90deg]">{stageIcon}</span>
+                                                        <h3 className="font-bold text-gray-700 text-xs uppercase tracking-wider truncate">{stage.name}</h3>
+                                                        <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-400 border border-gray-100">
+                                                            {stageContacts.length}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronLeft size={14} className="text-gray-400 rotate-[-90deg]" />
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Cards Container */}
                                         <div
-                                            className="p-2 flex-1 overflow-y-auto space-y-2 bg-gray-50/30 min-h-[100px] custom-scrollbar"
+                                            className={`p-2 flex-1 overflow-y-auto space-y-2 bg-gray-50/30 min-h-[100px] custom-scrollbar transition-all duration-300 ${
+                                                isExpanded ? "opacity-100 block" : "opacity-0 hidden"
+                                            }`}
                                             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
                                             onDrop={(e) => handleContactDrop(e, stage.id, stage.name)}
                                         >
@@ -384,7 +447,10 @@ export function CRM() {
                                                     draggable
                                                     onDragStart={(e) => handleContactDragStart(e, contact.id)}
                                                     onDragEnd={() => setDraggedContact(null)}
-                                                    onClick={() => setSelectedContactPanel(contact.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedContactPanel(contact.id);
+                                                    }}
                                                     className={`bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition cursor-grab group relative ${draggedContact === contact.id ? 'opacity-50 scale-95' : ''}`}
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
