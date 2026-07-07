@@ -248,6 +248,7 @@ model Bot {
   productAddonGroups      ProductAddonGroup[]
   carts                   Cart[]
   vectorStores            VectorStore[]
+  digitalOffers           DigitalOffer[]
   smtpConfigs             SmtpConfig[]
 }
 
@@ -946,6 +947,7 @@ enum FunnelStage {
   CHURNED
 }
 
+
 model VectorStore {
   id        String                       @id @default(uuid())
   content   String
@@ -954,4 +956,24 @@ model VectorStore {
   botId     String
   createdAt DateTime                     @default(now())
   bot       Bot                          @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model DigitalOffer {
+  id              String   @id @default(uuid())
+  name            String
+  niche           String
+  price           Float
+  originalPrice   Float?
+  copy            Json?     // { headline, subheadline, bullets, scarcity, bonuses, cta }
+  mockupImageUrl  String?
+  salesPageHtml   String?  @db.Text
+  isPublished     Boolean  @default(false)
+  publicSlug      String?  @unique
+  botId           String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  bot             Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([publicSlug])
 }

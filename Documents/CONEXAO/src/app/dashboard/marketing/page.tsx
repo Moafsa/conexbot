@@ -3,6 +3,7 @@ import { ContentTab } from './components/ContentTab';
 import { AdsTab } from './components/AdsTab';
 import { CalendarTab } from './components/CalendarTab';
 import WorkflowTab from './components/WorkflowTab';
+import { OffersTab } from './components/OffersTab';
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { 
@@ -31,7 +32,8 @@ import {
     Check,
     Trash2,
     ChevronRight,
-    ClipboardList
+    ClipboardList,
+    ShoppingBag
 } from "lucide-react";
 import { uploadMarketingMedia } from "@/app/actions/marketing-actions";
 
@@ -78,6 +80,7 @@ function MarketingContent() {
         { id: "leads", label: "Conversas com Leads", icon: History },
         { id: "seo", label: "SEO & Keywords", icon: SearchCode },
         { id: "content", label: "Criador de Posts", icon: Sparkles },
+        { id: "offers", label: "Páginas de Vendas (LPs)", icon: ShoppingBag },
         { id: "ads", label: "Gestor de Anúncios", icon: Target },
         { id: "settings", label: "Integrações", icon: Settings },
     ];
@@ -342,6 +345,7 @@ function MarketingContent() {
                         onClearPrefilledDate={() => setPrefilledDate("")}
                     />
                 )}
+                {activeTab === "offers" && <OffersTab />}
                 {activeTab === "ads" && <AdsTab selectedClientId={selectedClientId} setShowCampaignModal={setShowCampaignModal} bots={bots} loadingBots={loadingBots} agencyClients={agencyClients} />}
                 {activeTab === "settings" && <SettingsTab selectedClientId={selectedClientId} />}
             </div>
