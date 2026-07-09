@@ -301,23 +301,65 @@ export default function ClientAuditPage() {
             {/* Elementos impressos ocultados */}
             <style jsx global>{`
                 @media print {
+                    /* Forçar exibição completa do conteúdo e remover limites de scroll da Shell */
+                    html, body, #__next {
+                        background: white !important;
+                        color: black !important;
+                        height: auto !important;
+                        min-height: 100% !important;
+                        overflow: visible !important;
+                    }
+                    
+                    /* Sobrescrever classes de layout h-screen / overflow-hidden da Shell para impressão */
+                    .h-screen,
+                    div[class*="h-screen"],
+                    div[class*="overflow-hidden"],
+                    div[class*="min-h-0"],
+                    main,
+                    aside,
+                    .flex-1 {
+                        height: auto !important;
+                        min-height: 0 !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        position: static !important;
+                        display: block !important;
+                    }
+
+                    /* Ocultar elementos de navegação, cabeçalhos de tela e botões */
+                    aside,
+                    .sidebar,
+                    div[class*="sidebar"],
+                    div[class*="md:hidden"],
+                    .no-print,
+                    button {
+                        display: none !important;
+                    }
+
+                    /* Estilização para o Relatório PDF impresso */
                     body {
                         background: white !important;
                         color: black !important;
-                    }
-                    .no-print {
-                        display: none !important;
                     }
                     .print-card {
                         background: #f9fafb !important;
                         border: 1px solid #e5e7eb !important;
                         color: black !important;
+                        box-shadow: none !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                     }
                     .print-text {
                         color: #1f2937 !important;
                     }
                     .print-title {
                         color: #111827 !important;
+                    }
+                    
+                    /* Evitar corte de páginas bagunçado */
+                    .page-break {
+                        page-break-before: always !important;
+                        break-before: page !important;
                     }
                 }
             `}</style>
