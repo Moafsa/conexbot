@@ -17,6 +17,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const orderMarkersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
     
     const [drivers, setDrivers] = useState<any[]>([]);
+    const [pendingOrders, setPendingOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDriver, setSelectedDriver] = useState<any>(null);
     const [showInactive, setShowInactive] = useState(true);
@@ -31,10 +32,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [driverKeywords, setDriverKeywords] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    // 1. Fetch Drivers & Deliveries Data
+    // 1. Fetch Drivers Data
     const fetchDrivers = async () => {
         try {
-            setIsRefreshing(true);
             const res = await fetch('/api/drivers');
             if (!res.ok) throw new Error('Falha ao buscar motoristas');
             const data = await res.json();
@@ -42,19 +42,36 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         } catch (e: any) {
             console.error('Error fetching drivers:', e);
             toast.error('Erro ao atualizar rastreamento de motoristas');
-        } finally {
-            setLoading(false);
-            setIsRefreshing(false);
         }
     };
 
+    // 2. Fetch Pending Orders Data
+    const fetchPendingOrders = async () => {
+        try {
+            const res = await fetch('/api/drivers/pending-orders');
+            if (!res.ok) throw new Error('Falha ao buscar pedidos pendentes');
+            const data = await res.json();
+            setPendingOrders(data || []);
+        } catch (e: any) {
+            console.error('Error fetching pending orders:', e);
+        }
+    };
+
+    // Reload both datasets
+    const refreshAll = async () => {
+        setIsRefreshing(true);
+        await Promise.all([fetchDrivers(), fetchPendingOrders()]);
+        setLoading(false);
+        setIsRefreshing(false);
+    };
+
     useEffect(() => {
-        fetchDrivers();
-        const interval = setInterval(fetchDrivers, 12000); // refresh every 12 seconds
+        refreshAll();
+        const interval = setInterval(refreshAll, 12000); // refresh every 12 seconds
         return () => clearInterval(interval);
     }, []);
 
-    // 2. Initialize Mapbox Map
+    // 3. Initialize Mapbox Map
     useEffect(() => {
         if (!mapContainerRef.current || mapRef.current || !mapboxToken) return;
 
@@ -84,7 +101,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         };
     }, [mapboxToken]);
 
-    // 3. Update Markers & Map bounds
+    // 4. Update Markers & Map bounds
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
@@ -220,6 +237,41 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         }
     };
 
+    // Drag & Drop event handlers
+    const handleDragStart = (e: React.DragEvent, orderId: string) => {
+        e.dataTransfer.setData('orderId', orderId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = async (e: React.DragEvent, driverId: string) => {
+        e.preventDefault();
+        const orderId = e.dataTransfer.getData('orderId');
+        if (!orderId || !driverId) return;
+
+        try {
+            toast.loading('Despachando entrega...', { id: 'dispatch' });
+            const res = await fetch('/api/drivers/dispatch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, driverId })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Erro ao despachar pedido');
+            }
+
+            toast.success('Pedido despachado e motorista notificado!', { id: 'dispatch' });
+            refreshAll();
+        } catch (err: any) {
+            toast.error(err.message, { id: 'dispatch' });
+        }
+    };
+
     // Open Modal for Create or Edit
     const handleOpenModal = (driverToEdit?: any) => {
         if (driverToEdit) {
@@ -267,7 +319,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
 
             toast.success(modalMode === 'create' ? 'Entregador cadastrado com sucesso!' : 'Cadastro atualizado!');
             setModalOpen(false);
-            fetchDrivers();
+            refreshAll();
         } catch (err: any) {
             toast.error(err.message);
         } finally {
@@ -278,22 +330,71 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     return (
         <div className="flex h-[calc(100vh-68px)] overflow-hidden bg-[#030014] text-white">
             
-            {/* Sidebar Control Panel */}
-            <div className="w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex flex-col justify-between custom-scrollbar-white overflow-y-auto">
+            {/* Column 1: Pending Orders (Drag Source) */}
+            <div className="w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex flex-col custom-scrollbar-white overflow-y-auto shrink-0">
+                <div className="p-5 space-y-4">
+                    <div>
+                        <h2 className="text-xs font-bold tracking-wider uppercase text-gray-400">Pedidos Pendentes ({pendingOrders.length})</h2>
+                        <p className="text-[10px] text-gray-500 mt-1">Arraste um cartão e solte-o em um motorista</p>
+                    </div>
+
+                    <div className="space-y-3">
+                        {pendingOrders.length === 0 ? (
+                            <div className="py-12 text-center text-gray-500 text-xs border border-dashed border-white/10 rounded-2xl p-4">
+                                Nenhum pedido pronto para entrega no momento
+                            </div>
+                        ) : (
+                            pendingOrders.map((order) => {
+                                const customer = order.contact || {};
+                                const address = customer.notes || customer.needs || 'Endereço não cadastrado';
+                                
+                                return (
+                                    <div 
+                                        key={order.id}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, order.id)}
+                                        className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-white/10 transition cursor-grab active:cursor-grabbing space-y-2 relative overflow-hidden group/order"
+                                    >
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-[#ec4899]"></div>
+                                        <div className="pl-1.5 space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-[#ec4899] bg-[#ec4899]/10 px-2 py-0.5 rounded-full">
+                                                    #{order.id.substring(0, 6)}
+                                                </span>
+                                                <span className="text-[9px] text-gray-500">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                            </div>
+                                            <h4 className="text-xs font-bold text-white truncate">{customer.name || 'Cliente'}</h4>
+                                            <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">
+                                                📍 {address}
+                                            </p>
+                                            <div className="text-[9px] text-[#c084fc] font-medium pt-1 border-t border-white/5">
+                                                {order.items?.map((i: any) => `${i.product?.name || 'Botijão'} x${i.quantity}`).join(', ')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Column 2: Drivers (Drop Target) */}
+            <div className="w-80 border-r border-white/5 bg-[#07041a]/40 backdrop-blur-md flex flex-col justify-between custom-scrollbar-white overflow-y-auto shrink-0">
                 <div className="p-5 space-y-5">
                     
                     {/* Title & Refresh */}
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-bold tracking-tight">Frota e Rotas</h2>
-                            <p className="text-xs text-gray-400">Entregadores e cobertura de entrega</p>
+                            <h2 className="text-xs font-bold tracking-wider uppercase text-gray-400">Entregadores ({drivers.length})</h2>
+                            <p className="text-[10px] text-gray-500 mt-1">Arraste os pedidos para estas caixas</p>
                         </div>
                         <button 
-                            onClick={fetchDrivers} 
+                            onClick={refreshAll} 
                             disabled={isRefreshing}
                             className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-gray-300 disabled:opacity-50"
                         >
-                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
 
@@ -301,26 +402,24 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     <div className="space-y-2">
                         <button 
                             onClick={() => handleOpenModal()} 
-                            className="w-full p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_10px_var(--primary-glow)] border-0 cursor-pointer"
+                            className="w-full p-2.5 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_10px_var(--primary-glow)] border-0 cursor-pointer"
                         >
                             + Cadastrar Entregador
                         </button>
 
-                        <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 text-sm">
+                        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/5 text-xs">
                             <span className="text-gray-300 font-medium">Mostrar Inativos</span>
                             <button 
                                 onClick={() => setShowInactive(!showInactive)}
                                 className="text-indigo-400 hover:text-indigo-300 transition"
                             >
-                                {showInactive ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5 text-gray-500" />}
+                                {showInactive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 text-gray-500" />}
                             </button>
                         </div>
                     </div>
 
                     {/* Drivers List */}
                     <div className="space-y-3">
-                        <h3 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">Entregadores ({drivers.length})</h3>
-                        
                         {loading ? (
                             <div className="py-8 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
                                 <RefreshCw className="h-5 w-5 animate-spin text-indigo-500" />
@@ -339,23 +438,28 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                 return (
                                     <div 
                                         key={driver.id}
-                                        className={`p-3.5 rounded-2xl border transition flex flex-col justify-between gap-3 ${
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, driver.id)}
+                                        className={`p-3.5 rounded-2xl border transition flex flex-col justify-between gap-3 group/item ${
                                             isSelected 
-                                                ? 'bg-indigo-600/20 border-indigo-500/50' 
-                                                : 'bg-white/5 border-white/5 hover:border-white/10'
-                                        }`}
+                                                ? 'bg-indigo-600/20 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                                                : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.07]'
+                                        } relative overflow-hidden`}
                                     >
+                                        {/* Drop overlay helper */}
+                                        <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover/item:opacity-100 border-2 border-dashed border-indigo-500/40 rounded-2xl pointer-events-none transition"></div>
+
                                         <div className="flex items-center justify-between cursor-pointer" onClick={() => handleFlyToDriver(driver)}>
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
-                                                    <div className="h-10 w-10 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center">
+                                                    <div className="h-9 w-9 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center">
                                                         <Truck className="h-4 w-4 text-indigo-400" />
                                                     </div>
-                                                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-slate-950 ${isOnline ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-slate-950 ${isOnline ? 'bg-green-500' : 'bg-amber-500'}`} />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-semibold text-white">{driver.name || 'Sem nome'}</h4>
-                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                    <h4 className="text-xs font-semibold text-white">{driver.name || 'Sem nome'}</h4>
+                                                    <p className="text-[9px] text-gray-400 mt-0.5">
                                                         {hasGps ? `${driver.latitude.toFixed(4)}, ${driver.longitude.toFixed(4)}` : 'Sem sinal GPS'}
                                                     </p>
                                                 </div>
@@ -367,7 +471,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                         </div>
 
                                         {/* Coverage keywords and edit button */}
-                                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-gray-400">
+                                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-gray-400">
                                             <span className="truncate max-w-[155px]" title={driver.dispatchKeywords || 'Nenhum'}>
                                                 <b>Região:</b> {driver.dispatchKeywords || 'Nenhum'}
                                             </span>
@@ -376,9 +480,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                     e.stopPropagation();
                                                     handleOpenModal(driver);
                                                 }}
-                                                className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer"
+                                                className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
                                             >
-                                                <Edit2 className="h-2.5 w-2.5" /> Editar
+                                                <Edit2 className="h-2 w-2" /> Editar
                                             </button>
                                         </div>
                                     </div>
@@ -392,17 +496,17 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 {selectedDriver && (
                     <div className="p-5 border-t border-white/5 bg-slate-950/80">
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Entregas do Motorista</h3>
-                        <h4 className="text-base font-bold text-white mt-1">{selectedDriver.name}</h4>
+                        <h4 className="text-sm font-bold text-white mt-1">{selectedDriver.name}</h4>
                         
-                        <div className="mt-3.5 space-y-3">
+                        <div className="mt-3 space-y-2.5">
                             {selectedDriver.assignedOrders?.length === 0 ? (
-                                <p className="text-xs text-gray-400 italic">Sem entregas ativas no momento.</p>
+                                <p className="text-[11px] text-gray-400 italic">Sem entregas ativas no momento.</p>
                             ) : (
                                 selectedDriver.assignedOrders?.map((order: any) => (
-                                    <div key={order.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-xs space-y-1.5">
+                                    <div key={order.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[11px] space-y-1.5 relative">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-indigo-300">#{order.id.substring(0, 6)}</span>
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
+                                            <span className="text-[8px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
                                                 {order.status}
                                             </span>
                                         </div>
@@ -416,7 +520,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 )}
             </div>
 
-            {/* Map Container */}
+            {/* Column 3: Mapbox Map */}
             <div className="flex-1 relative h-full w-full">
                 {!mapboxToken && (
                     <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center text-center p-6">
