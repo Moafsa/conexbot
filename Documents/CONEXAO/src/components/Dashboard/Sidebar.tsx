@@ -20,7 +20,16 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(false);
 
-    const isDelivery = botBusinessType === 'GAS_DISTRIBUTOR' || botBusinessType === 'DELIVERY' || botBusinessType === 'gas_distributor' || botBusinessType === 'delivery';
+    const typeLower = (botBusinessType || '').toLowerCase();
+    const isDelivery = !botBusinessType || 
+                       typeLower.includes('delivery') || 
+                       typeLower.includes('gas') || 
+                       typeLower.includes('gás') || 
+                       typeLower.includes('food') || 
+                       typeLower.includes('restaurante') || 
+                       typeLower.includes('restaurant') || 
+                       typeLower.includes('distribuidora') ||
+                       typeLower.includes('logis');
 
     const handleStopImpersonating = async () => {
         await fetch("/api/admin/impersonate", {
