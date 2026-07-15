@@ -1152,6 +1152,39 @@ Framework de crescimento de comunidade:
     ],
 };
 
+// ─── SQUAD 13: DELIVERY SQUAD ────────────────────────────────────────────────
+
+const DELIVERY_SQUAD: Squad = {
+    id: 'delivery',
+    name: 'Logística & Delivery',
+    emoji: '🚚',
+    description: 'Agentes focados em atendimento de delivery, despacho de entregas e roteamento para distribuidoras.',
+    agents: [
+        {
+            id: 'gas-assistant',
+            squadId: 'delivery',
+            name: 'Atendente de Gás',
+            role: 'Especialista em Distribuição de Gás',
+            emoji: '🔥',
+            llmProvider: 'openai',
+            llmModel: 'gpt-4o-mini',
+            systemPrompt: `Você é o Atendente de Gás da distribuidora, um assistente virtual focado em anotar pedidos de gás/água, calcular taxas de entrega e despachar os entregadores corretos por bairro de forma ultra-eficiente.
+
+Suas diretrizes fundamentais:
+1. **Identifique a Localidade:** Antes de fechar o pedido, SEMPRE peça o bairro/região de entrega do cliente.
+2. **Calcula a Taxa:** Use a ferramenta finalizar_pedido informando o bairro para calcular a taxa de entrega correspondente.
+3. **Despache Automaticamente:** Quando o cliente confirmar e o pagamento for concluído (ou selecionado dinheiro/PIX na entrega), execute IMEDIATAMENTE a ferramenta \`despachar_servico\` com os detalhes do pedido e a localidade (bairro) para que a IA selecione o entregador correto daquela região.
+4. **Tratamento de Região Sem Cobertura:** Se a ferramenta de despacho retornar erro de região fora de cobertura, use a função \`chamar_humano\` com o motivo "Região fora de cobertura" e informe o cliente no chat educadamente que está transferindo o atendimento para que a equipe humana conclua a venda manualmente.
+
+Seja sempre prestativo, educado e focado em concluir a venda rapidamente.`,
+            tasks: [
+                { id: 'gas-order', label: 'Anotar Pedido de Gás', prompt: 'Ajude o cliente a escolher o tipo de botijão (P13, P5, P45), confirme o bairro de entrega para calcular a taxa, e solicite a confirmação dos dados de entrega.' },
+                { id: 'dispatch-driver', label: 'Despachar Motorista da Região', prompt: 'Identifique o bairro do cliente, verifique o entregador responsável por essa região e use a ferramenta de despacho para enviar a rota e dados ao WhatsApp do motorista.' }
+            ]
+        }
+    ]
+};
+
 // ─── EXPORTAÇÕES ─────────────────────────────────────────────────────────────
 
 export const ALL_SQUADS: Squad[] = [
@@ -1167,6 +1200,7 @@ export const ALL_SQUADS: Squad[] = [
     CLAUDE_CODE_SQUAD,
     SECURITY_SQUAD,
     MOVEMENT_SQUAD,
+    DELIVERY_SQUAD,
 ];
 
 export const getAllAgents = (): Agent[] => ALL_SQUADS.flatMap(s => s.agents);
