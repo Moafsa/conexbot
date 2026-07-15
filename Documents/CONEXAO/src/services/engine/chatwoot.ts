@@ -425,6 +425,48 @@ export const ChatwootService = {
             logToFile(`Chatwoot createApiInbox Error: ${error.message}`);
             throw error;
         }
+    },
+
+    async assignConversation(bot: any, conversationId: number | string, agentId: number | null) {
+        if (!bot.chatwootUrl || !bot.chatwootToken || !bot.chatwootAccountId) return null;
+        try {
+            const url = `${bot.chatwootUrl.replace(/\/$/, '')}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${conversationId}`;
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'api_access_token': bot.chatwootToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ assignee_id: agentId })
+            });
+            return await response.json();
+        } catch (error: any) {
+            logToFile(`Assign Conversation Error: ${error.message}`);
+            return null;
+        }
+    },
+
+    async getAgentByEmail(bot: any, email: string) {
+        if (!bot.chatwootUrl || !bot.chatwootToken || !bot.chatwootAccountId) return null;
+        try {
+            const url = `${bot.chatwootUrl.replace(/\/$/, '')}/api/v1/accounts/${bot.chatwootAccountId}/agents`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'api_access_token': bot.chatwootToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const agents = await response.json();
+                const agent = agents.find((a: any) => a.email?.toLowerCase() === email.toLowerCase());
+                return agent || null;
+            }
+            return null;
+        } catch (error: any) {
+            logToFile(`Get Agent By Email Error: ${error.message}`);
+            return null;
+        }
     }
 };
 

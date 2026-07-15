@@ -516,6 +516,10 @@ model Order {
   contact          Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   coupon           Coupon?     @relation(fields: [couponId], references: [id])
   items            OrderItem[]
+  driverId         String?
+  driver           Contact?    @relation("DriverOrders", fields: [driverId], references: [id])
+  followUpSent     Boolean     @default(false)
+  followUpResponse String?
 
   @@index([couponId])
 }
@@ -577,6 +581,11 @@ model Contact {
   stage            CrmStage?     @relation(fields: [stageId], references: [id])
   tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders           Order[]
+  latitude         Float?
+  longitude        Float?
+  loginToken       String?       @unique
+  loginTokenExpires DateTime?
+  assignedOrders   Order[]       @relation("DriverOrders")
 
   @@unique([phone, botId])
 }

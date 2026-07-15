@@ -58,6 +58,102 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', message: 'Bot not found' }, { status: 404 });
         }
 
+        // --- Chatwoot Assignee Change / Assignment Detection ---
+        if (body.event === 'conversation_updated' && body.assignee) {
+            const assignee = body.assignee;
+            const assigneeEmail = assignee.email || '';
+            
+            if (assigneeEmail.includes('@entregador.conext.bot')) {
+                const driverPhone = assigneeEmail.split('@')[0].replace(/\D/g, '');
+                
+                const driver = await prisma.contact.findFirst({
+                    where: {
+                        phone: driverPhone,
+                        contactType: 'DRIVER',
+                        botId: bot.id
+                    }
+                });
+
+                if (driver) {
+                    const contactMeta = body.conversation?.meta?.sender || {};
+                    const customerPhoneRaw = contactMeta.phone_number || contactMeta.identifier || '';
+                    const customerPhone = customerPhoneRaw.replace(/\D/g, '');
+
+                    if (customerPhone) {
+                        const customer = await prisma.contact.findFirst({
+                            where: {
+                                phone: customerPhone,
+                                botId: bot.id
+                            }
+                        });
+
+                        const latestOrder = await prisma.order.findFirst({
+                            where: {
+                                contactId: customer?.id,
+                                botId: bot.id,
+                                status: { in: ['PENDING', 'DISPATCHED'] }
+                            },
+                            include: {
+                                items: {
+                                    include: {
+                                        product: true
+                                    }
+                                }
+                            },
+                            orderBy: {
+                                createdAt: 'desc'
+                            }
+                        });
+
+                        if (latestOrder) {
+                            const crypto = require('crypto');
+                            const token = crypto.randomBytes(16).toString('hex');
+                            const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+                            await prisma.contact.update({
+                                where: { id: driver.id },
+                                data: {
+                                    loginToken: token,
+                                    loginTokenExpires: tokenExpires
+                                }
+                            });
+
+                            await prisma.order.update({
+                                where: { id: latestOrder.id },
+                                data: {
+                                    driverId: driver.id,
+                                    status: 'DISPATCHED'
+                                }
+                            });
+
+                            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                            const orderItemsStr = latestOrder.items.map(i => `${i.product.name} x${i.quantity}`).join(', ');
+                            const customerName = customer?.name || 'Cliente Sem Nome';
+                            const deliveryAddress = customer?.notes || customer?.needs || 'Endereço não especificado no CRM.';
+
+                            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
+                            const pwaUrl = `${appUrl}/driver?token=${token}`;
+
+                            const dispatchMsg = `🚚 *NOVA ENTREGA ATRIBUÍDA* 🚚\n\n` +
+                                `*Cliente:* ${customerName}\n` +
+                                `*WhatsApp Cliente:* wa.me/${customerPhone}\n` +
+                                `*Endereço:* ${deliveryAddress}\n` +
+                                `*Itens:* ${orderItemsStr}\n\n` +
+                                `📍 *Iniciar Rota no Google Maps:*\n${mapsUrl}\n\n` +
+                                `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
+                                `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
+
+                            const { UzapiService } = await import('@/services/engine/uzapi');
+                            await UzapiService.sendMessage(bot.sessionName || '', driver.phone, dispatchMsg);
+                            
+                            logToFile(`[Chatwoot Assignee Webhook] Dispatched order ${latestOrder.id} to driver ${driver.name} (${driver.phone})`);
+                        }
+                    }
+                }
+            }
+            return NextResponse.json({ status: 'processed_assignment' });
+        }
+
         // --- Data Extraction Setup ---
         let senderPhone = '';
         let messageText = '';

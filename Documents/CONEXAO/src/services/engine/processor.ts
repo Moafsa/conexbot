@@ -337,6 +337,71 @@ export const MessageProcessor = {
                 return null;
             }
 
+            // --- Driver Response Checking (Intercept) ---
+            if (existingContact.contactType === 'DRIVER') {
+                logToFile(`[Processor] Driver response received from ${senderPhone}: "${messageText}"`);
+                
+                const activeOrderForDriver = await prisma.order.findFirst({
+                    where: {
+                        driverId: existingContact.id,
+                        status: 'DISPATCHED',
+                        followUpSent: true,
+                        followUpResponse: null
+                    },
+                    include: {
+                        contact: true
+                    }
+                });
+
+                if (activeOrderForDriver) {
+                    const textNormalized = messageText.toUpperCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+                    
+                    if (['SIM', 'OK', 'TUDO CERTO', 'ENTREGUE', 'FEITO', 'DEU CERTO', 'CONFIRMADO'].some(kw => textNormalized.includes(kw))) {
+                        await prisma.order.update({
+                            where: { id: activeOrderForDriver.id },
+                            data: {
+                                status: 'DELIVERED',
+                                followUpResponse: 'SIM'
+                            }
+                        });
+
+                        const newActiveJobs = Math.max(0, (existingContact.activeJobs || 1) - 1);
+                        await prisma.contact.update({
+                            where: { id: existingContact.id },
+                            data: { activeJobs: newActiveJobs }
+                        });
+
+                        return {
+                            text: `Obrigado pelo retorno! Entrega para o cliente *${activeOrderForDriver.contact?.name || 'Cliente'}* finalizada com sucesso no sistema. Bom trabalho! 👍`
+                        };
+                    } else if (['NAO', 'PROBLEMA', 'ERRO', 'FALHOU', 'NAO DEU', 'CANCELAR'].some(kw => textNormalized.includes(kw))) {
+                        await prisma.order.update({
+                            where: { id: activeOrderForDriver.id },
+                            data: {
+                                followUpResponse: 'NÃO'
+                            }
+                        });
+
+                        const title = `⚠️ Problema na Entrega`;
+                        const msgContent = `O motorista *${existingContact.name || 'Sem nome'}* (${senderPhone}) reportou um problema ao entregar o pedido *#${activeOrderForDriver.id.substring(0,6)}* para o cliente *${activeOrderForDriver.contact?.name || 'Cliente'}*.\n\n*Resposta do motorista:* "${messageText}"`;
+                        
+                        await NotificationService.alertTenant(bot.tenantId, title, msgContent, 'DELIVERY_ISSUE');
+
+                        return {
+                            text: `Entendido. Registramos que houve um problema com a entrega. Nossa equipe de suporte na central já foi notificada e entrará em contato com você em breve. Obrigado pelo retorno.`
+                        };
+                    } else {
+                        return {
+                            text: `Não entendi sua resposta. Por favor, responda com *SIM* se a entrega foi realizada com sucesso, ou *NÃO* se houve algum problema.`
+                        };
+                    }
+                } else {
+                    return {
+                        text: `Olá! Seu número está cadastrado como entregador no sistema. No momento, você não tem nenhuma entrega pendente de confirmação.`
+                    };
+                }
+            }
+
             // 6.0.5 AI Detection (Enhanced with LLM Scout)
             if (bot.enableAiDetection && await detectAiMessage(messageText, bot)) {
                 logToFile(`[Processor] AI DETECTED from ${senderPhone}`);
@@ -1140,53 +1205,50 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         } else if (name === 'despachar_servico') {
                             try {
                                 const { UzapiService } = await import('@/services/engine/uzapi');
+                                const { ChatwootService } = await import('@/services/engine/chatwoot');
                                 let finalPhone = args.colaborador_telefone;
                                 let chosenName = '';
+                                let bestColaborador: any = null;
 
                                 if (!finalPhone) {
-                                    // Lógica de roteamento híbrido
                                     const cType = (args.tipo_colaborador || 'DRIVER').toUpperCase();
                                     const allColaboradores = await prisma.contact.findMany({
                                         where: { botId: bot.id, contactType: cType }
                                     });
 
                                     if (allColaboradores.length === 0) {
-                                        throw new Error(`Nenhum colaborador do tipo ${cType} cadastrado.`);
+                                        toolResult = `ERRO: Não há nenhum colaborador do tipo ${cType} cadastrado no sistema. Use IMEDIATAMENTE a função chamar_humano com o motivo 'Sem entregadores cadastrados' para transferir o cliente ao atendimento humano.`;
+                                    } else {
+                                        let matchedColaboradores = allColaboradores;
+                                        if (args.localidade) {
+                                            const loc = args.localidade.toLowerCase().trim();
+                                            matchedColaboradores = allColaboradores.filter(c => {
+                                                if (!c.dispatchKeywords) return false;
+                                                const kwList = c.dispatchKeywords.toLowerCase().split(',').map(k => k.trim());
+                                                return kwList.some(kw => kw.includes(loc) || loc.includes(kw));
+                                            });
+                                        }
+
+                                        if (matchedColaboradores.length === 0) {
+                                            toolResult = `ERRO: O bairro ou região "${args.localidade || ''}" está fora da nossa área de cobertura automática de entregas. Use IMEDIATAMENTE a função chamar_humano com o motivo 'Bairro fora da cobertura de entregas' para transferir o cliente ao atendimento humano, e avise-o no chat.`;
+                                        } else {
+                                            matchedColaboradores.sort((a, b) => (a.activeJobs || 0) - (b.activeJobs || 0));
+                                            bestColaborador = matchedColaboradores[0];
+                                            finalPhone = bestColaborador.phone;
+                                            chosenName = bestColaborador.name || 'Sem nome';
+
+                                            await prisma.contact.update({
+                                                where: { id: bestColaborador.id },
+                                                data: { activeJobs: { increment: 1 } }
+                                            });
+                                        }
                                     }
-
-                                    // Filtra por localidade/palavra-chave se informada
-                                    let matchedColaboradores = allColaboradores;
-                                    if (args.localidade) {
-                                        const loc = args.localidade.toLowerCase().trim();
-                                        matchedColaboradores = allColaboradores.filter(c => {
-                                            if (!c.dispatchKeywords) return false;
-                                            const kwList = c.dispatchKeywords.toLowerCase().split(',').map(k => k.trim());
-                                            return kwList.some(kw => kw.includes(loc) || loc.includes(kw));
-                                        });
-                                    }
-
-                                    if (matchedColaboradores.length === 0) {
-                                        throw new Error(`Nenhum colaborador encontrado para a localidade/especialidade "${args.localidade}".`);
-                                    }
-
-                                    // Ordena por activeJobs (menor fila primeiro)
-                                    matchedColaboradores.sort((a, b) => (a.activeJobs || 0) - (b.activeJobs || 0));
-                                    
-                                    const bestColaborador = matchedColaboradores[0];
-                                    finalPhone = bestColaborador.phone;
-                                    chosenName = bestColaborador.name || 'Sem nome';
-
-                                    // Incrementa o contador de fila do colaborador
-                                    await prisma.contact.update({
-                                        where: { id: bestColaborador.id },
-                                        data: { activeJobs: { increment: 1 } }
-                                    });
                                 } else {
-                                    // Se informou telefone direto, localiza o contato correspondente para incrementar a fila
                                     const contact = await prisma.contact.findFirst({
                                         where: { botId: bot.id, phone: finalPhone }
                                     });
                                     if (contact) {
+                                        bestColaborador = contact;
                                         chosenName = contact.name || 'Sem nome';
                                         await prisma.contact.update({
                                             where: { id: contact.id },
@@ -1195,8 +1257,87 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     }
                                 }
 
-                                await UzapiService.sendMessage(bot.sessionName, finalPhone, args.detalhes_servico);
-                                toolResult = `Serviço despachado com sucesso para ${chosenName} (${finalPhone}). Fila de trabalhos ativos atualizada.`;
+                                if (finalPhone && !toolResult) {
+                                    // 1. Find latest pending order for client
+                                    const latestOrder = await prisma.order.findFirst({
+                                        where: {
+                                            contactId: existingContact.id,
+                                            botId: bot.id,
+                                            status: 'PENDING'
+                                        },
+                                        include: {
+                                            items: {
+                                                include: {
+                                                    product: true
+                                                }
+                                            }
+                                        },
+                                        orderBy: {
+                                            createdAt: 'desc'
+                                        }
+                                    });
+
+                                    // 2. Generate PWA magic login token for driver
+                                    const crypto = require('crypto');
+                                    const token = crypto.randomBytes(16).toString('hex');
+                                    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+                                    if (bestColaborador) {
+                                        await prisma.contact.update({
+                                            where: { id: bestColaborador.id },
+                                            data: {
+                                                loginToken: token,
+                                                loginTokenExpires: tokenExpires
+                                            }
+                                        });
+                                    }
+
+                                    // 3. Link order to driver
+                                    if (latestOrder && bestColaborador) {
+                                        await prisma.order.update({
+                                            where: { id: latestOrder.id },
+                                            data: {
+                                                driverId: bestColaborador.id,
+                                                status: 'DISPATCHED'
+                                            }
+                                        });
+                                    }
+
+                                    // 4. Format delivery dispatch message with routing links
+                                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                                    const customerName = existingContact.name || 'Cliente Sem Nome';
+                                    const customerPhone = existingContact.phone;
+                                    const deliveryAddress = args.detalhes_servico || existingContact.notes || existingContact.needs || 'Endereço não especificado';
+                                    const orderItemsStr = latestOrder ? latestOrder.items.map(i => `${i.product.name} x${i.quantity}`).join(', ') : 'Itens não especificados';
+
+                                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
+                                    const pwaUrl = `${appUrl}/driver?token=${token}`;
+
+                                    const dispatchMsg = `🚚 *NOVA ENTREGA ATRIBUÍDA* 🚚\n\n` +
+                                        `*Cliente:* ${customerName}\n` +
+                                        `*WhatsApp Cliente:* wa.me/${customerPhone.replace(/\D/g, '')}\n` +
+                                        `*Endereço:* ${deliveryAddress}\n` +
+                                        `*Itens:* ${orderItemsStr}\n\n` +
+                                        `📍 *Iniciar Rota no Google Maps:*\n${mapsUrl}\n\n` +
+                                        `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
+                                        `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
+
+                                    // 5. Send message to driver WhatsApp
+                                    await UzapiService.sendMessage(bot.sessionName, finalPhone, dispatchMsg);
+
+                                    // 6. Assign conversation to driver in Chatwoot
+                                    const cwConvId = conversation?.chatwootConversationId || (conversation as any)?.chatwootConversationId || options.chatwootConversationId;
+                                    if (cwConvId && bot.chatwootUrl && bot.chatwootToken) {
+                                        const driverEmail = `${finalPhone}@entregador.conext.bot`;
+                                        const agent = await ChatwootService.getAgentByEmail(bot, driverEmail);
+                                        if (agent) {
+                                            await ChatwootService.assignConversation(bot, cwConvId, agent.id);
+                                            logToFile(`[Processor dispatch] Assigned Chatwoot conversation ${cwConvId} to agent ${agent.name} (${agent.id})`);
+                                        }
+                                    }
+
+                                    toolResult = `Serviço despachado com sucesso para ${chosenName} (${finalPhone}). Fila de trabalhos ativos atualizada.`;
+                                }
                             } catch (e: any) {
                                 toolResult = `Erro ao despachar serviço: ${e.message}`;
                             }
