@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
@@ -21,6 +21,15 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [selectedDriver, setSelectedDriver] = useState<any>(null);
     const [showInactive, setShowInactive] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Modal State
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+    const [driverId, setDriverId] = useState('');
+    const [driverName, setDriverName] = useState('');
+    const [driverPhone, setDriverPhone] = useState('');
+    const [driverKeywords, setDriverKeywords] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     // 1. Fetch Drivers & Deliveries Data
     const fetchDrivers = async () => {
@@ -64,7 +73,6 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         mapRef.current = map;
 
         map.on('load', () => {
-            // Force resize trigger
             map.resize();
         });
 
@@ -90,10 +98,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             }
         });
 
-        // Track active order marker IDs to clear old ones
         const activeOrderIds = new Set<string>();
-
-        // Center map bounding box around active drivers
         const bounds = new mapboxgl.LngLatBounds();
         let hasCoords = false;
 
@@ -103,7 +108,6 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
 
             if (!hasGps) return;
             if (!showInactive && !isOnline) {
-                // Remove marker if filter is off
                 if (markersRef.current[driver.id]) {
                     markersRef.current[driver.id].remove();
                     delete markersRef.current[driver.id];
@@ -115,12 +119,10 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             bounds.extend(driverLngLat);
             hasCoords = true;
 
-            // --- A. Render/Update Driver Marker ---
+            // Render/Update Driver Marker
             if (markersRef.current[driver.id]) {
-                // Update position
                 markersRef.current[driver.id].setLngLat(driverLngLat);
             } else {
-                // Create custom element
                 const el = document.createElement('div');
                 el.className = 'relative flex items-center justify-center cursor-pointer';
                 el.style.width = '42px';
@@ -134,7 +136,6 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     <div class="absolute -bottom-1 h-3 w-3 rounded-full border border-slate-900 ${isOnline ? 'bg-green-500' : 'bg-amber-500'}"></div>
                 `;
 
-                // Add Popup
                 const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
                     <div class="p-2 text-slate-800 font-sans">
                         <h4 class="font-bold text-sm text-indigo-700">${driver.name || 'Entregador'}</h4>
@@ -148,7 +149,6 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     .setPopup(popup)
                     .addTo(map);
 
-                // Add click listener
                 el.addEventListener('click', () => {
                     setSelectedDriver(driver);
                 });
@@ -156,15 +156,11 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 markersRef.current[driver.id] = marker;
             }
 
-            // --- B. Render/Update Client Order Markers ---
+            // Render/Update Client Order Markers
             driver.assignedOrders?.forEach((order: any) => {
                 const customer = order.contact;
                 if (!customer) return;
 
-                // Try to draw coordinates for client. If not present, we skip.
-                // In a production app, we would Geocode customer notes/address to get lat/lng.
-                // For this tracking view, we simulate client coordinates near the driver or use standard geocoding.
-                // Let's assume order can have latitude/longitude in the contact, or simulate a offset.
                 const clientLat = customer.latitude || (driver.latitude + 0.005);
                 const clientLng = customer.longitude || (driver.longitude - 0.005);
                 const orderLngLat: [number, number] = [clientLng, clientLat];
@@ -200,7 +196,6 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             });
         });
 
-        // Clear order markers that are no longer active
         Object.keys(orderMarkersRef.current).forEach(id => {
             if (!activeOrderIds.has(id)) {
                 orderMarkersRef.current[id].remove();
@@ -208,13 +203,11 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             }
         });
 
-        // Fit map bounds to show all markers (only run once or when bounds change drastically)
         if (hasCoords && map && !selectedDriver) {
             map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 1500 });
         }
     }, [drivers, showInactive]);
 
-    // Pan map to selected driver
     const handleFlyToDriver = (driver: any) => {
         setSelectedDriver(driver);
         if (mapRef.current && driver.latitude && driver.longitude) {
@@ -224,6 +217,61 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 pitch: 45,
                 duration: 2000
             });
+        }
+    };
+
+    // Open Modal for Create or Edit
+    const handleOpenModal = (driverToEdit?: any) => {
+        if (driverToEdit) {
+            setModalMode('edit');
+            setDriverId(driverToEdit.id);
+            setDriverName(driverToEdit.name || '');
+            setDriverPhone(driverToEdit.phone || '');
+            setDriverKeywords(driverToEdit.dispatchKeywords || '');
+        } else {
+            setModalMode('create');
+            setDriverId('');
+            setDriverName('');
+            setDriverPhone('');
+            setDriverKeywords('');
+        }
+        setModalOpen(true);
+    };
+
+    // Save Driver handler
+    const handleSaveDriver = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!driverName || !driverPhone) {
+            toast.error('Nome e telefone são obrigatórios');
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+            const method = modalMode === 'create' ? 'POST' : 'PUT';
+            const res = await fetch('/api/drivers', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: driverId || undefined,
+                    name: driverName,
+                    phone: driverPhone,
+                    dispatchKeywords: driverKeywords
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || 'Erro ao salvar entregador');
+            }
+
+            toast.success(modalMode === 'create' ? 'Entregador cadastrado com sucesso!' : 'Cadastro atualizado!');
+            setModalOpen(false);
+            fetchDrivers();
+        } catch (err: any) {
+            toast.error(err.message);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -237,8 +285,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     {/* Title & Refresh */}
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-bold tracking-tight">Rastreamento de Frota</h2>
-                            <p className="text-xs text-gray-400">Posição dos entregadores em tempo real</p>
+                            <h2 className="text-lg font-bold tracking-tight">Frota e Rotas</h2>
+                            <p className="text-xs text-gray-400">Entregadores e cobertura de entrega</p>
                         </div>
                         <button 
                             onClick={fetchDrivers} 
@@ -249,15 +297,24 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         </button>
                     </div>
 
-                    {/* Filter Switches */}
-                    <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 text-sm">
-                        <span className="text-gray-300 font-medium">Mostrar Inativos</span>
+                    {/* Cadastrar button & Filter */}
+                    <div className="space-y-2">
                         <button 
-                            onClick={() => setShowInactive(!showInactive)}
-                            className="text-indigo-400 hover:text-indigo-300 transition"
+                            onClick={() => handleOpenModal()} 
+                            className="w-full p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_10px_var(--primary-glow)] border-0 cursor-pointer"
                         >
-                            {showInactive ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5 text-gray-500" />}
+                            + Cadastrar Entregador
                         </button>
+
+                        <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/5 text-sm">
+                            <span className="text-gray-300 font-medium">Mostrar Inativos</span>
+                            <button 
+                                onClick={() => setShowInactive(!showInactive)}
+                                className="text-indigo-400 hover:text-indigo-300 transition"
+                            >
+                                {showInactive ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5 text-gray-500" />}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Drivers List */}
@@ -282,31 +339,48 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                 return (
                                     <div 
                                         key={driver.id}
-                                        onClick={() => handleFlyToDriver(driver)}
-                                        className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between ${
+                                        className={`p-3.5 rounded-2xl border transition flex flex-col justify-between gap-3 ${
                                             isSelected 
                                                 ? 'bg-indigo-600/20 border-indigo-500/50' 
                                                 : 'bg-white/5 border-white/5 hover:border-white/10'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative">
-                                                <div className="h-10 w-10 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center">
-                                                    <Truck className="h-4 w-4 text-indigo-400" />
+                                        <div className="flex items-center justify-between cursor-pointer" onClick={() => handleFlyToDriver(driver)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <div className="h-10 w-10 rounded-full bg-slate-900 border border-white/10 flex items-center justify-center">
+                                                        <Truck className="h-4 w-4 text-indigo-400" />
+                                                    </div>
+                                                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-slate-950 ${isOnline ? 'bg-green-500' : 'bg-amber-500'}`} />
                                                 </div>
-                                                <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-slate-950 ${isOnline ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-white">{driver.name || 'Sem nome'}</h4>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        {hasGps ? `${driver.latitude.toFixed(4)}, ${driver.longitude.toFixed(4)}` : 'Sem sinal GPS'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="text-sm font-semibold text-white">{driver.name || 'Sem nome'}</h4>
-                                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                                    {hasGps ? `${driver.latitude.toFixed(4)}, ${driver.longitude.toFixed(4)}` : 'Sem sinal GPS'}
-                                                </p>
-                                            </div>
+                                            
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                                {driver.assignedOrders?.length || 0} jobs
+                                            </span>
                                         </div>
-                                        
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                                            {driver.assignedOrders?.length || 0} jobs
-                                        </span>
+
+                                        {/* Coverage keywords and edit button */}
+                                        <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-gray-400">
+                                            <span className="truncate max-w-[155px]" title={driver.dispatchKeywords || 'Nenhum'}>
+                                                <b>Região:</b> {driver.dispatchKeywords || 'Nenhum'}
+                                            </span>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenModal(driver);
+                                                }}
+                                                className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer"
+                                            >
+                                                <Edit2 className="h-2.5 w-2.5" /> Editar
+                                            </button>
+                                        </div>
                                     </div>
                                 );
                             })
@@ -355,6 +429,80 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 )}
                 <div ref={mapContainerRef} className="h-full w-full" />
             </div>
+
+            {/* Modal de Cadastro/Edição de Entregador */}
+            {modalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md bg-[#07041a] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4 animate-fade-in text-white">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                            <h3 className="text-base font-bold text-white">
+                                {modalMode === 'create' ? 'Cadastrar Novo Entregador' : 'Editar Entregador'}
+                            </h3>
+                            <button 
+                                onClick={() => setModalOpen(false)} 
+                                className="text-gray-400 hover:text-white transition text-lg bg-transparent border-0 cursor-pointer"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveDriver} className="space-y-4 text-sm">
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase">Nome</label>
+                                <input 
+                                    type="text" 
+                                    value={driverName}
+                                    onChange={(e) => setDriverName(e.target.value)}
+                                    placeholder="Ex: Carlos Silva"
+                                    className="w-full p-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase">WhatsApp (Apenas Números)</label>
+                                <input 
+                                    type="text" 
+                                    value={driverPhone}
+                                    onChange={(e) => setDriverPhone(e.target.value)}
+                                    placeholder="Ex: 5551999998888"
+                                    className="w-full p-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase">Bairros / Cidades Atendidos</label>
+                                <textarea 
+                                    value={driverKeywords}
+                                    onChange={(e) => setDriverKeywords(e.target.value)}
+                                    placeholder="Ex: Centro, Vila Nova, Jardim América (separados por vírgula)"
+                                    rows={3}
+                                    className="w-full p-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition resize-none"
+                                />
+                                <span className="text-[10px] text-gray-500 leading-normal block">
+                                    O bot usará estes nomes de bairros ou cidades para encontrar automaticamente este motorista ao receber pedidos.
+                                </span>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setModalOpen(false)}
+                                    className="flex-1 p-3 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-2xl transition border border-white/5 cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="flex-1 p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white font-semibold rounded-2xl transition disabled:opacity-50 border-0 cursor-pointer"
+                                >
+                                    {submitting ? 'Salvando...' : 'Salvar'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
