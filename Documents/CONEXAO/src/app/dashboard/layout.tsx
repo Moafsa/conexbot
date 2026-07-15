@@ -134,6 +134,16 @@ export default async function DashboardLayout({
 
     const isAgencyClient = !!(tenant?.agencyId && tenant?.role === 'USER');
 
+    // Fetch the first bot to determine businessType for conditional menu items
+    let botBusinessType: string | null = null;
+    if (tenant?.id) {
+        const bot = await prisma.bot.findFirst({
+            where: { tenantId: tenant.id },
+            select: { businessType: true }
+        });
+        botBusinessType = bot?.businessType || null;
+    }
+
     const userPlans = {
         hasPrimary: Boolean(session?.user && (
             session.user.role === 'SUPERADMIN' ||
@@ -162,6 +172,7 @@ export default async function DashboardLayout({
             isImpersonating={isImpersonating}
             isAgencyClient={isAgencyClient}
             agencyInfo={agencyInfo}
+            botBusinessType={botBusinessType}
         >
             {children}
         </Shell>

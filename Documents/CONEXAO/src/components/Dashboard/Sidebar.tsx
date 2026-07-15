@@ -4,20 +4,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList, Truck } from "lucide-react";
 
-export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo, isOpenOnMobile, onCloseMobile }: {
+export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo, botBusinessType, isOpenOnMobile, onCloseMobile }: {
     branding?: any;
     userPlans?: { hasPrimary: boolean; hasWriter: boolean };
     isImpersonating?: boolean;
     isAgencyClient?: boolean;
     agencyInfo?: { name: string; whatsapp: string | null; email: string | null } | null;
+    botBusinessType?: string | null;
     isOpenOnMobile?: boolean;
     onCloseMobile?: () => void;
 }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [collapsed, setCollapsed] = useState(false);
+
+    const isDelivery = botBusinessType === 'GAS_DISTRIBUTOR' || botBusinessType === 'DELIVERY' || botBusinessType === 'gas_distributor' || botBusinessType === 'delivery';
 
     const handleStopImpersonating = async () => {
         await fetch("/api/admin/impersonate", {
@@ -107,11 +110,14 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
         ];
     } else if (isAgencyClient) {
         // ---- AGENCY CLIENT MENU ----
-        const strategyItems = [
+        const strategyItems: any[] = [
             { icon: LayoutDashboard, label: "Visão Geral",  href: "/dashboard" },
             { icon: MessageSquare,   label: "Meu Agente",   href: "/dashboard/bots" },
             { icon: Users,           label: "CRM Pipeline", href: "/dashboard/crm" },
         ];
+        if (isDelivery) {
+            strategyItems.push({ icon: Truck, label: "Frota & Entregadores", href: "/dashboard/drivers" });
+        }
         const marketingItems = [];
         if (userPlans?.hasWriter) {
             marketingItems.push({ icon: PenTool,    label: "Escritor IA",  href: "/dashboard/writer" });
@@ -139,10 +145,13 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
     } else {
         // ---- USER MENU ----
         const overviewLink = (userPlans?.hasWriter && !userPlans?.hasPrimary) ? "/dashboard/writer" : "/dashboard";
-        const primaryItems = [];
+        const primaryItems: any[] = [];
         if (userPlans?.hasPrimary) {
-            primaryItems.push({ icon: Users,        label: "CRM Pipeline",  href: "/dashboard/crm" });
-            primaryItems.push({ icon: MessageSquare, label: "Meus Agentes", href: "/dashboard/bots" });
+            primaryItems.push({ icon: Users,         label: "CRM Pipeline",  href: "/dashboard/crm" });
+            primaryItems.push({ icon: MessageSquare, label: "Meus Agentes",  href: "/dashboard/bots" });
+            if (isDelivery) {
+                primaryItems.push({ icon: Truck, label: "Frota & Entregadores", href: "/dashboard/drivers" });
+            }
         }
         const writerItems = [];
         if (userPlans?.hasWriter) {

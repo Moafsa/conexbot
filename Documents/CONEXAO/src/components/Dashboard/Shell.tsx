@@ -12,9 +12,10 @@ interface ShellProps {
     isImpersonating?: boolean;
     isAgencyClient?: boolean;
     agencyInfo?: { name: string; whatsapp: string | null; email: string | null } | null;
+    botBusinessType?: string | null;
 }
 
-export default function Shell({ children, branding, alertBanner, userPlans, isImpersonating, isAgencyClient, agencyInfo }: ShellProps) {
+export default function Shell({ children, branding, alertBanner, userPlans, isImpersonating, isAgencyClient, agencyInfo, botBusinessType }: ShellProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
@@ -48,6 +49,7 @@ export default function Shell({ children, branding, alertBanner, userPlans, isIm
                     isImpersonating={isImpersonating}
                     isAgencyClient={isAgencyClient}
                     agencyInfo={agencyInfo}
+                    botBusinessType={botBusinessType}
                     isOpenOnMobile={mobileMenuOpen}
                     onCloseMobile={() => setMobileMenuOpen(false)}
                 />
