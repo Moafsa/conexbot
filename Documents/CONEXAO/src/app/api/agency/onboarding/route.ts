@@ -223,7 +223,7 @@ export async function POST(req: Request) {
 
         // 2b. Auto-provision Chatwoot account, user and API inbox
         // Non-fatal: bot is created and fully functional even if Chatwoot provision fails
-        const appBaseUrl = process.env.INTERNAL_WEBHOOK_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://app:3000';
+        const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.INTERNAL_WEBHOOK_URL || 'http://app:3000';
         const chatwootCreds = await ChatwootService.provisionForBot({
             clientName: name,
             clientEmail: email,

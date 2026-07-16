@@ -189,15 +189,24 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'ID e Tenant ID são obrigatórios' }, { status: 400 });
         }
 
+        // Verify that the driver exists and belongs to this tenant
+        const driver = await prisma.contact.findFirst({
+            where: { id, tenantId }
+        });
+
+        if (!driver) {
+            return NextResponse.json({ error: 'Motorista não encontrado' }, { status: 404 });
+        }
+
         // 1. Set driverId to null in all orders assigned to this driver
         await prisma.order.updateMany({
-            where: { driverId: id, tenantId },
+            where: { driverId: id },
             data: { driverId: null }
         });
 
         // 2. Delete the driver contact
         await prisma.contact.delete({
-            where: { id, tenantId }
+            where: { id }
         });
 
         return NextResponse.json({ success: true });
