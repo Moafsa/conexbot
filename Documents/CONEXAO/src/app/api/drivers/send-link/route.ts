@@ -35,10 +35,27 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Entregador não encontrado' }, { status: 404 });
         }
 
-        // Find first active bot for this tenant to send the message
-        const bot = await prisma.bot.findFirst({
-            where: { tenantId }
-        });
+        // Find bot to send the message
+        let bot = null;
+        if (driver.botId) {
+            bot = await prisma.bot.findUnique({
+                where: { id: driver.botId }
+            });
+        }
+
+        if (!bot || !bot.sessionName || bot.connectionStatus !== 'CONNECTED') {
+            // Fallback to any connected bot of this tenant
+            bot = await prisma.bot.findFirst({
+                where: { tenantId, connectionStatus: 'CONNECTED' }
+            });
+        }
+
+        if (!bot || !bot.sessionName) {
+            // Final fallback to any bot of this tenant
+            bot = await prisma.bot.findFirst({
+                where: { tenantId }
+            });
+        }
 
         if (!bot || !bot.sessionName) {
             return NextResponse.json({ error: 'Nenhum bot conectado/ativo encontrado para enviar a mensagem WhatsApp.' }, { status: 400 });
@@ -63,7 +80,13 @@ export async function POST(req: Request) {
         const messageText = `Olá, *${driver.name}*!\n\nAqui está o seu link de acesso exclusivo para o aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione o app à sua tela inicial para receber corridas!_`;
 
         const { UzapiService } = await import('@/services/engine/uzapi');
-        await UzapiService.sendMessage(bot.sessionName, driver.phone, messageText);
+        const sent = await UzapiService.sendMessage(bot.sessionName, driver.phone, messageText);
+
+        if (!sent) {
+            return NextResponse.json({ 
+                error: `Falha ao enviar mensagem de WhatsApp. Verifique se o bot '${bot.name}' (sessão: ${bot.sessionName}) está conectado e ativo no WuzAPI/Uzapi.` 
+            }, { status: 500 });
+        }
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
@@ -573,6 +573,28 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         }
     };
 
+    // Delete driver contact
+    const handleDeleteDriver = async (driverId: string, driverName: string) => {
+        if (!confirm(`Tem certeza que deseja excluir o entregador ${driverName}?`)) return;
+        toast.loading(`Excluindo entregador ${driverName}...`, { id: 'delete-driver' });
+        try {
+            const res = await fetch(`/api/drivers?id=${driverId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Erro ao excluir entregador.');
+            }
+
+            toast.success(`Entregador ${driverName} excluído com sucesso!`, { id: 'delete-driver' });
+            // Refresh list
+            refreshAll();
+        } catch (err: any) {
+            toast.error(err.message, { id: 'delete-driver' });
+        }
+    };
+
     return (
         <div className="flex h-[calc(100vh-68px)] overflow-hidden bg-[#030014] text-white">
             
@@ -747,6 +769,15 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                     className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
                                                 >
                                                     <Edit2 className="h-2 w-2" /> Editar
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteDriver(driver.id, driver.name);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
+                                                >
+                                                    <Trash2 className="h-2.5 w-2.5" /> Excluir
                                                 </button>
                                             </div>
                                         </div>

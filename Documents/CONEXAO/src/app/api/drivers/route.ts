@@ -134,6 +134,26 @@ export async function PUT(req: Request) {
 
         const normalizedPhone = phone.replace(/\D/g, '');
 
+        const driverContact = await prisma.contact.findFirst({
+            where: { id, tenantId }
+        });
+
+        if (!driverContact) {
+            return NextResponse.json({ error: 'Entregador não encontrado' }, { status: 404 });
+        }
+
+        const existing = await prisma.contact.findFirst({
+            where: {
+                phone: normalizedPhone,
+                botId: driverContact.botId,
+                id: { not: id }
+            }
+        });
+
+        if (existing) {
+            return NextResponse.json({ error: 'Já existe outro contato cadastrado com este número de telefone neste agente.' }, { status: 400 });
+        }
+
         const driver = await prisma.contact.update({
             where: { 
                 id,
@@ -149,6 +169,40 @@ export async function PUT(req: Request) {
         return NextResponse.json(driver);
     } catch (error: any) {
         console.error('[API Drivers PUT Error]:', error);
+        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user || !(session.user as any).id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get('id');
+        const clientId = searchParams.get("clientId");
+        const tenantId = await getEffectiveTenantId(clientId);
+
+        if (!id || !tenantId) {
+            return NextResponse.json({ error: 'ID e Tenant ID são obrigatórios' }, { status: 400 });
+        }
+
+        // 1. Set driverId to null in all orders assigned to this driver
+        await prisma.order.updateMany({
+            where: { driverId: id, tenantId },
+            data: { driverId: null }
+        });
+
+        // 2. Delete the driver contact
+        await prisma.contact.delete({
+            where: { id, tenantId }
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('[API Drivers DELETE Error]:', error);
         return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }
