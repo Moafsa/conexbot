@@ -178,7 +178,7 @@ export default function BotDetailsPage() {
                         Configurar
                     </button>
                     <button
-                        onClick={() => router.push(`/dashboard/connect${clientId ? `?clientId=${clientId}` : ''}`)}
+                        onClick={() => router.push(`/dashboard/connect?botId=${botId}${clientId ? `&clientId=${clientId}` : ''}`)}
                         className="h-10 px-4 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                     >
                         <RefreshCw size={14} />
