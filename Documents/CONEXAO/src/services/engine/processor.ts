@@ -1203,7 +1203,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                             try {
                                 const cart = await prisma.cart.findFirst({
                                     where: { botId: bot.id, contactPhone: senderPhone, status: 'ACTIVE' },
-                                    include: { items: true }
+                                    include: { items: { include: { product: true } } }
                                 });
 
                                 if (!cart || cart.items.length === 0) {
@@ -1273,6 +1273,24 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                         }
                                     });
 
+                                    // Create pending order
+                                    const order = await prisma.order.create({
+                                        data: {
+                                            botId: bot.id,
+                                            contactId: existingContact.id,
+                                            totalAmount: finalTotal,
+                                            commissionAmount: 0,
+                                            status: 'PENDING',
+                                            items: {
+                                                create: cart.items.map(item => ({
+                                                    productId: item.productId,
+                                                    quantity: item.quantity,
+                                                    unitPrice: item.unitPrice
+                                                }))
+                                            }
+                                        } as any
+                                    });
+
                                     // Transition the CRM stage to "PEDIDO CONFIRMADO"
                                     const confirmedStage = await prisma.crmStage.findFirst({
                                         where: { 
@@ -1295,6 +1313,47 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                             ).catch(() => {});
                                         }
                                     }
+
+                                    // Build notification message for the support human agent
+                                    const title = `📦 Novo Pedido Confirmado`;
+                                    const itemsText = cart.items.map(item => {
+                                        const pName = (item as any).product?.name || 'Produto';
+                                        return `- ${pName} x${item.quantity} (R$ ${item.unitPrice.toFixed(2)})`;
+                                    }).join('\n');
+
+                                    const notificationMessage = `*${title}*\n\nUm novo pedido foi confirmado pelo bot.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
+
+                                    const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
+                                    const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
+
+                                    let whatsappNotifyOk = false;
+                                    let notifyResultLine = '';
+
+                                    if (whatsappNotifyTarget) {
+                                        const sessionForNotify = bot.sessionName || identifier;
+                                        whatsappNotifyOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
+                                            sessionForNotify,
+                                            whatsappNotifyTarget,
+                                            notificationMessage
+                                        );
+                                        const destMask = `****${whatsappNotifyTarget.slice(-4)}`;
+                                        if (whatsappNotifyOk) {
+                                            notifyResultLine = `WhatsApp ao atendente: enviado para ${destMask}.`;
+                                        } else {
+                                            notifyResultLine = `WhatsApp ao atendente: falhou ao enviar para ${destMask}.`;
+                                        }
+                                    } else {
+                                        notifyResultLine = `WhatsApp ao atendente: não enviado (nenhum número cadastrado em chamar humano/perfil).`;
+                                    }
+
+                                    // Register the notification message in the customer's CRM conversation as a system message
+                                    await prisma.message.create({
+                                        data: {
+                                            conversationId: conversation.id,
+                                            role: 'system',
+                                            content: `[Notificação de Pedido Confirmado enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
+                                        },
+                                    });
 
                                     // Clear cart
                                     await prisma.cart.update({
