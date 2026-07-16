@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
@@ -400,6 +400,27 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         }
     };
 
+    // Send magic login link via WhatsApp
+    const handleSendAppLink = async (driverId: string, driverName: string) => {
+        toast.loading(`Enviando app para ${driverName}...`, { id: 'send-app' });
+        try {
+            const res = await fetch('/api/drivers/send-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ driverId })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Erro ao enviar link do aplicativo.');
+            }
+
+            toast.success(`Link do app enviado para ${driverName} via WhatsApp!`, { id: 'send-app' });
+        } catch (err: any) {
+            toast.error(err.message, { id: 'send-app' });
+        }
+    };
+
     return (
         <div className="flex h-[calc(100vh-68px)] overflow-hidden bg-[#030014] text-white">
             
@@ -553,18 +574,29 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
 
                                         {/* Coverage keywords and edit button */}
                                         <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-gray-400">
-                                            <span className="truncate max-w-[155px]" title={driver.dispatchKeywords || 'Nenhum'}>
+                                            <span className="truncate max-w-[100px]" title={driver.dispatchKeywords || 'Nenhum'}>
                                                 <b>Região:</b> {driver.dispatchKeywords || 'Nenhum'}
                                             </span>
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleOpenModal(driver);
-                                                }}
-                                                className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
-                                            >
-                                                <Edit2 className="h-2 w-2" /> Editar
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSendAppLink(driver.id, driver.name);
+                                                    }}
+                                                    className="text-emerald-400 hover:text-emerald-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
+                                                >
+                                                    <Smartphone className="h-2.5 w-2.5" /> Enviar App
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenModal(driver);
+                                                    }}
+                                                    className="text-indigo-400 hover:text-indigo-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
+                                                >
+                                                    <Edit2 className="h-2 w-2" /> Editar
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );

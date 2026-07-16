@@ -78,95 +78,101 @@ export async function GET(req: Request) {
             // Fetch all active/resolved/pending conversations
             const url = `${baseUrl}/api/v1/accounts/${bot.chatwootAccountId}/conversations?status=all`;
 
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'api_access_token': bot.chatwootToken,
-                    'Content-Type': 'application/json'
-                }
-            });
+            let conversations = [];
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'api_access_token': bot.chatwootToken,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            if (!response.ok) {
-                console.error('[API /api/contacts] Chatwoot fetch failed:', response.status, await response.text());
-                return NextResponse.json({ error: 'Failed to fetch conversations from Chatwoot' }, { status: response.status });
+                if (response.ok) {
+                    const data = await response.json();
+                    conversations = data.payload || [];
+                } else {
+                    console.error('[API /api/contacts] Chatwoot fetch failed status:', response.status);
+                }
+            } catch (err: any) {
+                console.error('[API /api/contacts] Chatwoot fetch exception:', err.message);
             }
 
-            const data = await response.json();
-            const conversations = data.payload || [];
+            if (conversations.length > 0) {
+                // Map conversations to Contacts format
+                const mappedContacts = conversations.map((conv: any) => {
+                    const sender = conv.meta?.sender || {};
+                    const customAttrs = conv.custom_attributes || {};
+                    
+                    // SLA alerts parsing
+                    const slaDateStr = customAttrs.retorno_agendado || customAttrs.sla_limite || null;
+                    
+                    // Channel parsing
+                    const channelName = conv.meta?.channel || 'whatsapp';
 
-            // Map conversations to Contacts format
-            const mappedContacts = conversations.map((conv: any) => {
-                const sender = conv.meta?.sender || {};
-                const customAttrs = conv.custom_attributes || {};
-                
-                // SLA alerts parsing
-                const slaDateStr = customAttrs.retorno_agendado || customAttrs.sla_limite || null;
-                
-                // Channel parsing
-                const channelName = conv.meta?.channel || 'whatsapp';
+                    // Stage ID from Chatwoot Custom Attributes or default to first stage
+                    let stageId = customAttrs.crm_stage_id || null;
+                    let stageName = firstStageName;
 
-                // Stage ID from Chatwoot Custom Attributes or default to first stage
-                let stageId = customAttrs.crm_stage_id || null;
-                let stageName = firstStageName;
-
-                if (stageId) {
-                    const matchedStage = stages.find(s => s.id === stageId);
-                    if (matchedStage) {
-                        stageName = matchedStage.name;
+                    if (stageId) {
+                        const matchedStage = stages.find(s => s.id === stageId);
+                        if (matchedStage) {
+                            stageName = matchedStage.name;
+                        } else {
+                            // Stage no longer exists or belongs to another pipeline
+                            stageId = firstStageId;
+                            stageName = firstStageName;
+                        }
                     } else {
-                        // Stage no longer exists or belongs to another pipeline
                         stageId = firstStageId;
                         stageName = firstStageName;
                     }
-                } else {
-                    stageId = firstStageId;
-                    stageName = firstStageName;
+
+                    // AI Insights, sentiment, finance, lead score
+                    const sentiment = customAttrs.sentiment || 'NEUTRAL';
+                    const leadScore = parseInt(customAttrs.lead_score || '50', 10);
+                    const lastAiInsight = customAttrs.ai_summary || customAttrs.ai_insight || null;
+                    const dealValue = parseFloat(customAttrs.financeiro_valor || customAttrs.deal_value || '0');
+
+                    return {
+                        id: String(conv.id), // Use Chatwoot Conversation ID
+                        name: sender.name || sender.phone_number || `Conversa #${conv.id}`,
+                        phone: sender.phone_number || '',
+                        email: sender.email || '',
+                        funnelStage: stageName,
+                        stageId: stageId,
+                        leadScore: leadScore,
+                        sentiment: sentiment,
+                        lastAiInsight: lastAiInsight,
+                        lastActive: conv.updated_at ? new Date(conv.updated_at * 1000).toISOString() : new Date().toISOString(),
+                        isBlocked: sender.blocked || false,
+                        notes: customAttrs.notes || null,
+                        // Additional CRM Kanban custom fields
+                        channel: channelName,
+                        priority: conv.priority || 'none',
+                        slaExpiresAt: slaDateStr,
+                        assignedAgentName: conv.meta?.assignee?.name || null,
+                        assignedAgentAvatar: conv.meta?.assignee?.avatar_url || null,
+                        dealValue: dealValue,
+                        chatwootConversationId: conv.id,
+                        stage: stageId ? { id: stageId, name: stageName } : null
+                    };
+                });
+
+                // If a search query is provided, perform case-insensitive filter
+                if (search) {
+                    const searchLower = search.toLowerCase();
+                    return NextResponse.json(
+                        mappedContacts.filter((c: any) => 
+                            c.name.toLowerCase().includes(searchLower) || 
+                            c.phone.toLowerCase().includes(searchLower) ||
+                            (c.lastAiInsight && c.lastAiInsight.toLowerCase().includes(searchLower))
+                        )
+                    );
                 }
 
-                // AI Insights, sentiment, finance, lead score
-                const sentiment = customAttrs.sentiment || 'NEUTRAL';
-                const leadScore = parseInt(customAttrs.lead_score || '50', 10);
-                const lastAiInsight = customAttrs.ai_summary || customAttrs.ai_insight || null;
-                const dealValue = parseFloat(customAttrs.financeiro_valor || customAttrs.deal_value || '0');
-
-                return {
-                    id: String(conv.id), // Use Chatwoot Conversation ID
-                    name: sender.name || sender.phone_number || `Conversa #${conv.id}`,
-                    phone: sender.phone_number || '',
-                    email: sender.email || '',
-                    funnelStage: stageName,
-                    stageId: stageId,
-                    leadScore: leadScore,
-                    sentiment: sentiment,
-                    lastAiInsight: lastAiInsight,
-                    lastActive: conv.updated_at ? new Date(conv.updated_at * 1000).toISOString() : new Date().toISOString(),
-                    isBlocked: sender.blocked || false,
-                    notes: customAttrs.notes || null,
-                    // Additional CRM Kanban custom fields
-                    channel: channelName,
-                    priority: conv.priority || 'none',
-                    slaExpiresAt: slaDateStr,
-                    assignedAgentName: conv.meta?.assignee?.name || null,
-                    assignedAgentAvatar: conv.meta?.assignee?.avatar_url || null,
-                    dealValue: dealValue,
-                    chatwootConversationId: conv.id,
-                    stage: stageId ? { id: stageId, name: stageName } : null
-                };
-            });
-
-            // If a search query is provided, perform case-insensitive filter
-            if (search) {
-                const searchLower = search.toLowerCase();
-                return NextResponse.json(
-                    mappedContacts.filter((c: any) => 
-                        c.name.toLowerCase().includes(searchLower) || 
-                        c.phone.toLowerCase().includes(searchLower) ||
-                        (c.lastAiInsight && c.lastAiInsight.toLowerCase().includes(searchLower))
-                    )
-                );
+                return NextResponse.json(mappedContacts);
             }
-
-            return NextResponse.json(mappedContacts);
         }
 
         // 2. Fallback: Bot doesn't have Chatwoot, use local database

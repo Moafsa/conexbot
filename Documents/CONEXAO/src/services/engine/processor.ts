@@ -750,6 +750,23 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                             }
                         }
                     }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'confirmar_pedido',
+                        description: 'Salva o pedido final no banco de dados e o envia para os entregadores no painel de frota. USE ISTO SEMPRE que o cliente der o endereço completo e confirmar que quer fechar o pedido usando dinheiro, PIX ou cartão na entrega.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                endereco_completo: { type: 'string', description: 'O endereço de entrega completo fornecido pelo cliente (rua, número, bairro, cidade, etc.).' },
+                                forma_pagamento: { type: 'string', description: 'A forma de pagamento escolhida (ex: DINHEIRO, PIX, CARTÃO DE CRÉDITO, CARTÃO DE DÉBITO).' },
+                                bairro_entrega: { type: 'string', description: 'O nome do bairro do cliente para cálculo de taxa de entrega.' },
+                                troco_para: { type: 'number', description: 'Opcional. Valor para o qual o cliente precisa de troco (se a forma de pagamento for dinheiro).' }
+                            },
+                            required: ['endereco_completo', 'forma_pagamento', 'bairro_entrega']
+                        }
+                    }
                 }
             );
 
@@ -1181,6 +1198,105 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 }
                             } catch (e: any) {
                                 toolResult = `Erro ao visualizar o carrinho oficial: ${e.message}`;
+                            }
+                        } else if (name === 'confirmar_pedido') {
+                            try {
+                                const cart = await prisma.cart.findFirst({
+                                    where: { botId: bot.id, contactPhone: senderPhone, status: 'ACTIVE' },
+                                    include: { items: true }
+                                });
+
+                                if (!cart || cart.items.length === 0) {
+                                    toolResult = "O carrinho está vazio. Peça para o cliente escolher produtos do catálogo primeiro.";
+                                } else {
+                                    const { CartService } = await import('./cart.service');
+                                    const summary = await CartService.getCartSummary(bot.id, senderPhone);
+                                    
+                                    let deliveryFee = 0;
+                                    let deliveryMsg = "";
+                                    const rawBairro = args.bairro_entrega || "";
+                                    
+                                    // Calculate delivery fee
+                                    if (bot.deliveryFeeType === 'FIXED') {
+                                        deliveryFee = Number(bot.deliveryFeeRules?.[0]?.value) || 0;
+                                        deliveryMsg = ` (Taxa fixa R$ ${deliveryFee.toFixed(2)})`;
+                                    } else if ((bot.deliveryFeeType === 'NEIGHBORHOOD' || bot.deliveryFeeType === 'BY_NEIGHBORHOOD') && rawBairro) {
+                                        const rules = (bot.deliveryFeeRules as any[]) || [];
+                                        const foundRule = rules.find((r: any) => 
+                                            (r.neighborhood || r.bairro || '').toLowerCase() === rawBairro.toLowerCase()
+                                        );
+                                        if (foundRule) {
+                                            deliveryFee = Number(foundRule.value || foundRule.fee) || 0;
+                                            deliveryMsg = ` (Taxa para ${rawBairro} R$ ${deliveryFee.toFixed(2)})`;
+                                        }
+                                    }
+
+                                    const finalTotal = summary.total + deliveryFee;
+                                    const fullAddr = args.endereco_completo || '';
+                                    const payMethod = args.forma_pagamento || 'A combinar';
+                                    const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
+                                    const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
+
+                                    // Update contact details
+                                    await prisma.contact.update({
+                                        where: { id: existingContact.id },
+                                        data: {
+                                            notes: contactNotes,
+                                            needs: fullAddr
+                                        }
+                                    });
+
+                                    // Create pending order
+                                    const order = await prisma.order.create({
+                                        data: {
+                                            botId: bot.id,
+                                            contactId: existingContact.id,
+                                            totalAmount: finalTotal,
+                                            commissionAmount: 0,
+                                            status: 'PENDING',
+                                            items: {
+                                                create: cart.items.map(item => ({
+                                                    productId: item.productId,
+                                                    quantity: item.quantity,
+                                                    unitPrice: item.unitPrice
+                                                }))
+                                            }
+                                        } as any
+                                    });
+
+                                    // Transition the CRM stage to "PEDIDO CONFIRMADO"
+                                    const confirmedStage = await prisma.crmStage.findFirst({
+                                        where: { 
+                                            pipeline: { botId: bot.id },
+                                            name: { contains: 'CONFIRMADO', mode: 'insensitive' }
+                                        }
+                                    });
+                                    if (confirmedStage) {
+                                        await prisma.contact.update({
+                                            where: { id: existingContact.id },
+                                            data: {
+                                                stageId: confirmedStage.id,
+                                                funnelStage: confirmedStage.name
+                                            }
+                                        });
+                                        if (options.chatwootConversationId) {
+                                            const { ChatwootService } = await import('@/services/engine/chatwoot');
+                                            await ChatwootService.updateConversationCustomAttributes(
+                                                bot, options.chatwootConversationId, { crm_stage: confirmedStage.name, crm_stage_id: confirmedStage.id }
+                                            ).catch(() => {});
+                                        }
+                                    }
+
+                                    // Clear cart
+                                    await prisma.cart.update({
+                                        where: { id: cart.id },
+                                        data: { status: 'COMPLETED' }
+                                    });
+
+                                    toolResult = `PEDIDO CRIADO COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\nO pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!`;
+                                }
+                            } catch (e: any) {
+                                toolResult = `Erro ao confirmar o pedido: ${e.message}`;
                             }
                         } else if (name === 'listar_colaboradores') {
                             try {
