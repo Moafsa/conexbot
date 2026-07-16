@@ -39,6 +39,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [deliveryFeeRules, setDeliveryFeeRules] = useState<any[]>([]);
     const [savingFees, setSavingFees] = useState(false);
 
+    // Responsive UI state
+    const [activeView, setActiveView] = useState<'map' | 'orders' | 'drivers'>('map');
+
     // 1. Fetch Drivers Data
     const fetchDrivers = async () => {
         try {
@@ -77,6 +80,15 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         const interval = setInterval(refreshAll, 12000); // refresh every 12 seconds
         return () => clearInterval(interval);
     }, []);
+
+    // Trigger map resize when switching to map view on mobile
+    useEffect(() => {
+        if (activeView === 'map' && mapRef.current) {
+            setTimeout(() => {
+                mapRef.current?.resize();
+            }, 100);
+        }
+    }, [activeView]);
 
     // 3. Initialize Mapbox Map
     useEffect(() => {
@@ -405,9 +417,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         e.preventDefault();
     };
 
-    const handleDrop = async (e: React.DragEvent, driverId: string) => {
-        e.preventDefault();
-        const orderId = e.dataTransfer.getData('orderId');
+    const handleAssignOrder = async (orderId: string, driverId: string) => {
         if (!orderId || !driverId) return;
 
         try {
@@ -428,6 +438,12 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         } catch (err: any) {
             toast.error(err.message, { id: 'dispatch' });
         }
+    };
+
+    const handleDrop = async (e: React.DragEvent, driverId: string) => {
+        e.preventDefault();
+        const orderId = e.dataTransfer.getData('orderId');
+        handleAssignOrder(orderId, driverId);
     };
 
     // Open Modal for Create or Edit Entregador
@@ -596,10 +612,46 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     };
 
     return (
-        <div className="flex h-[calc(100vh-68px)] overflow-hidden bg-[#030014] text-white">
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] overflow-hidden bg-[#030014] text-white">
+            
+            {/* Mobile View Tabs Header */}
+            <div className="flex lg:hidden bg-[#07041a] border-b border-white/5 p-2.5 shrink-0 justify-around gap-2 z-10">
+                <button 
+                    onClick={() => setActiveView('orders')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-bold transition-all text-center border cursor-pointer ${
+                        activeView === 'orders' 
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]' 
+                            : 'bg-white/5 border-white/5 text-gray-400'
+                    }`}
+                >
+                    Pedidos ({pendingOrders.length})
+                </button>
+                <button 
+                    onClick={() => setActiveView('drivers')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-bold transition-all text-center border cursor-pointer ${
+                        activeView === 'drivers' 
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]' 
+                            : 'bg-white/5 border-white/5 text-gray-400'
+                    }`}
+                >
+                    Entregadores ({drivers.length})
+                </button>
+                <button 
+                    onClick={() => setActiveView('map')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-[11px] font-bold transition-all text-center border cursor-pointer ${
+                        activeView === 'map' 
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]' 
+                            : 'bg-white/5 border-white/5 text-gray-400'
+                    }`}
+                >
+                    Mapa
+                </button>
+            </div>
             
             {/* Column 1: Pending Orders (Drag Source) */}
-            <div className="w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex flex-col custom-scrollbar-white overflow-y-auto shrink-0">
+            <div className={`${
+                activeView === 'orders' ? 'flex' : 'hidden'
+            } lg:flex w-full lg:w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex-col custom-scrollbar-white overflow-y-auto shrink-0 h-full`}>
                 <div className="p-5 space-y-4">
                     <div>
                         <h2 className="text-xs font-bold tracking-wider uppercase text-gray-400">Pedidos Pendentes ({pendingOrders.length})</h2>
@@ -638,6 +690,28 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                             <div className="text-[9px] text-[#c084fc] font-medium pt-1 border-t border-white/5">
                                                 {order.items?.map((i: any) => `${i.product?.name || 'Botijão'} x${i.quantity}`).join(', ')}
                                             </div>
+                                            {/* Mobile dispatch selection */}
+                                            {drivers.length > 0 && (
+                                                <div className="lg:hidden mt-2 pt-2 border-t border-white/5 flex flex-col gap-1">
+                                                    <span className="text-[8px] text-gray-500 font-semibold">Despachar para:</span>
+                                                    <select
+                                                        onChange={(e) => {
+                                                            const dId = e.target.value;
+                                                            if (dId) {
+                                                                handleAssignOrder(order.id, dId);
+                                                            }
+                                                            e.target.value = "";
+                                                        }}
+                                                        className="bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-gray-300 p-1 outline-none w-full"
+                                                        defaultValue=""
+                                                    >
+                                                        <option value="" disabled>Escolha o Entregador</option>
+                                                        {drivers.map(d => (
+                                                            <option key={d.id} value={d.id}>{d.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -648,7 +722,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             </div>
 
             {/* Column 2: Drivers (Drop Target) */}
-            <div className="w-80 border-r border-white/5 bg-[#07041a]/40 backdrop-blur-md flex flex-col justify-between custom-scrollbar-white overflow-y-auto shrink-0">
+            <div className={`${
+                activeView === 'drivers' ? 'flex' : 'hidden'
+            } lg:flex w-full lg:w-80 border-r border-white/5 bg-[#07041a]/40 backdrop-blur-md flex-col justify-between custom-scrollbar-white overflow-y-auto shrink-0 h-full`}>
                 <div className="p-5 space-y-5">
                     
                     {/* Title & Refresh */}
@@ -817,7 +893,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             </div>
 
             {/* Column 3: Mapbox Map */}
-            <div className="flex-1 relative h-full w-full">
+            <div className={`${
+                activeView === 'map' ? 'flex' : 'hidden'
+            } lg:flex flex-1 relative h-full w-full`}>
                 {!mapboxToken && (
                     <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center text-center p-6">
                         <MapPin className="h-12 w-12 text-indigo-500 mb-4 animate-bounce" />
