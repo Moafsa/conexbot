@@ -107,6 +107,46 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         };
     }, [mapboxToken]);
 
+    // Center map on configured city on load
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !mapboxToken) return;
+
+        const centerOnConfiguredCity = async () => {
+            try {
+                const res = await fetch('/api/drivers/fees');
+                if (res.ok) {
+                    const data = await res.json();
+                    const rules = data.deliveryFeeRules || [];
+                    const firstRule = rules.find((r: any) => r.city || r.cidade);
+                    const cityName = firstRule ? (firstRule.city || firstRule.cidade) : null;
+
+                    if (cityName) {
+                        const geocodeRes = await fetch(
+                            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cityName)}.json?access_token=${mapboxToken}&limit=1`
+                        );
+                        if (geocodeRes.ok) {
+                            const geocodeData = await geocodeRes.json();
+                            const center = geocodeData.features?.[0]?.center;
+                            if (center) {
+                                map.setCenter(center);
+                                map.setZoom(12);
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error geocoding configured city:", err);
+            }
+        };
+
+        if (map.loaded()) {
+            centerOnConfiguredCity();
+        } else {
+            map.once('load', centerOnConfiguredCity);
+        }
+    }, [mapboxToken, mapRef.current]);
+
     // 4. Update Markers & Map bounds
     useEffect(() => {
         const map = mapRef.current;
