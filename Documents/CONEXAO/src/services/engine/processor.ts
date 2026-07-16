@@ -1215,7 +1215,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     let deliveryFee = 0;
                                     let deliveryMsg = "";
                                     const rawBairro = args.bairro_entrega || "";
-                                    
+
                                     // Calculate delivery fee
                                     if (bot.deliveryFeeType === 'FIXED') {
                                         deliveryFee = Number(bot.deliveryFeeRules?.[0]?.value) || 0;
@@ -1230,38 +1230,47 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                             deliveryMsg = ` (Taxa para ${rawBairro} R$ ${deliveryFee.toFixed(2)})`;
                                         }
                                     }
-
                                     const finalTotal = summary.total + deliveryFee;
                                     const fullAddr = args.endereco_completo || '';
                                     const payMethod = args.forma_pagamento || 'A combinar';
                                     const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
                                     const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
 
+                                    const config = await prisma.globalConfig.findUnique({
+                                        where: { id: 'system' }
+                                    });
+                                    const mapboxToken = config?.mapboxToken;
+
+                                    let latitude: number | null = null;
+                                    let longitude: number | null = null;
+
+                                    if (mapboxToken && fullAddr) {
+                                        try {
+                                            const cleanAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`;
+                                            const geocodeRes = await fetch(geocodeUrl);
+                                            if (geocodeRes.ok) {
+                                                const geocodeData = await geocodeRes.json();
+                                                const center = geocodeData.features?.[0]?.center;
+                                                if (center) {
+                                                    longitude = center[0];
+                                                    latitude = center[1];
+                                                }
+                                            }
+                                        } catch (e: any) {
+                                            console.error('[confirmar_pedido] Geocoding exception:', e.message);
+                                        }
+                                    }
+
                                     // Update contact details
                                     await prisma.contact.update({
                                         where: { id: existingContact.id },
                                         data: {
                                             notes: contactNotes,
-                                            needs: fullAddr
+                                            needs: fullAddr,
+                                            latitude,
+                                            longitude
                                         }
-                                    });
-
-                                    // Create pending order
-                                    const order = await prisma.order.create({
-                                        data: {
-                                            botId: bot.id,
-                                            contactId: existingContact.id,
-                                            totalAmount: finalTotal,
-                                            commissionAmount: 0,
-                                            status: 'PENDING',
-                                            items: {
-                                                create: cart.items.map(item => ({
-                                                    productId: item.productId,
-                                                    quantity: item.quantity,
-                                                    unitPrice: item.unitPrice
-                                                }))
-                                            }
-                                        } as any
                                     });
 
                                     // Transition the CRM stage to "PEDIDO CONFIRMADO"

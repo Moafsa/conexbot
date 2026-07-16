@@ -15,6 +15,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const markersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
     const orderMarkersRef = useRef<{ [key: string]: mapboxgl.Marker }>({});
+    const geocodedOrdersRef = useRef<{ [key: string]: [number, number] }>({});
     
     const [drivers, setDrivers] = useState<any[]>([]);
     const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -224,25 +225,111 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 const customer = order.contact;
                 if (!customer) return;
 
-                const clientLat = customer.latitude || (driver.latitude + 0.005);
-                const clientLng = customer.longitude || (driver.longitude - 0.005);
-                const orderLngLat: [number, number] = [clientLng, clientLat];
-                activeOrderIds.add(order.id);
+                const orderId = order.id;
 
-                if (orderMarkersRef.current[order.id]) {
-                    orderMarkersRef.current[order.id].setLngLat(orderLngLat);
+                const renderMarker = (lng: number, lat: number) => {
+                    const orderLngLat: [number, number] = [lng, lat];
+                    activeOrderIds.add(orderId);
+                    bounds.extend(orderLngLat);
+                    hasCoords = true;
+
+                    if (orderMarkersRef.current[orderId]) {
+                        orderMarkersRef.current[orderId].setLngLat(orderLngLat);
+                    } else {
+                        const el = document.createElement('div');
+                        el.className = 'cursor-pointer';
+                        el.innerHTML = `
+                            <div class="h-8 w-8 rounded-full bg-slate-900 border border-rose-500 flex items-center justify-center shadow-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+                            </div>
+                        `;
+
+                        const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(`
+                            <div class="p-2 text-slate-800 font-sans max-w-xs">
+                                <span class="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">ENTREGA DE GÁS</span>
+                                <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
+                                <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${customer.notes || customer.needs || 'Não especificado'}</p>
+                                <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items?.map((i: any) => `${i.product.name} x${i.quantity}`).join(', ')}</p>
+                            </div>
+                        `);
+
+                        const marker = new mapboxgl.Marker({ element: el })
+                            .setLngLat(orderLngLat)
+                            .setPopup(popup)
+                            .addTo(map);
+
+                        orderMarkersRef.current[orderId] = marker;
+                    }
+                };
+
+                let clientLat = customer.latitude;
+                let clientLng = customer.longitude;
+
+                if (clientLng && clientLat) {
+                    renderMarker(clientLng, clientLat);
+                } else if (geocodedOrdersRef.current[orderId]) {
+                    const [lng, lat] = geocodedOrdersRef.current[orderId];
+                    renderMarker(lng, lat);
+                } else {
+                    const rawAddr = customer.needs || customer.notes || '';
+                    const cleanAddr = rawAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                    if (cleanAddr && mapboxToken) {
+                        fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
+                            .then(r => r.json())
+                            .then(data => {
+                                const center = data.features?.[0]?.center;
+                                if (center) {
+                                    geocodedOrdersRef.current[orderId] = center;
+                                    renderMarker(center[0], center[1]);
+                                } else {
+                                    const fallbackLng = driver.longitude - 0.005;
+                                    const fallbackLat = driver.latitude + 0.005;
+                                    geocodedOrdersRef.current[orderId] = [fallbackLng, fallbackLat];
+                                    renderMarker(fallbackLng, fallbackLat);
+                                }
+                            })
+                            .catch(err => {
+                                console.error("Error geocoding assigned order:", err);
+                                const fallbackLng = driver.longitude - 0.005;
+                                const fallbackLat = driver.latitude + 0.005;
+                                renderMarker(fallbackLng, fallbackLat);
+                            });
+                    } else {
+                        const fallbackLng = driver.longitude - 0.005;
+                        const fallbackLat = driver.latitude + 0.005;
+                        renderMarker(fallbackLng, fallbackLat);
+                    }
+                }
+            });
+        });
+
+        // Render/Update Pending (Unassigned) Client Order Markers
+        pendingOrders.forEach((order: any) => {
+            const customer = order.contact;
+            if (!customer) return;
+
+            const orderId = order.id;
+
+            const renderMarker = (lng: number, lat: number) => {
+                const orderLngLat: [number, number] = [lng, lat];
+                activeOrderIds.add(orderId);
+                bounds.extend(orderLngLat);
+                hasCoords = true;
+
+                if (orderMarkersRef.current[orderId]) {
+                    orderMarkersRef.current[orderId].setLngLat(orderLngLat);
                 } else {
                     const el = document.createElement('div');
                     el.className = 'cursor-pointer';
                     el.innerHTML = `
-                        <div class="h-8 w-8 rounded-full bg-slate-900 border border-rose-500 flex items-center justify-center shadow-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <div class="h-8 w-8 rounded-full bg-slate-900 border border-amber-500 flex items-center justify-center shadow-lg animate-pulse">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
                         </div>
                     `;
 
                     const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(`
                         <div class="p-2 text-slate-800 font-sans max-w-xs">
-                            <span class="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">ENTREGA DE GÁS</span>
+                            <span class="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold animate-pulse">AGUARDANDO ENTREGADOR</span>
                             <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
                             <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${customer.notes || customer.needs || 'Não especificado'}</p>
                             <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items?.map((i: any) => `${i.product.name} x${i.quantity}`).join(', ')}</p>
@@ -254,9 +341,34 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         .setPopup(popup)
                         .addTo(map);
 
-                    orderMarkersRef.current[order.id] = marker;
+                    orderMarkersRef.current[orderId] = marker;
                 }
-            });
+            };
+
+            let clientLat = customer.latitude;
+            let clientLng = customer.longitude;
+
+            if (clientLng && clientLat) {
+                renderMarker(clientLng, clientLat);
+            } else if (geocodedOrdersRef.current[orderId]) {
+                const [lng, lat] = geocodedOrdersRef.current[orderId];
+                renderMarker(lng, lat);
+            } else {
+                const rawAddr = customer.needs || customer.notes || '';
+                const cleanAddr = rawAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                if (cleanAddr && mapboxToken) {
+                    fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const center = data.features?.[0]?.center;
+                            if (center) {
+                                geocodedOrdersRef.current[orderId] = center;
+                                renderMarker(center[0], center[1]);
+                            }
+                        })
+                        .catch(err => console.error("Error geocoding pending order:", err));
+                }
+            }
         });
 
         Object.keys(orderMarkersRef.current).forEach(id => {
@@ -269,7 +381,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         if (hasCoords && map && !selectedDriver) {
             map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 1500 });
         }
-    }, [drivers, showInactive]);
+    }, [drivers, showInactive, pendingOrders]);
 
     const handleFlyToDriver = (driver: any) => {
         setSelectedDriver(driver);
