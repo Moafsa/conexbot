@@ -58,7 +58,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     // 2. Fetch Pending Orders Data
     const fetchPendingOrders = async () => {
         try {
-            const res = await fetch('/api/drivers/pending-orders');
+            const res = await fetch('/api/drivers/pending-orders', { cache: 'no-store' });
             if (!res.ok) throw new Error('Falha ao buscar pedidos pendentes');
             const data = await res.json();
             setPendingOrders(data || []);

@@ -19,6 +19,7 @@ interface ContactInfo {
     phone?: string | null;
     notes?: string | null;
     orders?: any[];
+    address?: string | null;
     // Ad attribution — tells the agent where this lead came from
     utmSource?: string | null;
     utmMedium?: string | null;
@@ -161,6 +162,10 @@ DETECTE AUTOMATICAMENTE quando o cliente fornece informações:
   → Se o cliente disse o telefone, NUNCA mais pergunte "Qual é o seu telefone?"
   → CORRETO: "Vou salvar aqui: ${bot.contactInfo?.name ? 'o número ' + bot.contactInfo.name : 'esse número'}. Agora..."
 
+🚨 DIRETRIZES DE RETORNO DO CLIENTE (MANDATÓRIO) 🚨
+1. Se o cliente já tem um nome no Perfil do Cliente (ex: "${bot.contactInfo?.name || ''}"), trate-o pelo nome e NUNCA pergunte seu nome novamente.
+2. Se o cliente já possui um endereço cadastrado no Perfil do Cliente (ex: "${bot.contactInfo?.address || ''}"), NÃO pergunte o endereço de entrega ou bairro novamente! Em vez disso, confirme amigavelmente: "Gostaria de entregar no mesmo endereço do seu último pedido (${bot.contactInfo?.address || ''})?" ou use o endereço existente para finalizar.
+
 EXEMPLO REAL DE ERRO (NÃO FAÇA ISSO!):
 ❌ Cliente: "moafsa@gmail.com"
 ❌ Você: "Qual é o seu e-mail, Moacir?"
@@ -242,6 +247,10 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             `- E-mail: ${ci.email || 'não informado ainda'}`,
             `- Empresa: ${ci.company || 'não informado ainda'}`,
         ];
+
+        if (ci.address) {
+            contactLines.push(`- Endereço Cadastrado/Última Entrega: ${ci.address}`);
+        }
 
         if (ci.notes) {
             contactLines.push(`- Anotações do Suporte: ${ci.notes}`);

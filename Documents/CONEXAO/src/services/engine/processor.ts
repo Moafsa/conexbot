@@ -612,6 +612,7 @@ export const MessageProcessor = {
                     email: existingContact.email,
                     company: (existingContact as any).company,
                     notes: (existingContact as any).notes,
+                    address: (existingContact as any).needs,
                     orders: (existingContact as any).orders,
                     // Ad attribution — enriches agent context with lead origin
                     utmSource:    (existingContact as any).utmSource,
