@@ -31,9 +31,9 @@ export default function AdminSettingsPage() {
         smtpPass: "",
         smtpFrom: "",
         systemBotId: "",
-        metaAppId: "",
         metaAppSecret: "",
-        metaVerifyToken: ""
+        metaVerifyToken: "",
+        mapboxToken: ""
     });
 
     const [systemBot, setSystemBot] = useState<{ status: string, botName?: string, botId?: string } | null>(null);
@@ -204,6 +204,10 @@ export default function AdminSettingsPage() {
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">ElevenLabs Key</label>
                             <input type="password" value={config.elevenLabsApiKey} onChange={e => setConfig({...config, elevenLabsApiKey: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Mapbox Access Token (Global)</label>
+                            <input value={config.mapboxToken || ''} onChange={e => setConfig({...config, mapboxToken: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" placeholder="pk.ey..." />
                         </div>
                     </div>
                 </section>
