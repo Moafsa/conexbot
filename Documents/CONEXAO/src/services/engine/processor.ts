@@ -771,14 +771,16 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     type: 'function',
                     function: {
                         name: 'confirmar_pedido',
-                        description: 'Salva o pedido final no banco de dados e o envia para os entregadores no painel de frota. USE ISTO SEMPRE que o cliente der o endereço completo e confirmar que quer fechar o pedido usando dinheiro, PIX ou cartão na entrega.',
+                        description: 'Salva o pedido final no banco de dados e o envia para os entregadores no painel de frota. USE ISTO SEMPRE que o cliente confirmar o pedido com endereço e forma de pagamento. Funciona tanto com carrinho (se o cliente usou adicionar_ao_carrinho) quanto sem carrinho (pedidos verbais).',
                         parameters: {
                             type: 'object',
                             properties: {
                                 endereco_completo: { type: 'string', description: 'O endereço de entrega completo fornecido pelo cliente (rua, número, bairro, cidade, etc.).' },
                                 forma_pagamento: { type: 'string', description: 'A forma de pagamento escolhida (ex: DINHEIRO, PIX, CARTÃO DE CRÉDITO, CARTÃO DE DÉBITO).' },
                                 bairro_entrega: { type: 'string', description: 'O nome do bairro do cliente para cálculo de taxa de entrega.' },
-                                troco_para: { type: 'number', description: 'Opcional. Valor para o qual o cliente precisa de troco (se a forma de pagamento for dinheiro).' }
+                                troco_para: { type: 'number', description: 'Opcional. Valor para o qual o cliente precisa de troco (se a forma de pagamento for dinheiro).' },
+                                itens_descricao: { type: 'string', description: 'Opcional. Descrição textual dos itens do pedido (use quando não houver carrinho). Ex: "3 botijões de gás 13kg".' },
+                                total_pedido: { type: 'number', description: 'Opcional. Valor total dos itens (sem taxa de entrega) quando o pedido é verbal/sem carrinho.' }
                             },
                             required: ['endereco_completo', 'forma_pagamento', 'bairro_entrega']
                         }
@@ -1222,164 +1224,180 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     include: { items: { include: { product: true } } }
                                 });
 
-                                if (!cart || cart.items.length === 0) {
-                                    toolResult = "O carrinho está vazio. Peça para o cliente escolher produtos do catálogo primeiro.";
-                                } else {
+                                // Allow order creation even WITHOUT a cart (verbal/conversational ordering)
+                                const hasCart = cart && cart.items.length > 0;
+
+                                let summary = { total: 0 };
+                                let itemsText = '';
+
+                                if (hasCart) {
                                     const { CartService } = await import('./cart.service');
-                                    const summary = await CartService.getCartSummary(bot.id, senderPhone);
-                                    
-                                    let deliveryFee = 0;
-                                    let deliveryMsg = "";
-                                    const rawBairro = args.bairro_entrega || "";
-
-                                    // Calculate delivery fee
-                                    if (bot.deliveryFeeType === 'FIXED') {
-                                        deliveryFee = Number(bot.deliveryFeeRules?.[0]?.value) || 0;
-                                        deliveryMsg = ` (Taxa fixa R$ ${deliveryFee.toFixed(2)})`;
-                                    } else if ((bot.deliveryFeeType === 'NEIGHBORHOOD' || bot.deliveryFeeType === 'BY_NEIGHBORHOOD') && rawBairro) {
-                                        const rules = (bot.deliveryFeeRules as any[]) || [];
-                                        const foundRule = rules.find((r: any) => 
-                                            (r.neighborhood || r.bairro || '').toLowerCase() === rawBairro.toLowerCase()
-                                        );
-                                        if (foundRule) {
-                                            deliveryFee = Number(foundRule.value || foundRule.fee) || 0;
-                                            deliveryMsg = ` (Taxa para ${rawBairro} R$ ${deliveryFee.toFixed(2)})`;
-                                        }
-                                    }
-                                    const finalTotal = summary.total + deliveryFee;
-                                    const fullAddr = args.endereco_completo || '';
-                                    const payMethod = args.forma_pagamento || 'A combinar';
-                                    const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
-                                    const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
-
-                                    const config = await prisma.globalConfig.findUnique({
-                                        where: { id: 'system' }
-                                    });
-                                    const mapboxToken = config?.mapboxToken;
-
-                                    let latitude: number | null = null;
-                                    let longitude: number | null = null;
-
-                                    if (mapboxToken && fullAddr) {
-                                        try {
-                                            const cleanAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
-                                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`;
-                                            const geocodeRes = await fetch(geocodeUrl);
-                                            if (geocodeRes.ok) {
-                                                const geocodeData = await geocodeRes.json();
-                                                const center = geocodeData.features?.[0]?.center;
-                                                if (center) {
-                                                    longitude = center[0];
-                                                    latitude = center[1];
-                                                }
-                                            }
-                                        } catch (e: any) {
-                                            console.error('[confirmar_pedido] Geocoding exception:', e.message);
-                                        }
-                                    }
-
-                                    // Update contact details
-                                    await prisma.contact.update({
-                                        where: { id: existingContact.id },
-                                        data: {
-                                            notes: contactNotes,
-                                            needs: fullAddr,
-                                            latitude,
-                                            longitude
-                                        }
-                                    });
-
-                                    // Create pending order
-                                    const order = await prisma.order.create({
-                                        data: {
-                                            botId: bot.id,
-                                            contactId: existingContact.id,
-                                            totalAmount: finalTotal,
-                                            commissionAmount: 0,
-                                            status: 'PENDING',
-                                            items: {
-                                                create: cart.items.map(item => ({
-                                                    productId: item.productId,
-                                                    quantity: item.quantity,
-                                                    unitPrice: item.unitPrice
-                                                }))
-                                            }
-                                        } as any
-                                    });
-
-                                    // Transition the CRM stage to "PEDIDO CONFIRMADO"
-                                    const confirmedStage = await prisma.crmStage.findFirst({
-                                        where: { 
-                                            pipeline: { botId: bot.id },
-                                            name: { contains: 'CONFIRMADO', mode: 'insensitive' }
-                                        }
-                                    });
-                                    if (confirmedStage) {
-                                        await prisma.contact.update({
-                                            where: { id: existingContact.id },
-                                            data: {
-                                                stageId: confirmedStage.id,
-                                                funnelStage: confirmedStage.name
-                                            }
-                                        });
-                                        if (options.chatwootConversationId) {
-                                            const { ChatwootService } = await import('@/services/engine/chatwoot');
-                                            await ChatwootService.updateConversationCustomAttributes(
-                                                bot, options.chatwootConversationId, { crm_stage: confirmedStage.name, crm_stage_id: confirmedStage.id }
-                                            ).catch(() => {});
-                                        }
-                                    }
-
-                                    // Build notification message for the support human agent
-                                    const title = `📦 Novo Pedido Confirmado`;
-                                    const itemsText = cart.items.map(item => {
+                                    summary = await CartService.getCartSummary(bot.id, senderPhone);
+                                    itemsText = cart!.items.map(item => {
                                         const pName = (item as any).product?.name || 'Produto';
                                         return `- ${pName} x${item.quantity} (R$ ${item.unitPrice.toFixed(2)})`;
                                     }).join('\n');
+                                } else {
+                                    // No cart — build description from args
+                                    const descFromArgs: string = args.itens_descricao || args.items_description || args.produtos || '';
+                                    const totalFromArgs = Number(args.total_pedido || args.total || 0);
+                                    summary = { total: totalFromArgs };
+                                    itemsText = descFromArgs || 'Pedido verbal (sem carrinho registrado)';
+                                }
 
-                                    const notificationMessage = `*${title}*\n\nUm novo pedido foi confirmado pelo bot.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
+                                let deliveryFee = 0;
+                                let deliveryMsg = '';
+                                const rawBairro = args.bairro_entrega || '';
 
-                                    const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
-                                    const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
-
-                                    let whatsappNotifyOk = false;
-                                    let notifyResultLine = '';
-
-                                    if (whatsappNotifyTarget) {
-                                        const sessionForNotify = bot.sessionName || identifier;
-                                        whatsappNotifyOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
-                                            sessionForNotify,
-                                            whatsappNotifyTarget,
-                                            notificationMessage
-                                        );
-                                        const destMask = `****${whatsappNotifyTarget.slice(-4)}`;
-                                        if (whatsappNotifyOk) {
-                                            notifyResultLine = `WhatsApp ao atendente: enviado para ${destMask}.`;
-                                        } else {
-                                            notifyResultLine = `WhatsApp ao atendente: falhou ao enviar para ${destMask}.`;
-                                        }
-                                    } else {
-                                        notifyResultLine = `WhatsApp ao atendente: não enviado (nenhum número cadastrado em chamar humano/perfil).`;
+                                // Calculate delivery fee
+                                if (bot.deliveryFeeType === 'FIXED') {
+                                    deliveryFee = Number(bot.deliveryFeeRules?.[0]?.value) || 0;
+                                    deliveryMsg = ` (Taxa fixa R$ ${deliveryFee.toFixed(2)})`;
+                                } else if ((bot.deliveryFeeType === 'NEIGHBORHOOD' || bot.deliveryFeeType === 'BY_NEIGHBORHOOD') && rawBairro) {
+                                    const rules = (bot.deliveryFeeRules as any[]) || [];
+                                    const foundRule = rules.find((r: any) =>
+                                        (r.neighborhood || r.bairro || '').toLowerCase() === rawBairro.toLowerCase()
+                                    );
+                                    if (foundRule) {
+                                        deliveryFee = Number(foundRule.value || foundRule.fee) || 0;
+                                        deliveryMsg = ` (Taxa para ${rawBairro} R$ ${deliveryFee.toFixed(2)})`;
                                     }
+                                }
+                                const finalTotal = summary.total + deliveryFee;
+                                const fullAddr = args.endereco_completo || (existingContact as any).needs || '';
+                                const payMethod = args.forma_pagamento || 'A combinar';
+                                const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
+                                const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
 
-                                    // Register the notification message in the customer's CRM conversation as a system message
-                                    await prisma.message.create({
+                                const config = await prisma.globalConfig.findUnique({
+                                    where: { id: 'system' }
+                                });
+                                const mapboxToken = config?.mapboxToken;
+
+                                let latitude: number | null = null;
+                                let longitude: number | null = null;
+
+                                if (mapboxToken && fullAddr) {
+                                    try {
+                                        const cleanAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`;
+                                        const geocodeRes = await fetch(geocodeUrl);
+                                        if (geocodeRes.ok) {
+                                            const geocodeData = await geocodeRes.json();
+                                            const center = geocodeData.features?.[0]?.center;
+                                            if (center) {
+                                                longitude = center[0];
+                                                latitude = center[1];
+                                            }
+                                        }
+                                    } catch (e: any) {
+                                        console.error('[confirmar_pedido] Geocoding exception:', e.message);
+                                    }
+                                }
+
+                                // Update contact details
+                                await prisma.contact.update({
+                                    where: { id: existingContact.id },
+                                    data: {
+                                        notes: contactNotes,
+                                        needs: fullAddr,
+                                        latitude,
+                                        longitude
+                                    }
+                                });
+
+                                // Create pending order
+                                const orderData: any = {
+                                    botId: bot.id,
+                                    contactId: existingContact.id,
+                                    totalAmount: finalTotal,
+                                    commissionAmount: 0,
+                                    status: 'PENDING',
+                                };
+
+                                // Only attach cart items if a real cart exists
+                                if (hasCart) {
+                                    orderData.items = {
+                                        create: cart!.items.map(item => ({
+                                            productId: item.productId,
+                                            quantity: item.quantity,
+                                            unitPrice: item.unitPrice
+                                        }))
+                                    };
+                                }
+
+                                const order = await prisma.order.create({ data: orderData });
+
+                                // Transition the CRM stage to "PEDIDO CONFIRMADO"
+                                const confirmedStage = await prisma.crmStage.findFirst({
+                                    where: {
+                                        pipeline: { botId: bot.id },
+                                        name: { contains: 'CONFIRMADO', mode: 'insensitive' }
+                                    }
+                                });
+                                if (confirmedStage) {
+                                    await prisma.contact.update({
+                                        where: { id: existingContact.id },
                                         data: {
-                                            conversationId: conversation.id,
-                                            role: 'system',
-                                            content: `[Notificação de Pedido Confirmado enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
-                                        },
+                                            stageId: confirmedStage.id,
+                                            funnelStage: confirmedStage.name
+                                        }
                                     });
+                                    if (options.chatwootConversationId) {
+                                        const { ChatwootService } = await import('@/services/engine/chatwoot');
+                                        await ChatwootService.updateConversationCustomAttributes(
+                                            bot, options.chatwootConversationId, { crm_stage: confirmedStage.name, crm_stage_id: confirmedStage.id }
+                                        ).catch(() => {});
+                                    }
+                                }
 
-                                    // Clear cart
+                                // Build notification message for the support human agent
+                                const title = `📦 Novo Pedido Confirmado`;
+                                const notificationMessage = `*${title}*\n\nUm novo pedido foi confirmado pelo bot.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
+
+                                const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
+                                const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
+
+                                let whatsappNotifyOk = false;
+                                let notifyResultLine = '';
+
+                                if (whatsappNotifyTarget) {
+                                    const sessionForNotify = bot.sessionName || identifier;
+                                    whatsappNotifyOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
+                                        sessionForNotify,
+                                        whatsappNotifyTarget,
+                                        notificationMessage
+                                    );
+                                    const destMask = `****${whatsappNotifyTarget.slice(-4)}`;
+                                    if (whatsappNotifyOk) {
+                                        notifyResultLine = `WhatsApp ao atendente: enviado para ${destMask}.`;
+                                    } else {
+                                        notifyResultLine = `WhatsApp ao atendente: falhou ao enviar para ${destMask}.`;
+                                    }
+                                } else {
+                                    notifyResultLine = `WhatsApp ao atendente: não enviado (nenhum número cadastrado em chamar humano/perfil).`;
+                                }
+
+                                // Register the notification message in the customer's CRM conversation as a system message
+                                await prisma.message.create({
+                                    data: {
+                                        conversationId: conversation.id,
+                                        role: 'system',
+                                        content: `[Notificação de Pedido Confirmado enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
+                                    },
+                                });
+
+                                // Clear cart if it existed
+                                if (hasCart) {
                                     await prisma.cart.update({
-                                        where: { id: cart.id },
+                                        where: { id: cart!.id },
                                         data: { status: 'COMPLETED' }
                                     });
-
-                                    toolResult = `PEDIDO CRIADO COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\nO pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!`;
                                 }
+
+                                toolResult = `PEDIDO CRIADO COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\nO pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!`;
                             } catch (e: any) {
+                                console.error('[confirmar_pedido] Exception:', e.message, e.stack);
                                 toolResult = `Erro ao confirmar o pedido: ${e.message}`;
                             }
                         } else if (name === 'listar_colaboradores') {
