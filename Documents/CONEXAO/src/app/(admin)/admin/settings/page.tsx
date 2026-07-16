@@ -30,7 +30,8 @@ export default function AdminSettingsPage() {
         metaAppSecret: '',
         metaVerifyToken: '',
         mlClientId: '',
-        mlClientSecret: ''
+        mlClientSecret: '',
+        mapboxToken: ''
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -259,6 +260,12 @@ export default function AdminSettingsPage() {
                                         value={settings.elevenLabsApiKey}
                                         onChange={v => setSettings({ ...settings, elevenLabsApiKey: v })}
                                         placeholder="sk_..."
+                                    />
+                                    <SettingInput
+                                        label="Mapbox Access Token (Global)"
+                                        value={settings.mapboxToken}
+                                        onChange={v => setSettings({ ...settings, mapboxToken: v })}
+                                        placeholder="pk.eyJ1..."
                                     />
                                 </div>
                             </div>

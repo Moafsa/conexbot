@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2 } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
@@ -23,7 +23,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [showInactive, setShowInactive] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Modal State
+    // Driver Modal State
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [driverId, setDriverId] = useState('');
@@ -31,6 +31,12 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [driverPhone, setDriverPhone] = useState('');
     const [driverKeywords, setDriverKeywords] = useState('');
     const [submitting, setSubmitting] = useState(false);
+
+    // Delivery Fees Modal State
+    const [feesModalOpen, setFeesModalOpen] = useState(false);
+    const [deliveryFeeType, setDeliveryFeeType] = useState('FIXED');
+    const [deliveryFeeRules, setDeliveryFeeRules] = useState<any[]>([]);
+    const [savingFees, setSavingFees] = useState(false);
 
     // 1. Fetch Drivers Data
     const fetchDrivers = async () => {
@@ -272,7 +278,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         }
     };
 
-    // Open Modal for Create or Edit
+    // Open Modal for Create or Edit Entregador
     const handleOpenModal = (driverToEdit?: any) => {
         if (driverToEdit) {
             setModalMode('edit');
@@ -288,6 +294,73 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             setDriverKeywords('');
         }
         setModalOpen(true);
+    };
+
+    // Open Delivery Fees configuration modal
+    const handleOpenFeesModal = async () => {
+        try {
+            toast.loading('Carregando regras de entrega...', { id: 'fees' });
+            const res = await fetch('/api/drivers/fees');
+            if (res.ok) {
+                const data = await res.json();
+                setDeliveryFeeType(data.deliveryFeeType || 'FIXED');
+                setDeliveryFeeRules(Array.isArray(data.deliveryFeeRules) ? data.deliveryFeeRules : []);
+                toast.dismiss('fees');
+            } else {
+                throw new Error('Falha ao carregar taxas');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao buscar taxas de entrega', { id: 'fees' });
+        }
+        setFeesModalOpen(true);
+    };
+
+    const handleAddRule = () => {
+        setDeliveryFeeRules([
+            ...deliveryFeeRules,
+            { city: '', neighborhood: '', fee: 0 }
+        ]);
+    };
+
+    const handleRemoveRule = (index: number) => {
+        setDeliveryFeeRules(deliveryFeeRules.filter((_, i) => i !== index));
+    };
+
+    const handleRuleChange = (index: number, field: string, value: any) => {
+        const updated = [...deliveryFeeRules];
+        updated[index] = {
+            ...updated[index],
+            [field]: value
+        };
+        setDeliveryFeeRules(updated);
+    };
+
+    // Save Delivery Fees
+    const handleSaveFees = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setSavingFees(true);
+            const res = await fetch('/api/drivers/fees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    deliveryFeeType,
+                    deliveryFeeRules
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || 'Erro ao salvar taxas de entrega');
+            }
+
+            toast.success('Configurações de entrega salvas com sucesso!');
+            setFeesModalOpen(false);
+        } catch (err: any) {
+            toast.error(err.message);
+        } finally {
+            setSavingFees(false);
+        }
     };
 
     // Save Driver handler
@@ -398,14 +471,22 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         </button>
                     </div>
 
-                    {/* Cadastrar button & Filter */}
+                    {/* Actions Panel */}
                     <div className="space-y-2">
-                        <button 
-                            onClick={() => handleOpenModal()} 
-                            className="w-full p-2.5 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_10px_var(--primary-glow)] border-0 cursor-pointer"
-                        >
-                            + Cadastrar Entregador
-                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button 
+                                onClick={() => handleOpenModal()} 
+                                className="p-2.5 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-[11px] font-semibold rounded-2xl flex items-center justify-center gap-1 transition shadow-[0_0_10px_var(--primary-glow)] border-0 cursor-pointer text-center"
+                            >
+                                + Entregador
+                            </button>
+                            <button 
+                                onClick={handleOpenFeesModal} 
+                                className="p-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-[11px] font-semibold rounded-2xl flex items-center justify-center gap-1 transition cursor-pointer text-center"
+                            >
+                                ⚙️ Taxas
+                            </button>
+                        </div>
 
                         <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/5 text-xs">
                             <span className="text-gray-300 font-medium">Mostrar Inativos</span>
@@ -601,6 +682,139 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                     className="flex-1 p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white font-semibold rounded-2xl transition disabled:opacity-50 border-0 cursor-pointer"
                                 >
                                     {submitting ? 'Salvando...' : 'Salvar'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Configuração de Taxas de Entrega */}
+            {feesModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl bg-[#07041a] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4 animate-fade-in text-white max-h-[85vh] flex flex-col">
+                        
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3 shrink-0">
+                            <div>
+                                <h3 className="text-base font-bold text-white">Configurar Regiões e Taxas de Entrega</h3>
+                                <p className="text-[10px] text-gray-500 mt-0.5">Cadastre o valor de entrega para cada bairro ou cidade</p>
+                            </div>
+                            <button 
+                                onClick={() => setFeesModalOpen(false)} 
+                                className="text-gray-400 hover:text-white transition text-lg bg-transparent border-0 cursor-pointer"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        {/* Form Body (Scrollable) */}
+                        <form onSubmit={handleSaveFees} className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
+                            
+                            {/* Mode Selection */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-400 uppercase">Modo de Cobrança</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setDeliveryFeeType('FIXED')}
+                                        className={`p-3 rounded-2xl border text-center transition cursor-pointer font-semibold ${
+                                            deliveryFeeType === 'FIXED' 
+                                                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' 
+                                                : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        Taxa Fixa (Padrão)
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setDeliveryFeeType('BY_NEIGHBORHOOD')}
+                                        className={`p-3 rounded-2xl border text-center transition cursor-pointer font-semibold ${
+                                            deliveryFeeType === 'BY_NEIGHBORHOOD' 
+                                                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' 
+                                                : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'
+                                        }`}
+                                    >
+                                        Por Bairro / Região
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Rules Table */}
+                            {deliveryFeeType === 'BY_NEIGHBORHOOD' && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase">Tabela de Valores por Região</label>
+                                        <button 
+                                            type="button"
+                                            onClick={handleAddRule}
+                                            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition cursor-pointer bg-transparent border-0"
+                                        >
+                                            + Adicionar Região
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
+                                        {deliveryFeeRules.length === 0 ? (
+                                            <div className="py-6 text-center text-gray-500 text-xs border border-dashed border-white/10 rounded-2xl">
+                                                Nenhuma região cadastrada. Clique em adicionar para configurar.
+                                            </div>
+                                        ) : (
+                                            deliveryFeeRules.map((rule, idx) => (
+                                                <div key={idx} className="flex gap-2 items-center">
+                                                    <input 
+                                                        type="text" 
+                                                        value={rule.city || ''}
+                                                        onChange={(e) => handleRuleChange(idx, 'city', e.target.value)}
+                                                        placeholder="Cidade (ex: Canoas)"
+                                                        className="flex-1 p-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition text-xs"
+                                                    />
+                                                    <input 
+                                                        type="text" 
+                                                        value={rule.neighborhood || ''}
+                                                        onChange={(e) => handleRuleChange(idx, 'neighborhood', e.target.value)}
+                                                        placeholder="Bairro (ex: Centro)"
+                                                        className="flex-1 p-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition text-xs"
+                                                    />
+                                                    <div className="relative w-28 shrink-0">
+                                                        <span className="absolute left-3 top-2.5 text-xs text-gray-400">R$</span>
+                                                        <input 
+                                                            type="number" 
+                                                            step="0.01"
+                                                            value={rule.fee || 0}
+                                                            onChange={(e) => handleRuleChange(idx, 'fee', parseFloat(e.target.value) || 0)}
+                                                            className="w-full pl-8 p-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500 transition text-xs text-right"
+                                                        />
+                                                    </div>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleRemoveRule(idx)}
+                                                        className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer bg-transparent border-0"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Footer Buttons */}
+                            <div className="flex gap-3 pt-3 border-t border-white/5 shrink-0">
+                                <button 
+                                    type="button"
+                                    onClick={() => setFeesModalOpen(false)}
+                                    className="flex-1 p-3 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-2xl transition border border-white/5 cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={savingFees}
+                                    className="flex-1 p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white font-semibold rounded-2xl transition disabled:opacity-50 border-0 cursor-pointer"
+                                >
+                                    {savingFees ? 'Salvando...' : 'Salvar Configurações'}
                                 </button>
                             </div>
                         </form>

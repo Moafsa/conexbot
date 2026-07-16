@@ -56,6 +56,9 @@ export const createBotSchema = z.object({
     workingHours: z.any().optional(),
     groupResponseMode: z.enum(['ALL', 'NONE', 'SPECIFIC']).optional().default('ALL'),
     allowedGroups: z.array(z.string()).optional().default([]),
+    mapboxToken: z.string().optional().nullable(),
+    deliveryFeeType: z.string().optional(),
+    deliveryFeeRules: z.any().optional().nullable(),
 });
 
 export const updateBotSchema = createBotSchema.partial();

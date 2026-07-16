@@ -743,6 +743,7 @@ model GlobalConfig {
   stripeSecretKey         String?
   openrouterApiKey        String?
   metaAppId               String?
+  mapboxToken             String?
   metaAppSecret           String?
   metaVerifyToken         String?
   platformAsaasWalletId   String?
@@ -750,7 +751,6 @@ model GlobalConfig {
   mlClientSecret          String?
   chatwootSuperAdminToken String?
   chatwootBaseUrl         String?
-  mapboxToken             String?
   anthropicApiKey         String?
 }
 

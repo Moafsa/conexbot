@@ -37,7 +37,8 @@ export async function GET() {
             mercadoPagoAccessToken: "",
             metaAppId: "",
             metaAppSecret: "",
-            metaVerifyToken: ""
+            metaVerifyToken: "",
+            mapboxToken: ""
         });
     } catch (error) {
         return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
@@ -87,7 +88,8 @@ export async function PUT(req: Request) {
             metaAppSecret: body.metaAppSecret || null,
             metaVerifyToken: body.metaVerifyToken || null,
             mlClientId: body.mlClientId || null,
-            mlClientSecret: body.mlClientSecret || null
+            mlClientSecret: body.mlClientSecret || null,
+            mapboxToken: body.mapboxToken || null
         };
 
         console.log(`[AdminConfig] [${timestamp}] Attempting upsert...`);
