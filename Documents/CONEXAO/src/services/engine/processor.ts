@@ -206,22 +206,6 @@ export const MessageProcessor = {
                 } as any,
             });
 
-            // 3.1. Check if conversation is PAUSED (handoff para humano)
-            if ((conversation as any).pausedUntil) {
-                if ((conversation as any).pausedUntil > new Date() && channel !== 'simulator') {
-                    logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()} (Silent Mode)`);
-                    // SILENT MODE: Return null instead of the "atendimento humano" message to avoid bot competition
-                    return null;
-                } else if ((conversation as any).pausedUntil <= new Date()) {
-                    logToFile(`[Processor] Conversation pausedUntil expired for ${senderPhone}. Clearing pause limit.`);
-                    await prisma.conversation.update({
-                        where: { id: conversation.id },
-                        data: { pausedUntil: null } as any
-                    });
-                    (conversation as any).pausedUntil = null;
-                }
-            }
-
             // 3.5. Specialized input processing
             let contentToSave = messageText;
             if (options.inputType === 'image' && options.mediaPath) {
@@ -246,8 +230,39 @@ export const MessageProcessor = {
                 },
             });
 
+            // 4.1. Check if conversation is PAUSED (handoff para humano) or Bot is PAUSED
+            let isPaused = false;
+            if ((conversation as any).pausedUntil) {
+                if ((conversation as any).pausedUntil > new Date() && channel !== 'simulator') {
+                    logToFile(`[Processor] Conversation PAUSED for ${senderPhone} until ${(conversation as any).pausedUntil.toISOString()} (Silent Mode)`);
+                    isPaused = true;
+                } else if ((conversation as any).pausedUntil <= new Date()) {
+                    logToFile(`[Processor] Conversation pausedUntil expired for ${senderPhone}. Clearing pause limit.`);
+                    await prisma.conversation.update({
+                        where: { id: conversation.id },
+                        data: { pausedUntil: null } as any
+                    });
+                    (conversation as any).pausedUntil = null;
+                }
+            }
+
             if (bot.status?.toLowerCase() === 'paused') {
                 logToFile(`[Processor] Bot ${bot.name} is PAUSED. Message recorded. Skipping AI response.`);
+                isPaused = true;
+            }
+
+            if (isPaused) {
+                // Sync to Chatwoot so the human agent receives the customer's message
+                if (channel === 'whatsapp' && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                    const { ChatwootService } = await import('./chatwoot');
+                    ChatwootService.syncToConversation(
+                        bot,
+                        senderPhone,
+                        undefined,
+                        messageText,
+                        '',
+                    ).catch((e: any) => logToFile(`[Processor] Chatwoot sync error during pause: ${e.message}`));
+                }
                 return null;
             }
 
@@ -261,7 +276,7 @@ export const MessageProcessor = {
             const history = rawHistory.reverse();
 
             // 6. CRM Extraction & Contact Management
-            let existingContact = await prisma.contact.findUnique({
+            let existingContact: any = await prisma.contact.findUnique({
                 where: { phone_botId: { phone: senderPhone, botId: bot.id } },
                 include: {
                     orders: { orderBy: { createdAt: 'desc' }, take: 5 }
@@ -385,7 +400,7 @@ export const MessageProcessor = {
                         const title = `⚠️ Problema na Entrega`;
                         const msgContent = `O motorista *${existingContact.name || 'Sem nome'}* (${senderPhone}) reportou um problema ao entregar o pedido *#${activeOrderForDriver.id.substring(0,6)}* para o cliente *${activeOrderForDriver.contact?.name || 'Cliente'}*.\n\n*Resposta do motorista:* "${messageText}"`;
                         
-                        await NotificationService.alertTenant(bot.tenantId, title, msgContent, 'DELIVERY_ISSUE');
+                        await NotificationService.alertTenant(bot.tenantId, title, msgContent, 'DELIVERY_ISSUE' as any);
 
                         return {
                             text: `Entendido. Registramos que houve um problema com a entrega. Nossa equipe de suporte na central já foi notificada e entrará em contato com você em breve. Obrigado pelo retorno.`
@@ -1510,7 +1525,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     await UzapiService.sendMessage(bot.sessionName, finalPhone, dispatchMsg);
 
                                     // 6. Assign conversation to driver in Chatwoot
-                                    const cwConvId = conversation?.chatwootConversationId || (conversation as any)?.chatwootConversationId || options.chatwootConversationId;
+                                    const cwConvId = (conversation as any)?.chatwootConversationId || options.chatwootConversationId;
                                     if (cwConvId && bot.chatwootUrl && bot.chatwootToken) {
                                         const driverEmail = `${finalPhone}@entregador.conext.bot`;
                                         const agent = await ChatwootService.getAgentByEmail(bot, driverEmail);

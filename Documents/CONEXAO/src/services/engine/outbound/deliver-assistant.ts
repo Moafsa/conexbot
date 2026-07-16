@@ -52,6 +52,16 @@ async function deliverWhatsApp(
         logToFile(`[Outbound/WhatsApp] destino WuzAPI: JID Chat (${recipient.substring(0, 48)}…)`);
     }
 
+    // Cache the reply to prevent loops from Chatwoot webhooks
+    try {
+        const { getRedis } = await import('@/lib/redis');
+        const redis = getRedis();
+        const cacheKey = `last_bot_reply:${bot.id}:${remoteIdNormalized}`;
+        await redis.set(cacheKey, cleanResponse, 'EX', 15);
+    } catch (e: any) {
+        logToFile(`[Outbound/WhatsApp] Redis caching error: ${e.message}`);
+    }
+
     // Regra: Sempre que houver link na resposta, tem que ser em texto (para ser clicável e evitar leitura robótica de URL)
     const hasLink = cleanResponse.includes('http://') || cleanResponse.includes('https://');
 

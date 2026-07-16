@@ -174,11 +174,46 @@ export async function POST(req: Request) {
                 if (!customerPhone || !messageText) {
                     return NextResponse.json({ status: 'ignored', message: 'Missing customer phone or text for agent reply' });
                 }
+                const cleanPhone = customerPhone.replace(/\D/g, '');
+
+                // Prevent loop: Check if this message matches a recent bot reply
+                try {
+                    const { getRedis } = await import('@/lib/redis');
+                    const redis = getRedis();
+                    const cacheKey = `last_bot_reply:${bot.id}:${cleanPhone}`;
+                    const cachedReply = await redis.get(cacheKey);
+                    if (cachedReply === messageText) {
+                        logToFile(`[Generic Webhook] Ignored loop message matching cached bot reply for ${cleanPhone}`);
+                        return NextResponse.json({ status: 'ignored_loop', message: 'Matches cached bot reply' });
+                    }
+                } catch (redisErr: any) {
+                    logToFile(`[Generic Webhook] Redis check failed: ${redisErr.message}`);
+                }
+
                 logToFile(`[Generic Webhook] Chatwoot AGENT reply → WhatsApp for ${customerPhone}: "${messageText.substring(0, 80)}"`);
                 // Forward the human agent's message to the customer on WhatsApp
                 try {
                     const { UzapiService } = await import('@/services/engine/uzapi');
                     await UzapiService.sendMessage(bot.sessionName || '', customerPhone.replace(/\D/g, ''), messageText);
+
+                    // Save human agent's message to database conversation history
+                    try {
+                        const conversation = await prisma.conversation.upsert({
+                            where: { botId_remoteId: { botId: bot.id, remoteId: cleanPhone } },
+                            update: { updatedAt: new Date() },
+                            create: { botId: bot.id, remoteId: cleanPhone, channel: 'whatsapp' }
+                        });
+                        await prisma.message.create({
+                            data: {
+                                conversationId: conversation.id,
+                                role: 'assistant',
+                                content: `[HUMANO]: ${messageText}`
+                            }
+                        });
+                    } catch (dbErr: any) {
+                        logToFile(`[Generic Webhook] Failed to save human agent reply to DB: ${dbErr.message}`);
+                    }
+
                     return NextResponse.json({ status: 'forwarded_to_whatsapp' });
                 } catch (fwdErr: any) {
                     logToFile(`[Generic Webhook] Forward agent reply to WhatsApp failed: ${fwdErr.message}`);

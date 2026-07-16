@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
         const pendingOrders = await prisma.order.findMany({
             where: {
-                tenantId,
+                bot: { tenantId },
                 botId: botId || undefined,
                 driverId: null,
                 status: { in: ['PENDING', 'PAID'] }
