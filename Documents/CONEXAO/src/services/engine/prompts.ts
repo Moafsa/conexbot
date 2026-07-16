@@ -220,8 +220,15 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
             businessLines.push(`- Taxa de Entrega: Fixa - R$ ${fee}`);
         } else if (bot.deliveryFeeType === 'FREE') {
             businessLines.push(`- Taxa de Entrega: Grátis`);
-        } else if (bot.deliveryFeeType === 'DISTANCE' || bot.deliveryFeeType === 'NEIGHBORHOOD') {
-            businessLines.push(`- Taxa de Entrega: Calculada por ${bot.deliveryFeeType === 'DISTANCE' ? 'distância' : 'bairro'}. Regras: ${JSON.stringify(bot.deliveryFeeRules)}`);
+        } else if (bot.deliveryFeeType === 'DISTANCE' || bot.deliveryFeeType === 'NEIGHBORHOOD' || bot.deliveryFeeType === 'BY_NEIGHBORHOOD') {
+            let rulesStr = '';
+            if (Array.isArray(bot.deliveryFeeRules) && bot.deliveryFeeRules.length > 0) {
+                rulesStr = bot.deliveryFeeRules.map((r: any) => 
+                    `- ${r.neighborhood || r.bairro || 'Geral'} (${r.city || r.cidade || ''}): R$ ${r.fee ?? r.value ?? 0}`
+                ).join(', ');
+            }
+            businessLines.push(`- Taxa de Entrega: Calculada por bairro. Regiões atendidas e valores: ${rulesStr || 'Nenhuma configurada.'}`);
+            businessLines.push(`- DIRETRIZ CRÍTICA DE ENTREGAS: Se o cliente solicitar entrega para um bairro ou cidade que NÃO está listado acima, você DEVE informá-lo educadamente que não realizamos entregas para essa região.`);
         }
     }
 
