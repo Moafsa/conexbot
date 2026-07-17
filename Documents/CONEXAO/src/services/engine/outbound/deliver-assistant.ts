@@ -31,12 +31,63 @@ export async function deliverAssistantOutbound(params: {
         return;
     }
 
+    if (channel === 'meta_whatsapp') {
+        await deliverMetaWhatsApp(bot, remoteId, cleanResponse, mediaMatches);
+        return;
+    }
+
     if (channel === 'wordpress') {
         await deliverWordPress(bot, remoteId, cleanResponse);
         return;
     }
 
     // simulator / generic: sem envio por Uzapi nem WordPress (comportamento do processor)
+}
+
+async function deliverMetaWhatsApp(
+    bot: any,
+    remoteId: string,
+    cleanResponse: string,
+    mediaMatches: RegExpMatchArray[]
+): Promise<void> {
+    const { default: prisma } = await import('@/lib/prisma');
+    const { MetaService } = await import('@/services/meta/meta-service');
+
+    const channel = await prisma.botChannel.findFirst({
+        where: { botId: bot.id, provider: 'META_WHATSAPP', status: 'CONNECTED' },
+    });
+
+    if (!channel) {
+        logToFile(`[Outbound/MetaWhatsApp] SKIP: bot ${bot?.id} sem canal META_WHATSAPP conectado.`);
+        return;
+    }
+
+    const creds = channel.credentials as any;
+    const accessToken = creds?.accessToken;
+    const phoneId = channel.identifier;
+
+    if (!accessToken || !phoneId) {
+        logToFile(`[Outbound/MetaWhatsApp] SKIP: credenciais incompletas para bot ${bot?.id}.`);
+        return;
+    }
+
+    try {
+        await MetaService.sendTextMessage(phoneId, accessToken, remoteId, cleanResponse);
+    } catch (e: any) {
+        logToFile(`[Outbound/MetaWhatsApp] Falha ao enviar texto para ${remoteId}: ${e.message}`);
+    }
+
+    for (const match of mediaMatches as any[]) {
+        const media = (bot.media as any[])?.find((m: any) => m.id === match[1]);
+        if (!media) continue;
+
+        const type = media.type === 'audio' ? 'audio' : media.type === 'video' ? 'video' : media.type === 'image' ? 'image' : 'document';
+        try {
+            await MetaService.sendMediaMessage(phoneId, accessToken, remoteId, type, media.url, media.description, media.filename);
+        } catch (e: any) {
+            logToFile(`[Outbound/MetaWhatsApp] Falha ao enviar mídia (id=${media?.id}): ${e.message}`);
+        }
+    }
 }
 
 async function deliverWhatsApp(

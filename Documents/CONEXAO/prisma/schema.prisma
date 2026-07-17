@@ -746,6 +746,7 @@ model GlobalConfig {
   mapboxToken             String?
   metaAppSecret           String?
   metaVerifyToken         String?
+  metaWhatsappConfigId    String?
   platformAsaasWalletId   String?
   mlClientId              String?
   mlClientSecret          String?

@@ -38,6 +38,7 @@ export async function GET() {
             metaAppId: "",
             metaAppSecret: "",
             metaVerifyToken: "",
+            metaWhatsappConfigId: "",
             mapboxToken: ""
         });
     } catch (error) {
@@ -87,6 +88,7 @@ export async function PUT(req: Request) {
             metaAppId: body.metaAppId || null,
             metaAppSecret: body.metaAppSecret || null,
             metaVerifyToken: body.metaVerifyToken || null,
+            metaWhatsappConfigId: body.metaWhatsappConfigId || null,
             mlClientId: body.mlClientId || null,
             mlClientSecret: body.mlClientSecret || null,
             mapboxToken: body.mapboxToken || null

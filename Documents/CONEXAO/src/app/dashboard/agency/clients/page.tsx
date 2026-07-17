@@ -22,6 +22,11 @@ export default function AgencyClientsPage() {
     const [inviting, setInviting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Transfer request state
+    const [transferError, setTransferError] = useState<{ isDuplicate: boolean, email: string, requesting: boolean, success: boolean }>({
+        isDuplicate: false, email: "", requesting: false, success: false
+    });
+
     const NICHES = [
         { value: 'generico', label: '🤖 Genérico' },
         { value: 'restaurante', label: '🍽️ Restaurante / Delivery' },
@@ -29,6 +34,7 @@ export default function AgencyClientsPage() {
         { value: 'ecommerce', label: '🛒 E-commerce / Loja' },
         { value: 'salao', label: '💈 Salão / Estética' },
         { value: 'imobiliaria', label: '🏠 Imobiliária' },
+        { value: 'distribuidora', label: '🛢️ Distribuidora / Gás' },
     ];
 
     // Invoice Modal states
@@ -133,12 +139,34 @@ export default function AgencyClientsPage() {
                 setInviteSitePreview(null);
                 fetchClients();
             } else {
-                alert(data.error || "Erro ao adicionar cliente.");
+                if (data.error === 'CLIENT_ALREADY_EXISTS') {
+                    setTransferError({ isDuplicate: true, email: data.existingEmail, requesting: false, success: false });
+                    alert(data.message || "Este cliente já pertence a outra agência.");
+                } else {
+                    alert(data.error || "Erro ao adicionar cliente.");
+                }
             }
         } catch {
             alert("Erro de conexão.");
         } finally {
             setInviting(false);
+        }
+    };
+
+    const handleRequestTransfer = async () => {
+        setTransferError(s => ({ ...s, requesting: true }));
+        try {
+            const res = await fetch("/api/agency/transfer-request", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: transferError.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Erro ao solicitar transferência.");
+            setTransferError(s => ({ ...s, success: true, requesting: false }));
+        } catch (err: any) {
+            alert(err.message);
+            setTransferError(s => ({ ...s, requesting: false }));
         }
     };
 
@@ -556,6 +584,24 @@ export default function AgencyClientsPage() {
                         <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 text-xs text-gray-400">
                             💡 Bot, funil de vendas, regras de follow-up e senha de acesso são criados automaticamente.
                         </div>
+                        
+                        {transferError.isDuplicate && !transferError.success && (
+                            <div className="bg-red-900/30 border border-red-500/30 rounded-2xl p-4 space-y-3">
+                                <p className="text-sm text-red-400 font-bold">⚠️ Este cliente já pertence a outra agência.</p>
+                                <button
+                                    onClick={handleRequestTransfer}
+                                    disabled={transferError.requesting}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl text-sm transition-colors border border-red-500/30 font-bold disabled:opacity-50"
+                                >
+                                    {transferError.requesting ? "⏳ Solicitando..." : "Solicitar Transferência de Agência"}
+                                </button>
+                            </div>
+                        )}
+                        {transferError.success && (
+                            <div className="bg-emerald-900/30 border border-emerald-500/30 rounded-2xl p-4 text-sm text-emerald-400 font-bold">
+                                ✅ Solicitação enviada! Um e-mail foi enviado ao cliente para aprovação.
+                            </div>
+                        )}
 
                         <div className="flex gap-3">
                             <button

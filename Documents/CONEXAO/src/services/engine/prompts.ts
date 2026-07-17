@@ -440,11 +440,35 @@ export function buildConversationMessages(
     const messages: { role: 'system' | 'user' | 'assistant' | 'tool'; content: string; tool_calls?: any; tool_call_id?: string }[] = [
         { role: 'system', content: systemPromptText },
     ];
-
     // Keep last 20 messages for context (avoid token overflow)
     const recentHistory = history.slice(-20);
-
-    for (const msg of recentHistory) {
+    // Sanitize: scan the ENTIRE window and drop any assistant message with tool_calls
+    // that is NOT immediately followed by all matching tool-result messages.
+    // OpenAI 400s on any orphaned tool_calls, regardless of position in the array.
+    const sanitized: typeof recentHistory = [];
+    for (let i = 0; i < recentHistory.length; i++) {
+        const msg = recentHistory[i];
+        // Skip system messages injected into history (only the top-level system prompt is allowed)
+        if (msg.role === 'system') continue;
+        if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+            const toolCallIds: string[] = msg.tool_calls.map((tc: any) => tc.id);
+            const following = recentHistory.slice(i + 1, i + 1 + toolCallIds.length);
+            const allPresent = toolCallIds.every((id: string) =>
+                following.some((m) => m.role === 'tool' && m.tool_call_id === id)
+            );
+            if (!allPresent) {
+                // Orphaned: skip assistant + any stray tool results that follow
+                while (i + 1 < recentHistory.length && recentHistory[i + 1].role === 'tool') {
+                    i++;
+                }
+                continue; // drop orphan entirely
+            }
+        }
+        // Also skip 'system' role injected into history (only real system is at the top)
+        if (msg.role === 'system') continue;
+        sanitized.push(msg);
+    }
+    for (const msg of sanitized) {
         messages.push({
             role: msg.role as any,
             content: msg.content,
@@ -452,6 +476,5 @@ export function buildConversationMessages(
             tool_call_id: msg.tool_call_id
         });
     }
-
     return messages;
 }

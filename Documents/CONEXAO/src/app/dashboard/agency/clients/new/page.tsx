@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * /dashboard/agency/clients/new
@@ -40,6 +40,7 @@ const NICHES = [
     { value: "ecommerce",     label: "🛒 E-commerce / Loja" },
     { value: "salao",         label: "💈 Salão / Estética" },
     { value: "imobiliaria",   label: "🏠 Imobiliária" },
+    { value: "distribuidora", label: "🛢️ Distribuidora / Gás" },
 ];
 
 const PAYMENT_OPTIONS = [
@@ -119,6 +120,11 @@ export default function NewClientWizardPage() {
     const [submitting, setSubmitting] = useState(false);
     const [result,     setResult]     = useState<any>(null);
     const [submitError,setSubmitError]= useState<string | null>(null);
+
+    // Transfer request state
+    const [transferError, setTransferError] = useState<{ isDuplicate: boolean, email: string, requesting: boolean, success: boolean }>({
+        isDuplicate: false, email: "", requesting: false, success: false
+    });
 
     // ── Load existing client data for editing ─────────────────────────────────
     useEffect(() => {
@@ -292,7 +298,7 @@ export default function NewClientWizardPage() {
                 productsServices:form.productsServices || undefined,
                 differentials:   form.differentials || undefined,
                 keyProducts:     form.keyProducts || undefined,
-                extractedProducts: form.extractedProducts.length > 0 ? form.extractedProducts : undefined,
+                extractedProducts: Array.isArray(form.extractedProducts) && form.extractedProducts.length > 0 ? form.extractedProducts : undefined,
                 paymentMethods:  form.paymentMethods,
                 avgTicket:       form.avgTicket || undefined,
                 deliveryFeeType: form.deliveryFeeType,
@@ -315,7 +321,12 @@ export default function NewClientWizardPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                setSubmitError(data.error || "Erro ao cadastrar cliente.");
+                if (data.error === 'CLIENT_ALREADY_EXISTS') {
+                    setTransferError({ isDuplicate: true, email: data.existingEmail, requesting: false, success: false });
+                    setSubmitError(data.message || "Este cliente já pertence a outra agência.");
+                } else {
+                    setSubmitError(data.error || "Erro ao cadastrar cliente.");
+                }
                 return;
             }
             setResult(data);
@@ -323,6 +334,24 @@ export default function NewClientWizardPage() {
             setSubmitError(err.message || "Erro de conexão.");
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleRequestTransfer = async () => {
+        setTransferError(s => ({ ...s, requesting: true }));
+        setSubmitError(null);
+        try {
+            const res = await fetch("/api/agency/transfer-request", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: transferError.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Erro ao solicitar transferência.");
+            setTransferError(s => ({ ...s, success: true, requesting: false }));
+        } catch (err: any) {
+            setSubmitError(err.message);
+            setTransferError(s => ({ ...s, requesting: false }));
         }
     };
 
@@ -355,21 +384,20 @@ export default function NewClientWizardPage() {
                     </p>
 
                     <div className="bg-[#0b0f1a] rounded-xl p-4 text-left space-y-2 mb-6 text-sm">
-                        <InfoRow label="E-mail" value={form.clientEmail} />
-                        <InfoRow label="Senha temporária" value={result.tempPassword} mono />
-                        <InfoRow label="Bot criado" value={result.template?.label || form.niche} />
-                        <InfoRow label="Etapas CRM" value={`${result.template?.stagesCreated ?? 0} criadas`} />
-                        {result.chatwootProvisioned && (
-                            <InfoRow label="Chatwoot" value={`✅ Conta #${result.chatwootAccountId} provisionada`} />
-                        )}
-                        {!result.chatwootProvisioned && (
+                        <InfoRow label="E-mail" value={String(form.clientEmail || "")} />
+                        <InfoRow label="Senha temporária" value={String(result.tempPassword || "")} mono />
+                        <InfoRow label="Bot criado" value={String(result.template?.label || form.niche || "")} />
+                        <InfoRow label="Etapas CRM" value={`${Number(result.template?.stagesCreated || 0)} criadas`} />
+                        {result.chatwootProvisioned ? (
+                            <InfoRow label="Chatwoot" value={`✅ Conta #${String(result.chatwootAccountId || "")} provisionada`} />
+                        ) : (
                             <InfoRow label="Chatwoot" value="⚠️ Não configurado (GlobalConfig ausente)" />
                         )}
                     </div>
 
                     <div className="flex gap-3 justify-center">
                         <button
-                            onClick={() => router.push(`/dashboard/agency/clients/${result.clientId}`)}
+                            onClick={() => router.push(`/dashboard/agency/clients/${String(result.clientId || "")}`)}
                             className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                             Ver Cliente
@@ -462,9 +490,27 @@ export default function NewClientWizardPage() {
                     />
 
                     {submitError && (
-                        <div className="mt-4 flex items-center gap-2 bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
-                            <AlertCircle size={16} />
-                            {submitError}
+                        <div className="mt-4 bg-red-900/30 border border-red-500/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-sm text-red-400 mb-2">
+                                <AlertCircle size={16} />
+                                <span>{submitError}</span>
+                            </div>
+                            {transferError.isDuplicate && !transferError.success && (
+                                <button
+                                    onClick={handleRequestTransfer}
+                                    disabled={transferError.requesting}
+                                    className="mt-2 flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-md text-sm transition-colors border border-red-500/30"
+                                >
+                                    {transferError.requesting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
+                                    Solicitar Transferência de Agência
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {transferError.success && (
+                        <div className="mt-4 flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg p-3 text-sm text-emerald-400">
+                            <CheckCircle2 size={16} />
+                            Um e-mail foi enviado ao cliente para aprovação. Assim que ele aceitar, a conta será transferida!
                         </div>
                     )}
 
@@ -682,10 +728,10 @@ function Step3Produtos({ form, set }: any) {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-                set("extractedProducts", data.products);
+                set("extractedProducts", Array.isArray(data.products) ? data.products : []);
                 setMenuText("");
             } else {
-                setExtractError(data.error || "Erro ao extrair cardápio.");
+                setExtractError(typeof data.error === 'string' ? data.error : "Erro ao extrair cardápio.");
             }
         } catch (err: any) {
             setExtractError(err.message || "Erro de conexão.");
@@ -698,7 +744,7 @@ function Step3Produtos({ form, set }: any) {
         <div className="space-y-6">
             <StepHeader icon={Package} title="Produtos & Serviços" desc="O que a empresa oferece? O bot usará isso para conversar com leads." />
 
-            {(form.niche === "restaurante" || form.niche === "ecommerce") && (
+            {(form.niche === "restaurante" || form.niche === "ecommerce" || form.niche === "distribuidora") && (
                 <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-4 space-y-3">
                     <h3 className="text-sm font-medium text-emerald-300 flex items-center gap-1.5">
                         <Sparkles size={16} /> Importador Mágico de Cardápio / Catálogo
@@ -721,13 +767,13 @@ function Step3Produtos({ form, set }: any) {
                             {isExtracting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                             Extrair Produtos
                         </button>
-                        {form.extractedProducts?.length > 0 && (
+                        {Array.isArray(form.extractedProducts) && form.extractedProducts.length > 0 && (
                             <span className="text-xs text-emerald-400">{form.extractedProducts.length} produtos extraídos com sucesso!</span>
                         )}
                         {extractError && <span className="text-xs text-red-400">{extractError}</span>}
                     </div>
 
-                    {form.extractedProducts?.length > 0 && (
+                    {Array.isArray(form.extractedProducts) && form.extractedProducts.length > 0 && (
                         <div className="mt-3 bg-[#111827] rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 border border-white/5">
                             {form.extractedProducts.map((p: any, idx: number) => (
                                 <div key={idx} className="flex justify-between items-start border-b border-white/5 pb-2 last:border-0 last:pb-0">
@@ -882,7 +928,7 @@ function Step5Financeiro({ form, set, toggleArr }: any) {
         <div className="space-y-6">
             <StepHeader icon={DollarSign} title="Financeiro" desc="Formas de pagamento e ticket médio." />
 
-            {(form.niche === "restaurante" || form.niche === "ecommerce") && (
+            {(form.niche === "restaurante" || form.niche === "ecommerce" || form.niche === "distribuidora") && (
                 <div className="bg-[#1a2235] border border-white/10 rounded-xl p-4 space-y-4">
                     <label className="block text-sm font-medium text-emerald-300">Taxas de Entrega</label>
                     <div className="flex gap-2">

@@ -475,7 +475,7 @@ export const MessageProcessor = {
                 bot
             );
 
-            logToFile(`[Processor] SUPERVISOR: ${(existingContact as any).funnelStage} -> ${analysis.nextStage}`);
+            logToFile(`[Processor] SUPERVISOR: ${(existingContact as any).funnelStage} -> ${analysis.nextStage} | Reasoning: ${analysis.reasoning} | Strategy: ${analysis.strategy}`);
 
             await prisma.contact.update({
                 where: { id: existingContact.id },
@@ -850,6 +850,23 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     role: 'system',
                     content: `🚨 LEMRETE: Não empurre vendas se estiver no início da conversa. Siga o fluxo de qualificação do seu criador. Use a ancoragem de preço (De X por Y) apenas se necessário nesta etapa.`
                 });
+
+                const isPedidoConfirmado = analysis.nextStage &&
+                    (analysis.nextStage.toUpperCase().includes('PEDIDO CONFIRMADO') ||
+                     analysis.nextStage.toUpperCase().includes('PEDIDO_CONFIRMADO') ||
+                     analysis.nextStage.toUpperCase() === 'CONFIRMADO' ||
+                     analysis.nextStage.toUpperCase() === 'ORDER_CONFIRMED');
+
+                // When the stage is Pedido Confirmado and this is the first iteration,
+                // inject a hard override instruction right before the AI call.
+                // Do NOT use tool_choice forced mode — that creates orphaned tool_calls
+                // when the history has errors, breaking subsequent messages.
+                if (isPedidoConfirmado && toolIteration === 0) {
+                    messages.push({
+                        role: 'system',
+                        content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o endereço e a forma de pagamento. Você DEVE chamar a função confirmar_pedido IMEDIATAMENTE com os dados coletados na conversa. NÃO escreva texto antes de chamar a função. Esta é uma instrução técnica de sistema e não pode ser ignorada.`
+                    });
+                }
 
                 aiResult = await safeChatCompletion({
                     bot,

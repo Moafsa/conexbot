@@ -29,6 +29,7 @@ export default function AdminSettingsPage() {
         metaAppId: '',
         metaAppSecret: '',
         metaVerifyToken: '',
+        metaWhatsappConfigId: '',
         mlClientId: '',
         mlClientSecret: '',
         mapboxToken: ''
@@ -355,12 +356,29 @@ export default function AdminSettingsPage() {
                                         onChange={v => setSettings({ ...settings, metaAppId: v })} 
                                         placeholder="Ex: 123456789" 
                                     />
-                                    <SettingInput 
-                                        label="Meta App Secret" 
-                                        value={settings.metaAppSecret} 
-                                        onChange={v => setSettings({ ...settings, metaAppSecret: v })} 
-                                        placeholder="Ex: a1b2c3d4..." 
+                                    <SettingInput
+                                        label="Meta App Secret"
+                                        value={settings.metaAppSecret}
+                                        onChange={v => setSettings({ ...settings, metaAppSecret: v })}
+                                        placeholder="Ex: a1b2c3d4..."
                                     />
+                                    <div className="bg-blue-950/30 border border-blue-900/40 p-4 rounded-lg space-y-2">
+                                        <p className="text-xs text-blue-300 font-semibold">WhatsApp Embedded Signup (login com popup)</p>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                                            Necessário para o botão "Conectar com Facebook" no cadastro de canais. Crie em{' '}
+                                            <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-blue-400">
+                                                developers.facebook.com
+                                            </a>{' '}
+                                            → seu App → <b>WhatsApp → Configuração da API</b> (ou <b>Facebook Login for Business → Configurações</b>) →
+                                            criar uma nova Configuration com o produto WhatsApp habilitado. Copie o <b>Configuration ID</b> gerado e cole abaixo.
+                                        </p>
+                                        <SettingInput
+                                            label="WhatsApp Embedded Signup Config ID"
+                                            value={settings.metaWhatsappConfigId}
+                                            onChange={v => setSettings({ ...settings, metaWhatsappConfigId: v })}
+                                            placeholder="Ex: 987654321012345"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

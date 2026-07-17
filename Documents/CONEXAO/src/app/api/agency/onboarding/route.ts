@@ -83,14 +83,25 @@ export async function POST(req: Request) {
         const template = getNicheTemplate(niche);
 
         // 1. Create or link client tenant
-        const existingTenant = await prisma.tenant.findUnique({ where: { email } });
+        const existingTenant = await prisma.tenant.findFirst({ 
+            where: { 
+                OR: [
+                    { email },
+                    { whatsapp: phone }
+                ]
+            } 
+        });
         let clientId: string;
         const tempPassword = Math.random().toString(36).slice(-10);
         const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
         if (existingTenant) {
             if (existingTenant.agencyId && existingTenant.agencyId !== agency.id) {
-                return NextResponse.json({ error: 'Este e-mail já pertence a outra agência' }, { status: 409 });
+                return NextResponse.json({ 
+                    error: 'CLIENT_ALREADY_EXISTS',
+                    message: 'Este cliente (e-mail ou telefone) já pertence a outra agência.',
+                    existingEmail: existingTenant.email 
+                }, { status: 409 });
             }
             await prisma.tenant.update({
                 where: { id: existingTenant.id },

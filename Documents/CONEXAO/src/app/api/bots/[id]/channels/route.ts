@@ -30,17 +30,22 @@ export async function GET(req: Request, { params }: { params: any }) {
             orderBy: { createdAt: 'desc' },
         });
 
-        // Hide sensitive credentials before returning to frontend
-        const safeChannels = channels.map(c => ({
-            id: c.id,
-            botId: c.botId,
-            provider: c.provider,
-            status: c.status,
-            identifier: c.identifier,
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-            hasCredentials: !!c.credentials
-        }));
+        // Hide sensitive credentials before returning to frontend (mantém apenas metadados não sensíveis)
+        const safeChannels = channels.map(c => {
+            const creds = c.credentials as any;
+            return {
+                id: c.id,
+                botId: c.botId,
+                provider: c.provider,
+                status: c.status,
+                identifier: c.identifier,
+                createdAt: c.createdAt,
+                updatedAt: c.updatedAt,
+                hasCredentials: !!c.credentials,
+                displayNumber: creds?.displayNumber || null,
+                verifiedName: creds?.verifiedName || null,
+            };
+        });
 
         return NextResponse.json(safeChannels);
     } catch (error) {

@@ -67,6 +67,8 @@ export const SupervisorService = {
 
         SUA TAREFA:
         1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil?
+           🚨 ATENÇÃO (RECOMPRA/RETORNO): Se o cliente já concluiu um pedido anterior (estágio Entregue ou Saiu para Entrega) e agora está iniciando um NOVO contato ou querendo fazer um novo pedido (ex: dizendo "quero gás", "quero 1 gas", "quero fazer um pedido", "oi", etc.), você DEVE obrigatoriamente retorná-lo para o estágio inicial de negociação correspondente (como "Escolhendo Pedido"), permitindo que o bot faça uma nova venda do início!
+           🚨 REGRA DE CONFIRMAÇÃO (MANDATÓRIO): Se a última mensagem do assistente na conversa foi uma pergunta para confirmar detalhes finais, endereço ou forma de pagamento (ex: "Você vai pagar em dinheiro, certo?" ou "Posso confirmar o pedido?") e a resposta atual do usuário for afirmativa (ex: "sim", "isso", "pode", "ok", "confirmado"), você DEVE obrigatoriamente classificar como estágio "Pedido Confirmado", mesmo que a conversa pareça repetitiva no histórico devido a testes.
         2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar.
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
@@ -158,9 +160,9 @@ export const SupervisorService = {
         if (name === 'NEGOCIAÇÃO' || name === 'NEGOCIACAO' || name === 'NEGOTIATION') {
             return "FOCO: Negociação. Supere objeções. Ofereça alternativas (parcelamento, descontos se aplicável). Leve ao fechamento.";
         }
-        // Fechamento
-        if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO' || name === 'GANHO' || name === 'CUSTOMER') {
-            return "FOCO: FECHAMENTO. Seja direto e encoraje o pagamento/contratação. Confirme a decisão e parabenize.";
+        // Fechamento e Confirmação de Pedidos
+        if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO' || name === 'GANHO' || name === 'CUSTOMER' || name === 'PEDIDO CONFIRMADO' || name === 'PEDIDO_CONFIRMADO' || name === 'ORDER_CONFIRMED' || name === 'CONFIRMADO') {
+            return "FOCO: FECHAMENTO. O cliente confirmou o pedido. Você DEVE obrigatoriamente chamar a ferramenta \"confirmar_pedido\" para registrar o pedido no banco de dados e enviá-lo para os entregadores. Certifique-se de passar todos os parâmetros necessários (endereco_completo, forma_pagamento, bairro_entrega e itens_descricao se for pedido verbal sem carrinho). NÃO apenas responda em formato texto sem acionar a ferramenta.";
         }
         return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
     }

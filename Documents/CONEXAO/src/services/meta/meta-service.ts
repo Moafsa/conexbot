@@ -1,52 +1,199 @@
 import prisma from '@/lib/prisma';
 
+const GRAPH_VERSION = 'v22.0';
+const GRAPH_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
+
+export class MetaApiError extends Error {
+    code?: number;
+    subcode?: number;
+    fbtraceId?: string;
+    constructor(message: string, code?: number, subcode?: number, fbtraceId?: string) {
+        super(message);
+        this.name = 'MetaApiError';
+        this.code = code;
+        this.subcode = subcode;
+        this.fbtraceId = fbtraceId;
+    }
+}
+
+/** Traduz os erros mais comuns da Graph API para mensagens acionáveis em PT-BR. */
+function friendlyMetaError(raw: any): string {
+    const err = raw?.error;
+    if (!err) return 'Erro desconhecido ao comunicar com a Meta.';
+
+    const msg = err.error_user_msg || err.message || 'Erro desconhecido.';
+
+    // Códigos conhecidos que merecem uma explicação melhor para o usuário final
+    if (err.code === 100 && /phone number/i.test(msg)) {
+        return 'Este número já está registrado em outra conta WhatsApp Business (App oficial, on-premise ou outro sistema). Migre o número ou use outro.';
+    }
+    if (err.code === 190) {
+        return 'Sessão/token da Meta expirado. Refaça o login com o Facebook.';
+    }
+    if (err.code === 200 || err.code === 10) {
+        return 'Permissões insuficientes. Verifique se o App da Meta possui acesso aprovado a "whatsapp_business_management" e "whatsapp_business_messaging".';
+    }
+    if (err.code === 368) {
+        return 'A conta da Meta associada está temporariamente restrita para essa ação. Verifique o Gerenciador de Negócios.';
+    }
+    return msg;
+}
+
+async function graphFetch(url: string, init?: RequestInit) {
+    const res = await fetch(url, init);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+        throw new MetaApiError(friendlyMetaError(data), data?.error?.code, data?.error?.error_subcode, data?.error?.fbtrace_id);
+    }
+    return data;
+}
+
 export class MetaService {
     private static async getGlobalConfig() {
-        return await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+        return prisma.globalConfig.findUnique({ where: { id: 'system' } });
+    }
+
+    static async getPublicConfig() {
+        const config = await this.getGlobalConfig();
+        return {
+            appId: config?.metaAppId || null,
+            configId: config?.metaWhatsappConfigId || null,
+        };
     }
 
     /**
-     * Troca o código de autorização (do Embedded Signup) por um token de acesso de curta duração.
+     * Troca o código de autorização (retornado pelo popup de Embedded Signup) por um
+     * token de acesso de curta duração (~1h-2h).
      */
-    static async exchangeCodeForToken(code: string) {
+    static async exchangeCodeForToken(code: string): Promise<string> {
+        const config = await this.getGlobalConfig();
+        if (!config?.metaAppId || !config?.metaAppSecret) {
+            throw new Error('Configurações globais da Meta (App ID/Secret) não encontradas. Configure em Admin > Configurações.');
+        }
+
+        const url = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
+        const data = await graphFetch(url);
+        return data.access_token;
+    }
+
+    /**
+     * Converte um token de curta duração em um token de longa duração (~60 dias).
+     * Essencial para que a conexão do cliente não caia sozinha depois de 1h.
+     */
+    static async getLongLivedToken(shortLivedToken: string): Promise<{ accessToken: string; expiresInSeconds: number | null }> {
         const config = await this.getGlobalConfig();
         if (!config?.metaAppId || !config?.metaAppSecret) {
             throw new Error('Configurações globais da Meta (App ID/Secret) não encontradas.');
         }
 
-        const url = `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${code}`;
-        
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.error) {
-            throw new Error(`Meta OAuth Error: ${data.error.message}`);
-        }
-
-        return data.access_token;
+        const url = `${GRAPH_URL}/oauth/access_token?grant_type=fb_exchange_token&client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&fb_exchange_token=${encodeURIComponent(shortLivedToken)}`;
+        const data = await graphFetch(url);
+        return {
+            accessToken: data.access_token || shortLivedToken,
+            expiresInSeconds: typeof data.expires_in === 'number' ? data.expires_in : null,
+        };
     }
 
-    /**
-     * Busca os números de telefone vinculados a uma WABA.
-     */
-    static async getWabaPhoneNumbers(wabaId: string, accessToken: string) {
-        const url = `https://graph.facebook.com/v22.0/${wabaId}/phone_numbers`;
-        const res = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const data = await res.json();
-        return data.data || [];
-    }
-
-    /**
-     * Busca as WABAs acessíveis pelo token.
-     */
+    /** Busca as WABAs acessíveis pelo token (fallback caso o front não capture via postMessage). */
     static async getAvailableWabas(accessToken: string) {
-        const url = `https://graph.facebook.com/v22.0/me/whatsapp_business_accounts`;
-        const res = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        const data = await res.json();
+        const url = `${GRAPH_URL}/me/whatsapp_business_accounts`;
+        const data = await graphFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
         return data.data || [];
+    }
+
+    /** Busca os números de telefone vinculados a uma WABA. */
+    static async getWabaPhoneNumbers(wabaId: string, accessToken: string) {
+        const url = `${GRAPH_URL}/${wabaId}/phone_numbers`;
+        const data = await graphFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        return data.data || [];
+    }
+
+    /** Detalhes de um número específico (nome verificado, status de qualidade, etc). */
+    static async getPhoneNumberDetails(phoneId: string, accessToken: string) {
+        const url = `${GRAPH_URL}/${phoneId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type`;
+        return graphFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    }
+
+    /**
+     * Registra o número na Cloud API (obrigatório antes de enviar/receber mensagens
+     * pela primeira vez, ou após portar um número de outro provedor/app oficial).
+     */
+    static async registerPhoneNumber(phoneId: string, accessToken: string, pin: string) {
+        const url = `${GRAPH_URL}/${phoneId}/register`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ messaging_product: 'whatsapp', pin }),
+        });
+    }
+
+    /**
+     * Inscreve o nosso App como "assinante" de eventos da WABA do cliente.
+     * Sem isso, as mensagens recebidas pelo número do cliente NUNCA chegam no nosso webhook.
+     */
+    static async subscribeAppToWaba(wabaId: string, accessToken: string) {
+        const url = `${GRAPH_URL}/${wabaId}/subscribed_apps`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+    }
+
+    /** Gera um PIN numérico de 6 dígitos para o /register (2FA da Cloud API). */
+    static generatePin(): string {
+        return String(Math.floor(100000 + Math.random() * 900000));
+    }
+
+    /** Envia uma mensagem de texto simples via Cloud API. */
+    static async sendTextMessage(phoneId: string, accessToken: string, to: string, body: string) {
+        const url = `${GRAPH_URL}/${phoneId}/messages`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to,
+                type: 'text',
+                text: { preview_url: true, body },
+            }),
+        });
+    }
+
+    /** Envia mídia (imagem/áudio/vídeo/documento) por link público via Cloud API. */
+    static async sendMediaMessage(
+        phoneId: string,
+        accessToken: string,
+        to: string,
+        type: 'image' | 'audio' | 'video' | 'document',
+        link: string,
+        caption?: string,
+        filename?: string
+    ) {
+        const url = `${GRAPH_URL}/${phoneId}/messages`;
+        const mediaPayload: any = { link };
+        if (caption && (type === 'image' || type === 'video' || type === 'document')) mediaPayload.caption = caption;
+        if (filename && type === 'document') mediaPayload.filename = filename;
+
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to,
+                type,
+                [type]: mediaPayload,
+            }),
+        });
     }
 }

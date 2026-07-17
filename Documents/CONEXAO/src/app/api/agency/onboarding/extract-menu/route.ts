@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { safeChatCompletion } from '@/lib/ai-provider';
+import prisma from '@/lib/prisma';
 
 const EXTRACT_MENU_PROMPT = `Você é um extrator de cardápios e catálogos de produtos.
 Vou te fornecer um texto que o usuário colou, que representa um cardápio de restaurante, catálogo de serviços ou lista de produtos.
@@ -48,15 +49,23 @@ export async function POST(req: Request) {
     }
 
     try {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: session.user.id },
+            include: {
+                agency: true,
+                managedBy: true
+            }
+        });
+
+        if (!tenant) {
+            return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 });
+        }
+
         // Build a minimal bot-like object for safeChatCompletion
         const mockBot = {
             aiProvider: 'openai',
             aiModel: 'gpt-4o-mini',
-            tenant: {
-                openaiApiKey: null,
-                geminiApiKey: null,
-                openrouterApiKey: null,
-            },
+            tenant: tenant,
         };
 
         const truncatedContent = menuText.slice(0, 10000); // Prevent gigantic inputs
@@ -88,10 +97,16 @@ export async function POST(req: Request) {
         });
     } catch (err: any) {
         console.error('[ExtractMenu Error]', err);
+        let errorMsg = 'Falha ao extrair cardápio. Verifique se o texto está claro e tente novamente.';
+        if (err.message && err.message.includes('All AI providers failed')) {
+            errorMsg = 'Falha na IA: Nenhuma chave de API válida foi encontrada. Configure sua chave da OpenAI ou Gemini nas configurações da Agência.';
+        } else if (err.message) {
+            errorMsg = err.message;
+        }
+        
         return NextResponse.json({
             success: false,
-            error: 'Falha ao extrair cardápio. Verifique se o texto está claro e tente novamente.',
-            details: err.message
+            error: errorMsg,
         }, { status: 500 });
     }
 }

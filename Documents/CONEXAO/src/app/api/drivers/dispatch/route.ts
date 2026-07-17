@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
         // 2. Get order
         const order = await prisma.order.findFirst({
-            where: { id: orderId, tenantId },
+            where: { id: orderId, bot: { tenantId } },
             include: {
                 contact: true,
                 bot: true,

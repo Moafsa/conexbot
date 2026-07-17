@@ -33,6 +33,7 @@ export default function AdminSettingsPage() {
         systemBotId: "",
         metaAppSecret: "",
         metaVerifyToken: "",
+        metaWhatsappConfigId: "",
         mapboxToken: ""
     });
 
@@ -231,6 +232,14 @@ export default function AdminSettingsPage() {
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Webhook Verify Token</label>
                             <input type="password" value={config.metaVerifyToken || ''} onChange={e => setConfig({...config, metaVerifyToken: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                             <p className="text-[10px] text-gray-500 mt-1">Token usado para validar o recebimento de webhooks do Facebook.</p>
+                        </div>
+                        <div className="pt-2 border-t border-white/10">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">WhatsApp Embedded Signup — Config ID</label>
+                            <input value={config.metaWhatsappConfigId || ''} onChange={e => setConfig({...config, metaWhatsappConfigId: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" placeholder="Ex: 987654321012345" />
+                            <p className="text-[10px] text-gray-500 mt-1">
+                                Crie em developers.facebook.com → seu App → WhatsApp → Configuração da API (Embedded Signup) → nova Configuration.
+                                Necessário para o botão de login com popup no cadastro de canais dos agentes.
+                            </p>
                         </div>
                     </div>
                 </section>
