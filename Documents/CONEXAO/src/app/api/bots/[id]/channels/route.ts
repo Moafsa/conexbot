@@ -15,16 +15,23 @@ async function checkBotOwnership(botId: string, tenantId: string) {
 export async function GET(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
-
         const { searchParams } = new URL(req.url);
         const clientId = searchParams.get('clientId');
-        const tenantId = await getEffectiveTenantId(clientId);
+        const token = searchParams.get('token');
         const { id: botId } = await params;
 
-        if (!tenantId || !(await checkBotOwnership(botId, tenantId))) {
+        let hasAccess = false;
+        if (session?.user) {
+            const tenantId = await getEffectiveTenantId(clientId);
+            hasAccess = tenantId ? (await checkBotOwnership(botId, tenantId)) : false;
+        } else if (token) {
+            const bot = await prisma.bot.findFirst({
+                where: { id: botId, connectToken: token }
+            });
+            hasAccess = bot !== null;
+        }
+
+        if (!hasAccess) {
             return NextResponse.json({ error: 'Bot não encontrado ou sem permissão' }, { status: 404 });
         }
 
@@ -60,15 +67,27 @@ export async function GET(req: Request, { params }: { params: any }) {
 export async function POST(req: Request, { params }: { params: any }) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get('clientId');
+        const token = searchParams.get('token');
+        const { id: botId } = await params;
+
+        const body = await req.json();
+        const { provider, identifier, credentials, token: bodyToken } = body;
+        const actualToken = token || bodyToken;
+
+        let hasAccess = false;
+        if (session?.user) {
+            const tenantId = await getEffectiveTenantId(clientId);
+            hasAccess = tenantId ? (await checkBotOwnership(botId, tenantId)) : false;
+        } else if (actualToken) {
+            const bot = await prisma.bot.findFirst({
+                where: { id: botId, connectToken: actualToken }
+            });
+            hasAccess = bot !== null;
         }
 
-        const { id: botId } = await params;
-        const { provider, identifier, credentials, clientId } = await req.json();
-
-        const tenantId = await getEffectiveTenantId(clientId);
-        if (!tenantId || !(await checkBotOwnership(botId, tenantId))) {
+        if (!hasAccess) {
             return NextResponse.json({ error: 'Bot não encontrado ou sem permissão' }, { status: 404 });
         }
 

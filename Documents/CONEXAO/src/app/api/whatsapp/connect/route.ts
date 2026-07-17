@@ -17,10 +17,12 @@ export async function POST(req: Request) {
 
         let bot;
         if (session?.user && botId) {
-            // Considera personificação de admin e gestão de cliente por agência (mesmo padrão de /api/bots/[id])
             const tenantId = await getEffectiveTenantId(clientId);
+            if (!tenantId) {
+                return NextResponse.json({ error: 'Não autorizado ou agente não encontrado' }, { status: 401 });
+            }
             bot = await prisma.bot.findFirst({
-                where: { id: botId, tenantId: tenantId ?? undefined },
+                where: { id: botId, tenantId },
             });
         } else if (token) {
             bot = await prisma.bot.findFirst({
@@ -103,7 +105,9 @@ export async function POST(req: Request) {
             return NextResponse.json({
                 session: sessionName,
                 status: 'CONNECTED',
-                qrCodeUrl: ''
+                qrCodeUrl: '',
+                botId: bot.id,
+                botName: bot.name
             });
         }
 
@@ -122,6 +126,8 @@ export async function POST(req: Request) {
             session: sessionName,
             status: currentStatus === 'QRCODE' ? 'QRCODE' : 'GENERATING_QR',
             qrCodeUrl: qrCode || '',
+            botId: bot.id,
+            botName: bot.name
         });
 
     } catch (error: any) {

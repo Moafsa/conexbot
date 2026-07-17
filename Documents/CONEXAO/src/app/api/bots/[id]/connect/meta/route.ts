@@ -18,16 +18,21 @@ export async function POST(req: Request, { params }: { params: any }) {
 
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        const body = await req.json();
+        const { code, wabaId, phoneNumberId, businessId, clientId, token } = body;
+
+        let hasAccess = false;
+        if (session?.user) {
+            const tenantId = await getEffectiveTenantId(clientId);
+            hasAccess = tenantId ? (await checkBotOwnership(botId, tenantId)) : false;
+        } else if (token) {
+            const bot = await prisma.bot.findFirst({
+                where: { id: botId, connectToken: token }
+            });
+            hasAccess = bot !== null;
         }
 
-        const body = await req.json();
-        const { code, wabaId, phoneNumberId, businessId, clientId } = body;
-
-        // Considera personificação de admin e gestão de cliente por agência (mesmo padrão de /api/bots)
-        const tenantId = await getEffectiveTenantId(clientId);
-        if (!tenantId || !(await checkBotOwnership(botId, tenantId))) {
+        if (!hasAccess) {
             return NextResponse.json({ error: 'Agente não encontrado ou sem permissão' }, { status: 404 });
         }
 

@@ -22,8 +22,11 @@ export async function GET(req: Request) {
             });
         } else if (session?.user) {
             const tenantId = await getEffectiveTenantId(clientId);
+            if (!tenantId) {
+                return NextResponse.json({ error: 'Não autorizado ou agente não encontrado' }, { status: 401 });
+            }
             bot = await prisma.bot.findFirst({
-                where: { id: botId as string, tenantId: tenantId ?? undefined },
+                where: { id: botId as string, tenantId },
             });
         }
 
