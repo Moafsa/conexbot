@@ -30,6 +30,7 @@ export default function AdminSettingsPage() {
         metaAppSecret: '',
         metaVerifyToken: '',
         metaWhatsappConfigId: '',
+        metaInstagramConfigId: '',
         mlClientId: '',
         mlClientSecret: '',
         mapboxToken: ''
@@ -377,6 +378,26 @@ export default function AdminSettingsPage() {
                                             value={settings.metaWhatsappConfigId}
                                             onChange={v => setSettings({ ...settings, metaWhatsappConfigId: v })}
                                             placeholder="Ex: 987654321012345"
+                                        />
+                                    </div>
+                                    <div className="bg-fuchsia-950/30 border border-fuchsia-900/40 p-4 rounded-lg space-y-2">
+                                        <p className="text-xs text-fuchsia-300 font-semibold">Instagram Business Login (login com popup)</p>
+                                        <p className="text-[11px] text-gray-400 leading-relaxed">
+                                            Necessário para o botão "Conectar com Instagram" no cadastro de canais. No mesmo App usado acima,
+                                            crie uma <b>Configuration</b> (Facebook Login for Business) com os escopos{' '}
+                                            <code className="bg-black/30 px-1 rounded">instagram_basic</code>,{' '}
+                                            <code className="bg-black/30 px-1 rounded">instagram_manage_messages</code>,{' '}
+                                            <code className="bg-black/30 px-1 rounded">instagram_manage_comments</code>,{' '}
+                                            <code className="bg-black/30 px-1 rounded">instagram_content_publish</code>,{' '}
+                                            <code className="bg-black/30 px-1 rounded">pages_show_list</code> e{' '}
+                                            <code className="bg-black/30 px-1 rounded">pages_read_engagement</code>. Copie o <b>Configuration ID</b> gerado e cole abaixo.
+                                            O cliente precisa ter a conta Instagram (Business/Creator) vinculada a uma Página do Facebook.
+                                        </p>
+                                        <SettingInput
+                                            label="Instagram Business Login Config ID"
+                                            value={settings.metaInstagramConfigId}
+                                            onChange={v => setSettings({ ...settings, metaInstagramConfigId: v })}
+                                            placeholder="Ex: 987654321099999"
                                         />
                                     </div>
                                 </div>

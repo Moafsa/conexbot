@@ -36,6 +36,11 @@ export async function deliverAssistantOutbound(params: {
         return;
     }
 
+    if (channel === 'instagram') {
+        await deliverInstagram(bot, remoteId, cleanResponse, mediaMatches);
+        return;
+    }
+
     if (channel === 'wordpress') {
         await deliverWordPress(bot, remoteId, cleanResponse);
         return;
@@ -86,6 +91,56 @@ async function deliverMetaWhatsApp(
             await MetaService.sendMediaMessage(phoneId, accessToken, remoteId, type, media.url, media.description, media.filename);
         } catch (e: any) {
             logToFile(`[Outbound/MetaWhatsApp] Falha ao enviar mídia (id=${media?.id}): ${e.message}`);
+        }
+    }
+}
+
+async function deliverInstagram(
+    bot: any,
+    remoteId: string,
+    cleanResponse: string,
+    mediaMatches: RegExpMatchArray[]
+): Promise<void> {
+    const { default: prisma } = await import('@/lib/prisma');
+    const { MetaService } = await import('@/services/meta/meta-service');
+
+    const channel = await prisma.botChannel.findFirst({
+        where: { botId: bot.id, provider: 'INSTAGRAM', status: 'CONNECTED' },
+    });
+
+    if (!channel) {
+        logToFile(`[Outbound/Instagram] SKIP: bot ${bot?.id} sem canal INSTAGRAM conectado.`);
+        return;
+    }
+
+    const creds = channel.credentials as any;
+    const pageAccessToken = creds?.accessToken;
+    const pageId = creds?.pageId;
+
+    if (!pageAccessToken || !pageId) {
+        logToFile(`[Outbound/Instagram] SKIP: credenciais incompletas para bot ${bot?.id}.`);
+        return;
+    }
+
+    try {
+        await MetaService.sendInstagramMessage(pageId, pageAccessToken, remoteId, cleanResponse);
+    } catch (e: any) {
+        logToFile(`[Outbound/Instagram] Falha ao enviar texto para ${remoteId}: ${e.message}`);
+    }
+
+    for (const match of mediaMatches as any[]) {
+        const media = (bot.media as any[])?.find((m: any) => m.id === match[1]);
+        if (!media) continue;
+
+        // Direct do Instagram só aceita anexos image/audio/video (sem "document").
+        if (media.type !== 'image' && media.type !== 'audio' && media.type !== 'video') {
+            logToFile(`[Outbound/Instagram] Tipo de mídia "${media.type}" não suportado no Direct; ignorando (id=${media?.id}).`);
+            continue;
+        }
+        try {
+            await MetaService.sendInstagramMedia(pageId, pageAccessToken, remoteId, media.type, media.url);
+        } catch (e: any) {
+            logToFile(`[Outbound/Instagram] Falha ao enviar mídia (id=${media?.id}): ${e.message}`);
         }
     }
 }

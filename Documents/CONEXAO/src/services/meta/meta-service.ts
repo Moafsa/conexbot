@@ -58,6 +58,7 @@ export class MetaService {
         return {
             appId: config?.metaAppId || null,
             configId: config?.metaWhatsappConfigId || null,
+            instagramConfigId: config?.metaInstagramConfigId || null,
         };
     }
 
@@ -194,6 +195,112 @@ export class MetaService {
                 type,
                 [type]: mediaPayload,
             }),
+        });
+    }
+
+    // ==================== Instagram (via Facebook Login for Business) ====================
+    //
+    // Reaproveita o mesmo App/config_id de login com popup; a diferença é que a
+    // API de mensagens/publicação do Instagram é acessada através da Página do
+    // Facebook vinculada à conta profissional do Instagram (Messenger Platform),
+    // não pelo host graph.instagram.com (esse é o fluxo "Instagram API com Login
+    // do Instagram", que exigiria um popup/host diferente).
+
+    /**
+     * Lista as Páginas do Facebook que o usuário administra, incluindo a conta
+     * profissional do Instagram vinculada a cada uma (quando existir).
+     */
+    static async getFacebookPagesWithInstagram(accessToken: string) {
+        const url = `${GRAPH_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,profile_picture_url}`;
+        const data = await graphFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        return (data.data || []) as Array<{
+            id: string;
+            name: string;
+            access_token: string;
+            instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+        }>;
+    }
+
+    /**
+     * Inscreve o nosso App nos eventos da Página (mensagens diretas e comentários
+     * do Instagram). Sem isso, nada chega no nosso webhook.
+     */
+    static async subscribePageToWebhooks(pageId: string, pageAccessToken: string) {
+        const url = `${GRAPH_URL}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${pageAccessToken}` },
+        });
+    }
+
+    /** Envia uma mensagem de texto simples no Direct do Instagram. */
+    static async sendInstagramMessage(pageId: string, pageAccessToken: string, recipientId: string, text: string) {
+        const url = `${GRAPH_URL}/${pageId}/messages`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${pageAccessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { text },
+            }),
+        });
+    }
+
+    /** Envia mídia (imagem/áudio/vídeo) por link público no Direct do Instagram. */
+    static async sendInstagramMedia(
+        pageId: string,
+        pageAccessToken: string,
+        recipientId: string,
+        type: 'image' | 'audio' | 'video',
+        link: string
+    ) {
+        const url = `${GRAPH_URL}/${pageId}/messages`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${pageAccessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                recipient: { id: recipientId },
+                message: { attachment: { type, payload: { url: link } } },
+            }),
+        });
+    }
+
+    /**
+     * Cria o container de mídia para publicação no feed/reels do Instagram.
+     * Passo 1 de 2 — depois é preciso chamar publishInstagramMedia com o ID retornado.
+     */
+    static async createInstagramMediaContainer(
+        igUserId: string,
+        pageAccessToken: string,
+        params: { imageUrl?: string; videoUrl?: string; caption?: string; isReels?: boolean }
+    ) {
+        const url = `${GRAPH_URL}/${igUserId}/media`;
+        const body: Record<string, string> = { access_token: pageAccessToken };
+        if (params.caption) body.caption = params.caption;
+        if (params.videoUrl) {
+            body.video_url = params.videoUrl;
+            body.media_type = params.isReels === false ? 'VIDEO' : 'REELS';
+        } else if (params.imageUrl) {
+            body.image_url = params.imageUrl;
+        } else {
+            throw new Error('É necessário informar imageUrl ou videoUrl para publicar.');
+        }
+
+        return graphFetch(url, { method: 'POST', body: new URLSearchParams(body) });
+    }
+
+    /** Publica o container de mídia criado anteriormente. Passo 2 de 2. */
+    static async publishInstagramMedia(igUserId: string, pageAccessToken: string, creationId: string) {
+        const url = `${GRAPH_URL}/${igUserId}/media_publish`;
+        return graphFetch(url, {
+            method: 'POST',
+            body: new URLSearchParams({ creation_id: creationId, access_token: pageAccessToken }),
         });
     }
 }

@@ -34,6 +34,7 @@ export default function AdminSettingsPage() {
         metaAppSecret: "",
         metaVerifyToken: "",
         metaWhatsappConfigId: "",
+        metaInstagramConfigId: "",
         mapboxToken: ""
     });
 
@@ -239,6 +240,14 @@ export default function AdminSettingsPage() {
                             <p className="text-[10px] text-gray-500 mt-1">
                                 Crie em developers.facebook.com → seu App → WhatsApp → Configuração da API (Embedded Signup) → nova Configuration.
                                 Necessário para o botão de login com popup no cadastro de canais dos agentes.
+                            </p>
+                        </div>
+                        <div className="pt-2 border-t border-white/10">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Instagram Business Login — Config ID</label>
+                            <input value={config.metaInstagramConfigId || ''} onChange={e => setConfig({...config, metaInstagramConfigId: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" placeholder="Ex: 987654321099999" />
+                            <p className="text-[10px] text-gray-500 mt-1">
+                                Configuration separada (mesmo App) com escopos instagram_basic, instagram_manage_messages, instagram_manage_comments,
+                                instagram_content_publish, pages_show_list e pages_read_engagement. O cliente precisa ter a conta Instagram vinculada a uma Página do Facebook.
                             </p>
                         </div>
                     </div>

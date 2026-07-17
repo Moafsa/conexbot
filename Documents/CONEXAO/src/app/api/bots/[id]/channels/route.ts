@@ -54,6 +54,8 @@ export async function GET(req: Request, { params }: { params: any }) {
                 hasCredentials: !!c.credentials,
                 displayNumber: creds?.displayNumber || null,
                 verifiedName: creds?.verifiedName || null,
+                username: creds?.username || null,
+                pageName: creds?.pageName || null,
             };
         });
 

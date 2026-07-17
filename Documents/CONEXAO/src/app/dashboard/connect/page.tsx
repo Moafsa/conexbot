@@ -8,7 +8,7 @@ import Script from "next/script";
 
 type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' | 'error';
 
-function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | null; metaConfigId: string | null }) {
+function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { metaAppId: string | null; metaConfigId: string | null; instagramConfigId: string | null }) {
     const searchParams = useSearchParams();
     const botId = searchParams.get('botId');
     const clientId = searchParams.get('clientId');
@@ -37,6 +37,15 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
     // valores "congelados" no momento do clique — um state aqui ficaria sempre vazio
     // por causa do stale closure. A ref sempre reflete o valor mais recente.
     const waSignupIdsRef = useRef<{ wabaId?: string; phoneNumberId?: string; businessId?: string }>({});
+
+    // Instagram (Facebook Login for Business, via Página vinculada) — mesmo padrão do WhatsApp
+    const [instaConnectStep, setInstaConnectStep] = useState<MetaConnectStep>('idle');
+    const [instaConnectError, setInstaConnectError] = useState("");
+    const [instaConnectedInfo, setInstaConnectedInfo] = useState<{ username?: string; pageName?: string } | null>(null);
+    const [instaPostImageUrl, setInstaPostImageUrl] = useState("");
+    const [instaPostCaption, setInstaPostCaption] = useState("");
+    const [instaPosting, setInstaPosting] = useState(false);
+    const [instaPostMessage, setInstaPostMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // Captura os IDs (WABA, phone number, business) diretamente do popup via postMessage.
     // Esse é o método oficial recomendado pela Meta — mais rápido e confiável do que
@@ -138,6 +147,87 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
         }
     };
 
+    const handleInstagramLogin = () => {
+        if (!metaAppId || !instagramConfigId) {
+            setInstaConnectStep('error');
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID / Configuration ID ausentes).');
+            return;
+        }
+        if (!(window as any).FB) {
+            setInstaConnectStep('error');
+            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            return;
+        }
+
+        setInstaConnectStep('authenticating');
+        setInstaConnectError('');
+
+        (window as any).FB.login((response: any) => {
+            if (response.authResponse && response.authResponse.code) {
+                processInstagramCode(response.authResponse.code);
+            } else {
+                setInstaConnectStep('idle');
+                console.log('Usuário cancelou o login do Instagram ou não concluiu a autorização.');
+            }
+        }, {
+            config_id: instagramConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+        });
+    };
+
+    const processInstagramCode = async (code: string) => {
+        setInstaConnectStep('registering');
+        try {
+            const res = await fetch(`/api/bots/${botId}/connect/instagram`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, clientId })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
+                setInstaConnectStep('connected');
+            } else {
+                setInstaConnectStep('error');
+                setInstaConnectError(data.error || 'Falha na conexão automática. Tente novamente.');
+            }
+        } catch (e) {
+            setInstaConnectStep('error');
+            setInstaConnectError('Erro de rede ao processar a conexão. Verifique sua internet e tente novamente.');
+        }
+    };
+
+    const handlePublishInstagramPost = async () => {
+        if (!instaPostImageUrl) {
+            setInstaPostMessage({ type: 'error', text: 'Informe a URL da imagem a publicar.' });
+            return;
+        }
+        setInstaPosting(true);
+        setInstaPostMessage(null);
+        try {
+            const res = await fetch(`/api/bots/${botId}/instagram/publish`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrl: instaPostImageUrl, caption: instaPostCaption, clientId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setInstaPostMessage({ type: 'success', text: 'Publicado com sucesso no Instagram!' });
+                setInstaPostImageUrl("");
+                setInstaPostCaption("");
+            } else {
+                setInstaPostMessage({ type: 'error', text: data.error || 'Falha ao publicar.' });
+            }
+        } catch (e) {
+            setInstaPostMessage({ type: 'error', text: 'Erro de rede ao publicar.' });
+        } finally {
+            setInstaPosting(false);
+        }
+    };
+
     useEffect(() => {
         setWebhookBaseUrl(window.location.origin);
     }, []);
@@ -166,6 +256,10 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
                     const insta = channels.find((c: any) => c.provider === 'INSTAGRAM');
                     if (insta) {
                         setInstaAccountId(insta.identifier || "");
+                        if (insta.status === 'CONNECTED') {
+                            setInstaConnectStep('connected');
+                            setInstaConnectedInfo({ username: insta.username, pageName: insta.pageName });
+                        }
                     }
                 }
             } catch (e) {
@@ -482,50 +576,180 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
                         <div className="space-y-6">
                             <div className="flex items-center gap-3 border-b pb-4">
                                 <Instagram className="w-6 h-6 text-fuchsia-600" />
-                                <h3 className="font-bold text-lg text-gray-800">Instagram Direct</h3>
-                            </div>
-                            
-                            <div className="bg-fuchsia-50 border border-fuchsia-100 p-4 rounded-lg text-sm text-fuchsia-800 space-y-3">
-                                <p className="font-semibold">Tutorial de Configuração:</p>
-                                <ol className="list-decimal pl-5 space-y-1">
-                                    <li>Crie um App em <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline">Meta for Developers</a>.</li>
-                                    <li>Adicione o produto <b>Instagram Graph API</b> ao seu app.</li>
-                                    <li>Configure o Webhook com a URL: <code className="bg-fuchsia-100 px-1 py-0.5 rounded select-all break-all">{webhookBaseUrl}/api/webhooks/meta</code></li>
-                                    <li>Use o Verify Token: <code className="bg-fuchsia-100 px-1 py-0.5 rounded select-all">CONEXT_META_VERIFY</code></li>
-                                    <li>Assine os eventos: <b>messages</b> e <b>messaging_postbacks</b>.</li>
-                                    <li>Cole abaixo o Token de Acesso da Página e o ID da Conta do Instagram.</li>
-                                </ol>
+                                <div>
+                                    <h3 className="font-bold text-lg text-gray-800">Instagram Direct</h3>
+                                    <p className="text-xs text-gray-500">Responde Directs automaticamente e pode publicar posts/reels na conta conectada.</p>
+                                </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">ID da Conta do Instagram</label>
-                                    <input 
-                                        type="text" 
-                                        value={instaAccountId} 
-                                        onChange={e => setInstaAccountId(e.target.value)}
-                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
-                                        placeholder="Ex: 17841400000000000"
-                                    />
+                            {/* ESTADO: CONECTADO */}
+                            {instaConnectStep === 'connected' && (
+                                <div className="space-y-6">
+                                    <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center space-y-3 animate-fade-in">
+                                        <CheckCircle className="w-12 h-12 text-green-600 mx-auto" />
+                                        <h4 className="font-bold text-green-800 text-lg">Instagram conectado com sucesso!</h4>
+                                        {instaConnectedInfo?.username && (
+                                            <p className="text-sm text-green-700">
+                                                @{instaConnectedInfo.username}
+                                                {instaConnectedInfo.pageName ? ` — Página ${instaConnectedInfo.pageName}` : ''}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-green-600">
+                                            A IA já pode responder Directs automaticamente. Pode levar 1-2 minutos até as primeiras mensagens fluírem.
+                                        </p>
+                                        <button
+                                            onClick={() => setInstaConnectStep('idle')}
+                                            className="text-xs text-green-700 underline hover:text-green-900"
+                                        >
+                                            Conectar outra conta
+                                        </button>
+                                    </div>
+
+                                    {/* COMPOSITOR DE POST */}
+                                    <div className="border-t pt-4 space-y-3">
+                                        <p className="font-semibold text-sm text-gray-800">Publicar no Instagram (feed/reels)</p>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">URL da imagem ou vídeo</label>
+                                            <input
+                                                type="text"
+                                                value={instaPostImageUrl}
+                                                onChange={e => setInstaPostImageUrl(e.target.value)}
+                                                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
+                                                placeholder="https://.../imagem.jpg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Legenda</label>
+                                            <textarea
+                                                value={instaPostCaption}
+                                                onChange={e => setInstaPostCaption(e.target.value)}
+                                                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
+                                                rows={3}
+                                                placeholder="Legenda do post..."
+                                            />
+                                        </div>
+                                        {instaPostMessage && (
+                                            <p className={`text-xs ${instaPostMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                                {instaPostMessage.text}
+                                            </p>
+                                        )}
+                                        <button
+                                            onClick={handlePublishInstagramPost}
+                                            disabled={instaPosting}
+                                            className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-medium py-2 rounded-lg transition disabled:opacity-50"
+                                        >
+                                            {instaPosting ? 'Publicando...' : 'Publicar'}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Access Token da Meta</label>
-                                    <input 
-                                        type="password" 
-                                        value={instaToken} 
-                                        onChange={e => setInstaToken(e.target.value)}
-                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
-                                        placeholder="EAAL..."
-                                    />
+                            )}
+
+                            {/* ESTADO: AUTENTICANDO / REGISTRANDO */}
+                            {(instaConnectStep === 'authenticating' || instaConnectStep === 'registering') && (
+                                <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-6 text-center space-y-3">
+                                    <Loader2 className="w-10 h-10 text-fuchsia-600 mx-auto animate-spin" />
+                                    <p className="font-medium text-fuchsia-800">
+                                        {instaConnectStep === 'authenticating'
+                                            ? 'Aguardando login e seleção da Página/Instagram na janela da Meta…'
+                                            : 'Ativando o webhook e finalizando a conexão…'}
+                                    </p>
+                                    <p className="text-xs text-fuchsia-500">Não feche esta página.</p>
                                 </div>
-                                <button 
-                                    onClick={() => handleSaveMetaChannel('INSTAGRAM', instaAccountId, instaToken)}
-                                    disabled={isSaving}
-                                    className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-medium py-2 rounded-lg transition"
-                                >
-                                    {isSaving ? 'Salvando...' : 'Salvar e Conectar'}
-                                </button>
-                            </div>
+                            )}
+
+                            {/* ESTADO: ERRO */}
+                            {instaConnectStep === 'error' && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-red-800">Não foi possível concluir a conexão</p>
+                                        <p className="text-xs text-red-700 mt-1">{instaConnectError}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ESTADO: IDLE — instruções + botão principal */}
+                            {(instaConnectStep === 'idle' || instaConnectStep === 'error') && (
+                                <>
+                                    <div className="bg-fuchsia-50 border border-fuchsia-100 p-4 rounded-lg text-sm text-fuchsia-900 space-y-2">
+                                        <p className="font-semibold flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-fuchsia-600" />
+                                            Como funciona a conexão automática
+                                        </p>
+                                        <ol className="list-decimal pl-5 space-y-1 text-fuchsia-800">
+                                            <li>Clique em <b>Conectar com Instagram</b> abaixo.</li>
+                                            <li>Faça login com a conta que administra a Página do Facebook vinculada ao Instagram.</li>
+                                            <li>Sua conta Instagram precisa ser <b>Profissional (Business/Creator)</b> e estar vinculada a uma Página do Facebook.</li>
+                                            <li>Pronto — nós ativamos o webhook e a IA já pode responder Directs e publicar posts.</li>
+                                        </ol>
+                                        <p className="text-[11px] text-fuchsia-600 pt-1">
+                                            Não é necessário copiar tokens nem mexer no painel de desenvolvedor da Meta. Tudo acontece dentro do popup.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={handleInstagramLogin}
+                                        disabled={isSaving || !metaAppId || !instagramConfigId}
+                                        className="w-full flex items-center justify-center gap-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-fuchsia-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Instagram size={20} />
+                                        <span>Conectar com Instagram</span>
+                                    </button>
+                                    {(!metaAppId || !instagramConfigId) && (
+                                        <p className="text-[11px] text-red-500 text-center">
+                                            Conexão automática ainda não configurada pelo administrador da plataforma. Use a opção manual abaixo ou contate o suporte.
+                                        </p>
+                                    )}
+
+                                    {/* Fallback manual, escondido por padrão */}
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={() => setShowManualFallback(v => !v)}
+                                            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 mx-auto"
+                                        >
+                                            <ChevronDown size={14} className={`transition-transform ${showManualFallback ? 'rotate-180' : ''}`} />
+                                            Prefiro colar as credenciais manualmente
+                                        </button>
+
+                                        {showManualFallback && (
+                                            <div className="mt-4 space-y-4 border-t pt-4">
+                                                <p className="text-[11px] text-gray-500">
+                                                    Use apenas se você já tem um token de Página gerado no painel de desenvolvedor da Meta.
+                                                    Webhook: <code className="bg-gray-100 px-1 py-0.5 rounded select-all break-all">{webhookBaseUrl}/api/webhooks/meta</code>,
+                                                    Verify Token: <code className="bg-gray-100 px-1 py-0.5 rounded select-all">CONEXT_META_VERIFY</code>.
+                                                </p>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">ID da Conta do Instagram</label>
+                                                    <input
+                                                        type="text"
+                                                        value={instaAccountId}
+                                                        onChange={e => setInstaAccountId(e.target.value)}
+                                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
+                                                        placeholder="Ex: 17841400000000000"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Access Token da Página</label>
+                                                    <input
+                                                        type="password"
+                                                        value={instaToken}
+                                                        onChange={e => setInstaToken(e.target.value)}
+                                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
+                                                        placeholder="EAAL..."
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={() => handleSaveMetaChannel('INSTAGRAM', instaAccountId, instaToken)}
+                                                    disabled={isSaving}
+                                                    className="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 rounded-lg transition"
+                                                >
+                                                    {isSaving ? 'Salvando...' : 'Salvar e Conectar'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
@@ -553,6 +777,7 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
 export default function ConnectPage() {
     const [metaAppId, setMetaAppId] = useState<string | null>(null);
     const [metaConfigId, setMetaConfigId] = useState<string | null>(null);
+    const [instagramConfigId, setInstagramConfigId] = useState<string | null>(null);
 
     useEffect(() => {
         fetch('/api/config/meta')
@@ -560,6 +785,7 @@ export default function ConnectPage() {
             .then(data => {
                 setMetaAppId(data.appId);
                 setMetaConfigId(data.configId);
+                setInstagramConfigId(data.instagramConfigId);
             })
             .catch(console.error);
     }, []);
@@ -591,7 +817,7 @@ export default function ConnectPage() {
                     }
                 }}
             />
-            <ConnectPageContent metaAppId={metaAppId} metaConfigId={metaConfigId} />
+            <ConnectPageContent metaAppId={metaAppId} metaConfigId={metaConfigId} instagramConfigId={instagramConfigId} />
         </Suspense>
     );
 }

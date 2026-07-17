@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
-import { Smartphone, CheckCircle, RefreshCw, ArrowLeft, Globe, Facebook, ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
+import { Smartphone, CheckCircle, RefreshCw, ArrowLeft, Globe, Facebook, Instagram, ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import Script from "next/script";
 
 type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' | 'error';
 
-function PublicConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | null; metaConfigId: string | null }) {
+function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { metaAppId: string | null; metaConfigId: string | null; instagramConfigId: string | null }) {
     const params = useParams();
     const token = params.token as string;
 
-    const [activeTab, setActiveTab] = useState<'whatsapp' | 'meta_whatsapp'>('whatsapp');
+    const [activeTab, setActiveTab] = useState<'whatsapp' | 'meta_whatsapp' | 'instagram'>('whatsapp');
     const [step, setStep] = useState<'generating' | 'qrcode' | 'connected'>('generating');
     const [qrCodeData, setQrCodeData] = useState("");
     const [error, setError] = useState("");
@@ -21,6 +21,61 @@ function PublicConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: stri
     const [metaConnectError, setMetaConnectError] = useState("");
     const [metaConnectedInfo, setMetaConnectedInfo] = useState<{ displayNumber?: string; verifiedName?: string } | null>(null);
     const waSignupIdsRef = useRef<{ wabaId?: string; phoneNumberId?: string; businessId?: string }>({});
+
+    // Instagram (Facebook Login for Business, via Página vinculada)
+    const [instaConnectStep, setInstaConnectStep] = useState<MetaConnectStep>('idle');
+    const [instaConnectError, setInstaConnectError] = useState("");
+    const [instaConnectedInfo, setInstaConnectedInfo] = useState<{ username?: string; pageName?: string } | null>(null);
+
+    const handleInstagramLogin = () => {
+        if (!metaAppId || !instagramConfigId) {
+            setInstaConnectStep('error');
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador da plataforma.');
+            return;
+        }
+        if (!(window as any).FB) {
+            setInstaConnectStep('error');
+            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            return;
+        }
+
+        setInstaConnectStep('authenticating');
+        setInstaConnectError('');
+
+        (window as any).FB.login((response: any) => {
+            if (response.authResponse && response.authResponse.code) {
+                processInstagramCode(response.authResponse.code);
+            } else {
+                setInstaConnectStep('idle');
+            }
+        }, {
+            config_id: instagramConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+        });
+    };
+
+    const processInstagramCode = async (code: string) => {
+        setInstaConnectStep('registering');
+        try {
+            const res = await fetch('/api/public/instagram/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, code })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
+                setInstaConnectStep('connected');
+            } else {
+                setInstaConnectStep('error');
+                setInstaConnectError(data.error || 'Falha na conexão automática. Tente novamente.');
+            }
+        } catch (e) {
+            setInstaConnectStep('error');
+            setInstaConnectError('Erro de rede ao processar a conexão. Verifique sua internet e tente novamente.');
+        }
+    };
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -212,6 +267,9 @@ function PublicConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: stri
                         <button onClick={() => setActiveTab('meta_whatsapp')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'meta_whatsapp' ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
                             WhatsApp Oficial (Meta)
                         </button>
+                        <button onClick={() => setActiveTab('instagram')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === 'instagram' ? 'bg-fuchsia-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
+                            Instagram
+                        </button>
                     </div>
 
                     {activeTab === 'whatsapp' && (
@@ -355,6 +413,76 @@ function PublicConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: stri
                         </div>
                     )}
 
+                    {activeTab === 'instagram' && (
+                        <div className="space-y-5">
+                            {instaConnectStep === 'connected' && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
+                                    <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto" />
+                                    <h4 className="font-bold text-emerald-300 text-lg">Instagram conectado!</h4>
+                                    {instaConnectedInfo?.username && (
+                                        <p className="text-sm text-emerald-200">@{instaConnectedInfo.username}</p>
+                                    )}
+                                    <p className="text-xs text-emerald-200/70">
+                                        Seu agente já pode responder Directs automaticamente.
+                                    </p>
+                                </div>
+                            )}
+
+                            {(instaConnectStep === 'authenticating' || instaConnectStep === 'registering') && (
+                                <div className="bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-2xl p-6 text-center space-y-3">
+                                    <Loader2 className="w-10 h-10 text-fuchsia-400 mx-auto animate-spin" />
+                                    <p className="font-medium text-fuchsia-200 text-sm">
+                                        {instaConnectStep === 'authenticating'
+                                            ? 'Aguardando login e seleção da Página na janela da Meta…'
+                                            : 'Ativando o webhook e finalizando a conexão…'}
+                                    </p>
+                                    <p className="text-xs text-fuchsia-300/70">Não feche esta página.</p>
+                                </div>
+                            )}
+
+                            {instaConnectStep === 'error' && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-red-300">Não foi possível concluir a conexão</p>
+                                        <p className="text-xs text-red-300/80 mt-1">{instaConnectError}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(instaConnectStep === 'idle' || instaConnectStep === 'error') && (
+                                <>
+                                    <div className="bg-fuchsia-500/10 border border-fuchsia-500/20 p-4 rounded-2xl text-sm text-fuchsia-100 space-y-2">
+                                        <p className="font-semibold flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-fuchsia-300" />
+                                            Como funciona
+                                        </p>
+                                        <ol className="list-decimal pl-5 space-y-1 text-fuchsia-200/90 text-xs">
+                                            <li>Clique em <b>Conectar com Instagram</b> abaixo.</li>
+                                            <li>Faça login com a conta que administra a Página do Facebook vinculada ao seu Instagram.</li>
+                                            <li>Sua conta Instagram precisa ser Profissional (Business/Creator).</li>
+                                            <li>Pronto — nenhuma outra configuração é necessária.</li>
+                                        </ol>
+                                    </div>
+
+                                    <button
+                                        onClick={handleInstagramLogin}
+                                        disabled={!metaAppId || !instagramConfigId}
+                                        className="w-full flex items-center justify-center gap-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-fuchsia-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Instagram size={20} />
+                                        <span>Conectar com Instagram</span>
+                                    </button>
+                                    {(!metaAppId || !instagramConfigId) && (
+                                        <p className="text-[11px] text-red-400 text-center">
+                                            Conexão automática ainda não configurada. Peça para a agência.
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     <div className="mt-8 pt-6 border-t border-white/5 text-center">
                         <p className="text-[10px] text-gray-600 uppercase tracking-tighter font-medium">
                             Powered by ConextBot AI Intelligence
@@ -369,6 +497,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: stri
 export default function PublicConnectPage() {
     const [metaAppId, setMetaAppId] = useState<string | null>(null);
     const [metaConfigId, setMetaConfigId] = useState<string | null>(null);
+    const [instagramConfigId, setInstagramConfigId] = useState<string | null>(null);
 
     useEffect(() => {
         fetch('/api/config/meta')
@@ -376,6 +505,7 @@ export default function PublicConnectPage() {
             .then(data => {
                 setMetaAppId(data.appId);
                 setMetaConfigId(data.configId);
+                setInstagramConfigId(data.instagramConfigId);
             })
             .catch(console.error);
     }, []);
@@ -407,7 +537,7 @@ export default function PublicConnectPage() {
                     }
                 }}
             />
-            <PublicConnectPageContent metaAppId={metaAppId} metaConfigId={metaConfigId} />
+            <PublicConnectPageContent metaAppId={metaAppId} metaConfigId={metaConfigId} instagramConfigId={instagramConfigId} />
         </Suspense>
     );
 }

@@ -39,6 +39,7 @@ export async function GET() {
             metaAppSecret: "",
             metaVerifyToken: "",
             metaWhatsappConfigId: "",
+            metaInstagramConfigId: "",
             mapboxToken: ""
         });
     } catch (error) {
@@ -89,6 +90,7 @@ export async function PUT(req: Request) {
             metaAppSecret: body.metaAppSecret || null,
             metaVerifyToken: body.metaVerifyToken || null,
             metaWhatsappConfigId: body.metaWhatsappConfigId || null,
+            metaInstagramConfigId: body.metaInstagramConfigId || null,
             mlClientId: body.mlClientId || null,
             mlClientSecret: body.mlClientSecret || null,
             mapboxToken: body.mapboxToken || null

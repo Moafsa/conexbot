@@ -747,6 +747,7 @@ model GlobalConfig {
   metaAppSecret           String?
   metaVerifyToken         String?
   metaWhatsappConfigId    String?
+  metaInstagramConfigId   String?
   platformAsaasWalletId   String?
   mlClientId              String?
   mlClientSecret          String?
