@@ -11,6 +11,7 @@ type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' |
 function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | null; metaConfigId: string | null }) {
     const searchParams = useSearchParams();
     const botId = searchParams.get('botId');
+    const clientId = searchParams.get('clientId');
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<'whatsapp' | 'meta_whatsapp' | 'instagram' | 'webhook'>('whatsapp');
@@ -117,6 +118,7 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
                     wabaId: waSignupIdsRef.current.wabaId,
                     phoneNumberId: waSignupIdsRef.current.phoneNumberId,
                     businessId: waSignupIdsRef.current.businessId,
+                    clientId,
                 })
             });
 
@@ -149,7 +151,8 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
         // Fetch existing channels
         const fetchChannels = async () => {
             try {
-                const res = await fetch(`/api/bots/${botId}/channels`);
+                const channelsUrl = clientId ? `/api/bots/${botId}/channels?clientId=${clientId}` : `/api/bots/${botId}/channels`;
+                const res = await fetch(channelsUrl);
                 if (res.ok) {
                     const channels = await res.json();
                     const metaWa = channels.find((c: any) => c.provider === 'META_WHATSAPP');
@@ -177,7 +180,7 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
                 try {
                     const res = await fetch('/api/whatsapp/connect', {
                         method: 'POST',
-                        body: JSON.stringify({ botId }),
+                        body: JSON.stringify({ botId, clientId }),
                         headers: { 'Content-Type': 'application/json' }
                     });
 
@@ -205,7 +208,8 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
             }
 
             try {
-                const res = await fetch(`/api/whatsapp/status?botId=${botId}`);
+                const statusUrl = clientId ? `/api/whatsapp/status?botId=${botId}&clientId=${clientId}` : `/api/whatsapp/status?botId=${botId}`;
+                const res = await fetch(statusUrl);
                 const data = await res.json();
 
                 if (res.ok) {
@@ -225,7 +229,7 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [botId, step, activeTab]);
+    }, [botId, clientId, step, activeTab]);
 
     const handleSaveMetaChannel = async (provider: string, identifier: string, token: string) => {
         if (!identifier || !token) {
@@ -241,7 +245,8 @@ function ConnectPageContent({ metaAppId, metaConfigId }: { metaAppId: string | n
                 body: JSON.stringify({
                     provider,
                     identifier,
-                    credentials: { accessToken: token }
+                    credentials: { accessToken: token },
+                    clientId,
                 })
             });
 

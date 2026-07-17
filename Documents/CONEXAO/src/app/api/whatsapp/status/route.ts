@@ -4,12 +4,14 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { UzapiService } from '@/services/engine/uzapi';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function GET(req: Request) {
     try {
         const url = new URL(req.url);
         const botId = url.searchParams.get('botId');
         const token = url.searchParams.get('token');
+        const clientId = url.searchParams.get('clientId');
 
         const session = await getServerSession(authOptions);
 
@@ -19,9 +21,9 @@ export async function GET(req: Request) {
                 where: { connectToken: token },
             });
         } else if (session?.user) {
-            const tenantId = (session.user as any).id;
+            const tenantId = await getEffectiveTenantId(clientId);
             bot = await prisma.bot.findFirst({
-                where: { id: botId as string, tenantId },
+                where: { id: botId as string, tenantId: tenantId ?? undefined },
             });
         }
 

@@ -4,11 +4,12 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { UzapiService } from '@/services/engine/uzapi';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        const { botId, token } = await req.json();
+        const { botId, token, clientId } = await req.json();
 
         if (!botId && !token) {
             return NextResponse.json({ error: 'botId ou token são necessários' }, { status: 400 });
@@ -16,9 +17,10 @@ export async function POST(req: Request) {
 
         let bot;
         if (session?.user && botId) {
-            const tenantId = (session.user as any).id;
+            // Considera personificação de admin e gestão de cliente por agência (mesmo padrão de /api/bots/[id])
+            const tenantId = await getEffectiveTenantId(clientId);
             bot = await prisma.bot.findFirst({
-                where: { id: botId, tenantId },
+                where: { id: botId, tenantId: tenantId ?? undefined },
             });
         } else if (token) {
             bot = await prisma.bot.findFirst({

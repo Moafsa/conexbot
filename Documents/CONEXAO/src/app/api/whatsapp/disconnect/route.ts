@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { UzapiService } from '@/services/engine/uzapi';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 export async function POST(req: Request) {
     try {
@@ -12,15 +13,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const { botId } = await req.json();
-        const tenantId = (session.user as any).id;
+        const { botId, clientId } = await req.json();
 
         if (!botId) {
             return NextResponse.json({ error: 'Bot ID não fornecido' }, { status: 400 });
         }
 
+        const tenantId = await getEffectiveTenantId(clientId);
         const bot = await prisma.bot.findFirst({
-            where: { id: botId, tenantId }
+            where: { id: botId, tenantId: tenantId ?? undefined }
         });
 
         if (!bot) {

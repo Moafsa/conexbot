@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 
 // Helper to check bot ownership
 async function checkBotOwnership(botId: string, tenantId: string) {
@@ -18,10 +19,12 @@ export async function GET(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const tenantId = (session.user as any).id;
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get('clientId');
+        const tenantId = await getEffectiveTenantId(clientId);
         const { id: botId } = await params;
 
-        if (!(await checkBotOwnership(botId, tenantId))) {
+        if (!tenantId || !(await checkBotOwnership(botId, tenantId))) {
             return NextResponse.json({ error: 'Bot não encontrado ou sem permissão' }, { status: 404 });
         }
 
@@ -61,14 +64,13 @@ export async function POST(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        const tenantId = (session.user as any).id;
         const { id: botId } = await params;
+        const { provider, identifier, credentials, clientId } = await req.json();
 
-        if (!(await checkBotOwnership(botId, tenantId))) {
+        const tenantId = await getEffectiveTenantId(clientId);
+        if (!tenantId || !(await checkBotOwnership(botId, tenantId))) {
             return NextResponse.json({ error: 'Bot não encontrado ou sem permissão' }, { status: 404 });
         }
-
-        const { provider, identifier, credentials } = await req.json();
 
         if (!provider) {
             return NextResponse.json({ error: 'Provedor é obrigatório' }, { status: 400 });
