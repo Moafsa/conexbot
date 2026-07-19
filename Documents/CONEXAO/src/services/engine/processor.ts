@@ -76,7 +76,7 @@ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b
 
 export const MessageProcessor = {
     async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number, adAttribution?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string; adId?: string; adsetId?: string; adName?: string; adsetName?: string; campaignId?: string; campaignName?: string; entrySource?: string; referrer?: string } } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
-        const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
+        const senderPhone = (channel === 'whatsapp' || channel === 'meta_whatsapp') ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
         const lockKey = `${channel}:${senderPhone}`;
 
         // Distributed Redis lock — survives restarts and multi-instance deploys.
@@ -253,7 +253,7 @@ export const MessageProcessor = {
 
             if (isPaused) {
                 // Sync to Chatwoot so the human agent receives the customer's message
-                if (channel === 'whatsapp' && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                if ((channel === 'whatsapp' || channel === 'meta_whatsapp' || channel === 'instagram') && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
                     const { ChatwootService } = await import('./chatwoot');
                     ChatwootService.syncToConversation(
                         bot,
@@ -1680,7 +1680,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
             // 14b. Chatwoot bidirectional sync — push exchange to Chatwoot inbox (non-blocking)
             // Only for WhatsApp channel. Simulator/generic/wordpress are already in the app or handled separately.
-            if (channel === 'whatsapp' && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+            if ((channel === 'whatsapp' || channel === 'meta_whatsapp' || channel === 'instagram') && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
                 ChatwootService.syncToConversation(
                     bot,
                     senderPhone,
