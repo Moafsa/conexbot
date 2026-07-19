@@ -63,16 +63,26 @@ export class MetaService {
     }
 
     /**
-     * Troca o código de autorização (retornado pelo popup de Embedded Signup) por um
-     * token de acesso de curta duração (~1h-2h).
+     * Troca o código de autorização (retornado pelo popup de Embedded Signup, ou pelo
+     * redirect clássico do Facebook Login for Business) por um token de acesso de
+     * curta duração (~1h-2h).
+     *
+     * `redirectUri` só é necessário (e deve ser passado) para fluxos de OAuth dialog
+     * clássico com redirect (ex.: conexão do Instagram) — a Meta exige que o mesmo
+     * redirect_uri usado na etapa de autorização seja repetido aqui, senão retorna
+     * "Error validating verification code... redirect_uri". O Embedded Signup via
+     * popup (WhatsApp) não usa redirect_uri e não deve passá-lo.
      */
-    static async exchangeCodeForToken(code: string): Promise<string> {
+    static async exchangeCodeForToken(code: string, redirectUri?: string): Promise<string> {
         const config = await this.getGlobalConfig();
         if (!config?.metaAppId || !config?.metaAppSecret) {
             throw new Error('Configurações globais da Meta (App ID/Secret) não encontradas. Configure em Admin > Configurações.');
         }
 
-        const url = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
+        let url = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
+        if (redirectUri) {
+            url += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        }
         const data = await graphFetch(url);
         return data.access_token;
     }

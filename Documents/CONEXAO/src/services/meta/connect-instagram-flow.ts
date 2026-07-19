@@ -4,6 +4,11 @@ import { logToFile } from '@/services/engine/logger';
 
 export interface InstagramConnectInput {
     code: string;
+    /**
+     * Precisa ser exatamente o mesmo redirect_uri usado para gerar o `code` (fluxo de
+     * OAuth dialog clássico do Facebook Login for Business — ver instagram/callback).
+     */
+    redirectUri?: string;
 }
 
 export interface InstagramConnectResult {
@@ -20,14 +25,14 @@ export interface InstagramConnectResult {
  * mesmo comportamento sem duplicar lógica — mesmo padrão do connect-flow do WhatsApp.
  */
 export async function connectInstagramForBot(botId: string, input: InstagramConnectInput): Promise<InstagramConnectResult> {
-    const { code } = input;
+    const { code, redirectUri } = input;
 
     if (!code) {
         throw new Error('Código de autorização é obrigatório');
     }
 
     // 1. Troca o código de autorização por um access token de curta duração
-    const shortLivedToken = await MetaService.exchangeCodeForToken(code);
+    const shortLivedToken = await MetaService.exchangeCodeForToken(code, redirectUri);
 
     // 2. Converte para token de longa duração (~60 dias)
     const { accessToken } = await MetaService.getLongLivedToken(shortLivedToken);

@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: any }) {
         }
 
         const body = await req.json();
-        const { code, clientId } = body;
+        const { code, clientId, redirectUri } = body;
 
         // Considera personificação de admin e gestão de cliente por agência (mesmo padrão de /api/bots)
         const tenantId = await getEffectiveTenantId(clientId);
@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: 'Agente não encontrado ou sem permissão' }, { status: 404 });
         }
 
-        const result = await connectInstagramForBot(botId, { code });
+        const result = await connectInstagramForBot(botId, { code, redirectUri });
         return NextResponse.json(result);
 
     } catch (error: any) {

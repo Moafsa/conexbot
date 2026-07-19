@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { Smartphone, CheckCircle, RefreshCw, ArrowLeft, Globe, Facebook, Instagram, ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
 
 type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' | 'error';
@@ -10,6 +10,8 @@ type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' |
 function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { metaAppId: string | null; metaConfigId: string | null; instagramConfigId: string | null }) {
     const params = useParams();
     const token = params.token as string;
+    const searchParams = useSearchParams();
+    const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<'whatsapp' | 'meta_whatsapp' | 'instagram'>('whatsapp');
     const [step, setStep] = useState<'generating' | 'qrcode' | 'connected'>('generating');
@@ -27,55 +29,57 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
     const [instaConnectError, setInstaConnectError] = useState("");
     const [instaConnectedInfo, setInstaConnectedInfo] = useState<{ username?: string; pageName?: string } | null>(null);
 
+    // Mesmo fluxo de OAuth dialog clássico usado no dashboard (ver comentário em
+    // src/app/dashboard/connect/page.tsx) — aqui o `state` carrega o token público
+    // em vez de botId/clientId.
     const handleInstagramLogin = () => {
-        if (!metaAppId || !instagramConfigId) {
+        if (!metaAppId) {
             setInstaConnectStep('error');
             setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador da plataforma.');
             return;
         }
-        if (!(window as any).FB) {
+        if (!token) {
             setInstaConnectStep('error');
-            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            setInstaConnectError('Token de conexão não encontrado.');
             return;
         }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        (window as any).FB.login((response: any) => {
-            if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code);
-            } else {
-                setInstaConnectStep('idle');
-            }
-        }, {
-            config_id: instagramConfigId,
-            response_type: 'code',
-            override_default_response_type: true,
-        });
+        const redirectUri = `${window.location.origin}/instagram/callback`;
+        const state = encodeURIComponent(JSON.stringify({ m: 'p', token }));
+        const scope = 'instagram_basic,instagram_content_publishing,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
+        const extras = encodeURIComponent(JSON.stringify({ setup: { channel: 'IG_API_ONBOARDING' } }));
+
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&display=page&extras=${extras}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        window.location.href = url;
     };
 
-    const processInstagramCode = async (code: string) => {
-        setInstaConnectStep('registering');
-        try {
-            const res = await fetch('/api/public/instagram/connect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, code })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
-                setInstaConnectStep('connected');
-            } else {
-                setInstaConnectStep('error');
-                setInstaConnectError(data.error || 'Falha na conexão automática. Tente novamente.');
-            }
-        } catch (e) {
-            setInstaConnectStep('error');
-            setInstaConnectError('Erro de rede ao processar a conexão. Verifique sua internet e tente novamente.');
+    // Retorno do /instagram/callback — não há um fetch de canais existente nesta
+    // página pública, então o status vem inteiramente pela query string.
+    useEffect(() => {
+        const tab = searchParams.get('activeTab');
+        if (tab === 'whatsapp' || tab === 'meta_whatsapp' || tab === 'instagram') {
+            setActiveTab(tab);
         }
-    };
+        const instaError = searchParams.get('insta_error');
+        const instaStatus = searchParams.get('insta_status');
+        if (instaError) {
+            setInstaConnectStep('error');
+            setInstaConnectError(instaError);
+        } else if (instaStatus === 'connected') {
+            setInstaConnectStep('connected');
+            setInstaConnectedInfo({
+                username: searchParams.get('insta_username') || undefined,
+                pageName: searchParams.get('insta_page') || undefined,
+            });
+        }
+        if (tab || instaError || instaStatus) {
+            router.replace(`/connect/${token}`);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -467,13 +471,13 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
 
                                     <button
                                         onClick={handleInstagramLogin}
-                                        disabled={!metaAppId || !instagramConfigId}
+                                        disabled={!metaAppId}
                                         className="w-full flex items-center justify-center gap-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-fuchsia-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Instagram size={20} />
                                         <span>Conectar com Instagram</span>
                                     </button>
-                                    {(!metaAppId || !instagramConfigId) && (
+                                    {!metaAppId && (
                                         <p className="text-[11px] text-red-400 text-center">
                                             Conexão automática ainda não configurada. Peça para a agência.
                                         </p>

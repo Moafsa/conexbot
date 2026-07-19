@@ -147,57 +147,34 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         }
     };
 
+    // Instagram usa o OAuth dialog clássico do Facebook Login for Business (redirect
+    // de página inteira), não o popup FB.login com config_id — é o fluxo que a própria
+    // Meta documenta para contas Instagram vinculadas a uma Página do Facebook, e não
+    // depende da variação "Instagram Graph API" das Configurations (que fica bloqueada
+    // neste tipo de app). O `state` carrega botId/clientId para sobreviver à ida e
+    // volta pela Meta; o callback fixo fica em /instagram/callback.
     const handleInstagramLogin = () => {
-        if (!metaAppId || !instagramConfigId) {
+        if (!metaAppId) {
             setInstaConnectStep('error');
-            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID / Configuration ID ausentes).');
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID ausente).');
             return;
         }
-        if (!(window as any).FB) {
+        if (!botId) {
             setInstaConnectStep('error');
-            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            setInstaConnectError('Bot ID não encontrado na URL.');
             return;
         }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        (window as any).FB.login((response: any) => {
-            if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code);
-            } else {
-                setInstaConnectStep('idle');
-                console.log('Usuário cancelou o login do Instagram ou não concluiu a autorização.');
-            }
-        }, {
-            config_id: instagramConfigId,
-            response_type: 'code',
-            override_default_response_type: true,
-        });
-    };
+        const redirectUri = `${window.location.origin}/instagram/callback`;
+        const state = encodeURIComponent(JSON.stringify({ m: 'd', botId, clientId: clientId || '' }));
+        const scope = 'instagram_basic,instagram_content_publishing,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
+        const extras = encodeURIComponent(JSON.stringify({ setup: { channel: 'IG_API_ONBOARDING' } }));
 
-    const processInstagramCode = async (code: string) => {
-        setInstaConnectStep('registering');
-        try {
-            const res = await fetch(`/api/bots/${botId}/connect/instagram`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, clientId })
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
-                setInstaConnectStep('connected');
-            } else {
-                setInstaConnectStep('error');
-                setInstaConnectError(data.error || 'Falha na conexão automática. Tente novamente.');
-            }
-        } catch (e) {
-            setInstaConnectStep('error');
-            setInstaConnectError('Erro de rede ao processar a conexão. Verifique sua internet e tente novamente.');
-        }
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&display=page&extras=${extras}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        window.location.href = url;
     };
 
     const handlePublishInstagramPost = async () => {
@@ -230,6 +207,34 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
 
     useEffect(() => {
         setWebhookBaseUrl(window.location.origin);
+    }, []);
+
+    // Retorno do /instagram/callback (redirect da Meta) — o status real da conexão
+    // já é lido do banco pelo fetchChannels abaixo; aqui só tratamos erro e a aba ativa.
+    useEffect(() => {
+        const tab = searchParams.get('activeTab');
+        if (tab === 'whatsapp' || tab === 'meta_whatsapp' || tab === 'instagram' || tab === 'webhook') {
+            setActiveTab(tab);
+        }
+        const instaError = searchParams.get('insta_error');
+        const instaStatus = searchParams.get('insta_status');
+        if (instaError) {
+            setInstaConnectStep('error');
+            setInstaConnectError(instaError);
+        } else if (instaStatus === 'connected') {
+            setInstaConnectStep('connected');
+            setInstaConnectedInfo({
+                username: searchParams.get('insta_username') || undefined,
+                pageName: searchParams.get('insta_page') || undefined,
+            });
+        }
+        if (tab || instaError || instaStatus) {
+            const params = new URLSearchParams();
+            if (botId) params.set('botId', botId);
+            if (clientId) params.set('clientId', clientId);
+            router.replace(`/dashboard/connect?${params.toString()}`);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -650,7 +655,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                     <Loader2 className="w-10 h-10 text-fuchsia-600 mx-auto animate-spin" />
                                     <p className="font-medium text-fuchsia-800">
                                         {instaConnectStep === 'authenticating'
-                                            ? 'Aguardando login e seleção da Página/Instagram na janela da Meta…'
+                                            ? 'Redirecionando para o login da Meta…'
                                             : 'Ativando o webhook e finalizando a conexão…'}
                                     </p>
                                     <p className="text-xs text-fuchsia-500">Não feche esta página.</p>
@@ -683,19 +688,19 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                             <li>Pronto — nós ativamos o webhook e a IA já pode responder Directs e publicar posts.</li>
                                         </ol>
                                         <p className="text-[11px] text-fuchsia-600 pt-1">
-                                            Não é necessário copiar tokens nem mexer no painel de desenvolvedor da Meta. Tudo acontece dentro do popup.
+                                            Não é necessário copiar tokens nem mexer no painel de desenvolvedor da Meta.
                                         </p>
                                     </div>
 
                                     <button
                                         onClick={handleInstagramLogin}
-                                        disabled={isSaving || !metaAppId || !instagramConfigId}
+                                        disabled={isSaving || !metaAppId}
                                         className="w-full flex items-center justify-center gap-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-fuchsia-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Instagram size={20} />
                                         <span>Conectar com Instagram</span>
                                     </button>
-                                    {(!metaAppId || !instagramConfigId) && (
+                                    {!metaAppId && (
                                         <p className="text-[11px] text-red-500 text-center">
                                             Conexão automática ainda não configurada pelo administrador da plataforma. Use a opção manual abaixo ou contate o suporte.
                                         </p>

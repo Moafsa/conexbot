@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     let botId: string | undefined;
     try {
         const body = await req.json();
-        const { token, code } = body;
+        const { token, code, redirectUri } = body;
 
         if (!token) {
             return NextResponse.json({ error: 'Token de conexão é obrigatório' }, { status: 400 });
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         }
         botId = bot.id;
 
-        const result = await connectInstagramForBot(bot.id, { code });
+        const result = await connectInstagramForBot(bot.id, { code, redirectUri });
         return NextResponse.json(result);
 
     } catch (error: any) {
