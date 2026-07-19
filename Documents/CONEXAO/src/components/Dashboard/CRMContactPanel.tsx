@@ -27,13 +27,44 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
     const [loading, setLoading] = useState(true);
     const [bots, setBots] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
 
     useEffect(() => {
         fetchContactData();
     }, [contactId, botId]);
 
-    async function fetchContactData() {
-        setLoading(true);
+    // Atualização automática: enquanto o painel de chat estiver aberto, busca
+    // novas mensagens periodicamente (sem precisar recarregar a página) e
+    // verifica se o agente de IA está processando uma resposta agora (lock
+    // Redis do MessageProcessor) para mostrar o indicador "digitando...".
+    useEffect(() => {
+        if (activeTab !== 'chat' || !contactId) return;
+
+        const messagesInterval = setInterval(() => {
+            fetchContactData({ silent: true });
+        }, 3000);
+
+        const typingInterval = setInterval(async () => {
+            try {
+                const query = clientId ? `?clientId=${clientId}` : '';
+                const res = await fetch(`/api/contacts/${contactId}/typing${query}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setIsTyping(!!data.typing);
+                }
+            } catch {
+                // silencioso — indicador é cosmético, não deve gerar erro visível
+            }
+        }, 1500);
+
+        return () => {
+            clearInterval(messagesInterval);
+            clearInterval(typingInterval);
+        };
+    }, [activeTab, contactId, clientId]);
+
+    async function fetchContactData(opts: { silent?: boolean } = {}) {
+        if (!opts.silent) setLoading(true);
         try {
             const query = clientId ? `&clientId=${clientId}` : '';
             const res = await fetch(`/api/contacts/${contactId}?botId=${botId}${query}`);
@@ -42,18 +73,24 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                 setContact(data);
                 setOrders(data.orders || []);
                 if (data.conversations?.[0]) {
-                    setMessages(data.conversations[0].messages || []);
+                    const newMessages = data.conversations[0].messages || [];
+                    // Evita re-render/flicker desnecessário quando nada mudou no polling silencioso
+                    setMessages(prev => (
+                        opts.silent && prev.length === newMessages.length ? prev : newMessages
+                    ));
                 }
             }
 
-            // Fetch bots for delegation
-            const q2 = clientId ? `?clientId=${clientId}` : '';
-            const botsRes = await fetch(`/api/bots${q2}`);
-            if (botsRes.ok) setBots(await botsRes.json());
+            if (!opts.silent) {
+                // Fetch bots for delegation (não precisa em todo poll silencioso)
+                const q2 = clientId ? `?clientId=${clientId}` : '';
+                const botsRes = await fetch(`/api/bots${q2}`);
+                if (botsRes.ok) setBots(await botsRes.json());
+            }
         } catch (error) {
             console.error("Error fetching contact detail", error);
         } finally {
-            setLoading(false);
+            if (!opts.silent) setLoading(false);
         }
     }
 
@@ -185,6 +222,11 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                             <Clock size={10} /> PAUSADO (HUMANO)
                                         </span>
                                     )}
+                                    {isTyping && (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full flex items-center gap-1 animate-pulse">
+                                            <Bot size={10} /> IA PROCESSANDO
+                                        </span>
+                                    )}
                                 </div>
                     </div>
                 </div>
@@ -274,6 +316,19 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                         </div>
                                     </div>
                                 ))
+                            )}
+                            {isTyping && (
+                                <div className="flex justify-end animate-fade-in">
+                                    <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-tr-none bg-indigo-600 text-white shadow-lg flex items-center gap-2">
+                                        <Bot size={14} className="opacity-80" />
+                                        <span className="text-xs font-medium opacity-90">Agente digitando</span>
+                                        <span className="flex gap-0.5">
+                                            <span className="w-1.5 h-1.5 bg-white/80 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                            <span className="w-1.5 h-1.5 bg-white/80 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                            <span className="w-1.5 h-1.5 bg-white/80 rounded-full animate-bounce" />
+                                        </span>
+                                    </div>
+                                </div>
                             )}
                         </div>
 
