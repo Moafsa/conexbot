@@ -35,6 +35,9 @@ export default function AdminSettingsPage() {
         mlClientSecret: '',
         mapboxToken: ''
     });
+    // Indica quais campos sensíveis já têm valor salvo no servidor. O GET nunca
+    // devolve o valor real (ver /api/admin/config) — só esse mapa de booleans.
+    const [secretsConfigured, setSecretsConfigured] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState({ colored: false, white: false });
@@ -50,6 +53,7 @@ export default function AdminSettingsPage() {
                         ...settings,
                         ...data
                     });
+                    setSecretsConfigured(data.secretsConfigured || {});
                 }
             })
             .catch(err => console.error('Failed to load settings', err))
@@ -173,12 +177,16 @@ export default function AdminSettingsPage() {
                                     value={settings.googleClientSecret}
                                     onChange={v => setSettings({ ...settings, googleClientSecret: v })}
                                     placeholder="GOCSPX-..."
+                                    secret
+                                    configured={secretsConfigured.googleClientSecret}
                                 />
                                 <SettingInput
                                     label="Google Ads Developer Token"
                                     value={settings.googleAdsDeveloperToken}
                                     onChange={v => setSettings({ ...settings, googleAdsDeveloperToken: v })}
                                     placeholder="Ex: a1b2c3d4e5f6g7h8i9j0k"
+                                    secret
+                                    configured={secretsConfigured.googleAdsDeveloperToken}
                                 />
                             </div>
 
@@ -193,6 +201,8 @@ export default function AdminSettingsPage() {
                                     value={settings.asaasApiKey}
                                     onChange={v => setSettings({ ...settings, asaasApiKey: v })}
                                     placeholder="sk_..."
+                                    secret
+                                    configured={secretsConfigured.asaasApiKey}
                                 />
                                 <SettingInput
                                     label="ASAAS Wallet ID (Plataforma)"
@@ -214,6 +224,8 @@ export default function AdminSettingsPage() {
                                             value={settings.stripeSecretKey}
                                             onChange={v => setSettings({ ...settings, stripeSecretKey: v })}
                                             placeholder="sk_test_..."
+                                            secret
+                                            configured={secretsConfigured.stripeSecretKey}
                                         />
                                     </div>
                                 </div>
@@ -224,6 +236,8 @@ export default function AdminSettingsPage() {
                                         value={settings.mercadoPagoAccessToken}
                                         onChange={v => setSettings({ ...settings, mercadoPagoAccessToken: v })}
                                         placeholder="APP_USR-..."
+                                        secret
+                                        configured={secretsConfigured.mercadoPagoAccessToken}
                                     />
                                 </div>
                                 <div className="border-t border-[#1a1a1a] my-4 pt-4">
@@ -240,6 +254,8 @@ export default function AdminSettingsPage() {
                                             value={settings.mlClientSecret}
                                             onChange={v => setSettings({ ...settings, mlClientSecret: v })}
                                             placeholder="Ex: abcdefghijklmnopqrstuvwxyz"
+                                            secret
+                                            configured={secretsConfigured.mlClientSecret}
                                         />
                                     </div>
                                 </div>
@@ -250,18 +266,24 @@ export default function AdminSettingsPage() {
                                         value={settings.openaiApiKey}
                                         onChange={v => setSettings({ ...settings, openaiApiKey: v })}
                                         placeholder="sk-..."
+                                        secret
+                                        configured={secretsConfigured.openaiApiKey}
                                     />
                                     <SettingInput
                                         label="Google Gemini Key"
                                         value={settings.geminiApiKey}
                                         onChange={v => setSettings({ ...settings, geminiApiKey: v })}
                                         placeholder="AIza..."
+                                        secret
+                                        configured={secretsConfigured.geminiApiKey}
                                     />
                                     <SettingInput
                                         label="ElevenLabs Key"
                                         value={settings.elevenLabsApiKey}
                                         onChange={v => setSettings({ ...settings, elevenLabsApiKey: v })}
                                         placeholder="sk_..."
+                                        secret
+                                        configured={secretsConfigured.elevenLabsApiKey}
                                     />
                                     <SettingInput
                                         label="Mapbox Access Token (Global)"
@@ -331,7 +353,7 @@ export default function AdminSettingsPage() {
                                     <SettingInput label="Host SMTP" value={settings.smtpHost} onChange={v => setSettings({ ...settings, smtpHost: v })} placeholder="smtp.gmail.com" />
                                     <SettingInput label="Porta" value={settings.smtpPort?.toString()} onChange={v => setSettings({ ...settings, smtpPort: parseInt(v) })} placeholder="587" />
                                     <SettingInput label="Usuário" value={settings.smtpUser} onChange={v => setSettings({ ...settings, smtpUser: v })} />
-                                    <SettingInput label="Senha" value={settings.smtpPass} onChange={v => setSettings({ ...settings, smtpPass: v })} />
+                                    <SettingInput label="Senha" value={settings.smtpPass} onChange={v => setSettings({ ...settings, smtpPass: v })} secret configured={secretsConfigured.smtpPass} />
                                     <SettingInput label="E-mail Remetente" value={settings.smtpFrom} onChange={v => setSettings({ ...settings, smtpFrom: v })} placeholder="alertas@conexbot.com" />
                                 </div>
                             </div>
@@ -345,23 +367,27 @@ export default function AdminSettingsPage() {
                                     <p className="text-xs text-gray-500 leading-relaxed">
                                         Configurações globais para uso da API Oficial do WhatsApp e Instagram (Opção C). O Verify Token será usado no webhook oficial (`/api/webhooks/meta`).
                                     </p>
-                                    <SettingInput 
-                                        label="Verify Token (Para Webhook)" 
-                                        value={settings.metaVerifyToken} 
-                                        onChange={v => setSettings({ ...settings, metaVerifyToken: v })} 
-                                        placeholder="CONEXT_META_VERIFY" 
+                                    <SettingInput
+                                        label="Verify Token (Para Webhook)"
+                                        value={settings.metaVerifyToken}
+                                        onChange={v => setSettings({ ...settings, metaVerifyToken: v })}
+                                        placeholder="CONEXT_META_VERIFY"
+                                        secret
+                                        configured={secretsConfigured.metaVerifyToken}
                                     />
-                                    <SettingInput 
-                                        label="Meta App ID" 
-                                        value={settings.metaAppId} 
-                                        onChange={v => setSettings({ ...settings, metaAppId: v })} 
-                                        placeholder="Ex: 123456789" 
+                                    <SettingInput
+                                        label="Meta App ID"
+                                        value={settings.metaAppId}
+                                        onChange={v => setSettings({ ...settings, metaAppId: v })}
+                                        placeholder="Ex: 123456789"
                                     />
                                     <SettingInput
                                         label="Meta App Secret"
                                         value={settings.metaAppSecret}
                                         onChange={v => setSettings({ ...settings, metaAppSecret: v })}
                                         placeholder="Ex: a1b2c3d4..."
+                                        secret
+                                        configured={secretsConfigured.metaAppSecret}
                                     />
                                     <div className="bg-blue-950/30 border border-blue-900/40 p-4 rounded-lg space-y-2">
                                         <p className="text-xs text-blue-300 font-semibold">WhatsApp Embedded Signup (login com popup)</p>
@@ -530,15 +556,22 @@ function LogoUploadSection({
     );
 }
 
-function SettingInput({ label, value, onChange, placeholder }: { label: string; value: string | null; onChange: (v: string) => void; placeholder?: string }) {
+function SettingInput({ label, value, onChange, placeholder, secret, configured }: { label: string; value: string | null; onChange: (v: string) => void; placeholder?: string; secret?: boolean; configured?: boolean }) {
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-400">{label}</label>
+            <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                {label}
+                {secret && configured && (
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        Configurado
+                    </span>
+                )}
+            </label>
             <input
-                type="text"
+                type={secret ? "password" : "text"}
                 value={value || ""}
                 onChange={e => onChange(e.target.value)}
-                placeholder={placeholder}
+                placeholder={secret && configured ? "•••••••• (deixe em branco para manter o valor atual)" : placeholder}
                 className="w-full bg-[#151515] border border-[#222] rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-all font-inter"
             />
         </div>

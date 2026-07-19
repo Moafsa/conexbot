@@ -39,6 +39,9 @@ export default function AdminSettingsPage() {
     });
 
     const [systemBot, setSystemBot] = useState<{ status: string, botName?: string, botId?: string } | null>(null);
+    // Quais campos sensíveis já têm valor salvo no servidor (o GET nunca devolve
+    // o valor real — ver /api/admin/config).
+    const [secretsConfigured, setSecretsConfigured] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         if (session && (session.user as any).role !== 'ADMIN' && (session.user as any).role !== 'SUPERADMIN') {
@@ -56,6 +59,7 @@ export default function AdminSettingsPage() {
                 if (configRes.ok) {
                     const data = await configRes.json();
                     setConfig(prev => ({ ...prev, ...data }));
+                    setSecretsConfigured(data.secretsConfigured || {});
                 }
 
                 if (systemBotRes.ok) {
@@ -196,16 +200,25 @@ export default function AdminSettingsPage() {
                     </h3>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">OpenAI Key</label>
-                            <input type="password" value={config.openaiApiKey} onChange={e => setConfig({...config, openaiApiKey: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                OpenAI Key
+                                {secretsConfigured.openaiApiKey && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.openaiApiKey} onChange={e => setConfig({...config, openaiApiKey: e.target.value})} placeholder={secretsConfigured.openaiApiKey ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Gemini Key</label>
-                            <input type="password" value={config.geminiApiKey} onChange={e => setConfig({...config, geminiApiKey: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                Gemini Key
+                                {secretsConfigured.geminiApiKey && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.geminiApiKey} onChange={e => setConfig({...config, geminiApiKey: e.target.value})} placeholder={secretsConfigured.geminiApiKey ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">ElevenLabs Key</label>
-                            <input type="password" value={config.elevenLabsApiKey} onChange={e => setConfig({...config, elevenLabsApiKey: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                ElevenLabs Key
+                                {secretsConfigured.elevenLabsApiKey && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.elevenLabsApiKey} onChange={e => setConfig({...config, elevenLabsApiKey: e.target.value})} placeholder={secretsConfigured.elevenLabsApiKey ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Mapbox Access Token (Global)</label>
@@ -226,12 +239,18 @@ export default function AdminSettingsPage() {
                             <input value={config.metaAppId || ''} onChange={e => setConfig({...config, metaAppId: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Meta App Secret</label>
-                            <input type="password" value={config.metaAppSecret || ''} onChange={e => setConfig({...config, metaAppSecret: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                Meta App Secret
+                                {secretsConfigured.metaAppSecret && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.metaAppSecret || ''} onChange={e => setConfig({...config, metaAppSecret: e.target.value})} placeholder={secretsConfigured.metaAppSecret ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Webhook Verify Token</label>
-                            <input type="password" value={config.metaVerifyToken || ''} onChange={e => setConfig({...config, metaVerifyToken: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                Webhook Verify Token
+                                {secretsConfigured.metaVerifyToken && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.metaVerifyToken || ''} onChange={e => setConfig({...config, metaVerifyToken: e.target.value})} placeholder={secretsConfigured.metaVerifyToken ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono" />
                             <p className="text-[10px] text-gray-500 mt-1">Token usado para validar o recebimento de webhooks do Facebook.</p>
                         </div>
                         <div className="pt-2 border-t border-white/10">
@@ -273,8 +292,11 @@ export default function AdminSettingsPage() {
                             <input value={config.smtpUser} onChange={e => setConfig({...config, smtpUser: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm" />
                         </div>
                         <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Senha</label>
-                            <input type="password" value={config.smtpPass} onChange={e => setConfig({...config, smtpPass: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                                Senha
+                                {secretsConfigured.smtpPass && <span className="text-[9px] normal-case font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">configurado</span>}
+                            </label>
+                            <input type="password" value={config.smtpPass} onChange={e => setConfig({...config, smtpPass: e.target.value})} placeholder={secretsConfigured.smtpPass ? "•••••••• (deixe em branco para manter)" : ""} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm" />
                         </div>
                         <div className="col-span-2">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">From Email</label>

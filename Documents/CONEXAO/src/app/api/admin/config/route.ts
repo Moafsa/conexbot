@@ -5,6 +5,40 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { logToFile } from '@/services/engine/logger';
 
+// Campos que guardam segredos/credenciais. Nunca devem ser devolvidos em texto
+// puro para o navegador — mesmo para admins autenticados, expandir a superfície
+// de exposição (Network tab, DevTools, extensões, prints de tela) não vale a pena.
+// O front recebe apenas um mapa `secretsConfigured` indicando o que já está
+// preenchido; o valor real só é sobrescrito se o admin digitar um novo.
+const SENSITIVE_FIELDS = [
+    'googleClientSecret',
+    'googleAdsDeveloperToken',
+    'openaiApiKey',
+    'geminiApiKey',
+    'asaasApiKey',
+    'elevenLabsApiKey',
+    'smtpPass',
+    'mercadoPagoAccessToken',
+    'stripeSecretKey',
+    'openrouterApiKey',
+    'metaAppSecret',
+    'metaVerifyToken',
+    'mlClientSecret',
+    'chatwootSuperAdminToken',
+    'anthropicApiKey',
+] as const;
+
+function sanitizeConfig(config: Record<string, any>) {
+    const sanitized: Record<string, any> = { ...config };
+    const secretsConfigured: Record<string, boolean> = {};
+    for (const field of SENSITIVE_FIELDS) {
+        secretsConfigured[field] = !!config?.[field];
+        sanitized[field] = '';
+    }
+    sanitized.secretsConfigured = secretsConfigured;
+    return sanitized;
+}
+
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
@@ -17,7 +51,7 @@ export async function GET() {
             where: { id: 'system' }
         });
 
-        return NextResponse.json(config || {
+        const base = config || {
             systemName: "ConextBot",
             googleClientId: "",
             googleClientSecret: "",
@@ -41,7 +75,9 @@ export async function GET() {
             metaWhatsappConfigId: "",
             metaInstagramConfigId: "",
             mapboxToken: ""
-        });
+        };
+
+        return NextResponse.json(sanitizeConfig(base));
     } catch (error) {
         return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
     }
@@ -60,41 +96,43 @@ export async function PUT(req: Request) {
 
         const body = await req.json();
         console.log(`[AdminConfig] [${timestamp}] Body received, keys:`, Object.keys(body));
-        
-        // Mapeamento explícito absoluto
-        const updatePayload = {
+
+        // Mapeamento explícito absoluto (apenas campos não sensíveis — os
+        // sensíveis são tratados abaixo, já que agora o GET não devolve mais
+        // o valor real e um campo "vazio" no formulário não deve apagar o
+        // segredo já salvo).
+        const updatePayload: Record<string, any> = {
             systemName: body.systemName,
             maintenanceMode: typeof body.maintenanceMode === 'boolean' ? body.maintenanceMode : false,
             supportEmail: body.supportEmail || null,
             supportWhatsapp: body.supportWhatsapp || null,
-            asaasApiKey: body.asaasApiKey || null,
             asaasWalletId: body.asaasWalletId || null,
-            openaiApiKey: body.openaiApiKey || null,
-            geminiApiKey: body.geminiApiKey || null,
-            openrouterApiKey: body.openrouterApiKey || null,
-            elevenLabsApiKey: body.elevenLabsApiKey || null,
-            stripeSecretKey: body.stripeSecretKey || null,
             stripePublishableKey: body.stripePublishableKey || null,
-            mercadoPagoAccessToken: body.mercadoPagoAccessToken || null,
             googleClientId: body.googleClientId || null,
-            googleClientSecret: body.googleClientSecret || null,
             smtpHost: body.smtpHost || null,
             smtpPort: body.smtpPort ? parseInt(String(body.smtpPort)) : null,
             smtpUser: body.smtpUser || null,
-            smtpPass: body.smtpPass || null,
             smtpFrom: body.smtpFrom || null,
             systemBotId: body.systemBotId || null,
             logoColoredUrl: body.logoColoredUrl || null,
             logoWhiteUrl: body.logoWhiteUrl || null,
             metaAppId: body.metaAppId || null,
-            metaAppSecret: body.metaAppSecret || null,
-            metaVerifyToken: body.metaVerifyToken || null,
             metaWhatsappConfigId: body.metaWhatsappConfigId || null,
             metaInstagramConfigId: body.metaInstagramConfigId || null,
             mlClientId: body.mlClientId || null,
-            mlClientSecret: body.mlClientSecret || null,
             mapboxToken: body.mapboxToken || null
         };
+
+        // Campos sensíveis: só sobrescreve se o admin realmente digitou um
+        // valor novo e não vazio. Deixar em branco = "manter o que já está
+        // salvo" (o GET nunca devolve o valor real, então o campo sempre
+        // chega vazio a menos que tenha sido editado agora).
+        for (const field of SENSITIVE_FIELDS) {
+            const value = typeof body[field] === 'string' ? body[field].trim() : '';
+            if (value) {
+                updatePayload[field] = value;
+            }
+        }
 
         console.log(`[AdminConfig] [${timestamp}] Attempting upsert...`);
         const config = await prisma.globalConfig.upsert({
@@ -107,7 +145,7 @@ export async function PUT(req: Request) {
         });
 
         console.log(`[AdminConfig] [${timestamp}] Upsert success!`);
-        return NextResponse.json(config);
+        return NextResponse.json(sanitizeConfig(config));
     } catch (error) {
         console.error(`[AdminConfig] [${timestamp}] Critical Error:`, error);
         logToFile(`[AdminConfig] [${timestamp}] Critical Error: ${error instanceof Error ? error.message : String(error)}`);
