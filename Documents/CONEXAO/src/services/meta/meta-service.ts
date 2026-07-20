@@ -236,7 +236,11 @@ export class MetaService {
      * do Instagram). Sem isso, nada chega no nosso webhook.
      */
     static async subscribePageToWebhooks(pageId: string, pageAccessToken: string) {
-        const url = `${GRAPH_URL}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,comments`;
+        // "comments" não é um campo válido para subscribed_apps de Página vinculada ao
+        // Instagram (a Graph API rejeita o pedido inteiro com #100 "Param subscribed_fields[2]
+        // must be one of {...}" e nada fica inscrito, nem "messages"). Mantemos só os campos
+        // realmente suportados nesse contexto.
+        const url = `${GRAPH_URL}/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`;
         return graphFetch(url, {
             method: 'POST',
             headers: { Authorization: `Bearer ${pageAccessToken}` },
