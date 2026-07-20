@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
+import { MetaService } from '@/services/meta/meta-service';
+import { logToFile } from '@/services/engine/logger';
 
 // Helper to check bot ownership
 async function checkBotOwnership(botId: string, tenantId: string) {
@@ -105,8 +107,9 @@ export async function POST(req: Request, { params }: { params: any }) {
             where: { botId, provider }
         });
 
+        let savedChannel;
         if (existingChannel) {
-            const updated = await prisma.botChannel.update({
+            savedChannel = await prisma.botChannel.update({
                 where: { id: existingChannel.id },
                 data: {
                     identifier: identifier || existingChannel.identifier,
@@ -114,9 +117,8 @@ export async function POST(req: Request, { params }: { params: any }) {
                     status: 'CONNECTED' // assume connected if credentials provided
                 }
             });
-            return NextResponse.json(updated);
         } else {
-            const created = await prisma.botChannel.create({
+            savedChannel = await prisma.botChannel.create({
                 data: {
                     botId,
                     provider,
@@ -125,8 +127,42 @@ export async function POST(req: Request, { params }: { params: any }) {
                     status: 'CONNECTED'
                 }
             });
-            return NextResponse.json(created, { status: 201 });
         }
+
+        // Ao salvar credenciais manualmente para o WhatsApp Oficial (Meta), o front-end
+        // não passa pelo fluxo de Embedded Signup (connect-flow.ts), que é o único lugar
+        // que chamava subscribeAppToWaba. Sem essa assinatura, um token novo/válido não
+        // basta: a Meta continua sem enviar eventos de webhook pra essa WABA (por exemplo,
+        // depois que um token antigo expira com subcode 463, a Meta pausa o envio de
+        // eventos e só volta a mandar depois que o app se re-inscreve na WABA). Replicamos
+        // esse passo aqui para o caminho manual não ficar "mudo" silenciosamente.
+        let webhookSubscription: 'ok' | 'skipped' | 'failed' | undefined;
+        let webhookSubscriptionError: string | undefined;
+
+        if (provider === 'META_WHATSAPP') {
+            const creds = (credentials || {}) as any;
+            const wabaId = creds.wabaId;
+            const accessToken = creds.accessToken;
+
+            if (wabaId && accessToken) {
+                try {
+                    await MetaService.subscribeAppToWaba(wabaId, accessToken);
+                    webhookSubscription = 'ok';
+                } catch (e: any) {
+                    webhookSubscription = 'failed';
+                    webhookSubscriptionError = e?.message || 'Erro desconhecido';
+                    logToFile(`[Channels API] subscribeAppToWaba falhou para waba=${wabaId} botId=${botId}: ${webhookSubscriptionError}`);
+                }
+            } else if (accessToken) {
+                // Sem wabaId não temos como assinar o webhook — apenas avisamos.
+                webhookSubscription = 'skipped';
+            }
+        }
+
+        return NextResponse.json(
+            { ...savedChannel, webhookSubscription, webhookSubscriptionError },
+            { status: existingChannel ? 200 : 201 }
+        );
 
     } catch (error) {
         console.error('Error saving bot channel:', error);

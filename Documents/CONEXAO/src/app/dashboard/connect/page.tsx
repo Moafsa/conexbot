@@ -23,6 +23,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
 
     // Meta API Form States (fallback manual)
     const [metaPhoneId, setMetaPhoneId] = useState("");
+    const [metaWabaId, setMetaWabaId] = useState("");
     const [metaToken, setMetaToken] = useState("");
     const [instaAccountId, setInstaAccountId] = useState("");
     const [instaToken, setInstaToken] = useState("");
@@ -330,7 +331,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         return () => clearInterval(interval);
     }, [botId, clientId, step, activeTab]);
 
-    const handleSaveMetaChannel = async (provider: string, identifier: string, token: string) => {
+    const handleSaveMetaChannel = async (provider: string, identifier: string, token: string, wabaId?: string) => {
         if (!identifier || !token) {
             alert("Preencha todos os campos.");
             return;
@@ -344,15 +345,31 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                 body: JSON.stringify({
                     provider,
                     identifier,
-                    credentials: { accessToken: token },
+                    credentials: { accessToken: token, ...(wabaId ? { wabaId } : {}) },
                     clientId,
                 })
             });
 
+            const data = await res.json().catch(() => null);
+
             if (res.ok) {
-                alert("Canal configurado com sucesso!");
+                if (data?.webhookSubscription === 'failed') {
+                    alert(
+                        "Canal salvo, mas não foi possível assinar o webhook automaticamente " +
+                        `(${data?.webhookSubscriptionError || 'erro desconhecido'}). ` +
+                        "Sem essa assinatura, mensagens recebidas não chegam ao sistema. " +
+                        "Confira o WABA ID informado."
+                    );
+                } else if (data?.webhookSubscription === 'skipped') {
+                    alert(
+                        "Canal salvo. Informe o WABA ID para que o sistema assine o webhook automaticamente " +
+                        "(sem isso, mensagens recebidas podem não chegar)."
+                    );
+                } else {
+                    alert("Canal configurado com sucesso! Webhook assinado.");
+                }
             } else {
-                alert("Erro ao salvar canal.");
+                alert(`Erro ao salvar canal: ${data?.error || res.status}`);
             }
         } catch (e) {
             alert("Erro ao salvar.");
@@ -552,6 +569,19 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                                     />
                                                 </div>
                                                 <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Business Account ID (WABA ID)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={metaWabaId}
+                                                        onChange={e => setMetaWabaId(e.target.value)}
+                                                        className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
+                                                        placeholder="Ex: 998441572955892"
+                                                    />
+                                                    <p className="text-[11px] text-gray-400 mt-1">
+                                                        Necessário para o sistema assinar o webhook automaticamente. Sem isso, mensagens recebidas podem não chegar.
+                                                    </p>
+                                                </div>
+                                                <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-1">Access Token da Meta</label>
                                                     <input
                                                         type="password"
@@ -562,7 +592,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                                     />
                                                 </div>
                                                 <button
-                                                    onClick={() => handleSaveMetaChannel('META_WHATSAPP', metaPhoneId, metaToken)}
+                                                    onClick={() => handleSaveMetaChannel('META_WHATSAPP', metaPhoneId, metaToken, metaWabaId)}
                                                     disabled={isSaving}
                                                     className="w-full bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 rounded-lg transition"
                                                 >
