@@ -49,7 +49,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
         const state = encodeURIComponent(JSON.stringify({ m: 'p', token }));
-        const scope = 'instagram_basic,instagram_content_publishing,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
+        const scope = 'instagram_basic,instagram_content_publish,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
         const extras = encodeURIComponent(JSON.stringify({ setup: { channel: 'IG_API_ONBOARDING' } }));
 
         const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&display=page&extras=${extras}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
