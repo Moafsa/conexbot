@@ -8,11 +8,20 @@ export default function WhatsAppDocsPage() {
                 <div className="flex items-center gap-3 mb-6">
                     <Zap className="text-emerald-400" size={32} />
                     <h1 className="text-4xl font-black bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent italic tracking-tighter">
-                        WhatsApp (WuzAPI / Uzapi)
+                        WhatsApp via QR Code (Uzapi)
                     </h1>
                 </div>
                 <p className="text-gray-400 leading-relaxed text-lg max-w-2xl">
-                    Conecte seu assistente de IA ao canal mais importante de vendas do Brasil. Através da tecnologia **WuzAPI**, garantimos uma conexão estável, rápida e sem quedas.
+                    A forma mais rápida de conectar: escaneie um QR Code com qualquer número de WhatsApp e comece a vender em menos de um minuto. Ideal para começar rápido ou para operações menores.
+                </p>
+            </section>
+
+            {/* Comparison callout */}
+            <section className="p-6 glass rounded-[2rem] border border-white/10 bg-white/5 max-w-3xl flex items-start gap-4">
+                <Globe className="text-blue-400 shrink-0 mt-1" size={20} />
+                <p className="text-xs text-gray-400 leading-relaxed">
+                    Existe uma <strong className="text-white not-italic">segunda forma</strong> de conectar, homologada diretamente pela Meta, sem depender de um celular ligado 24h e com maior limite de disparo: veja{' '}
+                    <span className="text-blue-400 font-bold">WhatsApp Oficial (Meta Cloud API)</span> no menu ao lado. Use o QR Code (esta página) para validar rápido ou operar com baixo volume; use a Meta Oficial para operações maiores ou clientes que exigem número comercial verificado.
                 </p>
             </section>
 

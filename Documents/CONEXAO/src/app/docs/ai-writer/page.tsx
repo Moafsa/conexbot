@@ -93,7 +93,32 @@ export default function AIWriterDocsPage() {
                     </li>
                     <li className="flex items-start gap-3">
                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                        <p><strong>Teste Grátis:</strong> Contas em período de teste (trial) têm um limite de 5 posts gerados antes de exigir assinatura ativa.</p>
+                    </li>
+                    <li className="flex items-start gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
                         <p><strong>Renovação:</strong> Seus créditos são resetados automaticamente a cada novo ciclo de pagamento (30 dias).</p>
+                    </li>
+                </ul>
+            </section>
+
+            {/* License key lifecycle */}
+            <section className="p-10 glass rounded-[2.5rem] border border-white/10 bg-indigo-500/5 max-w-2xl relative group">
+                <h3 className="text-xl font-black text-white flex items-center gap-3 italic mb-6">
+                    <Sparkles className="text-indigo-400" /> Como a Chave `CNX-XXXX` Funciona
+                </h3>
+                <ul className="space-y-4 text-[11px] text-gray-500">
+                    <li className="flex items-start gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                        <p><strong>Emissão automática:</strong> A chave é gerada sozinha no momento em que a assinatura do Conext Writer é criada — não é preciso pedir nem gerar manualmente. Ela fica disponível para copiar em Meus Bots &gt; Writer.</p>
+                    </li>
+                    <li className="flex items-start gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                        <p><strong>Vínculo ao site:</strong> Ao ativar a chave no plugin, ela é vinculada à URL do WordPress. Trocar de domínio atualiza o vínculo automaticamente na próxima verificação.</p>
+                    </li>
+                    <li className="flex items-start gap-3">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                        <p><strong>Verificação em cada uso:</strong> Antes de gerar um artigo, o plugin consulta o servidor para confirmar que a assinatura está ativa e que ainda há créditos de posts/palavras disponíveis no plano.</p>
                     </li>
                 </ul>
             </section>

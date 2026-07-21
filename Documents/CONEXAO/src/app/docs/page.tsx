@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { 
-    Cpu, Zap, Brain, MessageSquare, ShieldCheck, PieChart, 
-    Globe, Calendar, Database, ArrowRight, Rocket, Settings, PencilLine
+import {
+    Cpu, Zap, Brain, MessageSquare, ShieldCheck, PieChart,
+    Globe, Calendar, Database, ArrowRight, Rocket, Settings, PencilLine,
+    Instagram, ShoppingBag, Truck, Briefcase, Megaphone, AudioLines
 } from "lucide-react";
 
 export default function DocsPage() {
@@ -33,75 +34,115 @@ export default function DocsPage() {
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <ModuleCard 
-                        title="WhatsApp de Elite" 
-                        desc="Configure instâncias Uzapi de latência zero para sua agência." 
-                        href="/docs/whatsapp" 
-                        icon={Zap} 
+                    <ModuleCard
+                        title="WhatsApp de Elite"
+                        desc="Conecte via QR Code (Uzapi) ou direto pela API Oficial da Meta."
+                        href="/docs/whatsapp"
+                        icon={Zap}
                         color="text-emerald-400"
                         bg="bg-emerald-500/5"
                     />
-                    <ModuleCard 
-                        title="Voz Humana Real" 
-                        desc="Sincronia neural com ElevenLabs para áudios que vendem." 
-                        href="/docs/intelligence" 
-                        icon={Cpu} 
+                    <ModuleCard
+                        title="Instagram Direct"
+                        desc="Responda DMs e publique no feed sem sair do painel."
+                        href="/docs/instagram"
+                        icon={Instagram}
+                        color="text-pink-500"
+                        bg="bg-pink-500/5"
+                    />
+                    <ModuleCard
+                        title="Voz Humana Real"
+                        desc="Sincronia neural com ElevenLabs para áudios que vendem."
+                        href="/docs/intelligence/elevenlabs"
+                        icon={AudioLines}
                         color="text-purple-400"
                         bg="bg-purple-500/5"
                     />
-                    <ModuleCard 
-                        title="Treinamento Rápido" 
-                        desc="Base de conhecimento via URL ou PDF em segundos." 
-                        href="/docs/ai-training" 
-                        icon={Brain} 
+                    <ModuleCard
+                        title="Treinamento Rápido"
+                        desc="Base de conhecimento via URL ou PDF em segundos."
+                        href="/docs/ai-training"
+                        icon={Brain}
                         color="text-pink-400"
                         bg="bg-pink-500/5"
                     />
-                    <ModuleCard 
-                        title="Agendamento IA" 
-                        desc="Booking inteligente com Google Calendar e lembretes." 
-                        href="/docs/agenda" 
-                        icon={Calendar} 
+                    <ModuleCard
+                        title="Agendamento IA"
+                        desc="Booking inteligente com Google Calendar e lembretes."
+                        href="/docs/agenda"
+                        icon={Calendar}
                         color="text-indigo-400"
                         bg="bg-indigo-500/5"
                     />
-                    <ModuleCard 
-                        title="CRM Visual Inteligente" 
-                        desc="Gestão tática baseada no sentimento e intenção do lead." 
-                        href="/docs/crm" 
-                        icon={PieChart} 
+                    <ModuleCard
+                        title="CRM Visual Inteligente"
+                        desc="Gestão tática baseada no sentimento e intenção do lead."
+                        href="/docs/crm"
+                        icon={PieChart}
                         color="text-blue-400"
                         bg="bg-blue-500/5"
                     />
-                    <ModuleCard 
-                        title="Split de Pagamentos" 
-                        desc="Configuração Asaas e divisão automática de MRR." 
-                        href="/docs/payments" 
-                        icon={Database} 
+                    <ModuleCard
+                        title="Entregadores & Logística"
+                        desc="Despache pedidos e acompanhe entregas em mapa ao vivo."
+                        href="/docs/drivers"
+                        icon={Truck}
                         color="text-orange-400"
                         bg="bg-orange-500/5"
                     />
-                    <ModuleCard 
-                        title="Supervisor AI" 
-                        desc="Auditoria e melhoria contínua dos seus agentes de IA." 
-                        href="/docs/intelligence" 
-                        icon={ShieldCheck} 
+                    <ModuleCard
+                        title="Mercado Livre"
+                        desc="Sincronize preço e estoque entre WooCommerce e seus anúncios."
+                        href="/docs/mercado-livre"
+                        icon={ShoppingBag}
+                        color="text-yellow-400"
+                        bg="bg-yellow-500/5"
+                    />
+                    <ModuleCard
+                        title="Split de Pagamentos"
+                        desc="Configuração Asaas e divisão automática de MRR."
+                        href="/docs/payments"
+                        icon={Database}
+                        color="text-emerald-500"
+                        bg="bg-emerald-500/5"
+                    />
+                    <ModuleCard
+                        title="Supervisor AI"
+                        desc="Auditoria e melhoria contínua dos seus agentes de IA."
+                        href="/docs/intelligence"
+                        icon={ShieldCheck}
                         color="text-cyan-400"
                         bg="bg-cyan-500/5"
                     />
-                    <ModuleCard 
-                        title="Conext Writer" 
-                        desc="IA para posts e SEO nativo dentro do WordPress." 
-                        href="/docs/ai-writer" 
-                        icon={PencilLine} 
+                    <ModuleCard
+                        title="Conext Writer"
+                        desc="IA para posts e SEO nativo dentro do WordPress."
+                        href="/docs/ai-writer"
+                        icon={PencilLine}
                         color="text-green-400"
                         bg="bg-green-500/5"
                     />
-                    <ModuleCard 
-                        title="Setup & Branding" 
-                        desc="Configuração White-Label e chaves de API." 
-                        href="/docs/settings" 
-                        icon={Settings} 
+                    <ModuleCard
+                        title="Marketing & Anúncios IA"
+                        desc="Posts, calendário e campanhas pagas para Instagram/Facebook."
+                        href="/docs/marketing"
+                        icon={Megaphone}
+                        color="text-fuchsia-400"
+                        bg="bg-fuchsia-500/5"
+                    />
+                    <ModuleCard
+                        title="Squads de Agência"
+                        desc="Time de especialistas em marketing movido a IA para sua operação."
+                        href="/docs/agency-suite"
+                        icon={Briefcase}
+                        color="text-indigo-400"
+                        bg="bg-indigo-500/5"
+                    />
+                    <ModuleCard
+                        title="Setup & Branding"
+                        desc="Configuração White-Label e chaves de API."
+                        href="/docs/settings"
+                        icon={Settings}
                         color="text-gray-400"
                         bg="bg-gray-500/5"
                     />

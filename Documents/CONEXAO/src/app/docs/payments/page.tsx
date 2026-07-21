@@ -66,22 +66,22 @@ export default function PaymentsDocsPage() {
                     </div>
 
                     <div className="p-8 border border-indigo-500/20 rounded-3xl bg-indigo-500/5">
-                        <h4 className="text-indigo-400 font-black mb-4 uppercase tracking-tighter italic text-xl">🚀 Modelo de Negócios para Parceiros</h4>
+                        <h4 className="text-indigo-400 font-black mb-4 uppercase tracking-tighter italic text-xl">🚀 Como funciona o modelo de Agência</h4>
                         <p className="text-sm text-gray-400 mb-6 font-light">
-                            Transforme o ConextBot em sua própria agência de IA. Você pode monetizar de três formas simultâneas:
+                            Criar uma conta de agência no Conext Bot é <strong className="text-white not-italic">gratuito</strong> — não existe taxa de cadastro. A agência é quem define e cobra o preço do cliente final; a plataforma nunca aparece nem cobra diretamente do cliente da agência.
                         </p>
                         <ul className="space-y-4">
                             <li className="flex items-start gap-3">
                                 <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
-                                <p className="text-xs text-gray-300"><strong>Setup & Criação:</strong> Cobre pela configuração inicial e personalização do bot para o cliente.</p>
+                                <p className="text-xs text-gray-300"><strong>Preço próprio (markup):</strong> A agência define sua própria margem sobre o preço-base de cada plano/produto e emite a fatura para o cliente com o valor que ela quiser.</p>
                             </li>
                             <li className="flex items-start gap-3">
                                 <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
-                                <p className="text-xs text-gray-300"><strong>Mensalidade (SaaS):</strong> Cancele ou ative o acesso do bot conforme o pagamento recorrente do seu cliente.</p>
+                                <p className="text-xs text-gray-300"><strong>Taxa de Split Automática:</strong> Cada cobrança feita pela agência ao seu cliente é processada na própria conta Asaas da agência. Um percentual configurado é enviado automaticamente para a Conext (split direto no gateway de pagamento), o restante fica com a agência — sem repasse manual.</p>
                             </li>
                             <li className="flex items-start gap-3">
                                 <div className="p-1 bg-indigo-500/20 rounded-lg"><ArrowRight size={12} className="text-indigo-400" /></div>
-                                <p className="text-xs text-gray-300"><strong>Split de Vendas:</strong> Receba um percentual automático de cada transação que o bot fechar via WhatsApp.</p>
+                                <p className="text-xs text-gray-300"><strong>Taxa decrescente por volume:</strong> Quanto maior o volume de vendas mensal da agência, menor o percentual de split cobrado pela plataforma — o modelo recompensa agências que escalam.</p>
                             </li>
                         </ul>
                     </div>
