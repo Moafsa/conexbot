@@ -151,7 +151,7 @@ function LoginContent() {
 
           <p className="mt-6 text-center text-sm text-gray-400">
             Não tem conta?{" "}
-            <Link href={`/auth/register${type ? `?type=${type}` : ''}`} className="text-indigo-400 hover:text-indigo-300 font-medium">
+            <Link href={type ? `/auth/register?type=${type}` : '/auth/register?isAgency=true'} className="text-indigo-400 hover:text-indigo-300 font-medium">
               Criar conta
             </Link>
           </p>

@@ -26,7 +26,7 @@ export default function Hero({ branding }: { branding?: any }) {
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto items-center mb-16 px-4 sm:px-0">
-                <Link href="/auth/register" className="btn-primary flex items-center justify-center w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 text-lg md:text-xl shadow-[0_0_30px_rgba(99,102,241,0.4)]">
+                <Link href="/auth/register?isAgency=true" className="btn-primary flex items-center justify-center w-full sm:w-auto px-8 md:px-12 py-4 md:py-5 text-lg md:text-xl shadow-[0_0_30px_rgba(99,102,241,0.4)]">
                     Criar Agência Grátis
                 </Link>
                 <Link href="#features" className="btn-outline flex items-center justify-center gap-3 w-full sm:w-auto text-lg md:text-xl px-8 md:px-10 py-4 md:py-5 border-white/20 text-white hover:bg-white/5 group">
