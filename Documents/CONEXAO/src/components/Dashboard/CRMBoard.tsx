@@ -525,10 +525,48 @@ export function CRMBoard({ botId }: { botId: string }) {
                                     >
                                         {stageContacts.map(contact => {
                                             const slaStatus = getSlaStatus(contact.slaExpiresAt);
-                                            const slaBorderColor = 
-                                                slaStatus === 'red' ? 'border-rose-500 ring-2 ring-rose-500/15 animate-pulse' :
-                                                slaStatus === 'yellow' ? 'border-amber-400 ring-2 ring-amber-400/15' :
-                                                'border-gray-100 hover:border-indigo-200';
+
+                                            // Determine contact status category
+                                            const isHumanRequested = contact.isPaused || 
+                                                                     contact.stage?.name?.toUpperCase().includes('HUMANO') || 
+                                                                     contact.stage?.name?.toUpperCase().includes('TRANSBORDO') ||
+                                                                     contact.needsHuman;
+
+                                            const activeOrders = (contact.orders || []).filter((o: any) => 
+                                                ['PENDING', 'DISPATCHED', 'IN_TRANSIT', 'CONFIRMED', 'PROCESSING'].includes(o.status)
+                                            );
+                                            const hasActiveOrder = activeOrders.length > 0;
+
+                                            const deliveredOrders = (contact.orders || []).filter((o: any) => 
+                                                ['DELIVERED', 'COMPLETED', 'PAID'].includes(o.status)
+                                            );
+                                            const hasDeliveredOrder = !hasActiveOrder && deliveredOrders.length > 0;
+
+                                            let cardBgStyle = 'bg-white border-gray-200 hover:border-indigo-200';
+                                            let customBadge = null;
+
+                                            if (isHumanRequested) {
+                                                cardBgStyle = 'bg-purple-50/90 border-purple-300 ring-2 ring-purple-500/30 hover:border-purple-400 shadow-purple-100/50';
+                                                customBadge = (
+                                                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm animate-pulse">
+                                                        👨‍💼 ATENDIMENTO HUMANO
+                                                    </span>
+                                                );
+                                            } else if (hasActiveOrder) {
+                                                cardBgStyle = 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-400/30 hover:border-amber-400 shadow-amber-100/50';
+                                                customBadge = (
+                                                    <span className="bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
+                                                        📦 EM ENTREGA
+                                                    </span>
+                                                );
+                                            } else if (hasDeliveredOrder) {
+                                                cardBgStyle = 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 hover:border-emerald-400 shadow-emerald-100/50';
+                                                customBadge = (
+                                                    <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
+                                                        ✅ PEDIDO ENTREGUE
+                                                    </span>
+                                                );
+                                            }
 
                                             return (
                                                 <div
@@ -539,7 +577,7 @@ export function CRMBoard({ botId }: { botId: string }) {
                                                         e.stopPropagation();
                                                         setSelectedContactId(contact.id);
                                                     }}
-                                                    className={`group relative bg-white p-4 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 ${selectedContactId === contact.id ? 'border-indigo-500 ring-4 ring-indigo-500/10' : slaBorderColor}`}
+                                                    className={`group relative p-4 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 ${cardBgStyle} ${selectedContactId === contact.id ? 'ring-4 ring-indigo-500/20 border-indigo-500' : ''}`}
                                                 >
                                                     <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         {contact.dealValue && contact.dealValue > 0 ? (
@@ -575,14 +613,21 @@ export function CRMBoard({ botId }: { botId: string }) {
                                                         </div>
                                                     </div>
 
-                                                    {/* Channel Badge & SLA Info */}
+                                                    {/* Custom Category Badge & Channel Badge & SLA Info */}
                                                     <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                                                        {customBadge}
                                                         {contact.channel && renderChannelIcon(contact.channel)}
                                                         {slaStatus === 'red' && (
                                                             <span className="bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-rose-100 flex items-center gap-1 animate-pulse">
                                                                 <Clock size={10} /> SLA VENCIDO
                                                             </span>
                                                         )}
+                                                        {slaStatus === 'yellow' && (
+                                                            <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-amber-100 flex items-center gap-1">
+                                                                <Clock size={10} /> RESOLVER HOJE
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                         {slaStatus === 'yellow' && (
                                                             <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-amber-100 flex items-center gap-1">
                                                                 <Clock size={10} /> RESOLVER HOJE

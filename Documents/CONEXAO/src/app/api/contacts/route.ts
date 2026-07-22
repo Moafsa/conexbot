@@ -211,7 +211,28 @@ export async function GET(req: Request) {
             }
         });
 
-        return NextResponse.json(contacts);
+        const phoneList = contacts.map(c => c.phone);
+        const conversations = await prisma.conversation.findMany({
+            where: {
+                remoteId: { in: phoneList }
+            },
+            select: { remoteId: true, pausedUntil: true }
+        });
+
+        const conversationMap = new Map();
+        conversations.forEach(conv => {
+            if (conv.pausedUntil && new Date(conv.pausedUntil) > new Date()) {
+                conversationMap.set(conv.remoteId, conv.pausedUntil);
+            }
+        });
+
+        const enrichedContacts = contacts.map(c => ({
+            ...c,
+            isPaused: conversationMap.has(c.phone),
+            pausedUntil: conversationMap.get(c.phone) || null
+        }));
+
+        return NextResponse.json(enrichedContacts);
     } catch (error) {
         console.error('[API] Error fetching contacts:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

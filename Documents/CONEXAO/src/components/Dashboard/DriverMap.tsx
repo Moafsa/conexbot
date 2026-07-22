@@ -940,11 +940,20 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        handleFlyToDriver(driver);
+                                                    }}
+                                                    className="text-amber-300 hover:text-amber-200 transition font-bold flex items-center gap-1 cursor-pointer bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20"
+                                                >
+                                                    <Eye className="h-2.5 w-2.5" /> Ver Entregas
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         handleSendAppLink(driver.id, driver.name);
                                                     }}
                                                     className="text-emerald-400 hover:text-emerald-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
                                                 >
-                                                    <Smartphone className="h-2.5 w-2.5" /> Enviar App
+                                                    <Smartphone className="h-2.5 w-2.5" /> App
                                                 </button>
                                                 <button 
                                                     onClick={(e) => {
@@ -973,21 +982,22 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     </div>
                 </div>
 
-                {/* Selected Driver Details */}
+                {/* Modal de Entregas & Histórico do Entregador */}
                 {selectedDriver && (
-                    <div className="p-5 border-t border-white/5 bg-slate-950/90 max-h-[450px] overflow-y-auto custom-scrollbar-white">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Painel do Motorista</h3>
-                                <h4 className="text-sm font-bold text-white mt-0.5">{selectedDriver.name}</h4>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                        <div className="w-full max-w-lg bg-[#07041a] border border-indigo-500/30 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar-white text-white animate-fade-in">
+                            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                                <div>
+                                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Painel do Entregador</h3>
+                                    <h4 className="text-base font-bold text-white mt-0.5">{selectedDriver.name}</h4>
+                                </div>
+                                <button 
+                                    onClick={() => setSelectedDriver(null)}
+                                    className="text-gray-400 hover:text-white transition text-lg bg-transparent border-0 cursor-pointer"
+                                >
+                                    &times;
+                                </button>
                             </div>
-                            <button 
-                                onClick={() => setSelectedDriver(null)}
-                                className="text-xs text-gray-400 hover:text-white"
-                            >
-                                ✕ Fechar
-                            </button>
-                        </div>
                         
                         {/* Tabs */}
                         <div className="flex border-b border-white/10 mt-3 mb-3">
@@ -1169,7 +1179,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                             </div>
                         )}
                     </div>
-                )}
+                </div>
+            )}
             </div>
 
             {/* Column 3: Mapbox Map */}
