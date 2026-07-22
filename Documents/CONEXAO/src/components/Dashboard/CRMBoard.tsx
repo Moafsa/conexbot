@@ -628,12 +628,6 @@ export function CRMBoard({ botId }: { botId: string }) {
                                                             </span>
                                                         )}
                                                     </div>
-                                                        {slaStatus === 'yellow' && (
-                                                            <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-amber-100 flex items-center gap-1">
-                                                                <Clock size={10} /> RESOLVER HOJE
-                                                            </span>
-                                                        )}
-                                                    </div>
 
                                                     {/* Last Message/Insight snippet */}
                                                     {contact.lastAiInsight && (
