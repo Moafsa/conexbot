@@ -79,6 +79,36 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     // Responsive UI state
     const [activeView, setActiveView] = useState<'map' | 'orders' | 'drivers'>('map');
 
+    // Driver Details Tab & History State
+    const [driverTab, setDriverTab] = useState<'active' | 'history'>('active');
+    const [historyData, setHistoryData] = useState<any>(null);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [cityFilter, setCityFilter] = useState('ALL');
+    const [statusFilter, setStatusFilter] = useState('ALL');
+
+    const fetchDriverHistory = async (driverId: string) => {
+        try {
+            setLoadingHistory(true);
+            const res = await fetch(`/api/drivers/${driverId}/history`);
+            if (res.ok) {
+                const data = await res.json();
+                setHistoryData(data);
+            }
+        } catch (err) {
+            console.error('Error fetching driver history:', err);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedDriver?.id) {
+            fetchDriverHistory(selectedDriver.id);
+        } else {
+            setHistoryData(null);
+        }
+    }, [selectedDriver?.id]);
+
     // 1. Fetch Drivers Data
     const fetchDrivers = async () => {
         try {
@@ -945,10 +975,10 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
 
                 {/* Selected Driver Details */}
                 {selectedDriver && (
-                    <div className="p-5 border-t border-white/5 bg-slate-950/80">
+                    <div className="p-5 border-t border-white/5 bg-slate-950/90 max-h-[450px] overflow-y-auto custom-scrollbar-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Entregas do Motorista</h3>
+                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Painel do Motorista</h3>
                                 <h4 className="text-sm font-bold text-white mt-0.5">{selectedDriver.name}</h4>
                             </div>
                             <button 
@@ -959,59 +989,185 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                             </button>
                         </div>
                         
-                        <div className="mt-3 space-y-3">
-                            {selectedDriver.assignedOrders?.length === 0 ? (
-                                <p className="text-[11px] text-gray-400 italic">Sem entregas ativas no momento.</p>
-                            ) : (
-                                selectedDriver.assignedOrders?.map((order: any) => (
-                                    <div key={order.id} className="p-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] space-y-2 relative">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-indigo-300">#{order.id.substring(0, 6)}</span>
-                                            <div className="flex items-center gap-2">
-                                                <DeliveryTimer startTime={order.updatedAt || order.createdAt} />
-                                                <span className="text-[8px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
-                                                    {order.status}
-                                                </span>
+                        {/* Tabs */}
+                        <div className="flex border-b border-white/10 mt-3 mb-3">
+                            <button
+                                onClick={() => setDriverTab('active')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold border-b-2 transition ${
+                                    driverTab === 'active'
+                                        ? 'border-indigo-500 text-indigo-400'
+                                        : 'border-transparent text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                🚚 Ativas ({selectedDriver.assignedOrders?.length || 0})
+                            </button>
+                            <button
+                                onClick={() => setDriverTab('history')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold border-b-2 transition ${
+                                    driverTab === 'history'
+                                        ? 'border-indigo-500 text-indigo-400'
+                                        : 'border-transparent text-gray-400 hover:text-white'
+                                }`}
+                            >
+                                📜 Histórico ({historyData?.totalCount || 0})
+                            </button>
+                        </div>
+
+                        {/* TAB 1: ACTIVE DELIVERIES */}
+                        {driverTab === 'active' && (
+                            <div className="space-y-3">
+                                {selectedDriver.assignedOrders?.length === 0 ? (
+                                    <p className="text-[11px] text-gray-400 italic">Sem entregas ativas no momento.</p>
+                                ) : (
+                                    selectedDriver.assignedOrders?.map((order: any) => (
+                                        <div key={order.id} className="p-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] space-y-2 relative">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-bold text-indigo-300">#{order.id.substring(0, 6)}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <DeliveryTimer startTime={order.updatedAt || order.createdAt} />
+                                                    <span className="text-[8px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
+                                                        {order.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
+                                            <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+
+                                            {/* Action buttons */}
+                                            <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-white/5">
+                                                <button
+                                                    onClick={() => handleOrderAction(order.id, 'UNASSIGN')}
+                                                    className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    title="Devolver pedido para a lista de pendentes"
+                                                >
+                                                    <Undo2 className="h-3 w-3" /> Devolver
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOrderAction(order.id, 'DELIVER')}
+                                                    className="px-2 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    title="Marcar entrega como concluída"
+                                                >
+                                                    <CheckCircle2 className="h-3 w-3" /> Entregue
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOrderAction(order.id, 'CANCEL')}
+                                                    className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    title="Cancelar entrega"
+                                                >
+                                                    <XCircle className="h-3 w-3" /> Cancelar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleOrderAction(order.id, 'DELETE')}
+                                                    className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    title="Excluir pedido permanentemente"
+                                                >
+                                                    <Trash2 className="h-3 w-3" /> Excluir
+                                                </button>
                                             </div>
                                         </div>
-                                        <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
-                                        <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+                                    ))
+                                )}
+                            </div>
+                        )}
 
-                                        {/* Action buttons */}
-                                        <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-white/5">
-                                            <button
-                                                onClick={() => handleOrderAction(order.id, 'UNASSIGN')}
-                                                className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
-                                                title="Devolver pedido para a lista de pendentes"
-                                            >
-                                                <Undo2 className="h-3 w-3" /> Devolver
-                                            </button>
-                                            <button
-                                                onClick={() => handleOrderAction(order.id, 'DELIVER')}
-                                                className="px-2 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
-                                                title="Marcar entrega como concluída"
-                                            >
-                                                <CheckCircle2 className="h-3 w-3" /> Entregue
-                                            </button>
-                                            <button
-                                                onClick={() => handleOrderAction(order.id, 'CANCEL')}
-                                                className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
-                                                title="Cancelar entrega"
-                                            >
-                                                <XCircle className="h-3 w-3" /> Cancelar
-                                            </button>
-                                            <button
-                                                onClick={() => handleOrderAction(order.id, 'DELETE')}
-                                                className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
-                                                title="Excluir pedido permanentemente"
-                                            >
-                                                <Trash2 className="h-3 w-3" /> Excluir
-                                            </button>
-                                        </div>
+                        {/* TAB 2: DELIVERY HISTORY GROUPED BY CITY */}
+                        {driverTab === 'history' && (
+                            <div className="space-y-3">
+                                {/* Filters */}
+                                <div className="grid grid-cols-2 gap-2 bg-white/5 p-2 rounded-xl border border-white/5">
+                                    <div>
+                                        <label className="text-[9px] text-gray-400 block mb-1 font-semibold">Cidade:</label>
+                                        <select
+                                            value={cityFilter}
+                                            onChange={(e) => setCityFilter(e.target.value)}
+                                            className="w-full bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-white p-1 outline-none"
+                                        >
+                                            <option value="ALL">Todas as Cidades</option>
+                                            {historyData?.cities?.map((c: string) => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                    <div>
+                                        <label className="text-[9px] text-gray-400 block mb-1 font-semibold">Status:</label>
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            className="w-full bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-white p-1 outline-none"
+                                        >
+                                            <option value="ALL">Todos os Status</option>
+                                            <option value="DELIVERED">Entregues</option>
+                                            <option value="CANCELLED">Canceladas</option>
+                                            <option value="DISPATCHED">Em Andamento</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {loadingHistory ? (
+                                    <div className="py-6 text-center text-gray-400 text-xs flex flex-col items-center justify-center gap-2">
+                                        <RefreshCw className="h-4 w-4 animate-spin text-indigo-400" />
+                                        <span>Carregando histórico...</span>
+                                    </div>
+                                ) : !historyData || historyData.orders?.length === 0 ? (
+                                    <p className="text-[11px] text-gray-400 italic py-4 text-center">Nenhum registro no histórico.</p>
+                                ) : (() => {
+                                    const filtered = (historyData.orders || []).filter((o: any) => {
+                                        const matchCity = cityFilter === 'ALL' || o.city === cityFilter;
+                                        const matchStatus = statusFilter === 'ALL' || o.status === statusFilter;
+                                        return matchCity && matchStatus;
+                                    });
+
+                                    if (filtered.length === 0) {
+                                        return <p className="text-[11px] text-gray-400 italic py-4 text-center">Nenhuma entrega encontrada para os filtros selecionados.</p>;
+                                    }
+
+                                    const ordersByCity: Record<string, any[]> = {};
+                                    filtered.forEach((o: any) => {
+                                        const c = o.city || 'Geral';
+                                        if (!ordersByCity[c]) ordersByCity[c] = [];
+                                        ordersByCity[c].push(o);
+                                    });
+
+                                    return Object.keys(ordersByCity).map(cityName => (
+                                        <div key={cityName} className="space-y-2 mb-3">
+                                            <div className="flex items-center justify-between px-1 border-b border-white/10 pb-1">
+                                                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1">
+                                                    📍 {cityName}
+                                                </span>
+                                                <span className="text-[9px] text-gray-400 font-semibold bg-white/5 px-2 py-0.5 rounded-full">
+                                                    {ordersByCity[cityName].length} entregas
+                                                </span>
+                                            </div>
+                                            {ordersByCity[cityName].map((order: any) => (
+                                                <div key={order.id} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-[11px] space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-indigo-300">#{order.id.substring(0, 6)}</span>
+                                                        <span className={`text-[8px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                                                            order.status === 'DELIVERED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                                            order.status === 'CANCELLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                                                            'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                        }`}>
+                                                            {order.status === 'DELIVERED' ? 'ENTREGUE' : order.status === 'CANCELLED' ? 'CANCELADO' : order.status}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
+                                                    <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+                                                    {order.items && order.items.length > 0 && (
+                                                        <p className="text-[10px] text-purple-300">
+                                                            <b>Itens:</b> {order.items.map((i: any) => `${i.product?.name || 'Item'} x${i.quantity}`).join(', ')}
+                                                        </p>
+                                                    )}
+                                                    <div className="flex items-center justify-between text-[9px] text-gray-500 pt-1.5 border-t border-white/5">
+                                                        <span className="font-bold text-emerald-400">R$ {Number(order.totalAmount || 0).toFixed(2)}</span>
+                                                        <span>{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
