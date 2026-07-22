@@ -28,17 +28,22 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
     const [bots, setBots] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
     useEffect(() => {
-        if (activeTab === 'chat' && messages.length > 0) {
-            scrollToBottom();
+        if (activeTab === 'chat') {
+            const timer = setTimeout(scrollToBottom, 100);
+            return () => clearTimeout(timer);
         }
-    }, [messages, activeTab, isTyping]);
+    }, [messages.length, activeTab, isTyping]);
 
     useEffect(() => {
         fetchContactData();
@@ -280,7 +285,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-gray-50/30 custom-scrollbar">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-gray-50/30 custom-scrollbar">
 
                 {activeTab === 'chat' && (
                     <div className="flex flex-col h-full">

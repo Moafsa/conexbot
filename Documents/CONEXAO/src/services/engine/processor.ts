@@ -182,29 +182,40 @@ export const MessageProcessor = {
 
             // 3. Find or create conversation (capture ad attribution on first touch)
             const adAttr = options.adAttribution;
-            const conversation = await prisma.conversation.upsert({
+            const phoneVariations = PhoneUtils.getVariations(senderPhone);
+            let conversation = await prisma.conversation.findFirst({
                 where: {
-                    botId_remoteId: { botId: bot.id, remoteId: senderPhone },
-                },
-                update: { updatedAt: new Date() },
-                create: {
                     botId: bot.id,
-                    remoteId: senderPhone,
-                    channel: channel,
-                    ...(adAttr && {
-                        utmSource:    adAttr.utmSource,
-                        utmMedium:    adAttr.utmMedium,
-                        utmCampaign:  adAttr.utmCampaign,
-                        utmContent:   adAttr.utmContent,
-                        adId:         adAttr.adId,
-                        adName:       adAttr.adName,
-                        campaignId:   adAttr.campaignId,
-                        campaignName: adAttr.campaignName,
-                        entrySource:  adAttr.entrySource,
-                        referrer:     adAttr.referrer,
-                    }),
-                } as any,
+                    remoteId: { in: phoneVariations },
+                },
             });
+
+            if (conversation) {
+                await prisma.conversation.update({
+                    where: { id: conversation.id },
+                    data: { updatedAt: new Date(), remoteId: senderPhone }
+                }).catch(() => {});
+            } else {
+                conversation = await prisma.conversation.create({
+                    data: {
+                        botId: bot.id,
+                        remoteId: senderPhone,
+                        channel: channel,
+                        ...(adAttr && {
+                            utmSource:    adAttr.utmSource,
+                            utmMedium:    adAttr.utmMedium,
+                            utmCampaign:  adAttr.utmCampaign,
+                            utmContent:   adAttr.utmContent,
+                            adId:         adAttr.adId,
+                            adName:       adAttr.adName,
+                            campaignId:   adAttr.campaignId,
+                            campaignName: adAttr.campaignName,
+                            entrySource:  adAttr.entrySource,
+                            referrer:     adAttr.referrer,
+                        }),
+                    } as any,
+                });
+            }
 
             // 3.5. Specialized input processing
             let contentToSave = messageText;
@@ -276,8 +287,11 @@ export const MessageProcessor = {
             const history = rawHistory.reverse();
 
             // 6. CRM Extraction & Contact Management
-            let existingContact: any = await prisma.contact.findUnique({
-                where: { phone_botId: { phone: senderPhone, botId: bot.id } },
+            let existingContact: any = await prisma.contact.findFirst({
+                where: {
+                    botId: bot.id,
+                    phone: { in: phoneVariations },
+                },
                 include: {
                     orders: { orderBy: { createdAt: 'desc' }, take: 5 }
                 }
