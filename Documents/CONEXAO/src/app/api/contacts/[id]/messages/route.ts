@@ -6,6 +6,7 @@ import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import { sendOutboundMessageToPhone } from '@/services/engine/outbound-notifier';
 import { ChatwootService } from '@/services/engine/chatwoot';
 import { getRedis } from '@/lib/redis';
+import { getPhoneVariations, PhoneUtils } from '@/lib/phone-utils';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -49,8 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
 
         // 3. Find or create conversation by remoteId (phone variations)
-        const { PhoneUtils } = await import('@/lib/phone-utils');
-        const phoneVariations = PhoneUtils.getPhoneVariations(contact.phone);
+        const phoneVariations = getPhoneVariations(contact.phone);
 
         let conversation = await prisma.conversation.findFirst({
             where: {

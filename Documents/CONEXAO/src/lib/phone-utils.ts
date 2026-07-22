@@ -137,6 +137,10 @@ export const PhoneUtils = {
         return getPhoneVariations(phone);
     },
 
+    getPhoneVariations(phone: string): string[] {
+        return getPhoneVariations(phone);
+    },
+
     /**
      * Compares two normalized phone numbers.
      */
