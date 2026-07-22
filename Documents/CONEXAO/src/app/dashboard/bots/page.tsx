@@ -436,64 +436,80 @@ export default function BotsPage() {
 
                             <h3 className="font-bold text-lg mb-1">{bot.name}</h3>
                             <p className="text-sm text-gray-400 mb-3">{bot.businessType}</p>
+                            
                             {/* Channel Connection Status Badges */}
-                            <div className="flex flex-wrap items-center gap-2 my-3">
-                                {/* UzAPI WhatsApp */}
-                                <div 
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
-                                        bot.connectionStatus === 'CONNECTED' 
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                            : 'bg-white/5 text-gray-400 border-white/10'
-                                    }`}
-                                    title={`UzAPI WhatsApp: ${bot.connectionStatus === 'CONNECTED' ? 'Conectado' : 'Desconectado'}`}
-                                >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-                                    <span>UzAPI (QR)</span>
-                                </div>
+                            {(() => {
+                                const isWuzapiConnected = bot.connectionStatus === 'CONNECTED' || 
+                                                          bot.channels?.some((c: any) => (c.provider === 'whatsapp' || c.provider === 'UZAPI') && c.status === 'CONNECTED');
 
-                                {/* Meta Cloud WhatsApp */}
-                                <div 
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
-                                        (bot.metaAccessToken && bot.metaPhoneNumberId) 
-                                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' 
-                                            : 'bg-white/5 text-gray-400 border-white/10'
-                                    }`}
-                                    title={`Meta WhatsApp: ${(bot.metaAccessToken && bot.metaPhoneNumberId) ? 'Conectado' : 'Desconectado'}`}
-                                >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${(bot.metaAccessToken && bot.metaPhoneNumberId) ? 'bg-indigo-400 animate-pulse' : 'bg-rose-500'}`} />
-                                    <span>Meta Cloud</span>
-                                </div>
+                                const isMetaConnected = Boolean(
+                                    bot.channels?.some((c: any) => (c.provider === 'META_WHATSAPP' || c.provider === 'meta_whatsapp' || c.provider === 'meta') && c.status === 'CONNECTED')
+                                );
 
-                                {/* Instagram Direct */}
-                                <div 
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
-                                        (bot.instagramPageId || bot.instagramAccessToken) 
-                                            ? 'bg-pink-500/10 text-pink-300 border-pink-500/20' 
-                                            : 'bg-white/5 text-gray-400 border-white/10'
-                                    }`}
-                                    title={`Instagram Direct: ${(bot.instagramPageId || bot.instagramAccessToken) ? 'Conectado' : 'Desconectado'}`}
-                                >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${(bot.instagramPageId || bot.instagramAccessToken) ? 'bg-pink-400 animate-pulse' : 'bg-rose-500'}`} />
-                                    <span>Instagram</span>
-                                </div>
+                                const isInstagramConnected = Boolean(
+                                    bot.channels?.some((c: any) => (c.provider === 'instagram' || c.provider === 'INSTAGRAM') && c.status === 'CONNECTED')
+                                );
 
-                                <div className="ml-auto flex items-center gap-2">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleToggleStatus(bot.id, bot.status);
-                                        }}
-                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                            bot.status === 'active'
-                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
-                                                : 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20'
-                                        }`}
-                                    >
-                                        {bot.status === 'active' ? <Zap size={10} className="fill-current" /> : <Pause size={10} className="fill-current" />}
-                                        {bot.status === 'active' ? 'Ativo' : 'Pausado'}
-                                    </button>
-                                </div>
-                            </div>
+                                return (
+                                    <div className="flex flex-wrap items-center gap-2 my-3">
+                                        {/* UzAPI WhatsApp */}
+                                        <div 
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                                isWuzapiConnected 
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                                                    : 'bg-white/5 text-gray-400 border-white/10'
+                                            }`}
+                                            title={`UzAPI WhatsApp: ${isWuzapiConnected ? 'Conectado' : 'Desconectado'}`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isWuzapiConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                                            <span>UzAPI (QR)</span>
+                                        </div>
+
+                                        {/* Meta Cloud WhatsApp */}
+                                        <div 
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                                isMetaConnected 
+                                                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' 
+                                                    : 'bg-white/5 text-gray-400 border-white/10'
+                                            }`}
+                                            title={`Meta WhatsApp Cloud: ${isMetaConnected ? 'Conectado' : 'Desconectado'}`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isMetaConnected ? 'bg-indigo-400 animate-pulse' : 'bg-rose-500'}`} />
+                                            <span>Meta Cloud</span>
+                                        </div>
+
+                                        {/* Instagram Direct */}
+                                        <div 
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                                isInstagramConnected 
+                                                    ? 'bg-pink-500/20 text-pink-300 border-pink-500/40' 
+                                                    : 'bg-white/5 text-gray-400 border-white/10'
+                                            }`}
+                                            title={`Instagram Direct: ${isInstagramConnected ? 'Conectado' : 'Desconectado'}`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isInstagramConnected ? 'bg-pink-400 animate-pulse' : 'bg-rose-500'}`} />
+                                            <span>Instagram</span>
+                                        </div>
+
+                                        <div className="ml-auto flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleToggleStatus(bot.id, bot.status);
+                                                }}
+                                                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all border ${
+                                                    bot.status === 'active'
+                                                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20'
+                                                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20'
+                                                }`}
+                                            >
+                                                {bot.status === 'active' ? <Zap size={10} className="fill-current" /> : <Pause size={10} className="fill-current" />}
+                                                {bot.status === 'active' ? 'Ativo' : 'Pausado'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="grid grid-cols-2 gap-4 mb-6">
                                 <div className="bg-white/5 p-3 rounded-lg">
