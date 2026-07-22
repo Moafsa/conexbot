@@ -436,11 +436,47 @@ export default function BotsPage() {
 
                             <h3 className="font-bold text-lg mb-1">{bot.name}</h3>
                             <p className="text-sm text-gray-400 mb-3">{bot.businessType}</p>
-                            <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-                                <span className={`w-2 h-2 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`}></span>
-                                <span className={bot.connectionStatus === 'CONNECTED' ? 'text-emerald-500' : 'text-yellow-500'}>
-                                    {bot.connectionStatus === 'CONNECTED' ? 'Conectado' : (bot.connectionStatus || 'Aguardando Conexão')}
-                                </span>
+                            {/* Channel Connection Status Badges */}
+                            <div className="flex flex-wrap items-center gap-2 my-3">
+                                {/* UzAPI WhatsApp */}
+                                <div 
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                        bot.connectionStatus === 'CONNECTED' 
+                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                            : 'bg-white/5 text-gray-400 border-white/10'
+                                    }`}
+                                    title={`UzAPI WhatsApp: ${bot.connectionStatus === 'CONNECTED' ? 'Conectado' : 'Desconectado'}`}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${bot.connectionStatus === 'CONNECTED' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                                    <span>UzAPI (QR)</span>
+                                </div>
+
+                                {/* Meta Cloud WhatsApp */}
+                                <div 
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                        (bot.metaAccessToken && bot.metaPhoneNumberId) 
+                                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' 
+                                            : 'bg-white/5 text-gray-400 border-white/10'
+                                    }`}
+                                    title={`Meta WhatsApp: ${(bot.metaAccessToken && bot.metaPhoneNumberId) ? 'Conectado' : 'Desconectado'}`}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${(bot.metaAccessToken && bot.metaPhoneNumberId) ? 'bg-indigo-400 animate-pulse' : 'bg-rose-500'}`} />
+                                    <span>Meta Cloud</span>
+                                </div>
+
+                                {/* Instagram Direct */}
+                                <div 
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                        (bot.instagramPageId || bot.instagramAccessToken) 
+                                            ? 'bg-pink-500/10 text-pink-300 border-pink-500/20' 
+                                            : 'bg-white/5 text-gray-400 border-white/10'
+                                    }`}
+                                    title={`Instagram Direct: ${(bot.instagramPageId || bot.instagramAccessToken) ? 'Conectado' : 'Desconectado'}`}
+                                >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${(bot.instagramPageId || bot.instagramAccessToken) ? 'bg-pink-400 animate-pulse' : 'bg-rose-500'}`} />
+                                    <span>Instagram</span>
+                                </div>
+
                                 <div className="ml-auto flex items-center gap-2">
                                     <button
                                         onClick={(e) => {
