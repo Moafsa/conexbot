@@ -237,6 +237,28 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
         }
     };
 
+    const handleOrderAction = async (orderId: string, action: 'PAY' | 'DELETE') => {
+        try {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            toast.loading(action === 'PAY' ? 'Marcando fatura como paga...' : 'Excluindo fatura...', { id: 'finance-action' });
+            const res = await fetch(`/api/drivers/orders/action${query}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, action })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                toast.success(data.message || 'Sucesso!', { id: 'finance-action' });
+                fetchContactData({ silent: true });
+            } else {
+                const errData = await res.json();
+                toast.error(errData.error || 'Erro na operação', { id: 'finance-action' });
+            }
+        } catch (error) {
+            toast.error('Erro de conexão', { id: 'finance-action' });
+        }
+    };
+
     if (loading) return (
         <div className="w-full h-full flex items-center justify-center bg-white border-l shadow-2xl animate-fade-in">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -470,11 +492,31 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                             ))}
                                         </div>
 
-                                        <div className="flex items-center gap-2 pt-3 border-t border-gray-50">
-                                            {order.status === 'RECEIVED' ? <CheckCircle2 size={12} className="text-green-500" /> : <Clock size={12} className="text-amber-500" />}
-                                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                                                {order.status === 'RECEIVED' ? 'Pagamento Confirmado' : 'Aguardando Compensação'}
-                                            </span>
+                                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                                            <div className="flex items-center gap-1.5">
+                                                {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' ? <CheckCircle2 size={12} className="text-green-500" /> : <Clock size={12} className="text-amber-500" />}
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+                                                    {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' ? 'Pagamento Confirmado' : 'Aguardando Compensação'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                {(order.status !== 'RECEIVED' && order.status !== 'CONFIRMED' && order.status !== 'PAID') && (
+                                                    <button
+                                                        onClick={() => handleOrderAction(order.id, 'PAY')}
+                                                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition cursor-pointer border border-emerald-200"
+                                                        title="Marcar fatura como paga"
+                                                    >
+                                                        <CheckCircle2 size={10} /> Pago
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleOrderAction(order.id, 'DELETE')}
+                                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition cursor-pointer border border-red-200"
+                                                    title="Excluir fatura"
+                                                >
+                                                    <Trash2 size={10} /> Excluir
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))

@@ -30,6 +30,7 @@ interface Contact {
     email: string | null;
     funnelStage: string;
     stageId: string | null;
+    stage?: { id: string; name: string } | null;
     leadScore: number;
     sentiment: string | null;
     lastAiInsight: string | null;
@@ -42,6 +43,9 @@ interface Contact {
     assignedAgentName?: string | null;
     assignedAgentAvatar?: string | null;
     dealValue?: number;
+    isPaused?: boolean;
+    needsHuman?: boolean;
+    orders?: any[];
     _count?: { orders: number };
 }
 
@@ -546,23 +550,23 @@ export function CRMBoard({ botId }: { botId: string }) {
                                             let customBadge = null;
 
                                             if (isHumanRequested) {
-                                                cardBgStyle = 'bg-purple-50/90 border-purple-300 ring-2 ring-purple-500/30 hover:border-purple-400 shadow-purple-100/50';
+                                                cardBgStyle = 'bg-purple-100 border-purple-400 ring-2 ring-purple-500/40 shadow-md';
                                                 customBadge = (
-                                                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm animate-pulse">
+                                                    <span className="bg-purple-700 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm animate-pulse">
                                                         👨‍💼 ATENDIMENTO HUMANO
                                                     </span>
                                                 );
                                             } else if (hasActiveOrder) {
-                                                cardBgStyle = 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-400/30 hover:border-amber-400 shadow-amber-100/50';
+                                                cardBgStyle = 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/40 shadow-md';
                                                 customBadge = (
-                                                    <span className="bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
+                                                    <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
                                                         📦 EM ENTREGA
                                                     </span>
                                                 );
                                             } else if (hasDeliveredOrder) {
-                                                cardBgStyle = 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 hover:border-emerald-400 shadow-emerald-100/50';
+                                                cardBgStyle = 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/30 shadow-md';
                                                 customBadge = (
-                                                    <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
+                                                    <span className="bg-emerald-700 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
                                                         ✅ PEDIDO ENTREGUE
                                                     </span>
                                                 );

@@ -54,21 +54,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: true, message: 'Pedido devolvido para a lista de pendentes com sucesso.' });
         }
 
-        if (action === 'DELIVER') {
-            // Mark order as DELIVERED
+        if (action === 'DELIVER' || action === 'PAY') {
+            // Mark order as DELIVERED or RECEIVED (PAID)
+            const targetStatus = action === 'PAY' ? 'RECEIVED' : 'DELIVERED';
             await prisma.order.update({
                 where: { id: order.id },
-                data: { status: 'DELIVERED' }
+                data: { status: targetStatus }
             });
 
-            if (currentDriverId) {
+            if (currentDriverId && action === 'DELIVER') {
                 await prisma.contact.updateMany({
                     where: { id: currentDriverId, activeJobs: { gt: 0 } },
                     data: { activeJobs: { decrement: 1 } }
                 });
             }
 
-            // Optional: Move contact to "ENTREGUE" CRM stage if present
+            // Move contact to "ENTREGUE" CRM stage if present
             const deliveredStage = await prisma.crmStage.findFirst({
                 where: { botId: order.botId, name: { contains: 'ENTREGUE', mode: 'insensitive' } }
             });
@@ -80,7 +81,10 @@ export async function POST(req: Request) {
                 });
             }
 
-            return NextResponse.json({ success: true, message: 'Pedido marcado como entregue.' });
+            return NextResponse.json({ 
+                success: true, 
+                message: action === 'PAY' ? 'Pagamento marcado como concluído!' : 'Pedido marcado como entregue!' 
+            });
         }
 
         if (action === 'CANCEL') {

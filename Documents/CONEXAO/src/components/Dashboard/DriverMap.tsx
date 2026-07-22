@@ -85,6 +85,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [cityFilter, setCityFilter] = useState('ALL');
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const [dateFilter, setDateFilter] = useState('ALL');
 
     const fetchDriverHistory = async (driverId: string) => {
         try {
@@ -790,7 +791,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 <span className="text-[10px] font-bold text-[#ec4899] bg-[#ec4899]/10 px-2 py-0.5 rounded-full">
                                                     #{order.id.substring(0, 6)}
                                                 </span>
-                                                <span className="text-[9px] text-gray-500">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                <span className="text-[9px] font-bold text-gray-400">📅 {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                             </div>
                                             <h4 className="text-xs font-bold text-white truncate">{customer.name || 'Cliente'}</h4>
                                             <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">
@@ -798,6 +799,25 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                             </p>
                                             <div className="text-[9px] text-[#c084fc] font-medium pt-1 border-t border-white/5">
                                                 {order.items?.map((i: any) => `${i.product?.name || 'Botijão'} x${i.quantity}`).join(', ')}
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[9px]">
+                                                <span className="text-amber-400 font-extrabold">R$ {Number(order.totalAmount || 0).toFixed(2)}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOrderAction(order.id, 'PAY'); }}
+                                                        className="text-emerald-400 hover:text-emerald-300 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 cursor-pointer"
+                                                        title="Marcar como Pago"
+                                                    >
+                                                        💳 Pago
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOrderAction(order.id, 'DELETE'); }}
+                                                        className="text-red-400 hover:text-red-300 font-bold px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 cursor-pointer"
+                                                        title="Excluir Pedido"
+                                                    >
+                                                        🗑️ Excluir
+                                                    </button>
+                                                </div>
                                             </div>
                                             {/* Mobile dispatch selection */}
                                             {drivers.length > 0 && (
@@ -1042,6 +1062,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                             </div>
                                             <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
                                             <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+                                            <p className="text-[10px] text-gray-400">📅 <b>Data:</b> {new Date(order.createdAt).toLocaleDateString()} às {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
 
                                             {/* Action buttons */}
                                             <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-white/5">
@@ -1060,6 +1081,13 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                     <CheckCircle2 className="h-3 w-3" /> Entregue
                                                 </button>
                                                 <button
+                                                    onClick={() => handleOrderAction(order.id, 'PAY')}
+                                                    className="px-2 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    title="Marcar pedido como pago"
+                                                >
+                                                    <CheckCircle2 className="h-3 w-3" /> Pago
+                                                </button>
+                                                <button
                                                     onClick={() => handleOrderAction(order.id, 'CANCEL')}
                                                     className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
                                                     title="Cancelar entrega"
@@ -1068,7 +1096,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 </button>
                                                 <button
                                                     onClick={() => handleOrderAction(order.id, 'DELETE')}
-                                                    className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                    className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer col-span-2"
                                                     title="Excluir pedido permanentemente"
                                                 >
                                                     <Trash2 className="h-3 w-3" /> Excluir
@@ -1084,7 +1112,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         {driverTab === 'history' && (
                             <div className="space-y-3">
                                 {/* Filters */}
-                                <div className="grid grid-cols-2 gap-2 bg-white/5 p-2 rounded-xl border border-white/5">
+                                <div className="grid grid-cols-3 gap-2 bg-white/5 p-2 rounded-xl border border-white/5">
                                     <div>
                                         <label className="text-[9px] text-gray-400 block mb-1 font-semibold">Cidade:</label>
                                         <select
@@ -1092,7 +1120,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                             onChange={(e) => setCityFilter(e.target.value)}
                                             className="w-full bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-white p-1 outline-none"
                                         >
-                                            <option value="ALL">Todas as Cidades</option>
+                                            <option value="ALL">Todas</option>
                                             {historyData?.cities?.map((c: string) => (
                                                 <option key={c} value={c}>{c}</option>
                                             ))}
@@ -1105,10 +1133,23 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                             onChange={(e) => setStatusFilter(e.target.value)}
                                             className="w-full bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-white p-1 outline-none"
                                         >
-                                            <option value="ALL">Todos os Status</option>
+                                            <option value="ALL">Todos</option>
                                             <option value="DELIVERED">Entregues</option>
                                             <option value="CANCELLED">Canceladas</option>
                                             <option value="DISPATCHED">Em Andamento</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] text-gray-400 block mb-1 font-semibold">Período:</label>
+                                        <select
+                                            value={dateFilter}
+                                            onChange={(e) => setDateFilter(e.target.value)}
+                                            className="w-full bg-[#0f0b29] border border-white/10 rounded-lg text-[10px] text-white p-1 outline-none"
+                                        >
+                                            <option value="ALL">Todo Período</option>
+                                            <option value="TODAY">Hoje</option>
+                                            <option value="THIS_WEEK">Esta Semana</option>
+                                            <option value="THIS_MONTH">Este Mês</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1124,7 +1165,21 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                     const filtered = (historyData.orders || []).filter((o: any) => {
                                         const matchCity = cityFilter === 'ALL' || o.city === cityFilter;
                                         const matchStatus = statusFilter === 'ALL' || o.status === statusFilter;
-                                        return matchCity && matchStatus;
+                                        
+                                        const dateObj = new Date(o.createdAt);
+                                        const now = new Date();
+                                        let matchDate = true;
+
+                                        if (dateFilter === 'TODAY') {
+                                            matchDate = dateObj.toDateString() === now.toDateString();
+                                        } else if (dateFilter === 'THIS_WEEK') {
+                                            const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                                            matchDate = dateObj >= oneWeekAgo;
+                                        } else if (dateFilter === 'THIS_MONTH') {
+                                            matchDate = dateObj.getMonth() === now.getMonth() && dateObj.getFullYear() === now.getFullYear();
+                                        }
+
+                                        return matchCity && matchStatus && matchDate;
                                     });
 
                                     if (filtered.length === 0) {

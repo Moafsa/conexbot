@@ -175,6 +175,7 @@ export async function GET(req: Request) {
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: { select: { conversations: true } },
+                channels: true
             },
         });
 
