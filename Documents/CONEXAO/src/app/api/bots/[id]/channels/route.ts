@@ -139,23 +139,45 @@ export async function POST(req: Request, { params }: { params: any }) {
         let webhookSubscription: 'ok' | 'skipped' | 'failed' | undefined;
         let webhookSubscriptionError: string | undefined;
 
-        if (provider === 'META_WHATSAPP') {
+        if (provider === 'META_WHATSAPP' || provider === 'INSTAGRAM') {
             const creds = (credentials || {}) as any;
-            const wabaId = creds.wabaId;
-            const accessToken = creds.accessToken;
+            let accessToken = creds.accessToken;
 
-            if (wabaId && accessToken) {
+            if (accessToken) {
+                // Tenta converter token de curta duração para token de longa duração (~60 dias)
                 try {
-                    await MetaService.subscribeAppToWaba(wabaId, accessToken);
-                    webhookSubscription = 'ok';
+                    const longLived = await MetaService.getLongLivedToken(accessToken);
+                    if (longLived.accessToken) {
+                        accessToken = longLived.accessToken;
+                        creds.accessToken = accessToken;
+                        if (longLived.expiresInSeconds) {
+                            creds.tokenExpiresAt = new Date(Date.now() + longLived.expiresInSeconds * 1000).toISOString();
+                        }
+                        savedChannel = await prisma.botChannel.update({
+                            where: { id: savedChannel.id },
+                            data: { credentials: creds }
+                        });
+                        logToFile(`[Channels API] Token de longa duração obtido com sucesso para ${provider} botId=${botId}`);
+                    }
                 } catch (e: any) {
-                    webhookSubscription = 'failed';
-                    webhookSubscriptionError = e?.message || 'Erro desconhecido';
-                    logToFile(`[Channels API] subscribeAppToWaba falhou para waba=${wabaId} botId=${botId}: ${webhookSubscriptionError}`);
+                    logToFile(`[Channels API] Não foi possível trocar por token de longa duração (pode já ser permanente ou de teste): ${e?.message}`);
                 }
-            } else if (accessToken) {
-                // Sem wabaId não temos como assinar o webhook — apenas avisamos.
-                webhookSubscription = 'skipped';
+            }
+
+            if (provider === 'META_WHATSAPP') {
+                const wabaId = creds.wabaId;
+                if (wabaId && accessToken) {
+                    try {
+                        await MetaService.subscribeAppToWaba(wabaId, accessToken);
+                        webhookSubscription = 'ok';
+                    } catch (e: any) {
+                        webhookSubscription = 'failed';
+                        webhookSubscriptionError = e?.message || 'Erro desconhecido';
+                        logToFile(`[Channels API] subscribeAppToWaba falhou para waba=${wabaId} botId=${botId}: ${webhookSubscriptionError}`);
+                    }
+                } else if (accessToken) {
+                    webhookSubscription = 'skipped';
+                }
             }
         }
 
