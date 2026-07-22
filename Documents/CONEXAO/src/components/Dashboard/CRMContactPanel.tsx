@@ -134,8 +134,38 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
 
     const handleSend = async () => {
         if (!input.trim()) return;
-        console.log("Sending manual message:", input);
+        const msgText = input.trim();
         setInput("");
+
+        // Optimistic UI update
+        const tempMsg = {
+            id: `temp-${Date.now()}`,
+            role: 'assistant',
+            content: `[HUMANO]: ${msgText}`,
+            createdAt: new Date().toISOString()
+        };
+        setMessages((prev: any[]) => [...prev, tempMsg]);
+
+        try {
+            const query = clientId ? `?clientId=${clientId}` : '';
+            const res = await fetch(`/api/contacts/${contactId}/messages${query}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msgText })
+            });
+
+            if (res.ok) {
+                toast.success("Mensagem enviada!");
+                fetchContactData({ silent: true });
+            } else {
+                const errData = await res.json();
+                toast.error(errData.error || "Erro ao enviar mensagem");
+                setMessages((prev: any[]) => prev.filter(m => m.id !== tempMsg.id));
+            }
+        } catch (error) {
+            toast.error("Erro de conexão ao enviar mensagem");
+            setMessages((prev: any[]) => prev.filter(m => m.id !== tempMsg.id));
+        }
     };
 
     const handleToggleBlock = async () => {
@@ -355,7 +385,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                    placeholder="Responder como o Bot..."
+                                    placeholder="Digite sua mensagem para o cliente..."
                                     className="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                 />
                                 <button onClick={handleSend} className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors">
