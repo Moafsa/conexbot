@@ -36,6 +36,12 @@ function friendlyMetaError(raw: any): string {
     if (err.code === 368) {
         return 'A conta da Meta associada está temporariamente restrita para essa ação. Verifique o Gerenciador de Negócios.';
     }
+    if (err.code === 131030 || err.error_subcode === 131030 || /allowed list/i.test(msg)) {
+        return 'O número do entregador/destinatário não está na lista de números de teste autorizados no painel Meta Developers (App em modo Desenvolvimento). Adicione o número no painel da Meta ou altere o App para Produção.';
+    }
+    if (err.code === 131047 || err.error_subcode === 131047 || /24 hour/i.test(msg)) {
+        return 'A Meta bloqueou a mensagem porque se passaram mais de 24h desde o último contato do destinatário. Para iniciar contato via Meta Cloud API, o entregador precisa mandar um "Oi" primeiro ou usar um Modelo de Mensagem (Template) aprovado.';
+    }
     return msg;
 }
 

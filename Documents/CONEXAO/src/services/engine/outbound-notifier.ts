@@ -12,10 +12,11 @@ export async function sendOutboundMessageToPhone(
     bot: any,
     phone: string,
     text: string
-): Promise<boolean> {
-    if (!bot || !phone || !text) return false;
+): Promise<{ success: boolean; error?: string }> {
+    if (!bot || !phone || !text) return { success: false, error: 'Parâmetros inválidos' };
 
     const normalizedPhone = PhoneUtils.normalize(phone);
+    let lastError = '';
 
     // 1. Tenta enviar via Meta WhatsApp se o bot tiver canal Meta conectado
     try {
@@ -27,23 +28,33 @@ export async function sendOutboundMessageToPhone(
             const creds = metaChannel.credentials as any;
             await MetaService.sendTextMessage(metaChannel.identifier, creds.accessToken, normalizedPhone, text);
             logToFile(`[OutboundNotifier] Mensagem enviada via Meta WhatsApp para ${normalizedPhone}`);
-            return true;
+            return { success: true };
         }
     } catch (e: any) {
-        logToFile(`[OutboundNotifier] Falha ao enviar via Meta WhatsApp para ${normalizedPhone}: ${e.message}`);
+        lastError = e.message || 'Erro na Meta Cloud API';
+        logToFile(`[OutboundNotifier] Falha ao enviar via Meta WhatsApp para ${normalizedPhone}: ${lastError}`);
     }
 
-    // 2. Fallback: Tenta enviar via WuzAPI se o bot tiver sessionName
-    if (bot.sessionName) {
+    // 2. Fallback: Tenta enviar via WuzAPI APENAS se o WuzAPI estiver realmente CONECTADO
+    if (bot.sessionName && bot.connectionStatus === 'CONNECTED') {
         try {
-            await UzapiService.sendMessage(bot.sessionName, normalizedPhone, text);
-            logToFile(`[OutboundNotifier] Mensagem enviada via WuzAPI para ${normalizedPhone}`);
-            return true;
+            const sent = await UzapiService.sendMessage(bot.sessionName, normalizedPhone, text);
+            if (sent) {
+                logToFile(`[OutboundNotifier] Mensagem enviada via WuzAPI para ${normalizedPhone}`);
+                return { success: true };
+            }
         } catch (e: any) {
-            logToFile(`[OutboundNotifier] Falha ao enviar via WuzAPI para ${normalizedPhone}: ${e.message}`);
+            lastError = e.message || 'Erro na WuzAPI';
+            logToFile(`[OutboundNotifier] Falha ao enviar via WuzAPI para ${normalizedPhone}: ${lastError}`);
         }
     }
 
-    logToFile(`[OutboundNotifier] Nenhum canal ativo encontrado para enviar mensagem ao telefone ${normalizedPhone} (botId=${bot.id})`);
-    return false;
+    if (lastError) {
+        return { success: false, error: lastError };
+    }
+
+    return {
+        success: false,
+        error: `Nenhum canal de WhatsApp ativo e conectado para enviar a mensagem ao número ${normalizedPhone}.`
+    };
 }

@@ -72,11 +72,11 @@ export async function POST(req: Request) {
         const messageText = `Olá, *${driver.name}*!\n\nAqui está o seu link de acesso exclusivo para o aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione o app à sua tela inicial para receber corridas!_`;
 
         const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
-        const sent = await sendOutboundMessageToPhone(bot, driver.phone, messageText);
+        const sentResult = await sendOutboundMessageToPhone(bot, driver.phone, messageText);
 
-        if (!sent) {
+        if (!sentResult.success) {
             return NextResponse.json({ 
-                error: `Falha ao enviar mensagem de WhatsApp. Verifique se o canal WhatsApp do bot '${bot.name}' está ativo.` 
+                error: sentResult.error || `Falha ao enviar mensagem de WhatsApp. Verifique se o canal WhatsApp do bot '${bot.name}' está ativo.` 
             }, { status: 500 });
         }
 
