@@ -71,8 +71,22 @@ export async function POST(req: Request) {
         const pwaUrl = `${appUrl}/driver?token=${token}`;
         const messageText = `Olá, *${driver.name}*!\n\nAqui está o seu link de acesso exclusivo para o aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione o app à sua tela inicial para receber corridas!_`;
 
+        const templateComponents = [
+            {
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: driver.name || 'Entregador' },
+                    { type: 'text', text: pwaUrl }
+                ]
+            }
+        ];
+
         const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
-        const sentResult = await sendOutboundMessageToPhone(bot, driver.phone, messageText);
+        const sentResult = await sendOutboundMessageToPhone(bot, driver.phone, messageText, {
+            templateName: 'envio_link_entregador',
+            templateLanguage: 'pt_BR',
+            templateComponents
+        });
 
         if (!sentResult.success) {
             return NextResponse.json({ 

@@ -214,6 +214,39 @@ export class MetaService {
         });
     }
 
+    /**
+     * Envia uma mensagem baseada em Modelo (Template HSM) pré-aprovado na Meta.
+     * Necessário para iniciar contatos fora da janela de 24h ou para notificações de transbordo e entregas.
+     */
+    static async sendTemplateMessage(
+        phoneId: string,
+        accessToken: string,
+        to: string,
+        templateName: string,
+        languageCode: string = 'pt_BR',
+        components?: any[]
+    ) {
+        const url = `${GRAPH_URL}/${phoneId}/messages`;
+        return graphFetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to,
+                type: 'template',
+                template: {
+                    name: templateName,
+                    language: { code: languageCode },
+                    ...(components && components.length > 0 ? { components } : {})
+                }
+            }),
+        });
+    }
+
     // ==================== Instagram (via Facebook Login for Business) ====================
     //
     // Reaproveita o mesmo App/config_id de login com popup; a diferença é que a

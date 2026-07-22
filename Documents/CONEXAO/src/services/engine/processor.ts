@@ -983,19 +983,34 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     let whatsappHandoffOk = true;
                                     if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
                                         const last4 = String(whatsappNotifyTarget).replace(/\D/g, '').slice(-4);
-                                        const sessionForHandoff = bot.sessionName || identifier;
-                                        console.log(
-                                            `[Processor] chamar_humano: WhatsApp -> ****${last4} | sessão UzAPI do bot: ${sessionForHandoff ? `"${sessionForHandoff}"` : 'VAZIO (conecte o WhatsApp deste bot)'}`
-                                        );
-                                        whatsappHandoffOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
-                                            sessionForHandoff,
-                                            whatsappNotifyTarget,
-                                            message
-                                        );
+                                        logToFile(`[Processor] chamar_humano: enviando notificação de transbordo WhatsApp para ****${last4}`);
+                                        
+                                        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
+                                        const crmLink = `${appUrl}/dashboard/crm?conversation=${conversation.id}`;
+                                        const summaryText = analysis?.summary || messageText || 'Cliente solicitou atendimento humano.';
+
+                                        const templateComponents = [
+                                            {
+                                                type: 'body',
+                                                parameters: [
+                                                    { type: 'text', text: existingContact.name || 'Cliente' }, // {{1}}
+                                                    { type: 'text', text: senderPhone },                       // {{2}}
+                                                    { type: 'text', text: args.motivo || 'Atendimento Humano' }, // {{3}}
+                                                    { type: 'text', text: summaryText },                       // {{4}}
+                                                    { type: 'text', text: crmLink }                            // {{5}}
+                                                ]
+                                            }
+                                        ];
+
+                                        const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
+                                        const handoffRes = await sendOutboundMessageToPhone(bot, whatsappNotifyTarget, message, {
+                                            templateName: 'transbordo_humano',
+                                            templateLanguage: 'pt_BR',
+                                            templateComponents
+                                        });
+                                        whatsappHandoffOk = handoffRes.success;
                                         if (!whatsappHandoffOk) {
-                                            console.warn(
-                                                '[Processor] chamar_humano: WhatsApp ao humano falhou — use a sessão deste bot (mesmo que atende o cliente) na UzAPI.'
-                                            );
+                                            console.warn('[Processor] chamar_humano: Notificação por WhatsApp ao atendente falhou:', handoffRes.error);
                                         }
                                     } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
                                         console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');

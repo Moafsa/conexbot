@@ -98,7 +98,25 @@ export async function POST(req: Request) {
             `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
             `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
 
-        const sentResult = await sendOutboundMessageToPhone(order.bot, driver.phone, dispatchMsg);
+        const templateComponents = [
+            {
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: customerName },
+                    { type: 'text', text: customerPhone.replace(/\D/g, '') },
+                    { type: 'text', text: deliveryAddress },
+                    { type: 'text', text: orderItemsStr },
+                    { type: 'text', text: mapsUrl },
+                    { type: 'text', text: pwaUrl }
+                ]
+            }
+        ];
+
+        const sentResult = await sendOutboundMessageToPhone(order.bot, driver.phone, dispatchMsg, {
+            templateName: 'nova_entrega_atribuida',
+            templateLanguage: 'pt_BR',
+            templateComponents
+        });
         if (!sentResult.success) {
             return NextResponse.json({ 
                 error: sentResult.error || `Falha ao enviar notificação para o entregador via WhatsApp.` 
