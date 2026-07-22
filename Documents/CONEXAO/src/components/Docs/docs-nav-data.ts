@@ -64,6 +64,7 @@ export const docsNavSections: {
             { title: "Mercado Livre", href: "/docs/mercado-livre", iconKey: "ShoppingBag" },
             { title: "Plugin WordPress", href: "/docs/wordpress", iconKey: "Rocket" },
             { title: "AI Writer (Auto-Posts)", href: "/docs/ai-writer", iconKey: "Rocket" },
+            { title: "AI SEO Optimizer", href: "/docs/ai-seo-optimizer", iconKey: "Sparkles" },
         ],
     },
     {

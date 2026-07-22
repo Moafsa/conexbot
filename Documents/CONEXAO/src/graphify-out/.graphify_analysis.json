@@ -1,0 +1,1797 @@
+{
+  "communities": {
+    "0": [
+      "app_api_admin_impersonate_route",
+      "app_api_admin_impersonate_route_post",
+      "app_api_admin_marketplace_sync_route",
+      "app_api_admin_marketplace_sync_route_get",
+      "app_api_admin_payments_route",
+      "app_api_admin_payments_route_get",
+      "app_api_admin_plans_route",
+      "app_api_admin_plans_route_get",
+      "app_api_admin_plans_route_post",
+      "app_api_admin_plans_route_put",
+      "app_api_admin_stats_route",
+      "app_api_admin_stats_route_get",
+      "app_api_admin_tenant_keys_route",
+      "app_api_admin_tenant_keys_route_get",
+      "app_api_admin_users_route",
+      "app_api_admin_users_route_get",
+      "app_api_admin_users_route_post",
+      "app_api_agency_clients_id_audit_status_jobid_route",
+      "app_api_agency_tasks_id_route",
+      "app_api_agency_tasks_id_route_delete",
+      "app_api_agency_tasks_id_route_put",
+      "app_api_auth_mercadolivre_url_route",
+      "app_api_auth_mercadolivre_url_route_get",
+      "app_api_auth_nextauth_route",
+      "app_api_auth_nextauth_route_handler",
+      "app_api_bots_debug_get",
+      "app_api_bots_debug_get_get",
+      "app_api_bots_id_appointments_appointmentid_route",
+      "app_api_bots_id_appointments_appointmentid_route_delete",
+      "app_api_bots_id_appointments_appointmentid_route_patch",
+      "app_api_bots_id_crm_export_route",
+      "app_api_bots_id_crm_export_route_get",
+      "app_api_bots_id_crm_stages_reorder_route",
+      "app_api_bots_id_crm_stages_reorder_route_put",
+      "app_api_bots_id_crm_stages_stageid_route",
+      "app_api_bots_id_crm_stages_stageid_route_delete",
+      "app_api_bots_id_crm_stages_stageid_route_put",
+      "app_api_bots_id_duplicate_route",
+      "app_api_bots_id_duplicate_route_post",
+      "app_api_bots_id_google_auth_route",
+      "app_api_bots_id_google_auth_route_get",
+      "app_api_bots_id_marketing_automation_route",
+      "app_api_bots_id_marketing_automation_route_put",
+      "app_api_conversations_id_route",
+      "app_api_conversations_id_route_put",
+      "app_api_coupons_id_route",
+      "app_api_coupons_id_route_delete",
+      "app_api_coupons_id_route_put",
+      "app_api_coupons_route",
+      "app_api_coupons_route_get",
+      "app_api_coupons_route_post",
+      "app_api_finance_orders_route",
+      "app_api_finance_orders_route_get",
+      "app_api_finance_stats_route",
+      "app_api_finance_stats_route_get",
+      "app_api_integrations_facebook_accounts_route",
+      "app_api_integrations_facebook_accounts_route_get",
+      "app_api_integrations_google_connect_route",
+      "app_api_integrations_google_connect_route_get",
+      "app_api_marketing_offer_id_route",
+      "app_api_marketing_offer_id_route_delete",
+      "app_api_marketing_offer_id_route_get",
+      "app_api_marketing_offer_id_route_put",
+      "app_api_plans_route",
+      "app_api_plans_route_get",
+      "app_api_products_addon_groups_route",
+      "app_api_products_addon_groups_route_get",
+      "app_api_products_addons_unique_route",
+      "app_api_products_addons_unique_route_get",
+      "app_api_settings_asaas_route",
+      "app_api_settings_asaas_route_delete",
+      "app_api_settings_asaas_route_get",
+      "app_api_settings_asaas_route_post",
+      "app_api_settings_marketing_route",
+      "app_api_settings_marketing_route_get",
+      "app_api_settings_marketing_route_put",
+      "app_api_settings_smtp_route",
+      "app_api_settings_smtp_route_get",
+      "app_api_settings_smtp_route_post",
+      "app_api_user_writer_route",
+      "app_api_user_writer_route_get",
+      "lib_auth",
+      "lib_auth_authoptions"
+    ],
+    "1": [
+      "app_api_agency_clients_id_onboarding_route",
+      "app_api_agency_clients_id_onboarding_route_get",
+      "app_api_agency_clients_id_onboarding_route_put",
+      "app_api_agency_clients_route",
+      "app_api_agency_clients_route_get",
+      "app_api_agency_clients_route_post",
+      "app_api_agency_settings_dispatch_connection_route",
+      "app_api_agency_settings_dispatch_connection_route_get",
+      "app_api_ai_transcribe_route",
+      "app_api_ai_transcribe_route_post",
+      "app_api_analytics_route",
+      "app_api_analytics_route_get",
+      "app_api_auth_google_callback_route",
+      "app_api_auth_google_callback_route_get",
+      "app_api_auth_mercadolivre_url_plugin_route",
+      "app_api_auth_mercadolivre_url_plugin_route_get",
+      "app_api_auth_reset_password_route",
+      "app_api_auth_reset_password_route_post",
+      "app_api_bots_id_appointments_route",
+      "app_api_bots_id_appointments_route_get",
+      "app_api_bots_id_clone_route",
+      "app_api_bots_id_clone_route_post",
+      "app_api_bots_id_contacts_route",
+      "app_api_bots_id_contacts_route_get",
+      "app_api_config_meta_route",
+      "app_api_config_meta_route_get",
+      "app_api_cron_check_active_jobs_route",
+      "app_api_cron_renew_usage_route",
+      "app_api_cron_renew_usage_route_get",
+      "app_api_drivers_telemetry_route",
+      "app_api_drivers_telemetry_route_post",
+      "app_api_integrations_facebook_callback_route",
+      "app_api_integrations_facebook_callback_route_get",
+      "app_api_integrations_facebook_connect_route",
+      "app_api_integrations_facebook_connect_route_get",
+      "app_api_integrations_google_callback_route",
+      "app_api_integrations_google_callback_route_get",
+      "app_api_marketing_public_approve_token_route",
+      "app_api_marketing_public_approve_token_route_post",
+      "app_api_marketing_public_offer_route",
+      "app_api_marketing_public_offer_route_get",
+      "app_api_products_id_route",
+      "app_api_products_id_route_delete",
+      "app_api_products_id_route_put",
+      "app_api_settings_notifications_route",
+      "app_api_settings_notifications_route_get",
+      "app_api_settings_notifications_route_put",
+      "app_api_settings_smtp_id_route",
+      "app_api_settings_smtp_id_route_delete",
+      "app_api_temp_route",
+      "app_api_temp_route_get",
+      "app_api_v1_bot_info_id_route",
+      "app_api_v1_bot_info_id_route_get",
+      "app_api_v1_ml_refresh_route",
+      "app_api_v1_ml_refresh_route_post",
+      "app_api_v1_webchat_history_route",
+      "app_api_v1_webchat_history_route_get",
+      "app_api_v1_wp_me_route",
+      "app_api_v1_wp_me_route_get",
+      "app_api_v1_wp_register_store_route",
+      "app_api_v1_wp_register_store_route_post",
+      "app_api_webhooks_asaas_route",
+      "app_api_webhooks_asaas_route_post",
+      "app_api_webhooks_mercadopago_route",
+      "app_api_webhooks_mercadopago_route_post",
+      "app_marketing_preview_token_page",
+      "app_marketing_preview_token_page_publicpostpreview",
+      "app_support_page",
+      "app_support_page_supportpage",
+      "lib_prisma",
+      "lib_prisma_globalforprisma",
+      "lib_prisma_prisma",
+      "lib_prisma_prismaclientsingleton",
+      "scripts_rebrand_writer_db",
+      "scripts_rebrand_writer_db_main",
+      "scripts_seed_writer_plans",
+      "scripts_seed_writer_plans_main",
+      "services_engine_cart_service",
+      "services_marketing_meta_capi_service",
+      "services_marketing_meta_capi_service_metacapiservice"
+    ],
+    "2": [
+      "app_api_admin_config_route",
+      "app_api_admin_config_route_get",
+      "app_api_admin_config_route_put",
+      "app_api_admin_config_route_sanitizeconfig",
+      "app_api_admin_config_route_sensitive_fields",
+      "app_api_bots_id_channels_route",
+      "app_api_bots_id_channels_route_checkbotownership",
+      "app_api_bots_id_channels_route_get",
+      "app_api_bots_id_channels_route_post",
+      "app_api_bots_id_connect_instagram_route",
+      "app_api_bots_id_connect_instagram_route_checkbotownership",
+      "app_api_bots_id_connect_instagram_route_post",
+      "app_api_bots_id_connect_meta_route",
+      "app_api_bots_id_connect_meta_route_checkbotownership",
+      "app_api_bots_id_connect_meta_route_post",
+      "app_api_bots_id_instagram_publish_route",
+      "app_api_bots_id_instagram_publish_route_checkbotownership",
+      "app_api_bots_id_instagram_publish_route_post",
+      "app_api_public_instagram_connect_route",
+      "app_api_public_instagram_connect_route_post",
+      "app_api_public_whatsapp_meta_connect_route",
+      "app_api_public_whatsapp_meta_connect_route_post",
+      "app_api_webhooks_wordpress_route",
+      "app_api_webhooks_wordpress_route_post",
+      "services_engine_logger",
+      "services_engine_logger_logtofile",
+      "services_engine_outbound_deliver_assistant",
+      "services_engine_outbound_deliver_assistant_deliverassistantoutbound",
+      "services_engine_outbound_deliver_assistant_deliverinstagram",
+      "services_engine_outbound_deliver_assistant_delivermetawhatsapp",
+      "services_engine_outbound_deliver_assistant_deliverwhatsapp",
+      "services_engine_outbound_deliver_assistant_deliverwordpress",
+      "services_engine_outbound_deliver_assistant_outbounddeliverychannel",
+      "services_engine_wordpress",
+      "services_engine_wordpress_resolvewordpressbaseurl",
+      "services_engine_wordpress_wordpressservice",
+      "services_meta_connect_flow",
+      "services_meta_connect_flow_connectmetawhatsappforbot",
+      "services_meta_connect_flow_metaconnectinput",
+      "services_meta_connect_flow_metaconnectresult",
+      "services_meta_connect_instagram_flow",
+      "services_meta_connect_instagram_flow_connectinstagramforbot",
+      "services_meta_connect_instagram_flow_instagramconnectinput",
+      "services_meta_connect_instagram_flow_instagramconnectresult",
+      "services_meta_meta_service",
+      "services_meta_meta_service_friendlymetaerror",
+      "services_meta_meta_service_graphfetch",
+      "services_meta_meta_service_metaapierror",
+      "services_meta_meta_service_metaapierror_constructor",
+      "services_meta_meta_service_metaservice",
+      "services_meta_meta_service_metaservice_createinstagrammediacontainer",
+      "services_meta_meta_service_metaservice_exchangecodefortoken",
+      "services_meta_meta_service_metaservice_generatepin",
+      "services_meta_meta_service_metaservice_getavailablewabas",
+      "services_meta_meta_service_metaservice_getfacebookpageswithinstagram",
+      "services_meta_meta_service_metaservice_getglobalconfig",
+      "services_meta_meta_service_metaservice_getlonglivedtoken",
+      "services_meta_meta_service_metaservice_getphonenumberdetails",
+      "services_meta_meta_service_metaservice_getpublicconfig",
+      "services_meta_meta_service_metaservice_getwabaphonenumbers",
+      "services_meta_meta_service_metaservice_publishinstagrammedia",
+      "services_meta_meta_service_metaservice_registerphonenumber",
+      "services_meta_meta_service_metaservice_sendinstagrammedia",
+      "services_meta_meta_service_metaservice_sendinstagrammessage",
+      "services_meta_meta_service_metaservice_sendmediamessage",
+      "services_meta_meta_service_metaservice_sendtextmessage",
+      "services_meta_meta_service_metaservice_subscribeapptowaba",
+      "services_meta_meta_service_metaservice_subscribepagetowebhooks"
+    ],
+    "3": [
+      "app_api_bots_id_crm_stages_route",
+      "app_api_bots_id_crm_stages_route_get",
+      "app_api_bots_id_crm_stages_route_post",
+      "app_api_contacts_id_route",
+      "app_api_contacts_id_route_delete",
+      "app_api_contacts_id_route_get",
+      "app_api_contacts_id_route_put",
+      "app_api_contacts_id_route_requirecontactfortenant",
+      "app_api_contacts_id_typing_route",
+      "app_api_contacts_id_typing_route_channels",
+      "app_api_contacts_id_typing_route_get",
+      "app_api_contacts_route",
+      "app_api_contacts_route_get",
+      "app_api_crm_agents_route",
+      "app_api_crm_agents_route_get",
+      "app_api_crm_pipelines_id_route",
+      "app_api_crm_pipelines_id_route_delete",
+      "app_api_crm_pipelines_id_route_put",
+      "app_api_crm_pipelines_route",
+      "app_api_crm_pipelines_route_get",
+      "app_api_crm_pipelines_route_post",
+      "app_api_drivers_dispatch_route",
+      "app_api_drivers_dispatch_route_post",
+      "app_api_drivers_fees_route",
+      "app_api_drivers_fees_route_get",
+      "app_api_drivers_fees_route_post",
+      "app_api_drivers_pending_orders_route",
+      "app_api_drivers_pending_orders_route_get",
+      "app_api_drivers_route",
+      "app_api_drivers_route_delete",
+      "app_api_drivers_route_get",
+      "app_api_drivers_route_post",
+      "app_api_drivers_route_put",
+      "app_api_drivers_send_link_route",
+      "app_api_drivers_send_link_route_post",
+      "app_api_marketing_keywords_history_route",
+      "app_api_marketing_keywords_history_route_get",
+      "app_api_marketing_posts_id_publish_route",
+      "app_api_marketing_posts_id_publish_route_post",
+      "app_api_marketing_posts_id_route",
+      "app_api_marketing_posts_id_route_delete",
+      "app_api_marketing_posts_id_route_patch",
+      "app_api_marketing_posts_id_share_route",
+      "app_api_marketing_posts_id_share_route_post",
+      "app_api_marketing_posts_route",
+      "app_api_marketing_posts_route_get",
+      "app_api_marketing_stats_route",
+      "app_api_marketing_stats_route_get",
+      "app_api_whatsapp_connect_route",
+      "app_api_whatsapp_connect_route_post",
+      "app_api_whatsapp_disconnect_route",
+      "app_api_whatsapp_disconnect_route_post",
+      "app_api_whatsapp_status_route",
+      "app_api_whatsapp_status_route_get",
+      "app_dashboard_drivers_page",
+      "app_dashboard_drivers_page_driversdashboardpage",
+      "lib_get_effective_tenant",
+      "lib_get_effective_tenant_geteffectivetenantid"
+    ],
+    "4": [
+      "app_actions_marketing_actions",
+      "app_actions_marketing_actions_uploadmarketingmedia",
+      "app_api_admin_config_upload_route",
+      "app_api_admin_config_upload_route_post",
+      "app_api_bots_id_media_route",
+      "app_api_bots_id_media_route_delete",
+      "app_api_bots_id_media_route_get",
+      "app_api_bots_id_media_route_handlemediarequest",
+      "app_api_bots_id_media_route_post",
+      "app_api_bots_id_media_route_validateurl",
+      "app_api_marketing_posts_id_generate_image_route",
+      "app_api_marketing_posts_id_generate_image_route_post",
+      "app_api_marketing_upload_route",
+      "app_api_marketing_upload_route_post",
+      "app_dashboard_marketing_components_adstab",
+      "app_dashboard_marketing_components_adstab_adstab",
+      "app_dashboard_marketing_components_calendartab",
+      "app_dashboard_marketing_components_calendartab_calendartab",
+      "app_dashboard_marketing_components_calendartab_calendartabprops",
+      "app_dashboard_marketing_components_contenttab",
+      "app_dashboard_marketing_components_contenttab_contenttab",
+      "app_dashboard_marketing_components_offerstab",
+      "app_dashboard_marketing_components_offerstab_offerstab",
+      "app_dashboard_marketing_components_workflowtab",
+      "app_dashboard_marketing_components_workflowtab_columns",
+      "app_dashboard_marketing_components_workflowtab_workflowtab",
+      "app_dashboard_marketing_components_workflowtab_workflowtabprops",
+      "app_dashboard_marketing_page",
+      "app_dashboard_marketing_page_actionitem",
+      "app_dashboard_marketing_page_campaignmodal",
+      "app_dashboard_marketing_page_editpostmodal",
+      "app_dashboard_marketing_page_leadsconversationtab",
+      "app_dashboard_marketing_page_marketingcontent",
+      "app_dashboard_marketing_page_marketingpage",
+      "app_dashboard_marketing_page_overviewtab",
+      "app_dashboard_marketing_page_seotab",
+      "app_dashboard_marketing_page_settingstab",
+      "app_dashboard_marketing_page_statcard",
+      "lib_media_optimizer",
+      "lib_media_optimizer_optimizemedia",
+      "lib_media_optimizer_optimizepdf",
+      "lib_storage",
+      "lib_storage_s3client",
+      "lib_storage_storageservice",
+      "scripts_ingest_logos",
+      "scripts_ingest_logos_downloadfile",
+      "scripts_ingest_logos_logos",
+      "scripts_ingest_logos_run"
+    ],
+    "5": [
+      "app_api_cron_check_meta_balance_route",
+      "app_api_cron_check_meta_balance_route_get",
+      "app_api_marketing_ads_campaigns_id_route",
+      "app_api_marketing_ads_campaigns_id_route_put",
+      "app_api_marketing_ads_id_route",
+      "app_api_marketing_ads_id_route_delete",
+      "app_api_marketing_ads_id_route_put",
+      "app_api_marketing_ads_route",
+      "app_api_marketing_ads_route_get",
+      "app_api_marketing_ads_route_post",
+      "app_api_marketing_automation_sync_route",
+      "app_api_marketing_automation_sync_route_post",
+      "app_api_marketing_cron_ads_optimization_route",
+      "app_api_marketing_cron_ads_optimization_route_get",
+      "app_api_marketing_cron_generate_automation_route",
+      "app_api_marketing_cron_generate_automation_route_get",
+      "app_api_marketing_generate_batch_route",
+      "app_api_marketing_generate_batch_route_post",
+      "app_api_marketing_generate_post_route",
+      "app_api_marketing_generate_post_route_post",
+      "app_api_marketing_posts_id_refine_route",
+      "app_api_marketing_posts_id_refine_route_post",
+      "app_api_marketing_recommendations_route",
+      "app_api_marketing_recommendations_route_get",
+      "app_api_marketing_report_route",
+      "app_api_marketing_report_route_get",
+      "app_api_marketing_search_keywords_route",
+      "app_api_marketing_search_keywords_route_post",
+      "services_marketing_ads_supervisor",
+      "services_marketing_ads_supervisor_adssupervisorservice",
+      "services_marketing_dataforseo_service",
+      "services_marketing_dataforseo_service_dataforseoservice",
+      "services_marketing_google_ads_service",
+      "services_marketing_google_ads_service_googleadsservice",
+      "services_marketing_image_compositor",
+      "services_marketing_image_compositor_imagecompositor",
+      "services_marketing_image_compositor_imagecompositor_createcreative",
+      "services_marketing_image_compositor_imagecompositor_escapexml",
+      "services_marketing_marketing_ia_service",
+      "services_marketing_marketing_ia_service_marketingiaservice",
+      "services_marketing_meta_ads_service",
+      "services_marketing_meta_ads_service_metaadsservice",
+      "services_marketing_notification_service",
+      "services_marketing_notification_service_marketingnotificationservice",
+      "services_marketing_reporting_service",
+      "services_marketing_reporting_service_reportingservice",
+      "services_marketing_semrush_service",
+      "services_marketing_semrush_service_semrushservice"
+    ],
+    "6": [
+      "app_api_agency_clients_id_audit_route",
+      "app_api_agency_onboarding_extract_menu_route",
+      "app_api_agency_onboarding_extract_menu_route_post",
+      "app_api_agency_onboarding_preview_site_route",
+      "app_api_agency_onboarding_preview_site_route_post",
+      "app_api_agency_squads_chat_route",
+      "app_api_agency_squads_chat_route_post",
+      "app_api_agency_workflows_run_route",
+      "app_api_agency_workflows_run_route_post",
+      "app_api_agency_workflows_run_route_workflows",
+      "app_api_ai_architect_route",
+      "app_api_ai_architect_route_post",
+      "app_api_bots_id_scrape_route",
+      "app_api_bots_id_scrape_route_post",
+      "app_api_marketing_chat_generate_route",
+      "app_api_marketing_chat_generate_route_post",
+      "app_api_marketing_offer_generate_copy_route",
+      "app_api_marketing_offer_generate_copy_route_post",
+      "app_api_marketing_refine_route",
+      "app_api_marketing_refine_route_post",
+      "lib_ai_provider",
+      "lib_ai_provider_anthropicwrapper",
+      "lib_ai_provider_anthropicwrapper_constructor",
+      "lib_ai_provider_geminiwrapper",
+      "lib_ai_provider_geminiwrapper_constructor",
+      "lib_ai_provider_getaiclient",
+      "lib_ai_provider_safechatcompletion",
+      "lib_logger",
+      "lib_logger_logger",
+      "scripts_test_scraper",
+      "scripts_test_scraper_test",
+      "services_engine_scraper",
+      "services_engine_scraper_parsehtml",
+      "services_engine_scraper_scraperesult",
+      "services_engine_scraper_scrapewebsite",
+      "services_engine_vision",
+      "services_engine_vision_analyzewithgeminidirect",
+      "services_engine_vision_detectimagemimetype",
+      "services_engine_vision_service",
+      "services_engine_vision_service_visionservice",
+      "services_engine_vision_service_visionservice_analyzeimage",
+      "services_engine_vision_visionservice",
+      "workers_audit_worker",
+      "workers_audit_worker_processauditjob"
+    ],
+    "7": [
+      "app_api_admin_agencies_route",
+      "app_api_admin_agencies_route_get",
+      "app_api_admin_agencies_route_put",
+      "app_api_agency_clients_id_checkout_route",
+      "app_api_agency_clients_id_checkout_route_post",
+      "app_api_agency_clients_id_route",
+      "app_api_agency_clients_id_route_delete",
+      "app_api_agency_clients_id_route_get",
+      "app_api_agency_clients_id_route_put",
+      "app_api_agency_stats_route",
+      "app_api_agency_stats_route_get",
+      "app_api_checkout_portal_route",
+      "app_api_checkout_portal_route_baseurl",
+      "app_api_checkout_portal_route_generateredirectpage",
+      "app_api_checkout_portal_route_get",
+      "app_api_checkout_route",
+      "app_api_checkout_route_post",
+      "lib_agency",
+      "lib_agency_getdynamicagencyfee",
+      "services_payment_asaas",
+      "services_payment_asaas_asaasfetch",
+      "services_payment_asaas_getasaasbase",
+      "services_payment_asaas_getheaders",
+      "services_payment_asaas_normalizecpfcnpj",
+      "services_payment_asaas_plan_interval_map",
+      "services_payment_mercadopago",
+      "services_payment_mercadopago_mercadopagoservice",
+      "services_payment_mercadopago_plan_values"
+    ],
+    "8": [
+      "app_api_agency_clients_id_audit_route_post",
+      "app_api_agency_clients_id_audit_status_jobid_route_get",
+      "app_api_agency_transfer_request_route",
+      "app_api_agency_transfer_request_route_post",
+      "app_api_transfer_token_confirm_route",
+      "app_api_transfer_token_confirm_route_post",
+      "app_transfer_token_page",
+      "app_transfer_token_page_transferpage",
+      "app_transfer_token_transferclient",
+      "app_transfer_token_transferclient_transferclient",
+      "lib_queue",
+      "lib_queue_auditjob",
+      "lib_queue_enqueueaudit",
+      "lib_queue_enqueuemessage",
+      "lib_queue_getauditqueue",
+      "lib_queue_getmessagequeue",
+      "lib_queue_job_retention",
+      "lib_queue_messagejob",
+      "lib_queue_startauditworker",
+      "lib_queue_startmessageworker",
+      "lib_redis",
+      "lib_redis_acquirelock",
+      "lib_redis_getredis",
+      "lib_redis_releaselock",
+      "workers_message_worker",
+      "workers_message_worker_auditworker",
+      "workers_message_worker_concurrency",
+      "workers_message_worker_msgworker"
+    ],
+    "9": [
+      "app_api_admin_agent_templates_seed_route",
+      "app_api_admin_agent_templates_seed_route_post",
+      "app_dashboard_agency_squads_page",
+      "app_dashboard_agency_squads_page_agencysquadspage",
+      "lib_agent_squads",
+      "lib_agent_squads_advisory_squad",
+      "lib_agent_squads_agent",
+      "lib_agent_squads_agenttask",
+      "lib_agent_squads_all_squads",
+      "lib_agent_squads_brand_squad",
+      "lib_agent_squads_claude_code_squad",
+      "lib_agent_squads_clevel_squad",
+      "lib_agent_squads_copy_squad",
+      "lib_agent_squads_data_squad",
+      "lib_agent_squads_delivery_squad",
+      "lib_agent_squads_design_squad",
+      "lib_agent_squads_getagent",
+      "lib_agent_squads_getallagents",
+      "lib_agent_squads_getsquad",
+      "lib_agent_squads_hormozi_squad",
+      "lib_agent_squads_movement_squad",
+      "lib_agent_squads_security_squad",
+      "lib_agent_squads_squad",
+      "lib_agent_squads_storytelling_squad",
+      "lib_agent_squads_traffic_squad"
+    ],
+    "10": [
+      "app_api_agency_clients_id_send_access_route",
+      "app_api_agency_clients_id_send_access_route_post",
+      "app_api_agency_deliverables_whatsapp_route",
+      "app_api_agency_deliverables_whatsapp_route_post",
+      "app_api_agency_onboarding_route",
+      "app_api_cron_check_active_jobs_route_get",
+      "app_api_cron_delivery_check_route",
+      "app_api_cron_delivery_check_route_get",
+      "app_api_cron_follow_up_route",
+      "app_api_cron_follow_up_route_get",
+      "app_api_settings_whatsapp_route",
+      "app_api_settings_whatsapp_route_get",
+      "lib_phone_utils",
+      "lib_phone_utils_digitsonlybrazil",
+      "lib_phone_utils_normalizebrazilwhatsappe164",
+      "lib_phone_utils_phoneutils",
+      "services_engine_follow_up",
+      "services_engine_follow_up_followupservice",
+      "services_engine_uzapi",
+      "services_engine_uzapi_formatrecipientjid",
+      "services_engine_uzapi_uzapiservice",
+      "services_notification_service"
+    ],
+    "11": [
+      "app_api_auth_mercadolivre_callback_route",
+      "app_api_auth_mercadolivre_callback_route_get",
+      "app_api_v1_ml_token_route",
+      "app_api_v1_ml_token_route_get",
+      "app_api_v1_wp_sync_route",
+      "app_api_v1_wp_sync_route_post",
+      "app_api_webhooks_mercadolivre_route",
+      "app_api_webhooks_mercadolivre_route_post",
+      "services_engine_mcp_mercadolivre",
+      "services_engine_mcp_mercadolivre_mercadolivretools",
+      "services_mercadolivre_service",
+      "services_mercadolivre_service_mercadolivreservice",
+      "services_mercadolivre_service_mercadolivreservice_getauthurl",
+      "services_mercadolivre_service_mercadolivreservice_getitem",
+      "services_mercadolivre_service_mercadolivreservice_getvalidtoken",
+      "services_mercadolivre_service_mercadolivreservice_handlecallback",
+      "services_mercadolivre_service_mercadolivreservice_refreshtoken",
+      "services_mercadolivre_service_mercadolivreservice_updateitem",
+      "services_wordpress_service",
+      "services_wordpress_service_wordpressservice",
+      "services_wordpress_service_wordpressservice_synctowp"
+    ],
+    "12": [
+      "app_dashboard_agency_clients_new_page",
+      "app_dashboard_agency_clients_new_page_channel_providers",
+      "app_dashboard_agency_clients_new_page_field",
+      "app_dashboard_agency_clients_new_page_fieldcls",
+      "app_dashboard_agency_clients_new_page_inforow",
+      "app_dashboard_agency_clients_new_page_initial",
+      "app_dashboard_agency_clients_new_page_module_options",
+      "app_dashboard_agency_clients_new_page_newclientwizardpage",
+      "app_dashboard_agency_clients_new_page_niches",
+      "app_dashboard_agency_clients_new_page_payment_options",
+      "app_dashboard_agency_clients_new_page_step1negocio",
+      "app_dashboard_agency_clients_new_page_step2publico",
+      "app_dashboard_agency_clients_new_page_step3produtos",
+      "app_dashboard_agency_clients_new_page_step4canais",
+      "app_dashboard_agency_clients_new_page_step5financeiro",
+      "app_dashboard_agency_clients_new_page_step6ia",
+      "app_dashboard_agency_clients_new_page_step7acesso",
+      "app_dashboard_agency_clients_new_page_stepcontent",
+      "app_dashboard_agency_clients_new_page_stepheader",
+      "app_dashboard_agency_clients_new_page_steps",
+      "app_dashboard_agency_clients_new_page_summaryrow"
+    ],
+    "13": [
+      "app_dashboard_bots_id_page",
+      "app_dashboard_bots_id_page_botdetailspage",
+      "app_dashboard_bots_id_page_tabbutton",
+      "app_embed_bots_id_page",
+      "components_dashboard_agendamanager",
+      "components_dashboard_agendamanager_agendamanager",
+      "components_dashboard_agendamanager_appointment",
+      "components_dashboard_couponmanager",
+      "components_dashboard_couponmanager_coupon",
+      "components_dashboard_couponmanager_couponmanager",
+      "components_dashboard_productmanager",
+      "components_dashboard_productmanager_product",
+      "components_dashboard_productmanager_productmanager",
+      "components_dashboard_securitysettings",
+      "components_dashboard_securitysettings_securitysettings",
+      "components_dashboard_securitysettings_securitysettingsprops",
+      "components_dashboard_simulator",
+      "components_dashboard_simulator_message",
+      "components_dashboard_simulator_simulator"
+    ],
+    "14": [
+      "app_api_admin_payments_id_cancel_route",
+      "app_api_admin_payments_id_cancel_route_post",
+      "app_api_admin_payments_id_delete_route",
+      "app_api_admin_payments_id_delete_route_post",
+      "app_api_admin_payments_id_pay_route",
+      "app_api_admin_payments_id_pay_route_post",
+      "app_api_admin_users_id_route",
+      "app_api_admin_users_id_route_delete",
+      "app_api_admin_users_id_route_get",
+      "app_api_admin_users_id_route_patch",
+      "app_api_finance_orders_id_cancel_route",
+      "app_api_finance_orders_id_cancel_route_post",
+      "app_api_finance_orders_id_delete_route",
+      "app_api_finance_orders_id_delete_route_post",
+      "app_api_finance_orders_id_pay_route",
+      "app_api_finance_orders_id_pay_route_post",
+      "services_payment_asaas_asaasservice"
+    ],
+    "15": [
+      "app_page",
+      "app_page_home",
+      "components_landing_brandstory",
+      "components_landing_brandstory_brandstory",
+      "components_landing_features",
+      "components_landing_features_features",
+      "components_landing_footer",
+      "components_landing_footer_footer",
+      "components_landing_hero",
+      "components_landing_hero_hero",
+      "components_landing_hero_test",
+      "components_landing_integrations",
+      "components_landing_integrations_integrations",
+      "components_landing_navbar",
+      "components_landing_navbar_navbar",
+      "components_landing_pricing",
+      "components_landing_pricing_pricing"
+    ],
+    "16": [
+      "app_api_simulator_route",
+      "app_api_simulator_route_post",
+      "app_api_v1_webchat_route",
+      "app_api_v1_webchat_route_post",
+      "app_api_webhooks_generic_route",
+      "app_api_webhooks_generic_route_logtofile",
+      "app_api_webhooks_generic_route_post",
+      "scripts_test_buffering",
+      "scripts_test_buffering_runtest",
+      "services_engine_buffering",
+      "services_engine_buffering_activetimers",
+      "services_engine_buffering_bufferingservice",
+      "services_engine_buffering_bufferkey",
+      "services_engine_buffering_metakey",
+      "services_engine_buffering_timerkey",
+      "services_engine_processor_messageprocessor"
+    ],
+    "17": [
+      "app_api_ai_architect_upload_route",
+      "app_api_ai_architect_upload_route_post",
+      "services_ocr_extractor",
+      "services_ocr_extractor_detectmimefromextension",
+      "services_ocr_extractor_extractresult",
+      "services_ocr_extractor_extracttext",
+      "services_ocr_extractor_extracttextbymime",
+      "services_ocr_extractor_extracttextfromcsv",
+      "services_ocr_extractor_extracttextfromdocx",
+      "services_ocr_extractor_extracttextfromimage",
+      "services_ocr_extractor_extracttextfrompdf",
+      "services_ocr_extractor_extracttextfromplain",
+      "services_ocr_extractor_extracttextfromxlsx",
+      "services_ocr_extractor_supportedmime"
+    ],
+    "18": [
+      "services_engine_chatwoot",
+      "services_engine_chatwoot_chatwootservice",
+      "services_engine_chatwoot_logtofile",
+      "services_engine_knowledge_rag",
+      "services_engine_knowledge_rag_chunkknowledge",
+      "services_engine_knowledge_rag_escaperegex",
+      "services_engine_knowledge_rag_retrieverelevantchunks",
+      "services_engine_knowledge_rag_scoredchunk",
+      "services_engine_processor",
+      "services_engine_processor_detectaimessage",
+      "services_engine_supervisor",
+      "services_engine_supervisor_supervisorservice",
+      "services_marketing_google_measurement_service",
+      "services_marketing_google_measurement_service_googlemeasurementservice"
+    ],
+    "19": [
+      "app_api_webhooks_whatsapp_route",
+      "app_api_webhooks_whatsapp_route_get",
+      "app_api_webhooks_whatsapp_route_logtofile",
+      "app_api_webhooks_whatsapp_route_post",
+      "app_api_webhooks_whatsapp_route_temp_dir",
+      "lib_whatsapp_identity",
+      "lib_whatsapp_identity_islidjid",
+      "lib_whatsapp_identity_isnoisechat",
+      "lib_whatsapp_identity_ispnjid",
+      "lib_whatsapp_identity_pickpeerincoming",
+      "lib_whatsapp_identity_pickpeeroutgoing",
+      "lib_whatsapp_identity_resolvemessagefromme",
+      "lib_whatsapp_identity_resolvewhatsappcustomerkeys"
+    ],
+    "20": [
+      "app_api_media_id_route",
+      "app_api_media_id_route_delete",
+      "app_api_media_id_route_patch",
+      "services_engine_graph_rag_helper",
+      "services_engine_graph_rag_helper_getopenaiclient",
+      "services_engine_graph_rag_helper_graphraghelper",
+      "services_engine_graph_rag_helper_graphtriple",
+      "services_engine_knowledge",
+      "services_engine_knowledge_knowledgeservice",
+      "services_engine_vector",
+      "services_engine_vector_getopenaiclient",
+      "services_engine_vector_vectorservice"
+    ],
+    "21": [
+      "app_api_auth_register_route",
+      "app_api_auth_register_route_post",
+      "lib_validations",
+      "lib_validations_aiarchitectschema",
+      "lib_validations_checkoutschema",
+      "lib_validations_createbotschema",
+      "lib_validations_loginschema",
+      "lib_validations_registerschema",
+      "lib_validations_test",
+      "lib_validations_updatebotschema",
+      "lib_validations_whatsappconnectschema"
+    ],
+    "22": [
+      "app_api_licensing_consume_route",
+      "app_api_licensing_consume_route_post",
+      "app_api_licensing_verify_route",
+      "app_api_licensing_verify_route_post",
+      "lib_licensing_site_url",
+      "lib_licensing_site_url_canonicallicensingsiteurl",
+      "lib_licensing_site_url_licensingsitefingerprint",
+      "lib_licensing_site_url_licensingsiteurlsmatch",
+      "lib_subscription",
+      "lib_subscription_getsubscriptionstatus",
+      "lib_subscription_issubscriptionactive"
+    ],
+    "23": [
+      "app_dashboard_create_bot_page",
+      "app_dashboard_create_bot_page_createbotpage",
+      "components_dashboard_aiarchitect",
+      "components_dashboard_aiarchitect_aiarchitect",
+      "components_dashboard_aiarchitect_message",
+      "components_dashboard_aiarchitect_test",
+      "components_dashboard_aiarchitect_uploadedfile",
+      "components_dashboard_factsreview",
+      "components_dashboard_factsreview_factcard",
+      "components_dashboard_factsreview_factsreview",
+      "components_dashboard_factsreview_media"
+    ],
+    "24": [
+      "app_dashboard_page",
+      "app_dashboard_page_agencyinfo",
+      "app_dashboard_page_analytics",
+      "app_dashboard_page_botitem",
+      "app_dashboard_page_channel_label",
+      "app_dashboard_page_primarybot",
+      "app_embed_dashboard_page",
+      "app_embed_dashboard_page_embeddashboardpage",
+      "components_dashboard_onboardingguide",
+      "components_dashboard_onboardingguide_onboardingguide",
+      "components_dashboard_onboardingguide_onboardingguideprops"
+    ],
+    "25": [
+      "app_api_auth_forgot_password_route",
+      "app_api_auth_forgot_password_route_post",
+      "services_notification_service_notificationservice",
+      "services_notification_service_notificationservice_alerttenant",
+      "services_notification_service_notificationservice_createinternalnotification",
+      "services_notification_service_notificationservice_notifylimit",
+      "services_notification_service_notificationservice_sendemail",
+      "services_notification_service_notificationservice_sendhandoffwhatsappfrombotsession",
+      "services_notification_service_notificationservice_sendwhatsapp",
+      "services_notification_service_notificationservice_sendwhatsappasbot"
+    ],
+    "26": [
+      "components_dashboard_crmboard",
+      "components_dashboard_crmboard_contact",
+      "components_dashboard_crmboard_crmboard",
+      "components_dashboard_crmboard_crmpipeline",
+      "components_dashboard_crmboard_crmstage",
+      "components_dashboard_crmcontactpanel",
+      "components_dashboard_crmcontactpanel_crmcontactpanel",
+      "components_dashboard_crmcontactpanel_crmcontactpanelprops",
+      "components_dashboard_crmcontactpanel_inforow",
+      "components_dashboard_crmcontactpanel_tabbutton"
+    ],
+    "27": [
+      "app_dashboard_finance_page",
+      "app_dashboard_finance_page_errorbanner",
+      "app_dashboard_finance_page_financepage",
+      "app_dashboard_finance_page_financepagecontent",
+      "app_dashboard_finance_page_searchparamshandler",
+      "app_dashboard_finance_page_statcard",
+      "app_dashboard_finance_page_test",
+      "app_embed_finance_page",
+      "app_embed_finance_page_embedfinancepage"
+    ],
+    "28": [
+      "app_dashboard_settings_page",
+      "app_dashboard_settings_page_settingscontent",
+      "app_dashboard_settings_page_settingspage",
+      "app_dashboard_settings_page_test",
+      "app_embed_settings_page",
+      "app_embed_settings_page_embedsettingspage",
+      "components_agency_dispatchchannel",
+      "components_agency_dispatchchannel_dispatchchannel",
+      "components_agency_dispatchchannel_dispatchchannelprops"
+    ],
+    "29": [
+      "components_dashboard_editbotmodal",
+      "components_dashboard_editbotmodal_editbotmodal",
+      "components_dashboard_editbotmodal_editbotmodalprops",
+      "components_dashboard_editbotmodal_field",
+      "components_dashboard_editbotmodal_getavailablemodels",
+      "components_dashboard_editbotmodal_getdefaultmodel",
+      "components_dashboard_editbotmodal_models_by_provider",
+      "components_dashboard_editbotmodal_tab",
+      "components_dashboard_editbotmodal_tabbutton"
+    ],
+    "30": [
+      "lib_architect_bot_payload",
+      "lib_architect_bot_payload_buildarchitectbotpayload",
+      "lib_architect_bot_payload_optionaldigitscontact",
+      "lib_architect_bot_payload_optionalvalidurl",
+      "lib_architect_bot_payload_pickstring",
+      "lib_architect_bot_payload_tooptionalbool",
+      "lib_architect_bot_payload_tooptionalint",
+      "lib_architect_bot_payload_tooptionalnumber",
+      "lib_architect_bot_payload_tostringarray"
+    ],
+    "31": [
+      "services_engine_contact_extractor",
+      "services_engine_contact_extractor_company_indicators",
+      "services_engine_contact_extractor_contactdata",
+      "services_engine_contact_extractor_email_indicators",
+      "services_engine_contact_extractor_extractcontactdata",
+      "services_engine_contact_extractor_mergecontactdata",
+      "services_engine_contact_extractor_name_indicators",
+      "services_engine_contact_extractor_needs_indicators",
+      "services_engine_contact_extractor_role_indicators"
+    ],
+    "32": [
+      "services_engine_prompts",
+      "services_engine_prompts_botcontext",
+      "services_engine_prompts_buildconversationmessages",
+      "services_engine_prompts_buildsystemprompt",
+      "services_engine_prompts_contactinfo",
+      "services_engine_prompts_couponinfo",
+      "services_engine_prompts_mediainfo",
+      "services_engine_prompts_product",
+      "services_engine_prompts_test"
+    ],
+    "33": [
+      "app_dashboard_crm_page",
+      "app_dashboard_crm_page_crmpage",
+      "app_embed_crm_page",
+      "app_embed_crm_page_embedcrmpage",
+      "components_dashboard_crm",
+      "components_dashboard_crm_contact",
+      "components_dashboard_crm_crm",
+      "components_dashboard_crm_crmstage"
+    ],
+    "34": [
+      "app_docs_layout",
+      "app_docs_layout_docslayout",
+      "components_docs_docs_nav_data",
+      "components_docs_docs_nav_data_docsnaviconkey",
+      "components_docs_docs_nav_data_docsnavsections",
+      "components_docs_mobiledocsnav",
+      "components_docs_mobiledocsnav_mobiledocsnav",
+      "components_docs_mobiledocsnav_mobiledocsnavprops"
+    ],
+    "35": [
+      "lib_rate_limit",
+      "lib_rate_limit_apilimiter",
+      "lib_rate_limit_authlimiter",
+      "lib_rate_limit_ratelimit",
+      "lib_rate_limit_ratelimitentry",
+      "lib_rate_limit_store",
+      "lib_rate_limit_test",
+      "lib_rate_limit_webhooklimiter"
+    ],
+    "36": [
+      "services_scheduling_service",
+      "services_scheduling_service_schedulingservice",
+      "services_scheduling_service_schedulingservice_createappointment",
+      "services_scheduling_service_schedulingservice_creategoogleevent",
+      "services_scheduling_service_schedulingservice_getavailableslots",
+      "services_scheduling_service_schedulingservice_getgooglebusyslots",
+      "services_scheduling_service_schedulingservice_getoauth2client",
+      "services_scheduling_service_timeslot"
+    ],
+    "37": [
+      "app_admin_page",
+      "app_admin_page_admindata",
+      "app_admin_page_adminpage",
+      "app_dashboard_agency_clients_id_page",
+      "app_dashboard_agency_clients_id_page_clienthubpage",
+      "app_dashboard_page_dashboardpage",
+      "components_dashboard_crm_bot"
+    ],
+    "38": [
+      "app_dashboard_layout",
+      "app_dashboard_layout_dashboardlayout",
+      "components_dashboard_shell",
+      "components_dashboard_shell_shell",
+      "components_dashboard_shell_shellprops",
+      "components_dashboard_sidebar",
+      "components_dashboard_sidebar_sidebar"
+    ],
+    "39": [
+      "app_admin_admin_layout",
+      "app_admin_admin_layout_adminlayout",
+      "app_admin_layout",
+      "app_admin_layout_adminlayout",
+      "components_admin_adminsidebar",
+      "components_admin_adminsidebar_adminsidebar"
+    ],
+    "40": [
+      "app_api_bots_route",
+      "app_api_bots_route_get",
+      "app_api_bots_route_post",
+      "services_plan_limits",
+      "services_plan_limits_checkbotlimit",
+      "services_plan_limits_checkmessagelimit"
+    ],
+    "41": [
+      "app_api_marketing_cron_publish_scheduled_route",
+      "app_api_marketing_cron_publish_scheduled_route_get",
+      "app_api_marketing_posts_id_boost_route",
+      "app_api_marketing_posts_id_boost_route_post",
+      "services_marketing_meta_post_service",
+      "services_marketing_meta_post_service_metapostservice"
+    ],
+    "42": [
+      "app_api_admin_marketplace_products_route",
+      "app_api_admin_marketplace_products_route_delete",
+      "app_api_admin_marketplace_products_route_get",
+      "app_api_admin_marketplace_products_route_post",
+      "app_api_admin_marketplace_products_route_put"
+    ],
+    "43": [
+      "app_api_admin_marketplace_tiers_route",
+      "app_api_admin_marketplace_tiers_route_delete",
+      "app_api_admin_marketplace_tiers_route_get",
+      "app_api_admin_marketplace_tiers_route_post",
+      "app_api_admin_marketplace_tiers_route_put"
+    ],
+    "44": [
+      "app_api_agency_onboarding_route_post",
+      "lib_niche_templates",
+      "lib_niche_templates_getnichetemplate",
+      "lib_niche_templates_niche_templates",
+      "lib_niche_templates_nichetemplate"
+    ],
+    "45": [
+      "app_api_ai_speak_route",
+      "app_api_ai_speak_route_post",
+      "services_engine_voice",
+      "services_engine_voice_getopenai",
+      "services_engine_voice_voiceservice"
+    ],
+    "46": [
+      "app_api_webhooks_meta_route",
+      "app_api_webhooks_meta_route_get",
+      "app_api_webhooks_meta_route_handleinstagram",
+      "app_api_webhooks_meta_route_handlewhatsapp",
+      "app_api_webhooks_meta_route_post"
+    ],
+    "47": [
+      "app_dashboard_writer_page",
+      "app_dashboard_writer_page_generatelicensekey",
+      "app_dashboard_writer_page_writerdashboardpage",
+      "components_dashboard_copylicensebutton",
+      "components_dashboard_copylicensebutton_copylicensebutton"
+    ],
+    "48": [
+      "app_layout",
+      "app_layout_generatemetadata",
+      "app_layout_rootlayout",
+      "components_providers",
+      "components_providers_providers"
+    ],
+    "49": [
+      "proxy",
+      "proxy_baseurl",
+      "proxy_config",
+      "proxy_proxy",
+      "proxy_publicroutes"
+    ],
+    "50": [
+      "services_engine_skills",
+      "services_engine_skills_getskillprompt",
+      "services_engine_skills_mapbottoskill",
+      "services_engine_skills_specialistskill",
+      "services_engine_skills_specialistskills"
+    ],
+    "51": [
+      "app_admin_admin_dashboard_page",
+      "app_admin_admin_dashboard_page_admindashboardpage",
+      "app_admin_admin_dashboard_page_statcard",
+      "app_admin_admin_dashboard_page_systemitem"
+    ],
+    "52": [
+      "app_admin_admin_settings_page",
+      "app_admin_admin_settings_page_adminsettingspage",
+      "app_admin_admin_settings_page_logouploadsection",
+      "app_admin_admin_settings_page_settinginput"
+    ],
+    "53": [
+      "app_api_admin_system_bot_route",
+      "app_api_admin_system_bot_route_delete",
+      "app_api_admin_system_bot_route_get",
+      "app_api_admin_system_bot_route_post"
+    ],
+    "54": [
+      "app_api_bots_id_followup_route",
+      "app_api_bots_id_followup_route_delete",
+      "app_api_bots_id_followup_route_get",
+      "app_api_bots_id_followup_route_post"
+    ],
+    "55": [
+      "app_api_bots_id_route",
+      "app_api_bots_id_route_delete",
+      "app_api_bots_id_route_get",
+      "app_api_bots_id_route_put"
+    ],
+    "56": [
+      "app_api_settings_ai_route",
+      "app_api_settings_ai_route_get",
+      "app_api_settings_ai_route_put",
+      "app_api_settings_ai_route_updateaisettingsschema"
+    ],
+    "57": [
+      "app_api_settings_finance_route",
+      "app_api_settings_finance_route_get",
+      "app_api_settings_finance_route_put",
+      "app_api_settings_finance_route_updatefinanceschema"
+    ],
+    "58": [
+      "app_api_settings_profile_route",
+      "app_api_settings_profile_route_get",
+      "app_api_settings_profile_route_put",
+      "app_api_settings_profile_route_updateprofileschema"
+    ],
+    "59": [
+      "app_auth_login_page",
+      "app_auth_login_page_logincontent",
+      "app_auth_login_page_loginpage",
+      "app_auth_login_page_test"
+    ],
+    "60": [
+      "app_chat_embed_botid_page",
+      "app_chat_embed_botid_page_getorcreatesessionid",
+      "app_chat_embed_botid_page_message",
+      "app_chat_embed_botid_page_webchatwidget"
+    ],
+    "61": [
+      "app_connect_token_page",
+      "app_connect_token_page_metaconnectstep",
+      "app_connect_token_page_publicconnectpage",
+      "app_connect_token_page_publicconnectpagecontent"
+    ],
+    "62": [
+      "app_dashboard_agency_tasks_page",
+      "app_dashboard_agency_tasks_page_columns",
+      "app_dashboard_agency_tasks_page_kanbanboardpage",
+      "app_dashboard_agency_tasks_page_squad_colors"
+    ],
+    "63": [
+      "app_dashboard_bots_page",
+      "app_dashboard_bots_page_botspage",
+      "app_embed_bots_page",
+      "app_embed_bots_page_embedbotspage"
+    ],
+    "64": [
+      "app_dashboard_connect_page",
+      "app_dashboard_connect_page_connectpage",
+      "app_dashboard_connect_page_connectpagecontent",
+      "app_dashboard_connect_page_metaconnectstep"
+    ],
+    "65": [
+      "components_dashboard_mediamanager",
+      "components_dashboard_mediamanager_listrender",
+      "components_dashboard_mediamanager_media",
+      "components_dashboard_mediamanager_mediamanager"
+    ],
+    "66": [
+      "lib_monitoring",
+      "lib_monitoring_captureerror",
+      "lib_monitoring_capturemessage",
+      "lib_monitoring_getsentry"
+    ],
+    "67": [
+      "scripts_check_bot_prompt_js",
+      "scripts_check_bot_prompt_js_main",
+      "scripts_check_bot_prompt_js_prisma",
+      "scripts_check_bot_prompt_js_prismaclient"
+    ],
+    "68": [
+      "scripts_check_business_type",
+      "scripts_check_business_type_main",
+      "scripts_check_business_type_prisma",
+      "scripts_check_business_type_prismaclient"
+    ],
+    "69": [
+      "scripts_fix_bot_prompt_js",
+      "scripts_fix_bot_prompt_js_main",
+      "scripts_fix_bot_prompt_js_prisma",
+      "scripts_fix_bot_prompt_js_prismaclient"
+    ],
+    "70": [
+      "scripts_fix_bot_prompt_js_scripts_fix_bot_prompt",
+      "scripts_fix_bot_prompt_js_scripts_fix_bot_prompt_main",
+      "scripts_fix_bot_prompt_js_scripts_fix_bot_prompt_prisma",
+      "scripts_fix_bot_prompt_prismaclient"
+    ],
+    "71": [
+      "scripts_migrate_bot_status_js_scripts_migrate_bot_status",
+      "scripts_migrate_bot_status_js_scripts_migrate_bot_status_main",
+      "scripts_migrate_bot_status_js_scripts_migrate_bot_status_prisma",
+      "scripts_migrate_bot_status_prismaclient"
+    ],
+    "72": [
+      "services_engine_cart_service_cartservice",
+      "services_engine_cart_service_cartservice_addtocart",
+      "services_engine_cart_service_cartservice_getcartsummary",
+      "services_engine_cart_service_cartservice_getorcreatecart"
+    ],
+    "73": [
+      "services_payment_price_detector",
+      "services_payment_price_detector_extractprices",
+      "services_payment_price_detector_findrelevantprice",
+      "services_payment_price_detector_pricematch"
+    ],
+    "74": [
+      "app_admin_admin_agencies_page",
+      "app_admin_admin_agencies_page_agenciesadmin",
+      "app_admin_admin_agencies_page_statcard"
+    ],
+    "75": [
+      "app_admin_admin_plans_page",
+      "app_admin_admin_plans_page_featureitem",
+      "app_admin_admin_plans_page_plansadminpage"
+    ],
+    "76": [
+      "app_api_admin_users_id_bots_route",
+      "app_api_admin_users_id_bots_route_get",
+      "app_api_admin_users_id_bots_route_patch"
+    ],
+    "77": [
+      "app_api_agency_tasks_route",
+      "app_api_agency_tasks_route_get",
+      "app_api_agency_tasks_route_post"
+    ],
+    "78": [
+      "app_api_drivers_me_route",
+      "app_api_drivers_me_route_get",
+      "app_api_drivers_me_route_post"
+    ],
+    "79": [
+      "app_api_marketing_offer_route",
+      "app_api_marketing_offer_route_get",
+      "app_api_marketing_offer_route_post"
+    ],
+    "80": [
+      "app_api_products_magic_import_route",
+      "app_api_products_magic_import_route_getopenai",
+      "app_api_products_magic_import_route_post"
+    ],
+    "81": [
+      "app_api_products_route",
+      "app_api_products_route_get",
+      "app_api_products_route_post"
+    ],
+    "82": [
+      "app_api_settings_agency_pricing_route",
+      "app_api_settings_agency_pricing_route_get",
+      "app_api_settings_agency_pricing_route_post"
+    ],
+    "83": [
+      "app_api_settings_password_route",
+      "app_api_settings_password_route_put",
+      "app_api_settings_password_route_updatepasswordschema"
+    ],
+    "84": [
+      "app_api_v1_ml_update_route",
+      "app_api_v1_ml_update_route_compareversions",
+      "app_api_v1_ml_update_route_post"
+    ],
+    "85": [
+      "app_api_v1_wp_auth_route",
+      "app_api_v1_wp_auth_route_get",
+      "app_api_v1_wp_auth_route_post"
+    ],
+    "86": [
+      "app_auth_register_page",
+      "app_auth_register_page_registerpage",
+      "app_auth_register_page_test"
+    ],
+    "87": [
+      "app_auth_reset_password_page",
+      "app_auth_reset_password_page_resetpasswordcontent",
+      "app_auth_reset_password_page_resetpasswordpage"
+    ],
+    "88": [
+      "app_auth_verify_page",
+      "app_auth_verify_page_verifycontent",
+      "app_auth_verify_page_verifypage"
+    ],
+    "89": [
+      "app_checkout_complete_profile_page",
+      "app_checkout_complete_profile_page_completeprofilecontent",
+      "app_checkout_complete_profile_page_completeprofilepage"
+    ],
+    "90": [
+      "app_dashboard_agency_workflows_page",
+      "app_dashboard_agency_workflows_page_agencyworkflowspage",
+      "app_dashboard_agency_workflows_page_workflow_cards"
+    ],
+    "91": [
+      "app_dashboard_bots_id_test_chat_page",
+      "app_dashboard_bots_id_test_chat_page_message",
+      "app_dashboard_bots_id_test_chat_page_testchatpage"
+    ],
+    "92": [
+      "app_dashboard_integrations_wordpress_connect_ml_page",
+      "app_dashboard_integrations_wordpress_connect_ml_page_wordpressconnectmlcontent",
+      "app_dashboard_integrations_wordpress_connect_ml_page_wordpressconnectmlpage"
+    ],
+    "93": [
+      "app_dashboard_integrations_wordpress_connect_page",
+      "app_dashboard_integrations_wordpress_connect_page_wordpressconnectcontent",
+      "app_dashboard_integrations_wordpress_connect_page_wordpressconnectpage"
+    ],
+    "94": [
+      "app_docs_page",
+      "app_docs_page_docspage",
+      "app_docs_page_modulecard"
+    ],
+    "95": [
+      "app_driver_page",
+      "app_driver_page_driverdashboardcontent",
+      "app_driver_page_driverdashboardpage"
+    ],
+    "96": [
+      "app_instagram_callback_page",
+      "app_instagram_callback_page_instagramcallbackcontent",
+      "app_instagram_callback_page_instagramcallbackpage"
+    ],
+    "97": [
+      "app_pricing_page",
+      "app_pricing_page_gateways",
+      "app_pricing_page_pricingpage"
+    ],
+    "98": [
+      "app_wp_onboarding_page",
+      "app_wp_onboarding_page_step",
+      "app_wp_onboarding_page_wponboardingpage"
+    ],
+    "99": [
+      "app_writer_plugin_page",
+      "app_writer_plugin_page_agents",
+      "app_writer_plugin_page_writerpluginlp"
+    ],
+    "100": [
+      "components_dashboard_drivermap",
+      "components_dashboard_drivermap_drivermap",
+      "components_dashboard_drivermap_drivermapprops"
+    ],
+    "101": [
+      "scripts_check_bot_prompt",
+      "scripts_check_bot_prompt_main",
+      "scripts_check_bot_prompt_prisma"
+    ],
+    "102": [
+      "scripts_create_superadmin",
+      "scripts_create_superadmin_main",
+      "scripts_create_superadmin_prisma"
+    ],
+    "103": [
+      "scripts_fix_bot_prompt_ts_scripts_fix_bot_prompt",
+      "scripts_fix_bot_prompt_ts_scripts_fix_bot_prompt_main",
+      "scripts_fix_bot_prompt_ts_scripts_fix_bot_prompt_prisma"
+    ],
+    "104": [
+      "scripts_migrate_bot_status_ts_scripts_migrate_bot_status",
+      "scripts_migrate_bot_status_ts_scripts_migrate_bot_status_main",
+      "scripts_migrate_bot_status_ts_scripts_migrate_bot_status_prisma"
+    ],
+    "105": [
+      "scripts_migrate_scheduling",
+      "scripts_migrate_scheduling_main",
+      "scripts_migrate_scheduling_prisma"
+    ],
+    "106": [
+      "scripts_promote_admin",
+      "scripts_promote_admin_main",
+      "scripts_promote_admin_prisma"
+    ],
+    "107": [
+      "scripts_seed_writer_v3",
+      "scripts_seed_writer_v3_main",
+      "scripts_seed_writer_v3_prisma"
+    ],
+    "108": [
+      "app_admin_admin_marketplace_page",
+      "app_admin_admin_marketplace_page_marketplaceadmin"
+    ],
+    "109": [
+      "app_admin_admin_payments_page",
+      "app_admin_admin_payments_page_paymentsadminpage"
+    ],
+    "110": [
+      "app_admin_admin_profile_page",
+      "app_admin_admin_profile_page_adminprofilepage"
+    ],
+    "111": [
+      "app_admin_admin_users_page",
+      "app_admin_admin_users_page_usersadminpage"
+    ],
+    "112": [
+      "app_auth_forgot_password_page",
+      "app_auth_forgot_password_page_forgotpasswordpage"
+    ],
+    "113": [
+      "app_auth_google_popup_callback_page",
+      "app_auth_google_popup_callback_page_googlepopupcallbackpage"
+    ],
+    "114": [
+      "app_auth_google_popup_page",
+      "app_auth_google_popup_page_googlepopuppage"
+    ],
+    "115": [
+      "app_billing_success_page",
+      "app_billing_success_page_billingsuccess"
+    ],
+    "116": [
+      "app_dashboard_admin_settings_page",
+      "app_dashboard_admin_settings_page_adminsettingspage"
+    ],
+    "117": [
+      "app_dashboard_agency_clients_id_audit_page",
+      "app_dashboard_agency_clients_id_audit_page_clientauditpage"
+    ],
+    "118": [
+      "app_dashboard_agency_clients_page",
+      "app_dashboard_agency_clients_page_agencyclientspage"
+    ],
+    "119": [
+      "app_dashboard_agency_page",
+      "app_dashboard_agency_page_agencydashboard"
+    ],
+    "120": [
+      "app_dashboard_agency_pricing_page",
+      "app_dashboard_agency_pricing_page_agencypricing"
+    ],
+    "121": [
+      "app_docs_agency_suite_page",
+      "app_docs_agency_suite_page_agencysuitedocspage"
+    ],
+    "122": [
+      "app_docs_agenda_page",
+      "app_docs_agenda_page_agendadocspage"
+    ],
+    "123": [
+      "app_docs_ai_seo_optimizer_page",
+      "app_docs_ai_seo_optimizer_page_aiseooptimizerdocspage"
+    ],
+    "124": [
+      "app_docs_ai_training_page",
+      "app_docs_ai_training_page_aitrainingdocspage"
+    ],
+    "125": [
+      "app_docs_ai_writer_page",
+      "app_docs_ai_writer_page_aiwriterdocspage"
+    ],
+    "126": [
+      "app_docs_automation_page",
+      "app_docs_automation_page_followupdocspage"
+    ],
+    "127": [
+      "app_docs_bot_creation_page",
+      "app_docs_bot_creation_page_botcreationpage"
+    ],
+    "128": [
+      "app_docs_catalog_page",
+      "app_docs_catalog_page_catalogdocspage"
+    ],
+    "129": [
+      "app_docs_crm_page",
+      "app_docs_crm_page_crmdocspage"
+    ],
+    "130": [
+      "app_docs_drivers_page",
+      "app_docs_drivers_page_driversdocspage"
+    ],
+    "131": [
+      "app_docs_instagram_page",
+      "app_docs_instagram_page_instagramdocspage"
+    ],
+    "132": [
+      "app_docs_intelligence_elevenlabs_page",
+      "app_docs_intelligence_elevenlabs_page_elevenlabsdocspage"
+    ],
+    "133": [
+      "app_docs_intelligence_page",
+      "app_docs_intelligence_page_intelligencedocspage"
+    ],
+    "134": [
+      "app_docs_marketing_page",
+      "app_docs_marketing_page_marketingdocspage"
+    ],
+    "135": [
+      "app_docs_mercado_livre_page",
+      "app_docs_mercado_livre_page_mercadolivredocspage"
+    ],
+    "136": [
+      "app_docs_payments_page",
+      "app_docs_payments_page_paymentsdocspage"
+    ],
+    "137": [
+      "app_docs_settings_page",
+      "app_docs_settings_page_settingsdocspage"
+    ],
+    "138": [
+      "app_docs_simulator_page",
+      "app_docs_simulator_page_simulatordocspage"
+    ],
+    "139": [
+      "app_docs_uzapi_page",
+      "app_docs_uzapi_page_uzapidocspage"
+    ],
+    "140": [
+      "app_docs_whatsapp_oficial_page",
+      "app_docs_whatsapp_oficial_page_whatsappoficialdocspage"
+    ],
+    "141": [
+      "app_docs_whatsapp_page",
+      "app_docs_whatsapp_page_whatsappdocspage"
+    ],
+    "142": [
+      "app_docs_wordpress_page",
+      "app_docs_wordpress_page_wordpressdocspage"
+    ],
+    "143": [
+      "app_embed_layout",
+      "app_embed_layout_embedlayout"
+    ],
+    "144": [
+      "app_privacy_page",
+      "app_privacy_page_privacypage"
+    ],
+    "145": [
+      "app_terms_page",
+      "app_terms_page_termspage"
+    ],
+    "146": [
+      "app_v_slug_page",
+      "app_v_slug_page_publiclandingpage"
+    ],
+    "147": [
+      "scripts_check_user",
+      "scripts_check_user_main"
+    ],
+    "148": [
+      "scripts_check_wuzapi",
+      "scripts_check_wuzapi_check"
+    ],
+    "149": [
+      "scripts_simulate_audio",
+      "scripts_simulate_audio_run"
+    ],
+    "150": [
+      "scripts_verify_role",
+      "scripts_verify_role_main"
+    ],
+    "151": [
+      "services_engine_product_selector",
+      "services_engine_product_selector_productselector"
+    ],
+    "152": [
+      "services_payment_stripe",
+      "services_payment_stripe_stripeservice"
+    ],
+    "153": [
+      "constants_docs_nav"
+    ],
+    "154": [
+      "lib_constants"
+    ],
+    "155": [
+      "services_engine_maestro_test"
+    ]
+  },
+  "cohesion": {
+    "0": 0.034087569791360565,
+    "1": 0.03670886075949367,
+    "2": 0.06804214223002635,
+    "3": 0.06836055656382335,
+    "4": 0.06028368794326241,
+    "5": 0.0700354609929078,
+    "6": 0.08879492600422834,
+    "7": 0.1164021164021164,
+    "8": 0.12169312169312169,
+    "9": 0.09666666666666666,
+    "10": 0.18181818181818182,
+    "11": 0.1380952380952381,
+    "12": 0.12857142857142856,
+    "13": 0.13450292397660818,
+    "14": 0.11764705882352941,
+    "15": 0.14705882352941177,
+    "16": 0.15,
+    "17": 0.26373626373626374,
+    "18": 0.1978021978021978,
+    "19": 0.32051282051282054,
+    "20": 0.21212121212121213,
+    "21": 0.32727272727272727,
+    "22": 0.3090909090909091,
+    "23": 0.18181818181818182,
+    "24": 0.18181818181818182,
+    "25": 0.35555555555555557,
+    "26": 0.2,
+    "27": 0.2222222222222222,
+    "28": 0.25,
+    "29": 0.25,
+    "30": 0.4444444444444444,
+    "31": 0.2222222222222222,
+    "32": 0.2777777777777778,
+    "33": 0.32142857142857145,
+    "34": 0.42857142857142855,
+    "35": 0.4642857142857143,
+    "36": 0.42857142857142855,
+    "37": 0.2857142857142857,
+    "38": 0.3333333333333333,
+    "39": 0.3333333333333333,
+    "40": 0.4666666666666667,
+    "41": 0.4666666666666667,
+    "42": 0.4,
+    "43": 0.4,
+    "44": 0.4,
+    "45": 0.5,
+    "46": 0.6,
+    "47": 0.6,
+    "48": 0.5,
+    "49": 0.5,
+    "50": 0.5,
+    "51": 0.5,
+    "52": 0.5,
+    "53": 0.5,
+    "54": 0.5,
+    "55": 0.5,
+    "56": 0.5,
+    "57": 0.5,
+    "58": 0.5,
+    "59": 0.5,
+    "60": 0.5,
+    "61": 0.5,
+    "62": 0.5,
+    "63": 0.5,
+    "64": 0.5,
+    "65": 0.6666666666666666,
+    "66": 0.8333333333333334,
+    "67": 0.5,
+    "68": 0.5,
+    "69": 0.5,
+    "70": 0.5,
+    "71": 0.5,
+    "72": 0.8333333333333334,
+    "73": 0.6666666666666666,
+    "74": 0.6666666666666666,
+    "75": 0.6666666666666666,
+    "76": 0.6666666666666666,
+    "77": 0.6666666666666666,
+    "78": 0.6666666666666666,
+    "79": 0.6666666666666666,
+    "80": 1.0,
+    "81": 0.6666666666666666,
+    "82": 0.6666666666666666,
+    "83": 0.6666666666666666,
+    "84": 1.0,
+    "85": 0.6666666666666666,
+    "86": 0.6666666666666666,
+    "87": 0.6666666666666666,
+    "88": 0.6666666666666666,
+    "89": 0.6666666666666666,
+    "90": 0.6666666666666666,
+    "91": 0.6666666666666666,
+    "92": 0.6666666666666666,
+    "93": 0.6666666666666666,
+    "94": 0.6666666666666666,
+    "95": 0.6666666666666666,
+    "96": 0.6666666666666666,
+    "97": 0.6666666666666666,
+    "98": 0.6666666666666666,
+    "99": 0.6666666666666666,
+    "100": 0.6666666666666666,
+    "101": 0.6666666666666666,
+    "102": 0.6666666666666666,
+    "103": 0.6666666666666666,
+    "104": 0.6666666666666666,
+    "105": 0.6666666666666666,
+    "106": 0.6666666666666666,
+    "107": 0.6666666666666666,
+    "108": 1.0,
+    "109": 1.0,
+    "110": 1.0,
+    "111": 1.0,
+    "112": 1.0,
+    "113": 1.0,
+    "114": 1.0,
+    "115": 1.0,
+    "116": 1.0,
+    "117": 1.0,
+    "118": 1.0,
+    "119": 1.0,
+    "120": 1.0,
+    "121": 1.0,
+    "122": 1.0,
+    "123": 1.0,
+    "124": 1.0,
+    "125": 1.0,
+    "126": 1.0,
+    "127": 1.0,
+    "128": 1.0,
+    "129": 1.0,
+    "130": 1.0,
+    "131": 1.0,
+    "132": 1.0,
+    "133": 1.0,
+    "134": 1.0,
+    "135": 1.0,
+    "136": 1.0,
+    "137": 1.0,
+    "138": 1.0,
+    "139": 1.0,
+    "140": 1.0,
+    "141": 1.0,
+    "142": 1.0,
+    "143": 1.0,
+    "144": 1.0,
+    "145": 1.0,
+    "146": 1.0,
+    "147": 1.0,
+    "148": 1.0,
+    "149": 1.0,
+    "150": 1.0,
+    "151": 1.0,
+    "152": 1.0,
+    "153": 1.0,
+    "154": 1.0,
+    "155": 1.0
+  },
+  "gods": [
+    {
+      "id": "lib_prisma_prisma",
+      "label": "prisma",
+      "degree": 207
+    },
+    {
+      "id": "lib_auth_authoptions",
+      "label": "authOptions",
+      "degree": 130
+    },
+    {
+      "id": "lib_get_effective_tenant_geteffectivetenantid",
+      "label": "getEffectiveTenantId()",
+      "degree": 79
+    },
+    {
+      "id": "services_engine_logger_logtofile",
+      "label": "logToFile()",
+      "degree": 35
+    },
+    {
+      "id": "services_meta_meta_service_metaservice",
+      "label": "MetaService",
+      "degree": 23
+    },
+    {
+      "id": "lib_redis_getredis",
+      "label": "getRedis()",
+      "degree": 19
+    },
+    {
+      "id": "lib_ai_provider_safechatcompletion",
+      "label": "safeChatCompletion()",
+      "degree": 18
+    },
+    {
+      "id": "services_meta_meta_service_graphfetch",
+      "label": "graphFetch()",
+      "degree": 17
+    },
+    {
+      "id": "services_engine_uzapi_uzapiservice",
+      "label": "UzapiService",
+      "degree": 16
+    },
+    {
+      "id": "lib_ai_provider_getaiclient",
+      "label": "getAiClient()",
+      "degree": 15
+    }
+  ],
+  "surprises": [
+    {
+      "source": "AdminPage()",
+      "target": "Bot",
+      "source_files": [
+        "app/admin/page.tsx",
+        "components/Dashboard/CRM.tsx"
+      ],
+      "confidence": "INFERRED",
+      "relation": "indirect_call",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `AdminPage()` unexpectedly reaches hub `Bot`"
+    },
+    {
+      "source": "GET()",
+      "target": "getEffectiveTenantId()",
+      "source_files": [
+        "app/api/bots/route.ts",
+        "lib/get-effective-tenant.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `GET()` unexpectedly reaches hub `getEffectiveTenantId()`"
+    },
+    {
+      "source": "PUT()",
+      "target": "getEffectiveTenantId()",
+      "source_files": [
+        "app/api/marketing/ads/[id]/route.ts",
+        "lib/get-effective-tenant.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `PUT()` unexpectedly reaches hub `getEffectiveTenantId()`"
+    },
+    {
+      "source": "DELETE()",
+      "target": "getEffectiveTenantId()",
+      "source_files": [
+        "app/api/marketing/ads/[id]/route.ts",
+        "lib/get-effective-tenant.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `DELETE()` unexpectedly reaches hub `getEffectiveTenantId()`"
+    },
+    {
+      "source": "PUT()",
+      "target": "getEffectiveTenantId()",
+      "source_files": [
+        "app/api/marketing/ads/campaigns/[id]/route.ts",
+        "lib/get-effective-tenant.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `PUT()` unexpectedly reaches hub `getEffectiveTenantId()`"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

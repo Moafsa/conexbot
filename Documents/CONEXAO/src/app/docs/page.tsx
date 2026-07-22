@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
     Cpu, Zap, Brain, MessageSquare, ShieldCheck, PieChart,
     Globe, Calendar, Database, ArrowRight, Rocket, Settings, PencilLine,
-    Instagram, ShoppingBag, Truck, Briefcase, Megaphone, AudioLines
+    Instagram, ShoppingBag, Truck, Briefcase, Megaphone, AudioLines, Gauge
 } from "lucide-react";
 
 export default function DocsPage() {
@@ -121,6 +121,14 @@ export default function DocsPage() {
                         icon={PencilLine}
                         color="text-green-400"
                         bg="bg-green-500/5"
+                    />
+                    <ModuleCard
+                        title="AI SEO Optimizer"
+                        desc="Reotimiza páginas, posts e produtos já existentes com IA + GEO."
+                        href="/docs/ai-seo-optimizer"
+                        icon={Gauge}
+                        color="text-emerald-400"
+                        bg="bg-emerald-500/5"
                     />
                     <ModuleCard
                         title="Marketing & Anúncios IA"
