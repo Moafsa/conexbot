@@ -441,19 +441,62 @@ export function CRM() {
                                             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
                                             onDrop={(e) => handleContactDrop(e, stage.id, stage.name)}
                                         >
-                                            {stageContacts.map(contact => (
-                                                <div
-                                                    key={contact.id}
-                                                    draggable
-                                                    onDragStart={(e) => handleContactDragStart(e, contact.id)}
-                                                    onDragEnd={() => setDraggedContact(null)}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedContactPanel(contact.id);
-                                                    }}
-                                                    className={`bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition cursor-grab group relative ${draggedContact === contact.id ? 'opacity-50 scale-95' : ''}`}
-                                                >
-                                                    <div className="flex justify-between items-start mb-2">
+                                            {stageContacts.map(contact => {
+                                                const isHumanRequested = (contact as any).isPaused || 
+                                                                         stage.name.toUpperCase().includes('HUMANO') || 
+                                                                         stage.name.toUpperCase().includes('TRANSBORDO') ||
+                                                                         (contact as any).needsHuman;
+
+                                                const activeOrders = ((contact as any).orders || []).filter((o: any) => 
+                                                    ['PENDING', 'DISPATCHED', 'IN_TRANSIT', 'CONFIRMED', 'PROCESSING'].includes(o.status)
+                                                );
+                                                const hasActiveOrder = activeOrders.length > 0;
+
+                                                const deliveredOrders = ((contact as any).orders || []).filter((o: any) => 
+                                                    ['DELIVERED', 'COMPLETED', 'PAID'].includes(o.status)
+                                                );
+                                                const hasDeliveredOrder = !hasActiveOrder && deliveredOrders.length > 0;
+
+                                                let cardBgStyle = 'bg-white border-gray-100 hover:shadow-md';
+                                                let customBadge = null;
+
+                                                if (isHumanRequested) {
+                                                    cardBgStyle = 'bg-purple-100 border-purple-400 ring-2 ring-purple-500/40 shadow-md';
+                                                    customBadge = (
+                                                        <span className="bg-purple-700 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm animate-pulse mb-2">
+                                                            👨‍💼 ATENDIMENTO HUMANO
+                                                        </span>
+                                                    );
+                                                } else if (hasActiveOrder) {
+                                                    cardBgStyle = 'bg-amber-100 border-amber-400 ring-2 ring-amber-500/40 shadow-md';
+                                                    customBadge = (
+                                                        <span className="bg-amber-600 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm mb-2">
+                                                            📦 EM ENTREGA
+                                                        </span>
+                                                    );
+                                                } else if (hasDeliveredOrder) {
+                                                    cardBgStyle = 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-500/30 shadow-md';
+                                                    customBadge = (
+                                                        <span className="bg-emerald-700 text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm mb-2">
+                                                            ✅ PEDIDO ENTREGUE
+                                                        </span>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div
+                                                        key={contact.id}
+                                                        draggable
+                                                        onDragStart={(e) => handleContactDragStart(e, contact.id)}
+                                                        onDragEnd={() => setDraggedContact(null)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedContactPanel(contact.id);
+                                                        }}
+                                                        className={`p-3 rounded-xl border transition cursor-grab group relative ${cardBgStyle} ${draggedContact === contact.id ? 'opacity-50 scale-95' : ''}`}
+                                                    >
+                                                        {customBadge}
+                                                        <div className="flex justify-between items-start mb-2">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-[10px] ring-1 ring-indigo-100">
                                                                 {contact.name ? contact.name.substring(0, 2).toUpperCase() : "?"}
@@ -502,7 +545,8 @@ export function CRM() {
                                                         </a>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            );
+                                        })}
                                             {stageContacts.length === 0 && (
                                                 <div className="py-8 border-2 border-dashed border-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-300 italic">
                                                     <span className="text-[10px] font-medium">Nenhum lead</span>
