@@ -182,7 +182,7 @@ export async function POST(req: Request) {
                     const redis = getRedis();
                     const cacheKey = `last_bot_reply:${bot.id}:${cleanPhone}`;
                     const cachedReply = await redis.get(cacheKey);
-                    if (cachedReply === messageText) {
+                    if (cachedReply && cachedReply.trim() === messageText.trim()) {
                         logToFile(`[Generic Webhook] Ignored loop message matching cached bot reply for ${cleanPhone}`);
                         return NextResponse.json({ status: 'ignored_loop', message: 'Matches cached bot reply' });
                     }

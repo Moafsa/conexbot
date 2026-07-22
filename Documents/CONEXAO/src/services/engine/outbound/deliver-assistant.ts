@@ -20,6 +20,19 @@ export async function deliverAssistantOutbound(params: {
 }): Promise<void> {
     const { channel, bot, remoteId, cleanResponse, mediaMatches, options } = params;
 
+    // Cache the reply in Redis for ALL channels to prevent loops and duplicate messages from Chatwoot webhooks
+    if (cleanResponse && bot?.id && remoteId) {
+        try {
+            const { getRedis } = await import('@/lib/redis');
+            const redis = getRedis();
+            const cleanPhone = remoteId.replace(/\D/g, '');
+            const cacheKey = `last_bot_reply:${bot.id}:${cleanPhone}`;
+            await redis.set(cacheKey, cleanResponse, 'EX', 60);
+        } catch (e: any) {
+            logToFile(`[Outbound] Redis caching error: ${e.message}`);
+        }
+    }
+
     if (channel === 'whatsapp') {
         if (!bot.sessionName) {
             logToFile(
