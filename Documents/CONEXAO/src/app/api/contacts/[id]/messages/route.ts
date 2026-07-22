@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // 1. Find contact
         const contact = await prisma.contact.findFirst({
             where: { id: contactId, tenantId },
-            include: { bot: true, conversations: true }
+            include: { bot: true }
         });
 
         if (!contact) {
@@ -48,21 +48,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             return NextResponse.json({ error: 'Nenhum bot encontrado para realizar o envio' }, { status: 400 });
         }
 
-        // 3. Find or create conversation
-        let conversation = contact.conversations?.[0];
+        // 3. Find or create conversation by remoteId (phone variations)
+        const { PhoneUtils } = await import('@/lib/phone-utils');
+        const phoneVariations = PhoneUtils.getPhoneVariations(contact.phone);
+
+        let conversation = await prisma.conversation.findFirst({
+            where: {
+                botId: bot.id,
+                remoteId: { in: phoneVariations }
+            }
+        });
+
         if (!conversation) {
             conversation = await prisma.conversation.create({
                 data: {
                     botId: bot.id,
-                    contactId: contact.id,
-                    remoteId: contact.phone,
+                    remoteId: PhoneUtils.normalize(contact.phone),
                     channel: 'whatsapp',
                 }
             });
         }
 
-        // 4. Pause bot for 24h so AI does not interrupt human agent
-        const pausedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        // 4. Pause bot for 30 minutes so AI does not interrupt human agent
+        const pausedUntil = new Date(Date.now() + 30 * 60 * 1000);
         await prisma.conversation.update({
             where: { id: conversation.id },
             data: { pausedUntil } as any

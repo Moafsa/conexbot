@@ -386,7 +386,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                                     placeholder="Digite sua mensagem para o cliente..."
-                                    className="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full bg-gray-50 text-gray-800 placeholder:text-gray-400 border border-gray-200 rounded-2xl px-4 py-3 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                 />
                                 <button onClick={handleSend} className="absolute right-2 top-1.5 p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors">
                                     <Send size={16} />

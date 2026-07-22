@@ -3,11 +3,48 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2 } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
     mapboxToken: string;
+}
+
+function DeliveryTimer({ startTime }: { startTime: string }) {
+    const [elapsed, setElapsed] = useState('');
+
+    useEffect(() => {
+        const updateTimer = () => {
+            if (!startTime) return;
+            const start = new Date(startTime).getTime();
+            const now = new Date().getTime();
+            const diffMs = Math.max(0, now - start);
+
+            const minutes = Math.floor(diffMs / 60000);
+            const seconds = Math.floor((diffMs % 60000) / 1000);
+            const hours = Math.floor(minutes / 60);
+            const remMinutes = minutes % 60;
+
+            const pad = (n: number) => String(n).padStart(2, '0');
+
+            if (hours > 0) {
+                setElapsed(`${hours}h ${pad(remMinutes)}m ${pad(seconds)}s`);
+            } else {
+                setElapsed(`${minutes}m ${pad(seconds)}s`);
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [startTime]);
+
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-mono font-bold text-[10px] shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping inline-block" />
+            ⏱️ {elapsed || '0m 00s'}
+        </span>
+    );
 }
 
 export default function DriverMap({ mapboxToken }: DriverMapProps) {
@@ -446,6 +483,44 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         handleAssignOrder(orderId, driverId);
     };
 
+    const handleOrderAction = async (orderId: string, action: 'UNASSIGN' | 'DELIVER' | 'CANCEL' | 'DELETE') => {
+        if (!orderId) return;
+        try {
+            const labels: Record<string, string> = {
+                UNASSIGN: 'Devolvendo pedido para pendentes...',
+                DELIVER: 'Marcando como entregue...',
+                CANCEL: 'Cancelando entrega...',
+                DELETE: 'Excluindo pedido...'
+            };
+            toast.loading(labels[action] || 'Processando...', { id: 'order-action' });
+
+            const res = await fetch('/api/drivers/orders/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, action })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Falha ao executar ação no pedido');
+            }
+
+            const data = await res.json();
+            toast.success(data.message || 'Operação realizada!', { id: 'order-action' });
+            refreshAll();
+        } catch (err: any) {
+            toast.error(err.message, { id: 'order-action' });
+        }
+    };
+
+    const handleDropToPending = async (e: React.DragEvent) => {
+        e.preventDefault();
+        const orderId = e.dataTransfer.getData('orderId');
+        if (orderId) {
+            handleOrderAction(orderId, 'UNASSIGN');
+        }
+    };
+
     // Open Modal for Create or Edit Entregador
     const handleOpenModal = (driverToEdit?: any) => {
         if (driverToEdit) {
@@ -648,10 +723,14 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 </button>
             </div>
             
-            {/* Column 1: Pending Orders (Drag Source) */}
-            <div className={`${
+            {/* Column 1: Pending Orders (Drag & Drop Target for Unassign) */}
+            <div 
+                onDragOver={handleDragOver}
+                onDrop={handleDropToPending}
+                className={`${
                 activeView === 'orders' ? 'flex' : 'hidden'
-            } lg:flex w-full lg:w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex-col custom-scrollbar-white overflow-y-auto shrink-0 h-full`}>
+            } lg:flex w-full lg:w-80 border-r border-white/5 bg-[#07041a]/60 backdrop-blur-md flex-col custom-scrollbar-white overflow-y-auto shrink-0 h-full group/pending`}
+            >
                 <div className="p-5 space-y-4">
                     <div>
                         <h2 className="text-xs font-bold tracking-wider uppercase text-gray-400">Pedidos Pendentes ({pendingOrders.length})</h2>
@@ -867,23 +946,68 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 {/* Selected Driver Details */}
                 {selectedDriver && (
                     <div className="p-5 border-t border-white/5 bg-slate-950/80">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Entregas do Motorista</h3>
-                        <h4 className="text-sm font-bold text-white mt-1">{selectedDriver.name}</h4>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Entregas do Motorista</h3>
+                                <h4 className="text-sm font-bold text-white mt-0.5">{selectedDriver.name}</h4>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedDriver(null)}
+                                className="text-xs text-gray-400 hover:text-white"
+                            >
+                                ✕ Fechar
+                            </button>
+                        </div>
                         
-                        <div className="mt-3 space-y-2.5">
+                        <div className="mt-3 space-y-3">
                             {selectedDriver.assignedOrders?.length === 0 ? (
                                 <p className="text-[11px] text-gray-400 italic">Sem entregas ativas no momento.</p>
                             ) : (
                                 selectedDriver.assignedOrders?.map((order: any) => (
-                                    <div key={order.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[11px] space-y-1.5 relative">
+                                    <div key={order.id} className="p-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] space-y-2 relative">
                                         <div className="flex items-center justify-between">
                                             <span className="font-bold text-indigo-300">#{order.id.substring(0, 6)}</span>
-                                            <span className="text-[8px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
-                                                {order.status}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <DeliveryTimer startTime={order.updatedAt || order.createdAt} />
+                                                <span className="text-[8px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase font-semibold">
+                                                    {order.status}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente'}</p>
+                                        <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
                                         <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+
+                                        {/* Action buttons */}
+                                        <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-white/5">
+                                            <button
+                                                onClick={() => handleOrderAction(order.id, 'UNASSIGN')}
+                                                className="px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                title="Devolver pedido para a lista de pendentes"
+                                            >
+                                                <Undo2 className="h-3 w-3" /> Devolver
+                                            </button>
+                                            <button
+                                                onClick={() => handleOrderAction(order.id, 'DELIVER')}
+                                                className="px-2 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                title="Marcar entrega como concluída"
+                                            >
+                                                <CheckCircle2 className="h-3 w-3" /> Entregue
+                                            </button>
+                                            <button
+                                                onClick={() => handleOrderAction(order.id, 'CANCEL')}
+                                                className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                title="Cancelar entrega"
+                                            >
+                                                <XCircle className="h-3 w-3" /> Cancelar
+                                            </button>
+                                            <button
+                                                onClick={() => handleOrderAction(order.id, 'DELETE')}
+                                                className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl font-semibold text-[9px] flex items-center justify-center gap-1 transition cursor-pointer"
+                                                title="Excluir pedido permanentemente"
+                                            >
+                                                <Trash2 className="h-3 w-3" /> Excluir
+                                            </button>
+                                        </div>
                                     </div>
                                 ))
                             )}
