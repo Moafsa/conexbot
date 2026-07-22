@@ -102,11 +102,22 @@ export const ChatwootService = {
                 }),
             });
             if (!res.ok) {
-                logToFile(`upsertContact create failed: ${res.status} ${await res.text().catch(() => '')}`);
+                const errText = await res.text().catch(() => '');
+                logToFile(`upsertContact create failed: ${res.status} ${errText}`);
+                // If phone already taken (422), the contact exists — retry the search
+                if (res.status === 422 || errText.includes('already been taken')) {
+                    const retry = await this.getContactByPhone(bot, phone);
+                    if (retry) {
+                        logToFile(`upsertContact found on retry: id=${retry.id}`);
+                        return retry;
+                    }
+                }
                 return null;
             }
             const data = await res.json();
-            return data.payload || data;
+            const contact = data.payload || data;
+            logToFile(`upsertContact created: id=${contact?.id} phone=${phone}`);
+            return contact;
         } catch (e: any) {
             logToFile(`upsertContact error: ${e.message}`);
             return null;
@@ -137,6 +148,7 @@ export const ChatwootService = {
             }
 
             // 2. Create new conversation
+            logToFile(`upsertConversation creating: contactId=${contactId} inboxId=${bot.chatwootInboxId}`);
             const createRes = await fetch(`${base}/api/v1/accounts/${bot.chatwootAccountId}/conversations`, {
                 method: 'POST',
                 headers,
@@ -147,11 +159,14 @@ export const ChatwootService = {
                 }),
             });
             if (!createRes.ok) {
-                logToFile(`upsertConversation create failed: ${createRes.status}`);
+                const errBody = await createRes.text().catch(() => '');
+                logToFile(`upsertConversation create failed: ${createRes.status} (contactId=${contactId}, inboxId=${bot.chatwootInboxId}) body=${errBody.substring(0, 200)}`);
                 return null;
             }
             const data = await createRes.json();
-            return data.payload || data;
+            const conv = data.payload || data;
+            logToFile(`upsertConversation created: id=${conv?.id} contactId=${contactId}`);
+            return conv;
         } catch (e: any) {
             logToFile(`upsertConversation error: ${e.message}`);
             return null;
