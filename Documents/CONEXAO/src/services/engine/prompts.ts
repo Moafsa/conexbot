@@ -239,6 +239,16 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
 
     sections.push(`═══ INFORMAÇÕES DO NEGÓCIO ═══\n\n${businessLines.join('\n')}`);
 
+    // Business Hours Guidelines
+    sections.push(`═══ ⏰ DIRETRIZES DE HORÁRIO DE FUNCIONAMENTO E AGENDAMENTO ═══
+1. 🕐 REFERÊNCIA DE HORÁRIO: O horário oficial de funcionamento da empresa é: "${bot.hours || 'Segunda a Sexta das 08h às 18h'}".
+2. 🌙 ATENDIMENTO FORA DO HORÁRIO (ESTABELECIMENTO FECHADO):
+   - Se o cliente solicitar atendimento ou produtos fora do horário de expediente, informe educadamente o horário de funcionamento e quando o estabelecimento reabrirá.
+   - 🚨 NUNCA PERDA A VENDA/ATENDIMENTO: Mesmo fechado, anote e registre o pedido/agendamento para ser entregue ou processado logo na abertura do próximo dia útil.
+   - Exemplo: "Olá! No momento estamos fechados (nosso expediente é ${bot.hours || 'das 08h às 18h'}). Porém, posso deixar seu pedido anotado e garantido para entrega logo no primeiro horário de amanhã! Vamos confirmar?"
+3. ⏳ ATENDIMENTO PRÓXIMO AO FECHAMENTO:
+   - Se o cliente chamar próximo do horário de encerramento, seja transparente e cordial: informe que estamos nos últimos minutos de atendimento e confirme se o pedido/agendamento pode ser atendido hoje ou agendado para o próximo período.`);
+
     // Contact profile (injected from CRM)
     if (bot.contactInfo) {
         const ci = bot.contactInfo;
