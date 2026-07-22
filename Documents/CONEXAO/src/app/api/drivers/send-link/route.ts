@@ -43,22 +43,14 @@ export async function POST(req: Request) {
             });
         }
 
-        if (!bot || !bot.sessionName || bot.connectionStatus !== 'CONNECTED') {
-            // Fallback to any connected bot of this tenant
-            bot = await prisma.bot.findFirst({
-                where: { tenantId, connectionStatus: 'CONNECTED' }
-            });
-        }
-
-        if (!bot || !bot.sessionName) {
-            // Final fallback to any bot of this tenant
+        if (!bot) {
             bot = await prisma.bot.findFirst({
                 where: { tenantId }
             });
         }
 
-        if (!bot || !bot.sessionName) {
-            return NextResponse.json({ error: 'Nenhum bot conectado/ativo encontrado para enviar a mensagem WhatsApp.' }, { status: 400 });
+        if (!bot) {
+            return NextResponse.json({ error: 'Nenhum bot encontrado para enviar a mensagem WhatsApp.' }, { status: 400 });
         }
 
         // Generate PWA magic login token
@@ -79,12 +71,12 @@ export async function POST(req: Request) {
         const pwaUrl = `${appUrl}/driver?token=${token}`;
         const messageText = `Olá, *${driver.name}*!\n\nAqui está o seu link de acesso exclusivo para o aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione o app à sua tela inicial para receber corridas!_`;
 
-        const { UzapiService } = await import('@/services/engine/uzapi');
-        const sent = await UzapiService.sendMessage(bot.sessionName, driver.phone, messageText);
+        const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
+        const sent = await sendOutboundMessageToPhone(bot, driver.phone, messageText);
 
         if (!sent) {
             return NextResponse.json({ 
-                error: `Falha ao enviar mensagem de WhatsApp. Verifique se o bot '${bot.name}' (sessão: ${bot.sessionName}) está conectado e ativo no WuzAPI/Uzapi.` 
+                error: `Falha ao enviar mensagem de WhatsApp. Verifique se o canal WhatsApp do bot '${bot.name}' está ativo.` 
             }, { status: 500 });
         }
 

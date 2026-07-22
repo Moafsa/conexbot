@@ -143,8 +143,8 @@ export async function POST(req: Request) {
                                 `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
                                 `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
 
-                            const { UzapiService } = await import('@/services/engine/uzapi');
-                            await UzapiService.sendMessage(bot.sessionName || '', driver.phone, dispatchMsg);
+                            const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
+                            await sendOutboundMessageToPhone(bot, driver.phone, dispatchMsg);
                             
                             logToFile(`[Chatwoot Assignee Webhook] Dispatched order ${latestOrder.id} to driver ${driver.name} (${driver.phone})`);
                         }

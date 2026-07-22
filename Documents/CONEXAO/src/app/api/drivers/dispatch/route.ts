@@ -98,9 +98,7 @@ export async function POST(req: Request) {
             `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
             `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
 
-        if (botSession) {
-            await UzapiService.sendMessage(botSession, driver.phone, dispatchMsg);
-        }
+        await sendOutboundMessageToPhone(order.bot, driver.phone, dispatchMsg);
 
         // 6. Assign conversation in Chatwoot
         const conversation = await prisma.conversation.findFirst({

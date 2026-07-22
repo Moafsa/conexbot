@@ -48,7 +48,8 @@ export async function GET(req: Request) {
                 `Por favor, responda com *SIM* ou *NÃO* diretamente neste chat.`;
 
             try {
-                await UzapiService.sendMessage(botSession, driverPhone, followUpMsg);
+                const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
+                await sendOutboundMessageToPhone(order.bot, driverPhone, followUpMsg);
                 
                 await prisma.order.update({
                     where: { id: order.id },

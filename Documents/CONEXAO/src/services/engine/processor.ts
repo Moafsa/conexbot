@@ -1571,8 +1571,9 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                         `📱 *Painel de Rastreamento (GPS):*\n${pwaUrl}\n\n` +
                                         `Por favor, clique no link do painel para ativar seu GPS e iniciar a corrida.`;
 
-                                    // 5. Send message to driver WhatsApp
-                                    await UzapiService.sendMessage(bot.sessionName, finalPhone, dispatchMsg);
+                                    // 5. Send message to driver WhatsApp via active channel (Meta WhatsApp or WuzAPI)
+                                    const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
+                                    await sendOutboundMessageToPhone(bot, finalPhone, dispatchMsg);
 
                                     // 6. Assign conversation to driver in Chatwoot
                                     const cwConvId = (conversation as any)?.chatwootConversationId || options.chatwootConversationId;
