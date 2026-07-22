@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     X, MessageCircle, History, Info, Send,
     TrendingUp, Star, Phone, Mail, MapPin,
@@ -28,6 +28,17 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
     const [bots, setBots] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        if (activeTab === 'chat' && messages.length > 0) {
+            scrollToBottom();
+        }
+    }, [messages, activeTab, isTyping]);
 
     useEffect(() => {
         fetchContactData();
@@ -330,6 +341,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                     </div>
                                 </div>
                             )}
+                            <div ref={messagesEndRef} />
                         </div>
 
                         <div className="p-4 bg-white border-t border-gray-100">
