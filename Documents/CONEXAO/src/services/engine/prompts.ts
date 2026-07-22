@@ -442,14 +442,11 @@ export function buildConversationMessages(
     ];
     // Keep last 20 messages for context (avoid token overflow)
     const recentHistory = history.slice(-20);
-    // Sanitize: scan the ENTIRE window and drop any assistant message with tool_calls
-    // that is NOT immediately followed by all matching tool-result messages.
-    // OpenAI 400s on any orphaned tool_calls, regardless of position in the array.
     const sanitized: typeof recentHistory = [];
     for (let i = 0; i < recentHistory.length; i++) {
         const msg = recentHistory[i];
-        // Skip system messages injected into history (only the top-level system prompt is allowed)
         if (msg.role === 'system') continue;
+
         if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
             const toolCallIds: string[] = msg.tool_calls.map((tc: any) => tc.id);
             const following = recentHistory.slice(i + 1, i + 1 + toolCallIds.length);
@@ -457,15 +454,23 @@ export function buildConversationMessages(
                 following.some((m) => m.role === 'tool' && m.tool_call_id === id)
             );
             if (!allPresent) {
-                // Orphaned: skip assistant + any stray tool results that follow
                 while (i + 1 < recentHistory.length && recentHistory[i + 1].role === 'tool') {
                     i++;
                 }
-                continue; // drop orphan entirely
+                continue;
             }
         }
-        // Also skip 'system' role injected into history (only real system is at the top)
-        if (msg.role === 'system') continue;
+
+        if (msg.role === 'tool') {
+            // Check if there is a preceding assistant message in sanitized with matching tool_call_id
+            const hasPrecedingToolCall = sanitized.some(
+                (m) => m.role === 'assistant' && m.tool_calls?.some((tc: any) => tc.id === msg.tool_call_id)
+            );
+            if (!hasPrecedingToolCall) {
+                continue; // Skip orphan tool message
+            }
+        }
+
         sanitized.push(msg);
     }
     for (const msg of sanitized) {
