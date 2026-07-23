@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DriverMapProps {
@@ -514,12 +514,13 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         handleAssignOrder(orderId, driverId);
     };
 
-    const handleOrderAction = async (orderId: string, action: 'UNASSIGN' | 'DELIVER' | 'CANCEL' | 'DELETE') => {
+    const handleOrderAction = async (orderId: string, action: 'UNASSIGN' | 'DELIVER' | 'CANCEL' | 'DELETE' | 'PAY') => {
         if (!orderId) return;
         try {
             const labels: Record<string, string> = {
                 UNASSIGN: 'Devolvendo pedido para pendentes...',
                 DELIVER: 'Marcando como entregue...',
+                PAY: 'Marcando como pago...',
                 CANCEL: 'Cancelando entrega...',
                 DELETE: 'Excluindo pedido...'
             };
@@ -674,6 +675,30 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
         }
     };
 
+    // Copy magic login link to clipboard
+    const handleCopyAppLink = async (driverId: string, driverName: string) => {
+        toast.loading(`Gerando link do app para ${driverName}...`, { id: 'copy-app-link' });
+        try {
+            const res = await fetch('/api/drivers/send-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ driverId, sendWhatsapp: false })
+            });
+
+            const data = await res.json();
+            const pwaUrl = data.pwaUrl;
+
+            if (pwaUrl) {
+                await navigator.clipboard.writeText(pwaUrl);
+                toast.success(`Link do app de ${driverName} copiado para a área de transferência!`, { id: 'copy-app-link' });
+            } else {
+                throw new Error(data.error || 'Não foi possível gerar o link de acesso.');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Erro ao copiar link.', { id: 'copy-app-link' });
+        }
+    };
+
     // Send magic login link via WhatsApp
     const handleSendAppLink = async (driverId: string, driverName: string) => {
         toast.loading(`Enviando app para ${driverName}...`, { id: 'send-app' });
@@ -681,15 +706,29 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
             const res = await fetch('/api/drivers/send-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ driverId })
+                body: JSON.stringify({ driverId, sendWhatsapp: true })
             });
 
+            const data = await res.json();
+
             if (!res.ok) {
-                const data = await res.json();
+                if (data.pwaUrl) {
+                    try {
+                        await navigator.clipboard.writeText(data.pwaUrl);
+                    } catch (e) {}
+                    toast.error(`${data.error} O link do app foi copiado para sua área de transferência para envio manual.`, { id: 'send-app', duration: 6000 });
+                    return;
+                }
                 throw new Error(data.error || 'Erro ao enviar link do aplicativo.');
             }
 
-            toast.success(`Link do app enviado para ${driverName} via WhatsApp!`, { id: 'send-app' });
+            if (data.pwaUrl) {
+                try {
+                    await navigator.clipboard.writeText(data.pwaUrl);
+                } catch (e) {}
+            }
+
+            toast.success(`Link enviado para ${driverName} via WhatsApp e copiado!`, { id: 'send-app' });
         } catch (err: any) {
             toast.error(err.message, { id: 'send-app' });
         }
@@ -969,9 +1008,20 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        handleCopyAppLink(driver.id, driver.name);
+                                                    }}
+                                                    className="text-cyan-400 hover:text-cyan-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20"
+                                                    title="Copiar link do PWA para a área de transferência"
+                                                >
+                                                    <Copy className="h-2.5 w-2.5" /> Copiar Link
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         handleSendAppLink(driver.id, driver.name);
                                                     }}
                                                     className="text-emerald-400 hover:text-emerald-300 transition font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-0"
+                                                    title="Enviar link via WhatsApp para o entregador"
                                                 >
                                                     <Smartphone className="h-2.5 w-2.5" /> App
                                                 </button>
@@ -1016,6 +1066,22 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                     className="text-gray-400 hover:text-white transition text-lg bg-transparent border-0 cursor-pointer"
                                 >
                                     &times;
+                                </button>
+                            </div>
+
+                            {/* Quick Action Bar for Links */}
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                <button
+                                    onClick={() => handleCopyAppLink(selectedDriver.id, selectedDriver.name)}
+                                    className="p-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                >
+                                    <Copy className="h-3.5 w-3.5" /> Copiar Link PWA
+                                </button>
+                                <button
+                                    onClick={() => handleSendAppLink(selectedDriver.id, selectedDriver.name)}
+                                    className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                >
+                                    <Smartphone className="h-3.5 w-3.5" /> Enviar no WhatsApp
                                 </button>
                             </div>
                         

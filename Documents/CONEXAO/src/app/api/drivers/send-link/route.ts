@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { driverId } = body;
+        const { driverId, sendWhatsapp = true } = body;
 
         if (!driverId) {
             return NextResponse.json({ error: 'Missing driverId' }, { status: 400 });
@@ -33,6 +33,28 @@ export async function POST(req: Request) {
 
         if (!driver) {
             return NextResponse.json({ error: 'Entregador não encontrado' }, { status: 404 });
+        }
+
+        // Generate PWA magic login token
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(16).toString('hex');
+        const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days token validity
+
+        await prisma.contact.update({
+            where: { id: driverId },
+            data: {
+                loginToken: token,
+                loginTokenExpires: tokenExpires
+            }
+        });
+
+        // Generate PWA Link
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://app.conext.click');
+        const pwaUrl = `${appUrl}/driver?token=${token}`;
+
+        // If only link generation was requested (without sending WhatsApp)
+        if (sendWhatsapp === false) {
+            return NextResponse.json({ success: true, pwaUrl });
         }
 
         // Find bot to send the message
@@ -50,25 +72,13 @@ export async function POST(req: Request) {
         }
 
         if (!bot) {
-            return NextResponse.json({ error: 'Nenhum bot encontrado para enviar a mensagem WhatsApp.' }, { status: 400 });
+            return NextResponse.json({ 
+                error: 'Nenhum bot encontrado para enviar a mensagem WhatsApp.',
+                pwaUrl 
+            }, { status: 400 });
         }
 
-        // Generate PWA magic login token
-        const crypto = require('crypto');
-        const token = crypto.randomBytes(16).toString('hex');
-        const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days token validity
-
-        await prisma.contact.update({
-            where: { id: driverId },
-            data: {
-                loginToken: token,
-                loginTokenExpires: tokenExpires
-            }
-        });
-
         // Send app link via WhatsApp
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.conext.click';
-        const pwaUrl = `${appUrl}/driver?token=${token}`;
         const messageText = `Olá, *${driver.name}*!\n\nAqui está o seu link de acesso exclusivo para o aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione o app à sua tela inicial para receber corridas!_`;
 
         const templateComponents = [
@@ -90,11 +100,12 @@ export async function POST(req: Request) {
 
         if (!sentResult.success) {
             return NextResponse.json({ 
-                error: sentResult.error || `Falha ao enviar mensagem de WhatsApp. Verifique se o canal WhatsApp do bot '${bot.name}' está ativo.` 
+                error: sentResult.error || `Falha ao enviar mensagem de WhatsApp. Verifique se o canal WhatsApp do bot '${bot.name}' está ativo.`,
+                pwaUrl
             }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, pwaUrl });
     } catch (error: any) {
         console.error('[API Send Link POST Error]:', error);
         return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
