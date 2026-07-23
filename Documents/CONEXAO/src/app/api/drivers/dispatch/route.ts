@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import { UzapiService } from '@/services/engine/uzapi';
 import { ChatwootService } from '@/services/engine/chatwoot';
+import { sendOutboundMessageToPhone } from '@/services/engine/outbound-notifier';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
