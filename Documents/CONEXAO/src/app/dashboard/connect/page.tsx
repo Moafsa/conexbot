@@ -107,7 +107,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
             response_type: 'code',
             override_default_response_type: true,
             extras: {
-                sessionInfoVersion: '3',
+                setup: {}
             }
         });
     };

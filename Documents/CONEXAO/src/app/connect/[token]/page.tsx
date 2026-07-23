@@ -168,7 +168,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
             config_id: metaConfigId,
             response_type: 'code',
             override_default_response_type: true,
-            extras: { sessionInfoVersion: '3' }
+            extras: { setup: {} }
         });
     };
 
