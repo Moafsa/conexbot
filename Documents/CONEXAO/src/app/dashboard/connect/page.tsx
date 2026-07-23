@@ -148,16 +148,18 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         }
     };
 
-    // Instagram usa o OAuth dialog clássico do Facebook Login for Business (redirect
-    // de página inteira), não o popup FB.login com config_id — é o fluxo que a própria
-    // Meta documenta para contas Instagram vinculadas a uma Página do Facebook, e não
-    // depende da variação "Instagram Graph API" das Configurations (que fica bloqueada
-    // neste tipo de app). O `state` carrega botId/clientId para sobreviver à ida e
-    // volta pela Meta; o callback fixo fica em /instagram/callback.
+    // Instagram usa o mesmo padrão do WhatsApp: popup FB.login com config_id (Facebook
+    // Login for Business), em vez do redirect clássico de página inteira. O redirect
+    // clássico com extras.setup.channel=IG_API_ONBOARDING passa pelo assistente
+    // "facebook_business_extension/oauth" hospedado pela própria Meta, que vinha
+    // retornando "Sorry, something went wrong" de forma consistente (bug/instabilidade
+    // do lado da Meta nesse assistente, não do nosso código). O popup com config_id
+    // evita esse assistente inteiramente e usa exatamente as mesmas 6 permissões
+    // (configuração "Conextbot Instagram Business Login" no painel da Meta).
     const handleInstagramLogin = () => {
-        if (!metaAppId) {
+        if (!metaAppId || !instagramConfigId) {
             setInstaConnectStep('error');
-            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID ausente).');
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID / Configuration ID do Instagram ausentes).');
             return;
         }
         if (!botId) {
@@ -165,17 +167,51 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
             setInstaConnectError('Bot ID não encontrado na URL.');
             return;
         }
+        if (!(window as any).FB) {
+            setInstaConnectStep('error');
+            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            return;
+        }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        const redirectUri = `${window.location.origin}/instagram/callback`;
-        const state = encodeURIComponent(JSON.stringify({ m: 'd', botId, clientId: clientId || '' }));
-        const scope = 'instagram_basic,instagram_content_publish,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
-        const extras = encodeURIComponent(JSON.stringify({ setup: { channel: 'IG_API_ONBOARDING' } }));
+        (window as any).FB.login((response: any) => {
+            if (response.authResponse && response.authResponse.code) {
+                processInstagramCode(response.authResponse.code);
+            } else {
+                setInstaConnectStep('idle');
+                console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
+            }
+        }, {
+            config_id: instagramConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+        });
+    };
 
-        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&display=page&extras=${extras}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
-        window.location.href = url;
+    const processInstagramCode = async (code: string) => {
+        setInstaConnectStep('registering');
+        try {
+            const res = await fetch(`/api/bots/${botId}/connect/instagram`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, clientId })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
+                setInstaConnectStep('connected');
+            } else {
+                setInstaConnectStep('error');
+                setInstaConnectError(data.error || 'Falha na conexão automática do Instagram. Tente novamente.');
+            }
+        } catch (e) {
+            setInstaConnectStep('error');
+            setInstaConnectError('Erro de rede ao processar a conexão do Instagram. Verifique sua internet e tente novamente.');
+        }
     };
 
     const handlePublishInstagramPost = async () => {

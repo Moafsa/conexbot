@@ -29,11 +29,11 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
     const [instaConnectError, setInstaConnectError] = useState("");
     const [instaConnectedInfo, setInstaConnectedInfo] = useState<{ username?: string; pageName?: string } | null>(null);
 
-    // Mesmo fluxo de OAuth dialog clássico usado no dashboard (ver comentário em
-    // src/app/dashboard/connect/page.tsx) — aqui o `state` carrega o token público
-    // em vez de botId/clientId.
+    // Mesmo padrão do dashboard (ver comentário em src/app/dashboard/connect/page.tsx):
+    // popup FB.login com config_id, em vez do redirect clássico que quebrava no
+    // assistente "facebook_business_extension/oauth" da própria Meta.
     const handleInstagramLogin = () => {
-        if (!metaAppId) {
+        if (!metaAppId || !instagramConfigId) {
             setInstaConnectStep('error');
             setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador da plataforma.');
             return;
@@ -43,17 +43,51 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
             setInstaConnectError('Token de conexão não encontrado.');
             return;
         }
+        if (!(window as any).FB) {
+            setInstaConnectStep('error');
+            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            return;
+        }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        const redirectUri = `${window.location.origin}/instagram/callback`;
-        const state = encodeURIComponent(JSON.stringify({ m: 'p', token }));
-        const scope = 'instagram_basic,instagram_content_publish,instagram_manage_messages,pages_read_engagement,pages_show_list,business_management';
-        const extras = encodeURIComponent(JSON.stringify({ setup: { channel: 'IG_API_ONBOARDING' } }));
+        (window as any).FB.login((response: any) => {
+            if (response.authResponse && response.authResponse.code) {
+                processInstagramCode(response.authResponse.code);
+            } else {
+                setInstaConnectStep('idle');
+                console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
+            }
+        }, {
+            config_id: instagramConfigId,
+            response_type: 'code',
+            override_default_response_type: true,
+        });
+    };
 
-        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&display=page&extras=${extras}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
-        window.location.href = url;
+    const processInstagramCode = async (code: string) => {
+        setInstaConnectStep('registering');
+        try {
+            const res = await fetch(`/api/public/instagram/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, code })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
+                setInstaConnectStep('connected');
+            } else {
+                setInstaConnectStep('error');
+                setInstaConnectError(data.error || 'Falha na conexão automática do Instagram. Tente novamente.');
+            }
+        } catch (e) {
+            setInstaConnectStep('error');
+            setInstaConnectError('Erro de rede ao processar a conexão do Instagram. Verifique sua internet e tente novamente.');
+        }
     };
 
     // Retorno do /instagram/callback — não há um fetch de canais existente nesta
