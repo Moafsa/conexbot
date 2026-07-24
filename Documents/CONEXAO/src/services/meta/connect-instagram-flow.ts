@@ -2,30 +2,47 @@ import prisma from '@/lib/prisma';
 import { MetaService } from './meta-service';
 import { logToFile } from '@/services/engine/logger';
 
-export interface InstagramConnectInput {
-    code: string;
-    /**
-     * Precisa ser exatamente o mesmo redirect_uri usado para gerar o `code` (fluxo de
-     * OAuth dialog clássico do Facebook Login for Business — ver instagram/callback).
-     */
-    redirectUri?: string;
+export interface InstagramAccountOption {
+    pageId: string;
+    pageName: string;
+    igAccountId: string;
+    username: string | null;
+    pageAccessToken: string;
 }
 
-export interface InstagramConnectResult {
-    success: true;
-    igAccountId: string;
-    username?: string;
-    pageName?: string;
+export interface InstagramConnectInput {
+    code?: string;
+    redirectUri?: string;
+    selectedIgAccountId?: string;
+    selectedPageId?: string;
+    accountSelectionData?: InstagramAccountOption;
 }
+
+export type InstagramConnectResult =
+    | {
+        success: true;
+        igAccountId: string;
+        username?: string;
+        pageName?: string;
+    }
+    | {
+        success: false;
+        requiresSelection: true;
+        availableAccounts: InstagramAccountOption[];
+    };
 
 /**
  * Fluxo completo de conexão do Instagram Direct (Messenger Platform, via Facebook
- * Login for Business) para um bot já resolvido. Usado tanto pela rota autenticada
- * (dashboard) quanto pela rota pública (link por token), para manter exatamente o
- * mesmo comportamento sem duplicar lógica — mesmo padrão do connect-flow do WhatsApp.
+ * Login for Business) para um bot já resolvido. Suporta contas únicas ou seleção
+ * de múltiplas contas de Instagram vinculadas ao mesmo perfil de Facebook.
  */
 export async function connectInstagramForBot(botId: string, input: InstagramConnectInput): Promise<InstagramConnectResult> {
-    const { code, redirectUri } = input;
+    const { code, redirectUri, selectedIgAccountId, selectedPageId, accountSelectionData } = input;
+
+    // Se o usuário selecionou diretamente uma conta da lista na UI:
+    if (accountSelectionData) {
+        return finalizeInstagramChannelConnection(botId, accountSelectionData);
+    }
 
     if (!code) {
         throw new Error('Código de autorização é obrigatório');
@@ -37,30 +54,59 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
     // 2. Converte para token de longa duração (~60 dias)
     const { accessToken } = await MetaService.getLongLivedToken(shortLivedToken);
 
-    // 3. Lista as Páginas administradas pelo usuário e encontra uma com Instagram Profissional vinculado
+    // 3. Lista as Páginas do Facebook que possuem Instagram Profissional vinculado
     const pages = await MetaService.getFacebookPagesWithInstagram(accessToken);
-    const pageWithInsta = pages.find(p => p.instagram_business_account?.id);
+    const pagesWithInsta = pages.filter(p => p.instagram_business_account?.id);
 
-    if (!pageWithInsta || !pageWithInsta.instagram_business_account) {
+    if (pagesWithInsta.length === 0) {
         throw new Error(
             'Nenhuma Página do Facebook com conta Instagram Profissional (Business/Creator) vinculada foi encontrada. ' +
             'Vincule sua conta Instagram a uma Página do Facebook em Configurações do Instagram > Conta vinculada, e tente novamente.'
         );
     }
 
-    const igAccountId = pageWithInsta.instagram_business_account.id;
-    const username = pageWithInsta.instagram_business_account.username;
-    // O token da Página (não o do usuário) é o que deve ser usado nas chamadas de mensagens/publicação.
-    const pageAccessToken = pageWithInsta.access_token;
+    const availableAccounts: InstagramAccountOption[] = pagesWithInsta.map(p => ({
+        pageId: p.id,
+        pageName: p.name,
+        igAccountId: p.instagram_business_account!.id,
+        username: p.instagram_business_account!.username || null,
+        pageAccessToken: p.access_token,
+    }));
 
-    // 4. Assina o nosso App nos eventos da Página (mensagens diretas + comentários)
+    // Verifica se alguma conta específica foi selecionada
+    let selectedAccount: InstagramAccountOption | undefined;
+
+    if (selectedIgAccountId) {
+        selectedAccount = availableAccounts.find(a => a.igAccountId === selectedIgAccountId);
+    } else if (selectedPageId) {
+        selectedAccount = availableAccounts.find(a => a.pageId === selectedPageId);
+    } else if (availableAccounts.length === 1) {
+        selectedAccount = availableAccounts[0];
+    }
+
+    // Se houver múltiplas contas e nenhuma tiver sido pré-selecionada:
+    if (!selectedAccount) {
+        return {
+            success: false,
+            requiresSelection: true,
+            availableAccounts,
+        };
+    }
+
+    return finalizeInstagramChannelConnection(botId, selectedAccount);
+}
+
+async function finalizeInstagramChannelConnection(botId: string, account: InstagramAccountOption): Promise<InstagramConnectResult> {
+    const { pageId, pageName, igAccountId, username, pageAccessToken } = account;
+
+    // Assina o nosso App nos eventos da Página (mensagens diretas + comentários)
     try {
-        await MetaService.subscribePageToWebhooks(pageWithInsta.id, pageAccessToken);
+        await MetaService.subscribePageToWebhooks(pageId, pageAccessToken);
     } catch (err: any) {
         logToFile(`[Instagram Connect] Aviso na assinatura de webhook: ${err.message}`);
     }
 
-    // 5. Persiste no BotChannel
+    // Persiste no BotChannel
     const existingChannel = await prisma.botChannel.findFirst({
         where: { botId, provider: 'INSTAGRAM' },
     });
@@ -72,8 +118,8 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
         status: 'CONNECTED',
         credentials: {
             accessToken: pageAccessToken,
-            pageId: pageWithInsta.id,
-            pageName: pageWithInsta.name,
+            pageId,
+            pageName,
             username: username || null,
             connectedAt: new Date().toISOString(),
         },
@@ -85,7 +131,7 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
         await prisma.botChannel.create({ data: channelData });
     }
 
-    logToFile(`[Instagram Connect] Bot ${botId} conectado à conta @${username} (ig=${igAccountId}, page=${pageWithInsta.id})`);
+    logToFile(`[Instagram Connect] Bot ${botId} conectado à conta @${username} (ig=${igAccountId}, page=${pageId})`);
 
-    return { success: true, igAccountId, username, pageName: pageWithInsta.name };
+    return { success: true, igAccountId, username: username || undefined, pageName };
 }

@@ -83,13 +83,24 @@ function InstagramCallbackContent() {
                 const data = await res.json();
 
                 if (res.ok) {
-                    setMessage('Instagram conectado! Redirecionando…');
-                    goBack({
-                        activeTab: 'instagram',
-                        insta_status: 'connected',
-                        ...(data.username ? { insta_username: data.username } : {}),
-                        ...(data.pageName ? { insta_page: data.pageName } : {}),
-                    });
+                    if (data.requiresSelection) {
+                        setMessage('Múltiplas contas encontradas! Redirecionando para seleção…');
+                        try {
+                            sessionStorage.setItem('insta_available_accounts', JSON.stringify(data.availableAccounts));
+                        } catch {}
+                        goBack({
+                            activeTab: 'instagram',
+                            insta_select: 'true',
+                        });
+                    } else {
+                        setMessage('Instagram conectado! Redirecionando…');
+                        goBack({
+                            activeTab: 'instagram',
+                            insta_status: 'connected',
+                            ...(data.username ? { insta_username: data.username } : {}),
+                            ...(data.pageName ? { insta_page: data.pageName } : {}),
+                        });
+                    }
                 } else {
                     setFailed(true);
                     setMessage(data.error || 'Falha ao conectar o Instagram.');

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
 
-type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' | 'error';
+type MetaConnectStep = 'idle' | 'authenticating' | 'registering' | 'connected' | 'error' | 'select_account';
 
 function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { metaAppId: string | null; metaConfigId: string | null; instagramConfigId: string | null }) {
     const searchParams = useSearchParams();
@@ -43,6 +43,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
     const [instaConnectStep, setInstaConnectStep] = useState<MetaConnectStep>('idle');
     const [instaConnectError, setInstaConnectError] = useState("");
     const [instaConnectedInfo, setInstaConnectedInfo] = useState<{ username?: string; pageName?: string } | null>(null);
+    const [availableInstaAccounts, setAvailableInstaAccounts] = useState<any[]>([]);
     const [instaPostImageUrl, setInstaPostImageUrl] = useState("");
     const [instaPostCaption, setInstaPostCaption] = useState("");
     const [instaPosting, setInstaPosting] = useState(false);
@@ -179,9 +180,36 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
             clientId: clientId || ''
         }));
 
-        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&auth_type=rerequest`;
 
         window.location.href = url;
+    };
+
+    const handleSelectInstagramAccount = async (account: any) => {
+        setInstaConnectStep('registering');
+        try {
+            const res = await fetch(`/api/bots/${botId}/connect/instagram`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId, accountSelectionData: account })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setInstaConnectedInfo({ username: data.username, pageName: data.pageName });
+                setInstaConnectStep('connected');
+                try {
+                    sessionStorage.removeItem('insta_available_accounts');
+                } catch {}
+            } else {
+                setInstaConnectStep('error');
+                setInstaConnectError(data.error || 'Falha ao conectar a conta do Instagram selecionada.');
+            }
+        } catch (e) {
+            setInstaConnectStep('error');
+            setInstaConnectError('Erro de rede ao selecionar a conta do Instagram.');
+        }
     };
 
     const processInstagramCode = async (code: string, redirectUri?: string) => {
@@ -249,6 +277,8 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         }
         const instaError = searchParams.get('insta_error');
         const instaStatus = searchParams.get('insta_status');
+        const instaSelect = searchParams.get('insta_select');
+
         if (instaError) {
             setInstaConnectStep('error');
             setInstaConnectError(instaError);
@@ -258,8 +288,19 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                 username: searchParams.get('insta_username') || undefined,
                 pageName: searchParams.get('insta_page') || undefined,
             });
+        } else if (instaSelect === 'true') {
+            try {
+                const stored = sessionStorage.getItem('insta_available_accounts');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setAvailableInstaAccounts(parsed);
+                        setInstaConnectStep('select_account');
+                    }
+                }
+            } catch {}
         }
-        if (tab || instaError || instaStatus) {
+        if (tab || instaError || instaStatus || instaSelect) {
             const params = new URLSearchParams();
             if (botId) params.set('botId', botId);
             if (clientId) params.set('clientId', clientId);
@@ -661,12 +702,56 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                         )}
                                         <p className="text-xs text-green-600">
                                             A IA já pode responder Directs automaticamente. Pode levar 1-2 minutos até as primeiras mensagens fluírem.
+                                            <button
+                                                onClick={() => { setInstaConnectStep('idle'); handleInstagramLogin(); }}
+                                                className="text-xs text-green-700 underline hover:text-green-900 block mt-1"
+                                            >
+                                                Conectar outra conta
+                                            </button>
                                         </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ESTADO: SELEÇÃO DE CONTA */}
+                            {instaConnectStep === 'select_account' && (
+                                <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-6 space-y-4 animate-fade-in">
+                                    <div className="flex items-center gap-3 border-b border-fuchsia-200/60 pb-3">
+                                        <Instagram className="w-6 h-6 text-fuchsia-600 shrink-0" />
+                                        <div>
+                                            <h4 className="font-bold text-fuchsia-950 text-base">Selecione a Conta do Instagram</h4>
+                                            <p className="text-xs text-fuchsia-800">Encontramos mais de uma conta profissional vinculada ao seu Facebook. Escolha qual deseja conectar a este agente:</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2.5">
+                                        {availableInstaAccounts.map((acc: any) => (
+                                            <div key={acc.igAccountId} className="p-3.5 border border-fuchsia-200 rounded-xl flex items-center justify-between bg-white hover:border-fuchsia-500 transition shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-fuchsia-100 text-fuchsia-600 flex items-center justify-center font-bold text-sm shrink-0">
+                                                        <Instagram size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm text-slate-800">@{acc.username || acc.pageName}</p>
+                                                        <p className="text-xs text-slate-500">Página do Facebook: <b>{acc.pageName}</b></p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleSelectInstagramAccount(acc)}
+                                                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition active:scale-95 shadow-md shadow-fuchsia-500/20"
+                                                >
+                                                    Conectar esta conta
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="text-center pt-2">
                                         <button
-                                            onClick={() => setInstaConnectStep('idle')}
-                                            className="text-xs text-green-700 underline hover:text-green-900"
+                                            onClick={() => { setInstaConnectStep('idle'); handleInstagramLogin(); }}
+                                            className="text-xs text-fuchsia-700 underline hover:text-fuchsia-900 font-medium"
                                         >
-                                            Conectar outra conta
+                                            Trocar de perfil no Facebook
                                         </button>
                                     </div>
                                 </div>
