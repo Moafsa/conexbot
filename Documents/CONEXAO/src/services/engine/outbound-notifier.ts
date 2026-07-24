@@ -72,26 +72,41 @@ export async function sendOutboundMessageToPhone(
         lastError = e.message || 'Erro no canal Meta';
     }
 
-    // 2. Fallback: Tenta enviar via WuzAPI APENAS se o WuzAPI estiver realmente CONECTADO
-    if (bot.sessionName && bot.connectionStatus === 'CONNECTED' && text) {
-        try {
-            const sent = await UzapiService.sendMessage(bot.sessionName, normalizedPhone, text);
-            if (sent) {
-                logToFile(`[OutboundNotifier] Mensagem enviada via WuzAPI para ${normalizedPhone}`);
-                return { success: true };
+    // 2. Fallback: Tenta enviar via WuzAPI (se tiver sessionName configurado)
+    if (bot.sessionName && text) {
+        const phoneVariations = PhoneUtils.getPhoneVariations(phone);
+        for (const targetPhone of phoneVariations) {
+            try {
+                const sent = await UzapiService.sendMessage(bot.sessionName, targetPhone, text);
+                if (sent) {
+                    logToFile(`[OutboundNotifier] Mensagem enviada via WuzAPI (${targetPhone}) para ${phone}`);
+                    return { success: true };
+                }
+            } catch (e: any) {
+                lastError = e.message || 'Erro na WuzAPI';
+                logToFile(`[OutboundNotifier] Falha ao enviar via WuzAPI (${targetPhone}) para ${phone}: ${lastError}`);
             }
-        } catch (e: any) {
-            lastError = e.message || 'Erro na WuzAPI';
-            logToFile(`[OutboundNotifier] Falha ao enviar via WuzAPI para ${normalizedPhone}: ${lastError}`);
         }
     }
 
     if (lastError) {
+        if (lastError.includes('131047') || lastError.includes('24 hour') || lastError.includes('24h')) {
+            return { 
+                success: false, 
+                error: `Meta Cloud WhatsApp: A janela de 24h expirou para o número ${normalizedPhone}. Conecte a sessão QR Code (UzAPI) no menu 'Meu Agente' ou peça para o entregador mandar um 'Oi' no WhatsApp da empresa.` 
+            };
+        }
+        if (lastError.includes('no session') || lastError.includes('session')) {
+            return {
+                success: false,
+                error: `UzAPI WhatsApp: A sessão QR Code do bot '${bot.name}' está desconectada. Acesse 'Meu Agente' para escanear o QR Code.`
+            };
+        }
         return { success: false, error: lastError };
     }
 
     return {
         success: false,
-        error: `Nenhum canal de WhatsApp ativo e conectado para enviar a mensagem ao número ${normalizedPhone}.`
+        error: `Nenhum canal de WhatsApp ativo e conectado no bot '${bot.name}' para enviar a mensagem ao número ${normalizedPhone}. Acesse 'Meu Agente' e conecte o QR Code ou Meta Cloud.`
     };
 }
