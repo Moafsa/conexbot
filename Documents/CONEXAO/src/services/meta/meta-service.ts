@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { logToFile } from '@/services/engine/logger';
 
 const GRAPH_VERSION = 'v22.0';
 const GRAPH_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
