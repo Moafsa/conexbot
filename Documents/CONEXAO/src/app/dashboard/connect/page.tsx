@@ -157,42 +157,31 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
     // evita esse assistente inteiramente e usa exatamente as mesmas 6 permissões
     // (configuração "Conextbot Instagram Business Login" no painel da Meta).
     const handleInstagramLogin = () => {
-        if (!metaAppId || !instagramConfigId) {
+        if (!metaAppId) {
             setInstaConnectStep('error');
-            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID / Configuration ID do Instagram ausentes).');
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID ausente).');
             return;
         }
         if (!botId) {
             setInstaConnectStep('error');
-            setInstaConnectError('Bot ID não encontrado na URL.');
-            return;
-        }
-        if (!(window as any).FB) {
-            setInstaConnectStep('error');
-            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
+            setInstaConnectError('Bot ID não encontrado.');
             return;
         }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        // Diferente do WhatsApp (variação "Embedded Signup", isenta de redirect_uri),
-        // a configuração "Geral" do Facebook Login for Business usada pelo Instagram
-        // exige que o mesmo redirect_uri seja enviado tanto no popup quanto na troca
-        // do código no backend — mesmo sem navegação de página real acontecendo.
-        // Precisa estar cadastrado em "Valid OAuth Redirect URIs" no app da Meta.
-        (window as any).FB.login((response: any) => {
-            if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code);
-            } else {
-                setInstaConnectStep('idle');
-                console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
-            }
-        }, {
-            config_id: instagramConfigId,
-            response_type: 'code',
-            override_default_response_type: true,
-        });
+        const redirectUri = `${window.location.origin}/instagram/callback`;
+        const scope = 'instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish,pages_show_list,pages_read_engagement';
+        const state = encodeURIComponent(JSON.stringify({
+            m: 'd',
+            botId,
+            clientId: clientId || ''
+        }));
+
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+
+        window.location.href = url;
     };
 
     const processInstagramCode = async (code: string, redirectUri?: string) => {

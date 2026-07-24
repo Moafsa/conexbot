@@ -33,7 +33,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
     // popup FB.login com config_id, em vez do redirect clássico que quebrava no
     // assistente "facebook_business_extension/oauth" da própria Meta.
     const handleInstagramLogin = () => {
-        if (!metaAppId || !instagramConfigId) {
+        if (!metaAppId) {
             setInstaConnectStep('error');
             setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador da plataforma.');
             return;
@@ -43,33 +43,20 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
             setInstaConnectError('Token de conexão não encontrado.');
             return;
         }
-        if (!(window as any).FB) {
-            setInstaConnectStep('error');
-            setInstaConnectError('SDK do Facebook não carregado. Aguarde alguns segundos e tente novamente.');
-            return;
-        }
 
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
-        // Ver comentário equivalente em src/app/dashboard/connect/page.tsx: a
-        // configuração "Geral" do Facebook Login for Business exige redirect_uri
-        // idêntico no popup e na troca do código, mesmo sem navegação real.
         const redirectUri = `${window.location.origin}/instagram/callback`;
+        const scope = 'instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish,pages_show_list,pages_read_engagement';
+        const state = encodeURIComponent(JSON.stringify({
+            m: 'p',
+            token
+        }));
 
-        (window as any).FB.login((response: any) => {
-            if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code, redirectUri);
-            } else {
-                setInstaConnectStep('idle');
-                console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
-            }
-        }, {
-            config_id: instagramConfigId,
-            response_type: 'code',
-            override_default_response_type: true,
-            redirect_uri: redirectUri,
-        });
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+
+        window.location.href = url;
     };
 
     const processInstagramCode = async (code: string, redirectUri?: string) => {
