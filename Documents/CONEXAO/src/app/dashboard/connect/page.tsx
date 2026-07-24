@@ -172,7 +172,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         setInstaConnectError('');
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
-        const scope = 'public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
+        const scope = 'public_profile,pages_show_list,pages_read_engagement,pages_messaging,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
         const state = encodeURIComponent(JSON.stringify({
             m: 'd',
             botId,
