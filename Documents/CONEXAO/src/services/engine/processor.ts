@@ -5,7 +5,7 @@ import { logToFile } from './logger';
 import { deliverAssistantOutbound } from './outbound/deliver-assistant';
 import { NotificationService } from '../notification/service';
 import { logger } from '@/lib/logger';
-import { PhoneUtils } from '@/lib/phone-utils';
+import { PhoneUtils, cleanAddress } from '@/lib/phone-utils';
 import { acquireLock, releaseLock } from '@/lib/redis';
 import { GoogleMeasurementService } from '../marketing/google-measurement-service';
 
@@ -1571,7 +1571,8 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
                                     const customerName = existingContact.name || 'Cliente Sem Nome';
                                     const customerPhone = existingContact.phone;
-                                    const deliveryAddress = args.detalhes_servico || existingContact.notes || existingContact.needs || 'Endereço não especificado';
+                                    const rawAddress = args.detalhes_servico || existingContact.notes || existingContact.needs || 'Endereço não especificado';
+                                    const deliveryAddress = cleanAddress(rawAddress);
                                     const orderItemsStr = latestOrder ? latestOrder.items.map(i => `${i.product.name} x${i.quantity}`).join(', ') : 'Itens não especificados';
 
                                     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;

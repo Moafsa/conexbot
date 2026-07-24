@@ -154,4 +154,31 @@ export const PhoneUtils = {
     normalizeBrazilWhatsAppE164(raw: string): string {
         return normalizeBrazilWhatsAppE164(raw);
     },
+
+    cleanAddress(raw: string | null | undefined): string {
+        return cleanAddress(raw);
+    }
 };
+
+export function cleanAddress(raw: string | null | undefined): string {
+    if (!raw) return 'Endereço não especificado';
+    let s = String(raw).trim();
+
+    // Take only first line if multiline (since payment/notes are often on line 2+)
+    if (s.includes('\n')) {
+        s = s.split('\n')[0].trim();
+    }
+
+    // Remove leading "Endereço:", "Endereço -", "Endereço :", "Endereco:"
+    s = s.replace(/^endere[çc]o\s*[:\-]?\s*/i, '').trim();
+
+    // Remove any trailing "Pagamento: ..." or "Forma de Pagamento: ..." on same line
+    if (/pagamento/i.test(s)) {
+        s = s.split(/pagamento/i)[0].trim();
+    }
+
+    // Remove trailing colons/commas/dashes
+    s = s.replace(/[:,-]+$/, '').trim();
+
+    return s || 'Endereço não especificado';
+}

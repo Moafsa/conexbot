@@ -15,6 +15,7 @@ import {
     Check
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { cleanAddress } from '@/lib/phone-utils';
 
 function DriverDashboardContent() {
     const searchParams = useSearchParams();
@@ -285,7 +286,8 @@ function DriverDashboardContent() {
                     ) : (
                         orders.map((order) => {
                             const customer = order.contact || {};
-                            const address = customer.notes || customer.needs || 'Endereço não informado';
+                            const rawAddress = customer.notes || customer.needs || 'Endereço não informado';
+                            const address = cleanAddress(rawAddress);
                             const clientPhone = customer.phone ? customer.phone.replace(/\D/g, '') : '';
                             
                             return (

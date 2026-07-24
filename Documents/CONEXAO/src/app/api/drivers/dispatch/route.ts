@@ -6,6 +6,7 @@ import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import { UzapiService } from '@/services/engine/uzapi';
 import { ChatwootService } from '@/services/engine/chatwoot';
 import { sendOutboundMessageToPhone } from '@/services/engine/outbound-notifier';
+import { cleanAddress } from '@/lib/phone-utils';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
@@ -84,7 +85,8 @@ export async function POST(req: Request) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const customerName = order.contact?.name || 'Cliente Sem Nome';
         const customerPhone = order.contact?.phone || '';
-        const deliveryAddress = order.contact?.notes || order.contact?.needs || 'Endereço não especificado';
+        const rawAddress = order.contact?.notes || order.contact?.needs || 'Endereço não especificado';
+        const deliveryAddress = cleanAddress(rawAddress);
         const orderItemsStr = order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ');
 
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
@@ -129,7 +131,7 @@ export async function POST(req: Request) {
             where: { botId: order.botId, remoteId: customerPhone }
         });
 
-        const cwConvId = conversation?.chatwootConversationId || (conversation as any)?.chatwootConversationId;
+        const cwConvId = (conversation as any)?.chatwootConversationId;
         if (cwConvId && order.bot.chatwootUrl && order.bot.chatwootToken) {
             const driverEmail = `${driver.phone}@entregador.conext.bot`;
             const agent = await ChatwootService.getAgentByEmail(order.bot, driverEmail);

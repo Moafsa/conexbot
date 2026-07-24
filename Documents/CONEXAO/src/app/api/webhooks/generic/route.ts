@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { MessageProcessor } from '@/services/engine/processor';
 import prisma from '@/lib/prisma';
+import { cleanAddress } from '@/lib/phone-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -129,7 +130,8 @@ export async function POST(req: Request) {
                             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
                             const orderItemsStr = latestOrder.items.map(i => `${i.product.name} x${i.quantity}`).join(', ');
                             const customerName = customer?.name || 'Cliente Sem Nome';
-                            const deliveryAddress = customer?.notes || customer?.needs || 'Endereço não especificado no CRM.';
+                            const rawAddress = customer?.notes || customer?.needs || 'Endereço não especificado no CRM.';
+                            const deliveryAddress = cleanAddress(rawAddress);
 
                             const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
                             const pwaUrl = `${appUrl}/driver?token=${token}`;
