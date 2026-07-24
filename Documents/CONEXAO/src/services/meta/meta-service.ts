@@ -17,7 +17,6 @@ export class MetaApiError extends Error {
     }
 }
 
-/** Traduz os erros mais comuns da Graph API para mensagens acionáveis em PT-BR. */
 function friendlyMetaError(raw: any): string {
     const err = raw?.error;
     if (!err) return 'Erro desconhecido ao comunicar com a Meta.';
@@ -32,7 +31,10 @@ function friendlyMetaError(raw: any): string {
         return 'Sessão/token da Meta expirado. Refaça o login com o Facebook.';
     }
     if (err.code === 200 || err.code === 10) {
-        return 'Permissões insuficientes. Verifique se o App da Meta possui acesso aprovado a "whatsapp_business_management" e "whatsapp_business_messaging".';
+        if (/whatsapp/i.test(msg)) {
+            return 'Permissões insuficientes no WhatsApp. Verifique se o App da Meta possui acesso aprovado a "whatsapp_business_management" e "whatsapp_business_messaging".';
+        }
+        return `Permissões insuficientes na Meta (${err.code}): ${msg}`;
     }
     if (err.code === 368) {
         return 'A conta da Meta associada está temporariamente restrita para essa ação. Verifique o Gerenciador de Negócios.';
@@ -50,6 +52,7 @@ async function graphFetch(url: string, init?: RequestInit) {
     const res = await fetch(url, init);
     const data = await res.json();
     if (!res.ok || data.error) {
+        logToFile(`[MetaGraphFetch Error] url=${url.split('?')[0]} status=${res.status} error=${JSON.stringify(data.error || data)}`);
         throw new MetaApiError(friendlyMetaError(data), data?.error?.code, data?.error?.error_subcode, data?.error?.fbtrace_id);
     }
     return data;

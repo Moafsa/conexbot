@@ -48,7 +48,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
         setInstaConnectError('');
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
-        const scope = 'instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish,pages_show_list,pages_read_engagement';
+        const scope = 'public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
         const state = encodeURIComponent(JSON.stringify({
             m: 'p',
             token
