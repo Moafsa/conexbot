@@ -54,7 +54,11 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
     const pageAccessToken = pageWithInsta.access_token;
 
     // 4. Assina o nosso App nos eventos da Página (mensagens diretas + comentários)
-    await MetaService.subscribePageToWebhooks(pageWithInsta.id, pageAccessToken);
+    try {
+        await MetaService.subscribePageToWebhooks(pageWithInsta.id, pageAccessToken);
+    } catch (err: any) {
+        logToFile(`[Instagram Connect] Aviso na assinatura de webhook: ${err.message}`);
+    }
 
     // 5. Persiste no BotChannel
     const existingChannel = await prisma.botChannel.findFirst({
