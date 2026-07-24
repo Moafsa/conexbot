@@ -52,9 +52,14 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
+        // Ver comentário equivalente em src/app/dashboard/connect/page.tsx: a
+        // configuração "Geral" do Facebook Login for Business exige redirect_uri
+        // idêntico no popup e na troca do código, mesmo sem navegação real.
+        const redirectUri = `${window.location.origin}/instagram/callback`;
+
         (window as any).FB.login((response: any) => {
             if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code);
+                processInstagramCode(response.authResponse.code, redirectUri);
             } else {
                 setInstaConnectStep('idle');
                 console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
@@ -63,16 +68,17 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
             config_id: instagramConfigId,
             response_type: 'code',
             override_default_response_type: true,
+            redirect_uri: redirectUri,
         });
     };
 
-    const processInstagramCode = async (code: string) => {
+    const processInstagramCode = async (code: string, redirectUri?: string) => {
         setInstaConnectStep('registering');
         try {
             const res = await fetch(`/api/public/instagram/connect`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, code })
+                body: JSON.stringify({ token, code, redirectUri })
             });
 
             const data = await res.json();

@@ -176,9 +176,16 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         setInstaConnectStep('authenticating');
         setInstaConnectError('');
 
+        // Diferente do WhatsApp (variação "Embedded Signup", isenta de redirect_uri),
+        // a configuração "Geral" do Facebook Login for Business usada pelo Instagram
+        // exige que o mesmo redirect_uri seja enviado tanto no popup quanto na troca
+        // do código no backend — mesmo sem navegação de página real acontecendo.
+        // Precisa estar cadastrado em "Valid OAuth Redirect URIs" no app da Meta.
+        const redirectUri = `${window.location.origin}/instagram/callback`;
+
         (window as any).FB.login((response: any) => {
             if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code);
+                processInstagramCode(response.authResponse.code, redirectUri);
             } else {
                 setInstaConnectStep('idle');
                 console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
@@ -187,16 +194,17 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
             config_id: instagramConfigId,
             response_type: 'code',
             override_default_response_type: true,
+            redirect_uri: redirectUri,
         });
     };
 
-    const processInstagramCode = async (code: string) => {
+    const processInstagramCode = async (code: string, redirectUri?: string) => {
         setInstaConnectStep('registering');
         try {
             const res = await fetch(`/api/bots/${botId}/connect/instagram`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, clientId })
+                body: JSON.stringify({ code, clientId, redirectUri })
             });
 
             const data = await res.json();
