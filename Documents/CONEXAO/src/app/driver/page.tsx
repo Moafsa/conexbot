@@ -124,7 +124,11 @@ function DriverDashboardContent() {
             },
             (err) => {
                 console.error('GPS Watch error:', err);
-                toast.error(`Erro no GPS: ${err.message}. Certifique-se de dar permissões de localização.`);
+                if (err.message?.toLowerCase().includes('permissions policy') || err.message?.toLowerCase().includes('disabled')) {
+                    toast.error('O navegador do WhatsApp bloqueou o GPS. Toque nos 3 pontos (⋮) no canto superior e escolha "Abrir no Chrome / Navegador".', { duration: 10000 });
+                } else {
+                    toast.error(`Erro no GPS: ${err.message}. Certifique-se de permitir a localização.`);
+                }
                 setGpsActive(false);
             },
             {
@@ -146,13 +150,21 @@ function DriverDashboardContent() {
     // Request GPS permission initially
     const toggleGps = () => {
         if (!gpsActive) {
+            if (!navigator.geolocation) {
+                toast.error('Seu aparelho não suporta Geolocalização.');
+                return;
+            }
             navigator.geolocation.getCurrentPosition(
                 () => {
                     setGpsActive(true);
                     toast.success('Rastreamento GPS ativado com sucesso!');
                 },
                 (err) => {
-                    toast.error(`Permissão de GPS negada: ${err.message}`);
+                    if (err.message?.toLowerCase().includes('permissions policy') || err.message?.toLowerCase().includes('disabled')) {
+                        toast.error('O navegador do WhatsApp bloqueou o GPS. Toque nos 3 pontos (⋮) no canto superior e escolha "Abrir no Chrome / Navegador".', { duration: 10000 });
+                    } else {
+                        toast.error(`Permissão de GPS negada: ${err.message}`);
+                    }
                 }
             );
         } else {
