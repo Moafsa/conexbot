@@ -85,12 +85,24 @@ export class MetaService {
             throw new Error('Configurações globais da Meta (App ID/Secret) não encontradas. Configure em Admin > Configurações.');
         }
 
-        let url = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
-        if (redirectUri) {
-            url += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        try {
+            let url = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
+            if (redirectUri) {
+                url += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+            }
+            const data = await graphFetch(url);
+            return data.access_token;
+        } catch (err: any) {
+            // Se o login foi feito via FB.login SDK, a Meta rejeita se o redirect_uri for passado no backend.
+            // O fallback sem redirect_uri resolve a troca do código com sucesso.
+            if (redirectUri && (err.message?.includes('redirect_uri') || err.message?.includes('verification code') || err.code === 100)) {
+                logToFile(`[MetaService] exchangeCodeForToken com redirect_uri falhou. Tentando fallback sem redirect_uri...`);
+                let fallbackUrl = `${GRAPH_URL}/oauth/access_token?client_id=${config.metaAppId}&client_secret=${config.metaAppSecret}&code=${encodeURIComponent(code)}`;
+                const data = await graphFetch(fallbackUrl);
+                return data.access_token;
+            }
+            throw err;
         }
-        const data = await graphFetch(url);
-        return data.access_token;
     }
 
     /**
