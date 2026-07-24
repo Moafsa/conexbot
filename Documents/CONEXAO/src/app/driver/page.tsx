@@ -34,6 +34,16 @@ function DriverDashboardContent() {
     const [lastSync, setLastSync] = useState<Date | null>(null);
     const [syncingGps, setSyncingGps] = useState(false);
 
+    // Auto-restore saved GPS preference on load
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedGps = localStorage.getItem('driver_gps_active');
+            if (savedGps === 'true') {
+                setGpsActive(true);
+            }
+        }
+    }, []);
+
     // 1. Token Initialization & Session Persistence
     useEffect(() => {
         const urlToken = searchParams.get('token');
@@ -157,6 +167,9 @@ function DriverDashboardContent() {
             navigator.geolocation.getCurrentPosition(
                 () => {
                     setGpsActive(true);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('driver_gps_active', 'true');
+                    }
                     toast.success('Rastreamento GPS ativado com sucesso!');
                 },
                 (err) => {
@@ -169,6 +182,9 @@ function DriverDashboardContent() {
             );
         } else {
             setGpsActive(false);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('driver_gps_active', 'false');
+            }
             toast.info('Rastreamento GPS pausado.');
         }
     };
@@ -314,9 +330,11 @@ function DriverDashboardContent() {
                                         </div>
                                         {clientPhone && (
                                             <a 
-                                                href={`tel:${clientPhone}`} 
-                                                className="p-2.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition"
-                                                title="Ligar para Cliente"
+                                                href={`https://wa.me/${clientPhone}`} 
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="p-2.5 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition shadow-sm flex items-center justify-center"
+                                                title="Conversar no WhatsApp com o Cliente"
                                             >
                                                 <Phone className="h-4 w-4" />
                                             </a>

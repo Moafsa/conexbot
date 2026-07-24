@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { cleanAddress } from '@/lib/phone-utils';
 
 interface DriverMapProps {
     mapboxToken: string;
@@ -328,8 +329,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                             <div class="p-2 text-slate-800 font-sans max-w-xs">
                                 <span class="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">ENTREGA DE GÁS</span>
                                 <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
-                                <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${customer.notes || customer.needs || 'Não especificado'}</p>
-                                <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items?.map((i: any) => `${i.product.name} x${i.quantity}`).join(', ')}</p>
+                                <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${cleanAddress(customer.notes || customer.needs)}</p>
+                                <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items && order.items.length > 0 ? order.items.map((i: any) => `${i.product?.name || 'Gás'} x${i.quantity}`).join(', ') : 'Gás 13kg'}</p>
                             </div>
                         `);
 
@@ -351,8 +352,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     const [lng, lat] = geocodedOrdersRef.current[orderId];
                     renderMarker(lng, lat);
                 } else {
-                    const rawAddr = customer.needs || customer.notes || '';
-                    const cleanAddr = rawAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                    const cleanAddr = cleanAddress(customer.needs || customer.notes || '');
                     if (cleanAddr && mapboxToken) {
                         fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
                             .then(r => r.json())
@@ -411,8 +411,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         <div class="p-2 text-slate-800 font-sans max-w-xs">
                             <span class="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold animate-pulse">AGUARDANDO ENTREGADOR</span>
                             <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
-                            <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${customer.notes || customer.needs || 'Não especificado'}</p>
-                            <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items?.map((i: any) => `${i.product.name} x${i.quantity}`).join(', ')}</p>
+                            <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${cleanAddress(customer.notes || customer.needs)}</p>
+                            <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items && order.items.length > 0 ? order.items.map((i: any) => `${i.product?.name || 'Gás'} x${i.quantity}`).join(', ') : 'Gás 13kg'}</p>
                         </div>
                     `);
 
@@ -434,8 +434,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 const [lng, lat] = geocodedOrdersRef.current[orderId];
                 renderMarker(lng, lat);
             } else {
-                const rawAddr = customer.needs || customer.notes || '';
-                const cleanAddr = rawAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                const cleanAddr = cleanAddress(customer.needs || customer.notes || '');
                 if (cleanAddr && mapboxToken) {
                     fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
                         .then(r => r.json())
@@ -815,7 +814,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         ) : (
                             pendingOrders.map((order) => {
                                 const customer = order.contact || {};
-                                const address = customer.notes || customer.needs || 'Endereço não cadastrado';
+                                const address = cleanAddress(customer.notes || customer.needs);
                                 
                                 return (
                                     <div 
@@ -1127,7 +1126,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 </div>
                                             </div>
                                             <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
-                                            <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+                                            <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {cleanAddress(order.contact?.notes || order.contact?.needs)}</p>
                                             <p className="text-[10px] text-gray-400">📅 <b>Data:</b> {new Date(order.createdAt).toLocaleDateString()} às {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
 
                                             {/* Action buttons */}
@@ -1282,7 +1281,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                         </span>
                                                     </div>
                                                     <p className="text-gray-300"><b>Cliente:</b> {order.contact?.name || 'Cliente Sem Nome'}</p>
-                                                    <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {order.contact?.notes || order.contact?.needs || 'Não informado'}</p>
+                                                    <p className="text-gray-400 line-clamp-2"><b>Endereço:</b> {cleanAddress(order.contact?.notes || order.contact?.needs)}</p>
                                                     {order.items && order.items.length > 0 && (
                                                         <p className="text-[10px] text-purple-300">
                                                             <b>Itens:</b> {order.items.map((i: any) => `${i.product?.name || 'Item'} x${i.quantity}`).join(', ')}
