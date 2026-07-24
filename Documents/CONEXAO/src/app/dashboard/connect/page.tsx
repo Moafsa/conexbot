@@ -666,7 +666,9 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                             onClick={() => setInstaConnectStep('idle')}
                                             className="text-xs text-green-700 underline hover:text-green-900"
                                         >
-                                        </div>
+                                            Conectar outra conta
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
