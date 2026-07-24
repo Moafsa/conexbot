@@ -181,11 +181,9 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         // exige que o mesmo redirect_uri seja enviado tanto no popup quanto na troca
         // do código no backend — mesmo sem navegação de página real acontecendo.
         // Precisa estar cadastrado em "Valid OAuth Redirect URIs" no app da Meta.
-        const redirectUri = `${window.location.origin}/instagram/callback`;
-
         (window as any).FB.login((response: any) => {
             if (response.authResponse && response.authResponse.code) {
-                processInstagramCode(response.authResponse.code, redirectUri);
+                processInstagramCode(response.authResponse.code);
             } else {
                 setInstaConnectStep('idle');
                 console.log('Usuário cancelou o login ou não concluiu a autorização do Instagram.');
@@ -194,7 +192,6 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
             config_id: instagramConfigId,
             response_type: 'code',
             override_default_response_type: true,
-            redirect_uri: redirectUri,
         });
     };
 
