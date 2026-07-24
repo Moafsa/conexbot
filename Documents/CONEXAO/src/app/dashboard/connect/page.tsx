@@ -666,46 +666,7 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                             onClick={() => setInstaConnectStep('idle')}
                                             className="text-xs text-green-700 underline hover:text-green-900"
                                         >
-                                            Conectar outra conta
-                                        </button>
-                                    </div>
-
-                                    {/* COMPOSITOR DE POST */}
-                                    <div className="border-t pt-4 space-y-3">
-                                        <p className="font-semibold text-sm text-gray-800">Publicar no Instagram (feed/reels)</p>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">URL da imagem ou vídeo</label>
-                                            <input
-                                                type="text"
-                                                value={instaPostImageUrl}
-                                                onChange={e => setInstaPostImageUrl(e.target.value)}
-                                                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
-                                                placeholder="https://.../imagem.jpg"
-                                            />
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">Legenda</label>
-                                            <textarea
-                                                value={instaPostCaption}
-                                                onChange={e => setInstaPostCaption(e.target.value)}
-                                                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm"
-                                                rows={3}
-                                                placeholder="Legenda do post..."
-                                            />
-                                        </div>
-                                        {instaPostMessage && (
-                                            <p className={`text-xs ${instaPostMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                                                {instaPostMessage.text}
-                                            </p>
-                                        )}
-                                        <button
-                                            onClick={handlePublishInstagramPost}
-                                            disabled={instaPosting}
-                                            className="w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-medium py-2 rounded-lg transition disabled:opacity-50"
-                                        >
-                                            {instaPosting ? 'Publicando...' : 'Publicar'}
-                                        </button>
-                                    </div>
                                 </div>
                             )}
 
