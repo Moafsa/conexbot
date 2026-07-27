@@ -273,23 +273,51 @@ export class MetaService {
             instagram_business_account?: { id: string; username?: string; name?: string; profile_picture_url?: string };
         }>;
 
-        // Se o username do Instagram vier ausente no objeto aninhado de /me/accounts,
-        // fazemos a consulta direta no endpoint do Instagram ID usando o token da página.
+        logToFile(`[MetaService] /me/accounts raw count=${pages.length}`);
+
+        const result: Array<{
+            id: string;
+            name: string;
+            access_token: string;
+            instagram_business_account: { id: string; username: string; name?: string; profile_picture_url?: string };
+        }> = [];
+
         for (const p of pages) {
-            if (p.instagram_business_account?.id && !p.instagram_business_account.username) {
+            // Apenas Páginas que tenham uma CONTA DE INSTAGRAM PROFISSIONAL vinculada
+            if (!p.instagram_business_account || !p.instagram_business_account.id) {
+                continue;
+            }
+
+            let igUsername = p.instagram_business_account.username;
+
+            // Se o username do Instagram não veio no /me/accounts, busca diretamente no nó do Instagram
+            if (!igUsername) {
                 try {
-                    const igUrl = `${GRAPH_URL}/${p.instagram_business_account.id}?fields=id,username,name,profile_picture_url`;
-                    const igData = await graphFetch(igUrl, { headers: { Authorization: `Bearer ${p.access_token}` } });
+                    const igUrl = `${GRAPH_URL}/${p.instagram_business_account.id}?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(p.access_token)}`;
+                    const igData = await graphFetch(igUrl);
+                    logToFile(`[MetaService] Direct IG fetch for ${p.instagram_business_account.id}: username=${igData?.username}`);
                     if (igData?.username) {
-                        p.instagram_business_account.username = igData.username;
+                        igUsername = igData.username;
                     }
                 } catch (e: any) {
-                    logToFile(`[MetaService] Aviso ao buscar username do IG ${p.instagram_business_account.id}: ${e?.message}`);
+                    logToFile(`[MetaService] Erro ao buscar username do IG ${p.instagram_business_account.id}: ${e?.message}`);
                 }
             }
+
+            result.push({
+                id: p.id,
+                name: p.name,
+                access_token: p.access_token,
+                instagram_business_account: {
+                    id: p.instagram_business_account.id,
+                    username: igUsername || p.instagram_business_account.name || `instagram_${p.instagram_business_account.id.substring(0, 6)}`,
+                    name: p.instagram_business_account.name,
+                    profile_picture_url: p.instagram_business_account.profile_picture_url,
+                }
+            });
         }
 
-        return pages;
+        return result;
     }
 
     /**

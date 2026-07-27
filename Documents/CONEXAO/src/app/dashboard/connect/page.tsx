@@ -740,26 +740,27 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2.5">
+                                    <div className="space-y-3">
                                         {availableInstaAccounts.map((acc: any) => (
-                                            <div key={acc.igAccountId} className="p-3.5 border border-fuchsia-200 rounded-xl flex items-center justify-between bg-white hover:border-fuchsia-500 transition shadow-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-fuchsia-100 text-fuchsia-600 flex items-center justify-center font-bold text-sm shrink-0">
-                                                        <Instagram size={20} />
+                                            <div key={acc.igAccountId} className="p-4 border border-fuchsia-200 rounded-2xl flex items-center justify-between bg-white hover:border-fuchsia-500 transition shadow-sm">
+                                                <div className="flex items-center gap-3.5">
+                                                    <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-fuchsia-600 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-md">
+                                                        <Instagram size={22} />
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-sm text-fuchsia-950 flex items-center gap-1">
-                                                            <span>📸</span>
-                                                            <span>{acc.username ? `@${acc.username}` : `Instagram (${acc.pageName})`}</span>
+                                                        <p className="font-extrabold text-base text-fuchsia-950 flex items-center gap-1.5">
+                                                            <span>@{acc.username}</span>
                                                         </p>
-                                                        <p className="text-xs text-slate-500">Página do Facebook vinculada: <b>{acc.pageName}</b></p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            Página do Facebook vinculada: <span className="font-medium text-slate-700">{acc.pageName}</span>
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <button
                                                     onClick={() => handleSelectInstagramAccount(acc)}
-                                                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition active:scale-95 shadow-md shadow-fuchsia-500/20"
+                                                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition active:scale-95 shadow-md shadow-fuchsia-500/20"
                                                 >
-                                                    Conectar esta conta
+                                                    Conectar @{acc.username}
                                                 </button>
                                             </div>
                                         ))}

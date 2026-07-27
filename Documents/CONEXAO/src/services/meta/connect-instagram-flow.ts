@@ -55,8 +55,7 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
     const { accessToken } = await MetaService.getLongLivedToken(shortLivedToken);
 
     // 3. Lista as Páginas do Facebook que possuem Instagram Profissional vinculado
-    const pages = await MetaService.getFacebookPagesWithInstagram(accessToken);
-    const pagesWithInsta = pages.filter(p => p.instagram_business_account?.id);
+    const pagesWithInsta = await MetaService.getFacebookPagesWithInstagram(accessToken);
 
     if (pagesWithInsta.length === 0) {
         throw new Error(
