@@ -2,6 +2,47 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { MessageProcessor } from '@/services/engine/processor';
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+function downloadBuffer(url: string, headers: Record<string, string> = {}): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        try {
+            const reqUrl = new URL(url);
+            const options = {
+                hostname: reqUrl.hostname,
+                port: reqUrl.port || (reqUrl.protocol === 'https:' ? 443 : 80),
+                path: reqUrl.pathname + reqUrl.search,
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'ConextBot/1.0',
+                    ...headers
+                }
+            };
+
+            const client = reqUrl.protocol === 'https:' ? https : http;
+            const req = client.request(options, (res) => {
+                if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                    return downloadBuffer(res.headers.location, headers).then(resolve).catch(reject);
+                }
+                if (res.statusCode !== 200) {
+                    return reject(new Error(`HTTP status ${res.statusCode}`));
+                }
+                const chunks: Buffer[] = [];
+                res.on('data', chunk => chunks.push(chunk));
+                res.on('end', () => resolve(Buffer.concat(chunks)));
+                res.on('error', reject);
+            });
+            req.on('error', reject);
+            req.end();
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
 
 // GET: Verificação de Webhook da Meta
 export async function GET(req: Request) {
@@ -123,20 +164,7 @@ async function handleWhatsApp(body: any) {
                                     return;
                                 }
 
-                                const audioRes = await fetch(downloadUrl, {
-                                    headers: { 'Authorization': `Bearer ${metaToken}` }
-                                });
-
-                                if (!audioRes.ok) {
-                                    console.error('[Meta Webhook] Failed to download audio binary:', audioRes.status);
-                                    return;
-                                }
-
-                                const arrayBuffer = await audioRes.arrayBuffer();
-                                const buffer = Buffer.from(arrayBuffer);
-                                const fs = require('fs');
-                                const path = require('path');
-                                const os = require('os');
+                                const buffer = await downloadBuffer(downloadUrl, { 'Authorization': `Bearer ${metaToken}` });
                                 const tempAudioPath = path.join(os.tmpdir(), `meta_audio_${mediaId}.ogg`);
                                 fs.writeFileSync(tempAudioPath, buffer);
 
@@ -190,16 +218,7 @@ async function handleWhatsApp(body: any) {
                                 const mediaJson = await mediaRes.json();
                                 if (!mediaJson.url) return;
 
-                                const imgRes = await fetch(mediaJson.url, {
-                                    headers: { 'Authorization': `Bearer ${metaToken}` }
-                                });
-                                if (!imgRes.ok) return;
-
-                                const arrayBuffer = await imgRes.arrayBuffer();
-                                const buffer = Buffer.from(arrayBuffer);
-                                const fs = require('fs');
-                                const path = require('path');
-                                const os = require('os');
+                                const buffer = await downloadBuffer(mediaJson.url, { 'Authorization': `Bearer ${metaToken}` });
                                 const tempImgPath = path.join(os.tmpdir(), `meta_img_${mediaId}.jpg`);
                                 fs.writeFileSync(tempImgPath, buffer);
 
@@ -275,13 +294,7 @@ async function handleInstagram(body: any) {
                         if (attType === 'image') {
                             (async () => {
                                 try {
-                                    const imgRes = await fetch(mediaUrl);
-                                    if (!imgRes.ok) return;
-                                    const arrayBuffer = await imgRes.arrayBuffer();
-                                    const buffer = Buffer.from(arrayBuffer);
-                                    const fs = require('fs');
-                                    const path = require('path');
-                                    const os = require('os');
+                                    const buffer = await downloadBuffer(mediaUrl);
                                     const tempImgPath = path.join(os.tmpdir(), `insta_img_${Date.now()}.jpg`);
                                     fs.writeFileSync(tempImgPath, buffer);
 
@@ -301,13 +314,7 @@ async function handleInstagram(body: any) {
                             (async () => {
                                 try {
                                     const bot = await prisma.bot.findUnique({ where: { id: channel.botId } });
-                                    const audioRes = await fetch(mediaUrl);
-                                    if (!audioRes.ok) return;
-                                    const arrayBuffer = await audioRes.arrayBuffer();
-                                    const buffer = Buffer.from(arrayBuffer);
-                                    const fs = require('fs');
-                                    const path = require('path');
-                                    const os = require('os');
+                                    const buffer = await downloadBuffer(mediaUrl);
                                     const tempAudioPath = path.join(os.tmpdir(), `insta_audio_${Date.now()}.ogg`);
                                     fs.writeFileSync(tempAudioPath, buffer);
 
