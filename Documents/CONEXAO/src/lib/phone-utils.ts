@@ -107,8 +107,11 @@ export const PhoneUtils = {
     normalize(phone: string): string {
         if (!phone) return '';
 
+        const rawTrimmed = String(phone).trim();
+        const startsWithPlus = rawTrimmed.startsWith('+');
+
         // 1. Remove common WhatsApp suffixes
-        let clean = phone.replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@g.us', '');
+        let clean = rawTrimmed.replace('@c.us', '').replace('@s.whatsapp.net', '').replace('@g.us', '');
 
         // 2. Remove anything after : (WuzAPI multi-device suffix)
         clean = clean.split(':')[0];
@@ -116,7 +119,17 @@ export const PhoneUtils = {
         // 3. Remove all non-digits
         clean = clean.replace(/\D/g, '');
 
-        // 4. Handle Brazilian numbers
+        // Se o número original começava com '+' e NÃO começava com '+55', é um número internacional explícito (ex: +34...)
+        if (startsWithPlus && !clean.startsWith('55')) {
+            return clean;
+        }
+
+        // Se já começa com DDI internacional diferente de 55 (ex: 34 Espanha, 351 Portugal, 1 EUA, etc.)
+        if (clean.startsWith('34') || clean.startsWith('351') || clean.startsWith('1') || clean.startsWith('44') || clean.startsWith('49') || clean.startsWith('33') || clean.startsWith('54') || clean.startsWith('56') || clean.startsWith('57')) {
+            return clean;
+        }
+
+        // 4. Tratamento de números do Brasil (DDI 55)
         if (clean.length >= 10 && (clean.startsWith('55') || clean.length <= 11)) {
             return normalizeBrazilWhatsAppE164(clean);
         }
