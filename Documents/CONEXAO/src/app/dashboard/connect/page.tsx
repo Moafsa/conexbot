@@ -158,7 +158,8 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
     // evita esse assistente inteiramente e usa exatamente as mesmas 6 permissões
     // (configuração "Conextbot Instagram Business Login" no painel da Meta).
     const handleInstagramLogin = () => {
-        if (!metaAppId) {
+        const appIdToUse = instagramConfigId || metaAppId;
+        if (!appIdToUse) {
             setInstaConnectStep('error');
             setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador (App ID ausente).');
             return;
@@ -173,14 +174,15 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         setInstaConnectError('');
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
-        const scope = 'public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
+        const scope = 'user_profile,user_media';
         const state = encodeURIComponent(JSON.stringify({
             m: 'd',
             botId,
             clientId: clientId || ''
         }));
 
-        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&auth_type=rerequest`;
+        // Redireciona para api.instagram.com para puxar diretamente a conta do Instagram logada na máquina/navegador do usuário
+        const url = `https://api.instagram.com/oauth/authorize?client_id=${appIdToUse}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
 
         window.location.href = url;
     };

@@ -98,6 +98,61 @@ export class MetaService {
     }
 
     /**
+     * Troca o código de autorização do fluxo DIRETO do Instagram (api.instagram.com/oauth/authorize)
+     * por um token de acesso da conta logada no navegador do usuário.
+     */
+    static async exchangeInstagramDirectCode(code: string, redirectUri: string): Promise<{ accessToken: string; userId: string; username: string }> {
+        const config = await this.getGlobalConfig();
+        const appId = config?.metaInstagramConfigId || config?.metaAppId;
+        const appSecret = config?.metaAppSecret;
+
+        if (!appId || !appSecret) {
+            throw new Error('Configurações globais do Instagram (App ID/Secret) não encontradas.');
+        }
+
+        const params = new URLSearchParams();
+        params.append('client_id', appId);
+        params.append('client_secret', appSecret);
+        params.append('grant_type', 'authorization_code');
+        params.append('redirect_uri', redirectUri);
+        params.append('code', code);
+
+        const res = await fetch('https://api.instagram.com/oauth/access_token', {
+            method: 'POST',
+            body: params,
+        });
+
+        const data = await res.json();
+        logToFile(`[Instagram Direct OAuth] Resposta da troca de token: ${JSON.stringify(data)}`);
+
+        if (!res.ok || data.error_type || !data.access_token) {
+            throw new Error(data.error_message || data.error?.message || 'Falha na autenticação com a conta do Instagram.');
+        }
+
+        const accessToken = data.access_token;
+        const userId = String(data.user_id || data.user?.id || '');
+
+        let username = data.user?.username;
+        if (!username && userId) {
+            try {
+                const profileRes = await fetch(`https://graph.instagram.com/v22.0/me?fields=id,username,account_type&access_token=${accessToken}`);
+                const profileData = await profileRes.json();
+                if (profileData?.username) {
+                    username = profileData.username;
+                }
+            } catch (e: any) {
+                logToFile(`[Instagram Direct OAuth] Aviso ao buscar perfil: ${e?.message}`);
+            }
+        }
+
+        return {
+            accessToken,
+            userId,
+            username: username || `user_${userId}`
+        };
+    }
+
+    /**
      * Converte um token de curta duração em um token de longa duração (~60 dias).
      * Essencial para que a conexão do cliente não caia sozinha depois de 1h.
      */

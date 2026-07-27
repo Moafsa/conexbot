@@ -48,7 +48,25 @@ export async function connectInstagramForBot(botId: string, input: InstagramConn
         throw new Error('Código de autorização é obrigatório');
     }
 
-    // 1. Troca o código de autorização por um access token de curta duração
+    // 1. Tenta o fluxo de OAuth DIRETO da conta de Instagram logada na máquina/navegador
+    try {
+        if (redirectUri) {
+            const directResult = await MetaService.exchangeInstagramDirectCode(code, redirectUri);
+            logToFile(`[Instagram Connect] Conectado diretamente à conta de Instagram do navegador: @${directResult.username} (${directResult.userId})`);
+            
+            return finalizeInstagramChannelConnection(botId, {
+                pageId: directResult.userId,
+                pageName: directResult.username,
+                igAccountId: directResult.userId,
+                username: directResult.username,
+                pageAccessToken: directResult.accessToken
+            });
+        }
+    } catch (directErr: any) {
+        logToFile(`[Instagram Connect] OAuth direto do Instagram não utilizado ou falhou (${directErr.message}), tentando via Meta Graph API...`);
+    }
+
+    // 2. Fallback: Troca de token via Meta Graph API clássico
     const shortLivedToken = await MetaService.exchangeCodeForToken(code, redirectUri);
 
     // 2. Converte para token de longa duração (~60 dias)

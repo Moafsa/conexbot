@@ -33,14 +33,10 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
     // popup FB.login com config_id, em vez do redirect clássico que quebrava no
     // assistente "facebook_business_extension/oauth" da própria Meta.
     const handleInstagramLogin = () => {
-        if (!metaAppId) {
+        const appIdToUse = instagramConfigId || metaAppId;
+        if (!appIdToUse) {
+            setInstaConnectError('A conexão do Instagram ainda não foi configurada (App ID ausente).');
             setInstaConnectStep('error');
-            setInstaConnectError('A conexão do Instagram ainda não foi configurada pelo administrador da plataforma.');
-            return;
-        }
-        if (!token) {
-            setInstaConnectStep('error');
-            setInstaConnectError('Token de conexão não encontrado.');
             return;
         }
 
@@ -48,13 +44,13 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
         setInstaConnectError('');
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
-        const scope = 'public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
+        const scope = 'user_profile,user_media';
         const state = encodeURIComponent(JSON.stringify({
             m: 'p',
             token
         }));
 
-        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&auth_type=rerequest`;
+        const url = `https://api.instagram.com/oauth/authorize?client_id=${appIdToUse}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
 
         window.location.href = url;
     };
