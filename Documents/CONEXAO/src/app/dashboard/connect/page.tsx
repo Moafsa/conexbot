@@ -748,8 +748,11 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                                         <Instagram size={20} />
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-sm text-slate-800">@{acc.username || acc.pageName}</p>
-                                                        <p className="text-xs text-slate-500">Página do Facebook: <b>{acc.pageName}</b></p>
+                                                        <p className="font-bold text-sm text-fuchsia-950 flex items-center gap-1">
+                                                            <span>📸</span>
+                                                            <span>{acc.username ? `@${acc.username}` : `Instagram (${acc.pageName})`}</span>
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">Página do Facebook vinculada: <b>{acc.pageName}</b></p>
                                                     </div>
                                                 </div>
                                                 <button

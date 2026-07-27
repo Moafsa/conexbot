@@ -264,14 +264,32 @@ export class MetaService {
      * profissional do Instagram vinculada a cada uma (quando existir).
      */
     static async getFacebookPagesWithInstagram(accessToken: string) {
-        const url = `${GRAPH_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,profile_picture_url}`;
+        const url = `${GRAPH_URL}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}`;
         const data = await graphFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-        return (data.data || []) as Array<{
+        const pages = (data.data || []) as Array<{
             id: string;
             name: string;
             access_token: string;
-            instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
+            instagram_business_account?: { id: string; username?: string; name?: string; profile_picture_url?: string };
         }>;
+
+        // Se o username do Instagram vier ausente no objeto aninhado de /me/accounts,
+        // fazemos a consulta direta no endpoint do Instagram ID usando o token da página.
+        for (const p of pages) {
+            if (p.instagram_business_account?.id && !p.instagram_business_account.username) {
+                try {
+                    const igUrl = `${GRAPH_URL}/${p.instagram_business_account.id}?fields=id,username,name,profile_picture_url`;
+                    const igData = await graphFetch(igUrl, { headers: { Authorization: `Bearer ${p.access_token}` } });
+                    if (igData?.username) {
+                        p.instagram_business_account.username = igData.username;
+                    }
+                } catch (e: any) {
+                    logToFile(`[MetaService] Aviso ao buscar username do IG ${p.instagram_business_account.id}: ${e?.message}`);
+                }
+            }
+        }
+
+        return pages;
     }
 
     /**
