@@ -58,18 +58,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // 3. Generate token for driver PWA
-        const token = crypto.randomBytes(16).toString('hex');
-        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+        // 3. Reutiliza o token permanente do entregador (válido por 365 dias)
+        // Isso impede a troca de token a cada novo pedido e evita deslogar o entregador da PWA.
+        let token = driver.loginToken;
+        const now = new Date();
+        const isExpired = driver.loginTokenExpires ? new Date(driver.loginTokenExpires) < now : true;
 
-        await prisma.contact.update({
-            where: { id: driver.id },
-            data: {
-                loginToken: token,
-                loginTokenExpires: tokenExpires,
-                activeJobs: { increment: 1 }
-            }
-        });
+        if (!token || isExpired) {
+            token = crypto.randomBytes(16).toString('hex');
+            const tokenExpires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 365 dias (permanente)
+
+            await prisma.contact.update({
+                where: { id: driver.id },
+                data: {
+                    loginToken: token,
+                    loginTokenExpires: tokenExpires,
+                    activeJobs: { increment: 1 }
+                }
+            });
+        } else {
+            await prisma.contact.update({
+                where: { id: driver.id },
+                data: {
+                    activeJobs: { increment: 1 }
+                }
+            });
+        }
 
         // 4. Link order to driver
         await prisma.order.update({
