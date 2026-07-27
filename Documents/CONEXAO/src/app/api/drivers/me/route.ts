@@ -110,11 +110,22 @@ export async function POST(req: Request) {
             });
 
             if (order.contactId) {
+                // Find 'ENTREGUE' stage for the bot
+                const deliveredStage = await prisma.crmStage.findFirst({
+                    where: {
+                        botId: order.botId,
+                        name: { contains: 'ENTREGUE', mode: 'insensitive' }
+                    }
+                });
+
                 const prevNotes = order.contact?.notes || '';
                 const newNote = `${prevNotes}\n[ENTREGA CONCLUÍDA - PAGAMENTO: ${payLabel}]`.trim();
                 await prisma.contact.update({
                     where: { id: order.contactId },
-                    data: { notes: newNote }
+                    data: {
+                        notes: newNote,
+                        ...(deliveredStage ? { stageId: deliveredStage.id, funnelStage: deliveredStage.name } : {})
+                    }
                 });
             }
 
