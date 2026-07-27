@@ -92,8 +92,14 @@ export async function POST(req: Request) {
         }
 
         if (action === 'complete') {
-            const { paymentMethod } = body;
-            const payLabel = paymentMethod || 'A COMBINAR';
+            const { paymentMethod, paymentMethods } = body;
+            let payLabel = 'A COMBINAR';
+
+            if (Array.isArray(paymentMethods) && paymentMethods.length > 0) {
+                payLabel = paymentMethods.join(' + ');
+            } else if (paymentMethod) {
+                payLabel = paymentMethod;
+            }
 
             await prisma.order.update({
                 where: { id: orderId },

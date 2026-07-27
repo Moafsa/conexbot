@@ -35,7 +35,7 @@ function DriverDashboardContent() {
     
     // Modals & Action State
     const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<any | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<string>('PIX');
+    const [paymentMethods, setPaymentMethods] = useState<string[]>(['PIX']);
 
     const [selectedOrderForCancel, setSelectedOrderForCancel] = useState<any | null>(null);
     const [cancelReason, setCancelReason] = useState<string>('CLIENTE_AUSENTE');
@@ -204,7 +204,18 @@ function DriverDashboardContent() {
         }
     };
 
-    // 4. Mark Delivery Completed with Selected Payment Tag
+    const togglePaymentMethod = (methodId: string) => {
+        setPaymentMethods(prev => {
+            if (prev.includes(methodId)) {
+                if (prev.length === 1) return prev;
+                return prev.filter(m => m !== methodId);
+            } else {
+                return [...prev, methodId];
+            }
+        });
+    };
+
+    // 4. Mark Delivery Completed with Selected Payment Tag(s)
     const handleConfirmDelivery = async () => {
         if (!token || !selectedOrderForDelivery) return;
         setSubmittingAction(true);
@@ -217,7 +228,7 @@ function DriverDashboardContent() {
                     token,
                     orderId: selectedOrderForDelivery.id,
                     action: 'complete',
-                    paymentMethod
+                    paymentMethods
                 })
             });
 
@@ -446,7 +457,7 @@ function DriverDashboardContent() {
                                         <button 
                                             onClick={() => {
                                                 setSelectedOrderForDelivery(order);
-                                                setPaymentMethod('PIX');
+                                                setPaymentMethods(['PIX']);
                                             }}
                                             className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_12px_rgba(16,185,129,0.3)] border-0"
                                         >
@@ -495,9 +506,14 @@ function DriverDashboardContent() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
-                                Como o cliente realizou o pagamento?
-                            </label>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                    Forma(s) de Pagamento:
+                                </label>
+                                <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                    Pode selecionar mais de uma
+                                </span>
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2.5">
                                 {[
@@ -508,20 +524,23 @@ function DriverDashboardContent() {
                                     { id: 'JA_PAGO', label: 'Já Pago (Online)', icon: CheckCircle2, color: 'border-blue-500/40 bg-blue-500/10 text-blue-300' },
                                 ].map((pm) => {
                                     const IconComponent = pm.icon;
-                                    const isSelected = paymentMethod === pm.id;
+                                    const isSelected = paymentMethods.includes(pm.id);
                                     return (
                                         <button
                                             key={pm.id}
                                             type="button"
-                                            onClick={() => setPaymentMethod(pm.id)}
-                                            className={`p-3 rounded-2xl border text-xs font-bold flex items-center gap-2 transition active:scale-95 ${
+                                            onClick={() => togglePaymentMethod(pm.id)}
+                                            className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-between transition active:scale-95 ${
                                                 isSelected 
                                                     ? `${pm.color} ring-2 ring-emerald-500 shadow-lg` 
                                                     : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10'
                                             }`}
                                         >
-                                            <IconComponent className="h-4 w-4 shrink-0" />
-                                            <span>{pm.label}</span>
+                                            <div className="flex items-center gap-2">
+                                                <IconComponent className="h-4 w-4 shrink-0" />
+                                                <span>{pm.label}</span>
+                                            </div>
+                                            {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
                                         </button>
                                     );
                                 })}
