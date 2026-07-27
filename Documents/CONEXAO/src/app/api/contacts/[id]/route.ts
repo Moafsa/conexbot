@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
+import { PhoneUtils } from '@/lib/phone-utils';
 
 async function requireContactForTenant(contactId: string, tenantId: string) {
     return prisma.contact.findFirst({
@@ -234,9 +235,10 @@ export async function GET(req: Request, { params }: { params: any }) {
         }
 
         // Conversa sempre no âmbito do tenant (mesmo telefone noutro bot/tenant = outra linha).
-        const conversation = await prisma.conversation.findFirst({
+        const phoneVariations = PhoneUtils.getVariations(contact.phone);
+        let conversation = await prisma.conversation.findFirst({
             where: {
-                remoteId: contact.phone,
+                remoteId: { in: phoneVariations },
                 bot: { tenantId },
                 ...(contact.botId ? { botId: contact.botId } : {}),
             },
@@ -249,6 +251,23 @@ export async function GET(req: Request, { params }: { params: any }) {
                 }
             }
         });
+
+        if (!conversation) {
+            conversation = await prisma.conversation.findFirst({
+                where: {
+                    remoteId: { in: phoneVariations },
+                    bot: { tenantId }
+                },
+                include: {
+                    messages: {
+                        orderBy: {
+                            createdAt: 'asc'
+                        },
+                        take: 100
+                    }
+                }
+            });
+        }
 
         // Attach conversations format as expected by CRMContactPanel
         const responseData = {

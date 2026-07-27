@@ -1775,8 +1775,8 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
             const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
             let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
 
-            // 12. Save Assistant Final Response (only if not a tool call already handled)
-            if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
+            // 12. Save Assistant Final Response to CRM history
+            if (cleanResponse && cleanResponse.trim().length > 0) {
                 await prisma.message.create({
                     data: {
                         conversationId: conversation.id,
