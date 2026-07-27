@@ -54,7 +54,7 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
             token
         }));
 
-        const url = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&auth_type=rerequest`;
 
         window.location.href = url;
     };
