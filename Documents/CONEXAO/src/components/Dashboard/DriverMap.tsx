@@ -814,17 +814,22 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                         ) : (
                             pendingOrders.map((order) => {
                                 const customer = order.contact || {};
-                                const address = cleanAddress(customer.notes || customer.needs);
+                                const rawAddress = (order as any).address || customer.notes || customer.needs || customer.address || 'Endereço não informado';
+                                const address = cleanAddress(rawAddress);
+                                const hasItems = order.items && order.items.length > 0;
+                                const itemsSummary = hasItems
+                                    ? order.items.map((i: any) => `${i.product?.name || 'Botijão de Gás'} x${i.quantity}`).join(', ')
+                                    : ((order as any).notes || (order as any).description || '1x Botijão P13');
                                 
                                 return (
                                     <div 
                                         key={order.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, order.id)}
-                                        className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-white/10 transition cursor-grab active:cursor-grabbing space-y-2 relative overflow-hidden group/order"
+                                        className="p-3.5 bg-white/5 border border-white/5 rounded-2xl hover:border-white/10 transition cursor-grab active:cursor-grabbing space-y-2 relative overflow-hidden group/order shadow-sm"
                                     >
                                         <div className="absolute top-0 left-0 w-1 h-full bg-[#ec4899]"></div>
-                                        <div className="pl-1.5 space-y-1.5">
+                                        <div className="pl-1.5 space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] font-bold text-[#ec4899] bg-[#ec4899]/10 px-2 py-0.5 rounded-full">
                                                     #{order.id.substring(0, 6)}
@@ -832,11 +837,16 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 <span className="text-[9px] font-bold text-gray-400">📅 {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                             </div>
                                             <h4 className="text-xs font-bold text-white truncate">{customer.name || 'Cliente'}</h4>
-                                            <p className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">
-                                                📍 {address}
-                                            </p>
-                                            <div className="text-[9px] text-[#c084fc] font-medium pt-1 border-t border-white/5">
-                                                {order.items?.map((i: any) => `${i.product?.name || 'Botijão'} x${i.quantity}`).join(', ')}
+                                            
+                                            <div className="bg-white/5 p-2 rounded-xl border border-white/5 space-y-1.5">
+                                                <p className="text-[10px] text-gray-300 font-medium flex items-start gap-1">
+                                                    <span className="shrink-0">📍</span>
+                                                    <span className="line-clamp-2 leading-relaxed"><b>Endereço:</b> {address}</span>
+                                                </p>
+                                                <p className="text-[10px] text-[#c084fc] font-bold flex items-center gap-1 border-t border-white/5 pt-1.5">
+                                                    <span className="shrink-0">🛒</span>
+                                                    <span className="truncate"><b>Pedido:</b> {itemsSummary}</span>
+                                                </p>
                                             </div>
                                             <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[9px]">
                                                 <span className="text-amber-400 font-extrabold">R$ {Number(order.totalAmount || 0).toFixed(2)}</span>

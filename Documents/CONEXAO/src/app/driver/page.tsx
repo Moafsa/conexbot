@@ -353,12 +353,19 @@ function DriverDashboardContent() {
                                     {/* Order Items */}
                                     <div className="space-y-2">
                                         <span className="text-[10px] text-gray-400 uppercase font-semibold block">Itens do Pedido</span>
-                                        {order.items?.map((item: any) => (
-                                            <div key={item.id} className="flex items-center justify-between text-xs text-gray-300">
-                                                <span>{item.product?.name || 'Botijão de Gás'}</span>
-                                                <span className="font-semibold text-white">x{item.quantity}</span>
+                                        {order.items && order.items.length > 0 ? (
+                                            order.items.map((item: any) => (
+                                                <div key={item.id} className="flex items-center justify-between text-xs text-gray-300">
+                                                    <span>{item.product?.name || 'Botijão de Gás'}</span>
+                                                    <span className="font-semibold text-white">x{item.quantity}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="flex items-center justify-between text-xs text-gray-300">
+                                                <span>{(order as any).notes || (order as any).description || 'Botijão de Gás P13'}</span>
+                                                <span className="font-semibold text-white">x1</span>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
 
                                     {/* Actions */}

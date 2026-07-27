@@ -185,6 +185,22 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         window.location.href = url;
     };
 
+    const handleDisconnectInstagram = async () => {
+        try {
+            const url = clientId 
+                ? `/api/bots/${botId}/channels?provider=INSTAGRAM&clientId=${clientId}` 
+                : `/api/bots/${botId}/channels?provider=INSTAGRAM`;
+            await fetch(url, { method: 'DELETE' });
+            setInstaConnectStep('idle');
+            setInstaConnectedInfo(null);
+            try {
+                sessionStorage.removeItem('insta_available_accounts');
+            } catch {}
+        } catch (e) {
+            console.error("Falha ao desconectar Instagram:", e);
+        }
+    };
+
     const handleSelectInstagramAccount = async (account: any) => {
         setInstaConnectStep('registering');
         try {
@@ -703,10 +719,10 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                         <p className="text-xs text-green-600">
                                             A IA já pode responder Directs automaticamente. Pode levar 1-2 minutos até as primeiras mensagens fluírem.
                                             <button
-                                                onClick={() => { setInstaConnectStep('idle'); handleInstagramLogin(); }}
-                                                className="text-xs text-green-700 underline hover:text-green-900 block mt-1"
+                                                onClick={handleDisconnectInstagram}
+                                                className="text-xs text-green-700 underline hover:text-green-900 block mt-2 font-medium"
                                             >
-                                                Conectar outra conta
+                                                Desconectar esta conta / Conectar outro Instagram
                                             </button>
                                         </p>
                                     </div>

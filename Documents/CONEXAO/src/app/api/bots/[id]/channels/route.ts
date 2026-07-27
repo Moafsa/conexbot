@@ -191,3 +191,33 @@ export async function POST(req: Request, { params }: { params: any }) {
         return NextResponse.json({ error: 'Falha ao salvar canal' }, { status: 500 });
     }
 }
+
+export async function DELETE(req: Request, { params }: { params: any }) {
+    try {
+        const session = await getServerSession(authOptions);
+        const { searchParams } = new URL(req.url);
+        const clientId = searchParams.get('clientId');
+        const provider = (searchParams.get('provider') || 'INSTAGRAM').toUpperCase();
+        const { id: botId } = await params;
+
+        let hasAccess = false;
+        if (session?.user) {
+            const tenantId = await getEffectiveTenantId(clientId);
+            hasAccess = tenantId ? (await checkBotOwnership(botId, tenantId)) : false;
+        }
+
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Bot não encontrado ou sem permissão' }, { status: 404 });
+        }
+
+        await prisma.botChannel.deleteMany({
+            where: { botId, provider }
+        });
+
+        logToFile(`[Channels API] Canal ${provider} desconectado do bot ${botId}`);
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting bot channel:', error);
+        return NextResponse.json({ error: 'Falha ao desconectar canal' }, { status: 500 });
+    }
+}
