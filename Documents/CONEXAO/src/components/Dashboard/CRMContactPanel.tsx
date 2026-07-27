@@ -58,7 +58,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
 
         const messagesInterval = setInterval(() => {
             fetchContactData({ silent: true });
-        }, 3000);
+        }, 2000);
 
         const typingInterval = setInterval(async () => {
             try {
@@ -89,9 +89,15 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                 setContact(data);
                 setOrders(data.orders || []);
                 const newMessages = data.conversations?.[0]?.messages || [];
-                setMessages(prev => (
-                    opts.silent && prev.length === newMessages.length ? prev : newMessages
-                ));
+                setMessages(prev => {
+                    if (!opts.silent || prev.length === 0) return newMessages;
+                    const lastPrevId = prev[prev.length - 1]?.id;
+                    const lastNewId = newMessages[newMessages.length - 1]?.id;
+                    if (lastPrevId !== lastNewId || prev.length !== newMessages.length) {
+                        return newMessages;
+                    }
+                    return prev;
+                });
             }
 
             if (!opts.silent) {
