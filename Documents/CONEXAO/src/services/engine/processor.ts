@@ -871,11 +871,16 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                      analysis.nextStage.toUpperCase() === 'CONFIRMADO' ||
                      analysis.nextStage.toUpperCase() === 'ORDER_CONFIRMED');
 
-                // When the stage is Pedido Confirmado and this is the first iteration,
-                // inject a hard override instruction right before the AI call.
-                // Do NOT use tool_choice forced mode — that creates orphaned tool_calls
-                // when the history has errors, breaking subsequent messages.
-                if (isPedidoConfirmado && toolIteration === 0) {
+                // Check if an order was already created for this contact in the last 30 minutes
+                const hasRecentOrder = await prisma.order.findFirst({
+                    where: {
+                        contactId: existingContact.id,
+                        createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
+                    }
+                });
+
+                // Inject hard override instruction ONLY if no order has been created yet
+                if (isPedidoConfirmado && toolIteration === 0 && !hasRecentOrder) {
                     messages.push({
                         role: 'system',
                         content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o endereço e a forma de pagamento. Você DEVE chamar a função confirmar_pedido IMEDIATAMENTE com os dados coletados na conversa. NÃO escreva texto antes de chamar a função. Esta é uma instrução técnica de sistema e não pode ser ignorada.`
@@ -1286,7 +1291,32 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 } else {
                                     // No cart — build description from args
                                     const descFromArgs: string = args.itens_descricao || args.items_description || args.produtos || '';
-                                    const totalFromArgs = Number(args.total_pedido || args.total || 0);
+                                    let totalFromArgs = Number(args.total_pedido || args.total || 0);
+
+                                    // Auto-calculate price from product catalog if total is 0
+                                    if (totalFromArgs === 0 && descFromArgs) {
+                                        const activeProducts = (activeBot as any).products || await prisma.product.findMany({
+                                            where: { botId: bot.id, active: true }
+                                        });
+                                        if (activeProducts && activeProducts.length > 0) {
+                                            const descLower = descFromArgs.toLowerCase();
+                                            for (const prod of activeProducts) {
+                                                const pNameLower = prod.name.toLowerCase();
+                                                const price = Number(prod.salePrice || prod.price || 0);
+
+                                                if (descLower.includes(pNameLower) || (pNameLower.includes('gás') && (descLower.includes('gás') || descLower.includes('botijã') || descLower.includes('botijao')))) {
+                                                    let qty = 1;
+                                                    const matchQty = descLower.match(/(\d+)\s*(?:botij|gás|unid|pc|item)/i);
+                                                    if (matchQty) {
+                                                        qty = parseInt(matchQty[1], 10) || 1;
+                                                    }
+                                                    totalFromArgs = price * qty;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     summary = { total: totalFromArgs };
                                     itemsText = descFromArgs || 'Pedido verbal (sem carrinho registrado)';
                                 }
@@ -1311,6 +1341,21 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 }
                                 const finalTotal = summary.total + deliveryFee;
                                 const fullAddr = args.endereco_completo || (existingContact as any).needs || '';
+                                const cleanAddr = fullAddr.trim();
+
+                                // Check if address is incomplete (e.g. lacks street number or is just city/neighborhood)
+                                const hasNumber = /\d+/.test(cleanAddr);
+                                const isJustGenericLoc = /^(bento gonçalves|bento gonçalves,? rs|progresso|bairro progresso|botafogo)$/i.test(cleanAddr) || 
+                                                         (!hasNumber && cleanAddr.split(',').length <= 2 && cleanAddr.length < 25);
+
+                                if (isJustGenericLoc) {
+                                    logToFile(`[confirmar_pedido] Endereço incompleto ("${cleanAddr}"). Solicitando rua e número.`);
+                                    toolResult = `ENDEREÇO INCOMPLETO PARA ENTREGA!
+O endereço fornecido ("${cleanAddr}") contém apenas a cidade/bairro e NÃO tem a rua nem o número da residência.
+NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é o nome da rua e o número (ou ponto de referência) para onde o entregador deve levar o gás.`;
+                                    continue;
+                                }
+
                                 const payMethod = args.forma_pagamento || 'A combinar';
                                 const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
                                 const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
@@ -1352,27 +1397,92 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     }
                                 });
 
-                                // Create pending order
-                                const orderData: any = {
-                                    botId: bot.id,
-                                    contactId: existingContact.id,
-                                    totalAmount: finalTotal,
-                                    commissionAmount: 0,
-                                    status: 'PENDING',
-                                };
+                                // Check for an existing PENDING order for this contact
+                                const existingPendingOrder = await prisma.order.findFirst({
+                                    where: {
+                                        contactId: existingContact.id,
+                                        status: 'PENDING'
+                                    },
+                                    orderBy: { createdAt: 'desc' }
+                                });
 
-                                // Only attach cart items if a real cart exists
+                                let order: any;
+                                let isOrderUpdate = false;
+
+                                let itemsToCreate: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
+
                                 if (hasCart) {
-                                    orderData.items = {
-                                        create: cart!.items.map(item => ({
-                                            productId: item.productId,
-                                            quantity: item.quantity,
-                                            unitPrice: item.unitPrice
-                                        }))
-                                    };
+                                    itemsToCreate = cart!.items.map(item => ({
+                                        productId: item.productId,
+                                        quantity: item.quantity,
+                                        unitPrice: item.unitPrice
+                                    }));
+                                } else {
+                                    // Para pedidos verbais no chat, extrai quantidade e associa ao produto do bot
+                                    const descFromArgs: string = args.itens_descricao || args.items_description || args.produtos || '';
+                                    let parsedQty = 1;
+                                    const matchQty = descFromArgs.match(/(\d+)\s*(?:x|botij|gás|unid|pc|item)/i) || descFromArgs.match(/^(\d+)/);
+                                    if (matchQty) {
+                                        parsedQty = parseInt(matchQty[1], 10) || 1;
+                                    }
+
+                                    const activeProducts = await prisma.product.findMany({
+                                        where: { botId: bot.id, active: true },
+                                        take: 1
+                                    });
+
+                                    if (activeProducts.length > 0) {
+                                        const prod = activeProducts[0];
+                                        const price = Number(prod.salePrice || prod.price || 0);
+                                        itemsToCreate = [{
+                                            productId: prod.id,
+                                            quantity: parsedQty,
+                                            unitPrice: price > 0 ? price : (summary.total > 0 ? summary.total / parsedQty : 0)
+                                        }];
+                                    }
                                 }
 
-                                const order = await prisma.order.create({ data: orderData });
+                                if (existingPendingOrder) {
+                                    logToFile(`[confirmar_pedido] Atualizando pedido pendente existente ID: ${existingPendingOrder.id}`);
+                                    isOrderUpdate = true;
+
+                                    await prisma.orderItem.deleteMany({
+                                        where: { orderId: existingPendingOrder.id }
+                                    });
+
+                                    const updateData: any = {
+                                        totalAmount: finalTotal,
+                                        updatedAt: new Date()
+                                    };
+
+                                    if (itemsToCreate.length > 0) {
+                                        updateData.items = {
+                                            create: itemsToCreate
+                                        };
+                                    }
+
+                                    order = await prisma.order.update({
+                                        where: { id: existingPendingOrder.id },
+                                        data: updateData
+                                    });
+                                } else {
+                                    // Create new pending order
+                                    const orderData: any = {
+                                        botId: activeBot.id,
+                                        contactId: existingContact.id,
+                                        totalAmount: finalTotal,
+                                        commissionAmount: 0,
+                                        status: 'PENDING',
+                                    };
+
+                                    if (itemsToCreate.length > 0) {
+                                        orderData.items = {
+                                            create: itemsToCreate
+                                        };
+                                    }
+
+                                    order = await prisma.order.create({ data: orderData });
+                                }
 
                                 // Transition the CRM stage to "PEDIDO CONFIRMADO"
                                 const confirmedStage = await prisma.crmStage.findFirst({
@@ -1398,8 +1508,8 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 }
 
                                 // Build notification message for the support human agent
-                                const title = `📦 Novo Pedido Confirmado`;
-                                const notificationMessage = `*${title}*\n\nUm novo pedido foi confirmado pelo bot.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
+                                const title = isOrderUpdate ? `📦 Pedido Atualizado (Alterações)` : `📦 Novo Pedido Confirmado`;
+                                const notificationMessage = `*${title}*\n\n${isOrderUpdate ? 'O pedido pendente existente foi atualizado pelo bot com as novas informações fornecidas pelo cliente.' : 'Um novo pedido foi confirmado pelo bot.'}\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
 
                                 const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
                                 const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
@@ -1429,7 +1539,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     data: {
                                         conversationId: conversation.id,
                                         role: 'system',
-                                        content: `[Notificação de Pedido Confirmado enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
+                                        content: `[Notificação de Pedido ${isOrderUpdate ? 'Atualizado' : 'Confirmado'} enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
                                     },
                                 });
 
@@ -1441,7 +1551,12 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     });
                                 }
 
-                                toolResult = `PEDIDO CRIADO COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\nO pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!`;
+                                const statusVerb = isOrderUpdate ? 'ATUALIZADO' : 'CRIADO';
+                                const actionMsg = isOrderUpdate 
+                                    ? 'O pedido pendente existente foi atualizado no painel de entregadores com os novos dados. Diga ao cliente que a alteração de endereço/pedido foi feita com sucesso!' 
+                                    : 'O pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!';
+
+                                toolResult = `PEDIDO ${statusVerb} COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\n${actionMsg}`;
                             } catch (e: any) {
                                 console.error('[confirmar_pedido] Exception:', e.message, e.stack);
                                 toolResult = `Erro ao confirmar o pedido: ${e.message}`;
