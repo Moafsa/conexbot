@@ -252,18 +252,87 @@ async function handleInstagram(body: any) {
             // Ignore messages sent by our own page/bot
             if (senderId === accountId) continue;
 
-            if (message && message.text) {
-                console.log(`[Meta Webhook] Insta Message from ${senderId} to ${accountId}: ${message.text}`);
-                
-                // Call the engine processor
-                MessageProcessor.process(
-                    channel.botId, 
-                    senderId, 
-                    message.text, 
-                    'instagram', 
-                    'id', 
-                    { inputType: 'text' }
-                ).catch(err => console.error('[Meta Webhook] Processor error:', err));
+            if (message) {
+                const text = message.text;
+                const attachments = message.attachments || [];
+
+                if (text && attachments.length === 0) {
+                    console.log(`[Meta Webhook] Insta Message from ${senderId} to ${accountId}: ${text}`);
+                    MessageProcessor.process(
+                        channel.botId, 
+                        senderId, 
+                        text, 
+                        'instagram', 
+                        'id', 
+                        { inputType: 'text' }
+                    ).catch(err => console.error('[Meta Webhook] Processor error:', err));
+                } else if (attachments.length > 0) {
+                    for (const att of attachments) {
+                        const attType = att.type; // 'image', 'audio', etc.
+                        const mediaUrl = att.payload?.url;
+                        if (!mediaUrl) continue;
+
+                        if (attType === 'image') {
+                            (async () => {
+                                try {
+                                    const imgRes = await fetch(mediaUrl);
+                                    if (!imgRes.ok) return;
+                                    const arrayBuffer = await imgRes.arrayBuffer();
+                                    const buffer = Buffer.from(arrayBuffer);
+                                    const fs = require('fs');
+                                    const path = require('path');
+                                    const os = require('os');
+                                    const tempImgPath = path.join(os.tmpdir(), `insta_img_${Date.now()}.jpg`);
+                                    fs.writeFileSync(tempImgPath, buffer);
+
+                                    await MessageProcessor.process(
+                                        channel.botId,
+                                        senderId,
+                                        text || '',
+                                        'instagram',
+                                        'id',
+                                        { inputType: 'image', mediaPath: tempImgPath }
+                                    );
+                                } catch (err: any) {
+                                    console.error('[Meta Webhook] Insta image error:', err);
+                                }
+                            })();
+                        } else if (attType === 'audio') {
+                            (async () => {
+                                try {
+                                    const bot = await prisma.bot.findUnique({ where: { id: channel.botId } });
+                                    const audioRes = await fetch(mediaUrl);
+                                    if (!audioRes.ok) return;
+                                    const arrayBuffer = await audioRes.arrayBuffer();
+                                    const buffer = Buffer.from(arrayBuffer);
+                                    const fs = require('fs');
+                                    const path = require('path');
+                                    const os = require('os');
+                                    const tempAudioPath = path.join(os.tmpdir(), `insta_audio_${Date.now()}.ogg`);
+                                    fs.writeFileSync(tempAudioPath, buffer);
+
+                                    const { VoiceService } = await import('@/services/engine/voice');
+                                    const transcribedText = await VoiceService.transcribe(
+                                        tempAudioPath,
+                                        (bot as any)?.openaiToken,
+                                        (bot as any)?.geminiToken
+                                    );
+
+                                    await MessageProcessor.process(
+                                        channel.botId,
+                                        senderId,
+                                        transcribedText || '(áudio sem fala detectada)',
+                                        'instagram',
+                                        'id',
+                                        { inputType: 'audio', mediaPath: tempAudioPath }
+                                    );
+                                } catch (err: any) {
+                                    console.error('[Meta Webhook] Insta audio error:', err);
+                                }
+                            })();
+                        }
+                    }
+                }
             }
         }
     }
