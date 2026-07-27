@@ -88,13 +88,10 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                 const data = await res.json();
                 setContact(data);
                 setOrders(data.orders || []);
-                if (data.conversations?.[0]) {
-                    const newMessages = data.conversations[0].messages || [];
-                    // Evita re-render/flicker desnecessário quando nada mudou no polling silencioso
-                    setMessages(prev => (
-                        opts.silent && prev.length === newMessages.length ? prev : newMessages
-                    ));
-                }
+                const newMessages = data.conversations?.[0]?.messages || [];
+                setMessages(prev => (
+                    opts.silent && prev.length === newMessages.length ? prev : newMessages
+                ));
             }
 
             if (!opts.silent) {

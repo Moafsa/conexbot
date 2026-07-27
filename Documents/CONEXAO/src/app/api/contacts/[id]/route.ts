@@ -245,9 +245,9 @@ export async function GET(req: Request, { params }: { params: any }) {
             include: {
                 messages: {
                     orderBy: {
-                        createdAt: 'asc'
+                        createdAt: 'desc'
                     },
-                    take: 100 // Limit to recent 100 messages for the panel
+                    take: 100 // 100 mensagens mais recentes
                 }
             }
         });
@@ -261,12 +261,16 @@ export async function GET(req: Request, { params }: { params: any }) {
                 include: {
                     messages: {
                         orderBy: {
-                            createdAt: 'asc'
+                            createdAt: 'desc'
                         },
                         take: 100
                     }
                 }
             });
+        }
+
+        if (conversation && conversation.messages) {
+            conversation.messages = conversation.messages.reverse();
         }
 
         // Attach conversations format as expected by CRMContactPanel
