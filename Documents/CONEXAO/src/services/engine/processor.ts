@@ -1427,12 +1427,25 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
 
                                     const activeProducts = await prisma.product.findMany({
-                                        where: { botId: bot.id, active: true },
-                                        take: 1
+                                        where: { botId: bot.id, active: true }
                                     });
 
                                     if (activeProducts.length > 0) {
-                                        const prod = activeProducts[0];
+                                        const descLower = descFromArgs.toLowerCase();
+
+                                        let matchedProd = activeProducts.find(p => {
+                                            const pName = p.name.toLowerCase();
+                                            if ((descLower.includes('13') || descLower.includes('p13') || descLower.includes('p-13')) && (pName.includes('13') || pName.includes('p13') || pName.includes('p-13'))) return true;
+                                            if ((descLower.includes('45') || descLower.includes('p45') || descLower.includes('p-45')) && (pName.includes('45') || pName.includes('p45') || pName.includes('p-45'))) return true;
+                                            if ((descLower.includes('20') || descLower.includes('p20') || descLower.includes('p-20')) && (pName.includes('20') || pName.includes('p20') || pName.includes('p-20'))) return true;
+                                            return pName.split(' ').some(word => word.length > 2 && descLower.includes(word));
+                                        });
+
+                                        if (!matchedProd) {
+                                            matchedProd = activeProducts[0];
+                                        }
+
+                                        const prod = matchedProd;
                                         const price = Number(prod.salePrice || prod.price || 0);
                                         itemsToCreate = [{
                                             productId: prod.id,
