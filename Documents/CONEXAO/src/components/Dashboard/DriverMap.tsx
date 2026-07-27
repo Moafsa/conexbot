@@ -715,7 +715,15 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     try {
                         await navigator.clipboard.writeText(data.pwaUrl);
                     } catch (e) {}
-                    toast.error(`${data.error} O link do app foi copiado para sua área de transferência para envio manual.`, { id: 'send-app', duration: 6000 });
+
+                    const driver = drivers.find(d => d.id === driverId);
+                    const cleanPhone = driver?.phone ? driver.phone.replace(/\D/g, '') : '';
+                    if (cleanPhone) {
+                        const msg = `Olá, *${driverName}*!\n\nAqui está o seu link de acesso ao aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${data.pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione à tela inicial!_`;
+                        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }
+
+                    toast.error(`${data.error} Abrindo WhatsApp para envio direto...`, { id: 'send-app', duration: 7000 });
                     return;
                 }
                 throw new Error(data.error || 'Erro ao enviar link do aplicativo.');
