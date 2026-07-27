@@ -44,13 +44,13 @@ function PublicConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }
         setInstaConnectError('');
 
         const redirectUri = `${window.location.origin}/instagram/callback`;
-        const scope = 'user_profile,user_media';
+        const scope = 'public_profile,pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_manage_comments,instagram_content_publish';
         const state = encodeURIComponent(JSON.stringify({
             m: 'p',
             token
         }));
 
-        const url = `https://api.instagram.com/oauth/authorize?client_id=${appIdToUse}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}`;
+        const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${metaAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&auth_type=rerequest`;
 
         window.location.href = url;
     };
