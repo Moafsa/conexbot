@@ -96,13 +96,19 @@ async function handleInstagram(body: any) {
     for (const entry of body.entry || []) {
         const accountId = entry.id;
         
-        // Find the bot channel
-        const channel = await prisma.botChannel.findUnique({
-            where: { provider_identifier: { provider: 'INSTAGRAM', identifier: accountId } }
+        // Busca o canal pelo Instagram Business Account ID ou pela Página vinculada
+        let channel = await prisma.botChannel.findFirst({
+            where: {
+                provider: 'INSTAGRAM',
+                OR: [
+                    { identifier: accountId },
+                    { credentials: { path: ['pageId'], equals: accountId } }
+                ]
+            }
         });
 
         if (!channel) {
-            console.log(`[Meta Webhook] No bot found for Insta Account ID: ${accountId}`);
+            console.log(`[Meta Webhook] No bot found for Insta / Page Account ID: ${accountId}`);
             continue;
         }
 
