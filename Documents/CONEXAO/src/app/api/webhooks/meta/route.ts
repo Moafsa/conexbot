@@ -68,24 +68,156 @@ async function handleWhatsApp(body: any) {
                 const messages = value.messages || [];
                 for (const msg of messages) {
                     const from = msg.from; // Customer phone
-                    const text = msg.text?.body;
+                    const msgType = msg.type;
 
-                    if (!text) {
-                        console.log(`[Meta Webhook] Received non-text WA message, skipping for now.`);
-                        continue;
+                    if (msgType === 'text') {
+                        const text = msg.text?.body;
+                        if (!text) continue;
+
+                        console.log(`[Meta Webhook] WA Text Message from ${from}: ${text}`);
+                        MessageProcessor.process(
+                            channel.botId,
+                            from,
+                            text,
+                            'meta_whatsapp',
+                            'id',
+                            { inputType: 'text' }
+                        ).catch(err => console.error('[Meta Webhook] Processor error:', err));
+                    } else if (msgType === 'audio' || msgType === 'voice') {
+                        const audioData = msg.audio || msg.voice;
+                        const mediaId = audioData?.id;
+                        console.log(`[Meta Webhook] WA Audio Message from ${from}, mediaId: ${mediaId}`);
+
+                        if (!mediaId) continue;
+
+                        (async () => {
+                            try {
+                                const bot = await prisma.bot.findUnique({
+                                    where: { id: channel.botId },
+                                    include: { tenant: true }
+                                });
+                                if (!bot) return;
+
+                                const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                                const metaToken = channel.access_token || (bot as any).metaToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+
+                                if (!metaToken) {
+                                    console.error('[Meta Webhook] Missing Meta Access Token for audio download');
+                                    return;
+                                }
+
+                                const mediaRes = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, {
+                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                });
+
+                                if (!mediaRes.ok) {
+                                    console.error('[Meta Webhook] Failed to fetch media URL:', mediaRes.status, await mediaRes.text());
+                                    return;
+                                }
+
+                                const mediaJson = await mediaRes.json();
+                                const downloadUrl = mediaJson.url;
+
+                                if (!downloadUrl) {
+                                    console.error('[Meta Webhook] No download URL returned for mediaId:', mediaId);
+                                    return;
+                                }
+
+                                const audioRes = await fetch(downloadUrl, {
+                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                });
+
+                                if (!audioRes.ok) {
+                                    console.error('[Meta Webhook] Failed to download audio binary:', audioRes.status);
+                                    return;
+                                }
+
+                                const arrayBuffer = await audioRes.arrayBuffer();
+                                const buffer = Buffer.from(arrayBuffer);
+                                const fs = require('fs');
+                                const path = require('path');
+                                const os = require('os');
+                                const tempAudioPath = path.join(os.tmpdir(), `meta_audio_${mediaId}.ogg`);
+                                fs.writeFileSync(tempAudioPath, buffer);
+
+                                console.log(`[Meta Webhook] Downloaded Meta Audio file to ${tempAudioPath} (${buffer.length} bytes)`);
+
+                                const { VoiceService } = await import('@/services/engine/voice');
+                                const transcribedText = await VoiceService.transcribe(
+                                    tempAudioPath, 
+                                    (bot as any).openaiToken, 
+                                    (bot as any).geminiToken
+                                );
+
+                                console.log(`[Meta Webhook] Transcribed Audio: "${transcribedText}"`);
+
+                                await MessageProcessor.process(
+                                    channel.botId,
+                                    from,
+                                    transcribedText || '(áudio sem fala detectada)',
+                                    'meta_whatsapp',
+                                    'id',
+                                    { inputType: 'audio', mediaPath: tempAudioPath }
+                                );
+                            } catch (err: any) {
+                                console.error('[Meta Webhook] Error processing audio message:', err);
+                            }
+                        })();
+                    } else if (msgType === 'image') {
+                        const imageData = msg.image;
+                        const mediaId = imageData?.id;
+                        const caption = imageData?.caption || '';
+
+                        console.log(`[Meta Webhook] WA Image Message from ${from}, mediaId: ${mediaId}`);
+
+                        if (!mediaId) continue;
+
+                        (async () => {
+                            try {
+                                const bot = await prisma.bot.findUnique({ where: { id: channel.botId } });
+                                if (!bot) return;
+
+                                const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                                const metaToken = channel.access_token || (bot as any).metaToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+
+                                if (!metaToken) return;
+
+                                const mediaRes = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, {
+                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                });
+                                if (!mediaRes.ok) return;
+
+                                const mediaJson = await mediaRes.json();
+                                if (!mediaJson.url) return;
+
+                                const imgRes = await fetch(mediaJson.url, {
+                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                });
+                                if (!imgRes.ok) return;
+
+                                const arrayBuffer = await imgRes.arrayBuffer();
+                                const buffer = Buffer.from(arrayBuffer);
+                                const fs = require('fs');
+                                const path = require('path');
+                                const os = require('os');
+                                const tempImgPath = path.join(os.tmpdir(), `meta_img_${mediaId}.jpg`);
+                                fs.writeFileSync(tempImgPath, buffer);
+
+                                await MessageProcessor.process(
+                                    channel.botId,
+                                    from,
+                                    caption,
+                                    'meta_whatsapp',
+                                    'id',
+                                    { inputType: 'image', mediaPath: tempImgPath }
+                                );
+                            } catch (err: any) {
+                                console.error('[Meta Webhook] Error processing image message:', err);
+                            }
+                        })();
+                    } else {
+                        console.log(`[Meta Webhook] Unsupported message type: ${msgType}`);
                     }
-
-                    console.log(`[Meta Webhook] WA Message from ${from} to ${phoneId}: ${text}`);
-                    
-                    // Call the engine processor
-                    MessageProcessor.process(
-                        channel.botId, 
-                        from, 
-                        text, 
-                        'meta_whatsapp', 
-                        'id', 
-                        { inputType: 'text' }
-                    ).catch(err => console.error('[Meta Webhook] Processor error:', err));
                 }
             }
         }
