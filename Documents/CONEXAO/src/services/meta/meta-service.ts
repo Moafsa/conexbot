@@ -286,6 +286,24 @@ export class MetaService {
         components?: any[]
     ) {
         const url = `${GRAPH_URL}/${phoneId}/messages`;
+
+        // Sanitiza todos os parâmetros de texto para evitar erro Meta #131008 (Parameter of type text is missing text value)
+        const sanitizedComponents = (components || []).map((comp: any) => {
+            if (comp.parameters && Array.isArray(comp.parameters)) {
+                return {
+                    ...comp,
+                    parameters: comp.parameters.map((p: any) => {
+                        if (p.type === 'text') {
+                            const val = (p.text !== null && p.text !== undefined) ? String(p.text).trim() : '';
+                            return { ...p, text: val || '--' };
+                        }
+                        return p;
+                    })
+                };
+            }
+            return comp;
+        });
+
         return graphFetch(url, {
             method: 'POST',
             headers: {
@@ -300,7 +318,7 @@ export class MetaService {
                 template: {
                     name: templateName,
                     language: { code: languageCode },
-                    ...(components && components.length > 0 ? { components } : {})
+                    ...(sanitizedComponents.length > 0 ? { components: sanitizedComponents } : {})
                 }
             }),
         });

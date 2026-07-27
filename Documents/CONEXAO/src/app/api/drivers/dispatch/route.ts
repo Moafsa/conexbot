@@ -83,18 +83,20 @@ export async function POST(req: Request) {
         // 5. Send message via WhatsApp
         const botSession = order.bot?.sessionName || '';
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const customerName = order.contact?.name || 'Cliente Sem Nome';
-        const customerPhone = order.contact?.phone || '';
-        const rawAddress = order.contact?.notes || order.contact?.needs || 'Endereço não especificado';
-        const deliveryAddress = cleanAddress(rawAddress);
-        const orderItemsStr = order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ');
+        const customerName = order.contact?.name || 'Cliente';
+        const customerPhone = order.contact?.phone ? order.contact.phone.replace(/\D/g, '') : 'Não informado';
+        const rawAddress = order.contact?.notes || order.contact?.needs || 'Endereço a confirmar';
+        const deliveryAddress = cleanAddress(rawAddress) || 'Endereço a confirmar';
+        const orderItemsStr = (order.items && order.items.length > 0)
+            ? order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ')
+            : (order.notes || order.description || '1x Botijão P13');
 
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
         const pwaUrl = `${appUrl}/driver?token=${token}`;
 
         const dispatchMsg = `🚚 *NOVA ENTREGA ATRIBUÍDA (MANUAL)* 🚚\n\n` +
             `*Cliente:* ${customerName}\n` +
-            `*WhatsApp Cliente:* wa.me/${customerPhone.replace(/\D/g, '')}\n` +
+            `*WhatsApp Cliente:* wa.me/${customerPhone}\n` +
             `*Endereço:* ${deliveryAddress}\n` +
             `*Itens:* ${orderItemsStr}\n\n` +
             `📍 *Iniciar Rota no Google Maps:*\n${mapsUrl}\n\n` +
@@ -105,10 +107,10 @@ export async function POST(req: Request) {
             {
                 type: 'body',
                 parameters: [
-                    { type: 'text', text: customerName },
-                    { type: 'text', text: customerPhone.replace(/\D/g, '') },
-                    { type: 'text', text: deliveryAddress },
-                    { type: 'text', text: orderItemsStr },
+                    { type: 'text', text: customerName || 'Cliente' },
+                    { type: 'text', text: customerPhone || 'Não informado' },
+                    { type: 'text', text: deliveryAddress || 'Endereço a confirmar' },
+                    { type: 'text', text: orderItemsStr || '1x Botijão P13' },
                     { type: 'text', text: mapsUrl },
                     { type: 'text', text: pwaUrl }
                 ]
