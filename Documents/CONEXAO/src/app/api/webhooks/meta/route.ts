@@ -140,7 +140,9 @@ async function handleWhatsApp(body: any) {
                                 if (!bot) return;
 
                                 const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-                                const metaToken = channel.access_token || (bot as any).metaToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+                                const channelCreds = (channel.credentials as any) || {};
+                                const botCreds = (bot as any) || {};
+                                const metaToken = channelCreds.accessToken || channelCreds.token || channelCreds.access_token || channel.access_token || botCreds.metaToken || botCreds.metaAccessToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
 
                                 if (!metaToken) {
                                     console.error('[Meta Webhook] Missing Meta Access Token for audio download');
@@ -206,7 +208,9 @@ async function handleWhatsApp(body: any) {
                                 if (!bot) return;
 
                                 const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
-                                const metaToken = channel.access_token || (bot as any).metaToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+                                const channelCreds = (channel.credentials as any) || {};
+                                const botCreds = (bot as any) || {};
+                                const metaToken = channelCreds.accessToken || channelCreds.token || channelCreds.access_token || channel.access_token || botCreds.metaToken || botCreds.metaAccessToken || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
 
                                 if (!metaToken) return;
 
