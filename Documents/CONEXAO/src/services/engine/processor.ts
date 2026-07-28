@@ -698,8 +698,17 @@ export const MessageProcessor = {
                                             }
                                         }
                                     }
+
+                                    // Fallback extraction from place_name (e.g. "Rua Amazonas 1014, Maria Goretti, Bento Gonçalves...")
+                                    if (!neighborhood && feature.place_name) {
+                                        const parts = feature.place_name.split(',').map(p => p.trim());
+                                        if (parts.length >= 3) {
+                                            neighborhood = parts[1];
+                                        }
+                                    }
+
                                     const fullResolved = feature.place_name || searchAddr;
-                                    mapboxResults.push(`- Endereço Digitado: "${rawAddr}" ➔ Verificado no Mapbox: "${fullResolved}" (Bairro Oficial Mapbox: ${neighborhood || 'Verificado em Bento Gonçalves'}).`);
+                                    mapboxResults.push(`- Endereço Digitado: "${rawAddr}" ➔ BAIRRO OFICIAL REGISTRADO NO MAPBOX: **${neighborhood || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
                                 }
                             }
                         } catch (e: any) {
@@ -708,7 +717,7 @@ export const MessageProcessor = {
                     }
 
                     if (mapboxResults.length > 0) {
-                        mapboxLookupBlock = `\n🗺️ CONSULTA EM TEMPO REAL AO MAPBOX (MAPA OFICIAL):\n${mapboxResults.join('\n')}\n🚨 REGRA OBRIGATÓRIA DE BAIRROS: Use SEMPRE os bairros oficiais confirmados pelo Mapbox acima. Se o cliente disser que o endereço é em um bairro (ex: Centro), mas o Mapbox confirmar outro bairro (ex: Maria Goretti), explique educadamente ao cliente com base na verificação no mapa!`;
+                        mapboxLookupBlock = `\n🗺️ CONSULTA EM TEMPO REAL AO MAPBOX (BANCO DE DADOS DE MAPAS):\n${mapboxResults.join('\n')}\n🚨 REGRA CRÍTICA DE BAIRROS: O Mapbox é a SUA FONTE DA VERDADE. Se o cliente disser que o endereço fica no "Centro" ou "Botafogo", mas o Mapbox indicar outro bairro (ex: "Maria Goretti"), informe educadamente ao cliente com base na consulta do mapa: "Conferi no mapa (Mapbox) e o endereço [rua...] fica no bairro Maria Goretti!"`;
                     }
                 }
             }
@@ -731,13 +740,17 @@ ${mapboxLookupBlock}
    - Se o cliente sugerir um método não suportado (ex: cheque ou parcelado em 2x), NUNCA repita a mesma frase robótica de recusa.
    - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
 3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS (CONFIRMAÇÃO DE BAIRRO E SEQUÊNCIA OBRIGATÓRIA):
-   - Se o cliente pedir botijões para mais de 1 bairro/local (ex: "1 no Centro e 1 no Botafogo") e enviar um endereço:
-     - Use a consulta do Mapbox acima para verificar o bairro exato do endereço digitado e solicite o endereço do 2º local!
-     - Exemplo: "Anotado a Rua Belo Horizonte, 380! Este endereço fica no bairro Botafogo segundo o mapa. Qual é o endereço completo para a outra entrega?"
+   - Se o cliente pedir botijões para mais de 1 bairro/local e enviar um endereço:
+     - Use o Mapbox para verificar o bairro exato do endereço digitado e solicite o endereço do 2º local!
+     - Exemplo: "Anotado a Rua Amazonas, 1014! Conferi no mapa e este endereço fica no bairro Maria Goretti. Qual é o endereço completo para a outra entrega?"
    - É ESTRITAMENTE PROIBIDO perguntar a forma de pagamento ou tentar confirmar o pedido antes de ter recebido o endereço completo de TODOS os locais solicitados!
 4. CIDADE E VERIFICAÇÃO DE BAIRRO:
    - A cidade padrão de atendimento é a cidade cadastrada para a empresa (${bot.address || 'Bento Gonçalves, RS'}).
-   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas o Mapbox confirmar outro bairro (ex: "Maria Goretti"), confirme com educação: "Entendi! Conferi no mapa e o endereço fica no bairro Maria Goretti. Confirmamos a entrega para lá?"
+   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas o Mapbox confirmar outro bairro (ex: "Maria Goretti"), confirme com educação: "Entendi! Conferi no mapa e o endereço fica na verdade no bairro Maria Goretti. Confirmamos a entrega para lá?"
+5. EXECUÇÃO OBRIGATÓRIA DA FERRAMENTA "confirmar_pedido":
+   - Quando o cliente concordar com o valor, disser "sim", "pode ser", "sem troco" ou "nada":
+     - Você É OBRIGADO a EXECUTAR a função "confirmar_pedido" na MESMA RESPOSTA.
+     - É ESTRITAMENTE PROIBIDO responder "vou registrar o pedido" ou "pedido confirmado" em texto sem invocar a ferramenta "confirmar_pedido"!
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
