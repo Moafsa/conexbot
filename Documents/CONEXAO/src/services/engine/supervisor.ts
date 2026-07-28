@@ -196,8 +196,18 @@ export const SupervisorService = {
             const currentHistoryText = currentHistory.map(h => `${h.role}: ${h.content}`).join('\n');
 
             // Checa se o cliente pediu múltiplos endereços/locais no pedido atual
-            const locationMatches = currentHistoryText.match(/(?:no|em|para o|para a)\s+([a-záàâãéèêíóòôõúç\s]{3,20})(?=\s*[,.e]|\s*\d|\s*$)/gi) || [];
-            const requestedLocations = [...new Set(locationMatches.map(l => l.replace(/^(no|em|para o|para a)\s+/i, '').trim()).filter(l => l.length > 2 && !/^(gás|botijão|pedido|dinheiro|pix|cartão|dinheirpo)$/i.test(l)))];
+            const userMessagesInCurrentOrder = currentHistory.filter(h => h.role === 'user');
+            const userText = userMessagesInCurrentOrder.map(h => h.content || '').join('\n');
+            const rawLocMatches = userText.match(/(?:no|na|em|para o|para a)\s+([a-záàâãéèêíóòôõúç\s]{3,20})/gi) || [];
+            const requestedLocations: string[] = [];
+            for (const match of rawLocMatches) {
+                let loc = match.replace(/^(no|na|em|para o|para a)\s+/i, '').replace(/\s+(e|ou)$/i, '').trim();
+                if (loc.length >= 3 && !/^(gás|botijão|botijões|pedido|dinheiro|pix|cartão|troco|painel|frota|entregador|atendente|sistema)$/i.test(loc)) {
+                    if (!requestedLocations.includes(loc.toLowerCase())) {
+                        requestedLocations.push(loc.toLowerCase());
+                    }
+                }
+            }
 
             const sessionAddrWithNumbers = history.filter(h => 
                 h.role === 'user' && 
@@ -206,7 +216,10 @@ export const SupervisorService = {
                 !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(h.content.trim())
             );
 
-            if ((requestedLocations.length > 1 || currentHistoryText.match(/(outro no|locais diferentes|dividido|endereços diferentes)/i)) && sessionAddrWithNumbers.length < Math.max(2, requestedLocations.length) && !addrGiven.includes(';') && !addrGiven.includes('\n')) {
+            const hasMultiKeyword = userText.match(/(outro no|locais diferentes|dividido|endereços diferentes)/i);
+            const targetLocCount = Math.max(requestedLocations.length, hasMultiKeyword ? 2 : 1);
+
+            if (targetLocCount > 1 && sessionAddrWithNumbers.length < targetLocCount && !addrGiven.includes(';') && !addrGiven.includes('\n')) {
                 const missingLoc = requestedLocations.find(loc => !sessionAddrWithNumbers.some(a => a.content.toLowerCase().includes(loc.toLowerCase())));
                 const targetLocName = missingLoc ? missingLoc.toUpperCase() : 'SEGUNDO LOCAL';
                 return {
