@@ -166,5 +166,68 @@ export const SupervisorService = {
             return "FOCO: ATENDIMENTO PÓS-PEDIDO CONFIRMADO. O pedido do cliente já foi registrado. NUNCA chame a ferramenta 'confirmar_pedido' novamente. Se o cliente enviar apenas mensagens como 'ok', 'obrigado' ou 'tá bom', responda de forma curta, natural e amigável (ex: 'Por nada! Qualquer coisa é só chamar. 😊'). NÃO repita a mensagem padrão de confirmação de pedido.";
         }
         return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
+    },
+
+    /**
+     * Valida pré-execução de qualquer ferramenta (Gatekeeper do Supervisor).
+     * O Supervisor analisa se todos os requisitos da ferramenta foram preenchidos antes de permitir sua execução.
+     */
+    async validateToolExecution(
+        toolName: string,
+        toolArgs: any,
+        history: { role: string; content: string }[],
+        bot: any
+    ): Promise<{ approved: boolean; reason?: string }> {
+        // 1. Validação de Confirmação de Pedido (confirmar_pedido)
+        if (toolName === 'confirmar_pedido') {
+            const historyText = history.map(h => `${h.role}: ${h.content}`).join('\n');
+            const addrGiven = toolArgs.endereco_completo || '';
+
+            // Checa se o cliente pediu múltiplos endereços/locais no histórico
+            const multiRequestMatch = historyText.match(/(um no|outro no|1 no|2 no|primeiro no|segundo no|dividido|endereços diferentes|locais diferentes)/i);
+
+            if (multiRequestMatch) {
+                // Conta quantos endereços com número ou rua/km foram fornecidos pelo usuário no chat
+                const userAddrLines = history.filter(h => h.role === 'user' && (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)));
+                if (userAddrLines.length < 2 && !addrGiven.includes('\n') && !addrGiven.includes(';')) {
+                    return {
+                        approved: false,
+                        reason: `O cliente solicitou entregas em locais diferentes na conversa, mas apenas 1 endereço foi fornecido até agora. Colete o endereço do segundo local antes de confirmar o pedido.`
+                    };
+                }
+            }
+
+            // Checa se o endereço fornecido tem rua e número (não é apenas bairro ou cidade)
+            const cleanAddr = addrGiven.trim();
+            const hasNumber = /\d+/.test(cleanAddr);
+            if (!hasNumber && cleanAddr.length < 25) {
+                return {
+                    approved: false,
+                    reason: `O endereço ("${cleanAddr}") está incompleto ou sem número. Peça o nome da rua e o número (ou ponto de referência) ao cliente.`
+                };
+            }
+        }
+
+        // 2. Validação de Geração de Fatura (gerar_fatura)
+        if (toolName === 'gerar_fatura') {
+            if (!toolArgs.cliente_nome || !toolArgs.cliente_email || !toolArgs.cliente_cpf) {
+                return {
+                    approved: false,
+                    reason: `Faltam dados obrigatórios para gerar fatura (Nome, E-mail ou CPF). Peça os dados faltantes ao cliente.`
+                };
+            }
+        }
+
+        // 3. Validação de Despacho de Serviço (despachar_servico)
+        if (toolName === 'despachar_servico') {
+            if (!toolArgs.detalhes_servico || toolArgs.detalhes_servico.length < 10) {
+                return {
+                    approved: false,
+                    reason: `Os detalhes do serviço a ser despachado estão incompletos. Especifique os itens e o endereço completo.`
+                };
+            }
+        }
+
+        return { approved: true };
     }
 };

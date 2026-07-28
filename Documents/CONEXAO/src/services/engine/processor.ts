@@ -934,12 +934,32 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         tool_calls: aiResult.toolCalls 
                     } as any);
 
-                    // 2. Execute each tool
+                    // 2. Execute each tool with Supervisor Gatekeeper Verification
                     for (const toolCall of aiResult.toolCalls) {
                         const { name, arguments: argsString } = toolCall.function;
-                        logToFile(`[Processor] Executing Tool: ${name} with args: ${argsString}`);
+                        logToFile(`[Processor] AI requested Tool Execution: ${name} with args: ${argsString}`);
                         const args = JSON.parse(argsString);
                         
+                        // --- SUPERVISOR GATEKEEPER CHECK ---
+                        const { SupervisorService } = await import('./supervisor');
+                        const gatekeeper = await SupervisorService.validateToolExecution(name, args, history as any, bot);
+
+                        if (!gatekeeper.approved) {
+                            logToFile(`[Processor] SUPERVISOR GATEKEEPER BLOCKED tool [${name}]: ${gatekeeper.reason}`);
+                            const toolResult = `AÇÃO BLOQUEADA PELO SUPERVISOR DE VENDAS!\nMotivo: ${gatekeeper.reason}\nInstrução Técnica: NÃO confirme o pedido nem execute a ação ainda. Peça as informações faltantes de forma educada ao cliente no chat.`;
+                            
+                            await (prisma.message as any).create({
+                                data: {
+                                    conversationId: conversation.id,
+                                    role: 'tool',
+                                    content: toolResult,
+                                    tool_call_id: toolCall.id
+                                }
+                            });
+                            history.push({ role: 'tool', content: toolResult, tool_call_id: toolCall.id } as any);
+                            continue;
+                        }
+
                         let toolResult = "";
                         if (name === 'consultar_horarios') {
                             try {
