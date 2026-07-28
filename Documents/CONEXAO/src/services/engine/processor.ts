@@ -1602,7 +1602,6 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         logToFile(`[confirmar_pedido] Pedido gerado com sucesso com endereço oficial do Mapbox: "${verifiedAddr}" (ID: ${order.id})`);
                                     }
                                 }
-                                }
 
                                 // Transition the CRM stage to "PEDIDO CONFIRMADO"
                                 const confirmedStage = await prisma.crmStage.findFirst({
