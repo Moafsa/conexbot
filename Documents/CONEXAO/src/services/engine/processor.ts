@@ -652,12 +652,29 @@ export const MessageProcessor = {
             
             let finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
             
-            // 9.5 REINFORCE SALES RULES AND USER PRIMACY (Absolute recency bias fix)
+            const savedAddress = (existingContact as any).needs || (existingContact as any).notes || 'Nenhum endereço salvo anteriormente';
+            const pastOrdersList = (existingContact as any).orders && (existingContact as any).orders.length > 0 
+                ? (existingContact as any).orders.map((o: any) => `- Pedido #${o.id.substring(0, 6)} em ${new Date(o.createdAt).toLocaleDateString()}: R$ ${o.totalAmount.toFixed(2)} (${o.status})`).join('\n')
+                : 'Sem histórico de pedidos anteriores';
+
+            // 9.5 REINFORCE CUSTOMER MEMORY, ADDRESS DEDUPLICATION AND NATURAL SALES RULES
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
-🚨 DIRETRIZ ESTRATÉGICA DE VENDAS:
-1. FOCO TOTAL NA QUALIFICAÇÃO: Em saudações ou no início da conversa, NUNCA empurre preços ou o catálogo. Siga 100% o seu prompt de usuário.
-2. PREÇOS REATIVOS: Fale de preços SOMENTE se o cliente perguntar OU se a sua estratégia (prompt) indicar o momento certo.
-3. FORMATO DE ANCORAGEM: SE e QUANDO falar de preços promocionais, use: "De R$ [Original] por APENAS R$ [Promocional]".
+👤 DADOS DO CLIENTE E MEMÓRIA DE ENDEREÇOS:
+- Nome do Cliente: ${existingContact.name || 'Não informado'}
+- Telefone: ${senderPhone}
+- Endereço(s) Registrado(s) no Banco de Dados: ${savedAddress}
+- Histórico de Pedidos Recentes:
+${pastOrdersList}
+
+🚨 REGRAS DE MEMÓRIA E ATENDIMENTO NATURAL:
+1. MEMÓRIA DE ENDEREÇO (NUNCA PERGUNTAR O QUE JÁ FOI INFORMADO):
+   - Se o cliente já informou o endereço (rua, número ou bairro) na conversa atual OU se o endereço já consta em "DADOS DO CLIENTE" acima, REAPROVEITE-O IMEDIATAMENTE.
+   - NUNCA pergunte "qual é o seu endereço" se o cliente já forneceu a localização (ex: "Fortaleza 730" ou "Progresso").
+2. TOM NATURAL E ACOLHEDOR EM RECUSA DE PAGAMENTO:
+   - Se o cliente sugerir um método não suportado (ex: cheque ou parcelado em 2x), NUNCA repita a mesma frase robótica de recusa.
+   - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
+3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS:
+   - Se o cliente pedir botijões para 2 locais diferentes (ex: 1 no Progresso e 1 no Botafogo), registre ambos os endereços com clareza antes de confirmar o pedido.
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
