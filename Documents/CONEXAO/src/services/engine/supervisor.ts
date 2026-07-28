@@ -220,8 +220,39 @@ export const SupervisorService = {
             if (!hasNumber && cleanAddr.length < 25) {
                 return {
                     approved: false,
-                    reason: `O endereço ("${cleanAddr}") está incompleto ou sem número. Peça o nome da rua e o número (ou ponto de referência) ao cliente.`
+                    reason: `O endereço ("${cleanAddr}") está incompleto ou sem número. Peça o nome da rua e o número (or ponto de referência) ao cliente.`
                 };
+            }
+
+            // 1.1 Validação do Endereço no Mapbox pelo Supervisor (Confere se o endereço existe na área de atendimento)
+            const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+            const mapboxToken = config?.mapboxToken;
+
+            if (mapboxToken && cleanAddr) {
+                try {
+                    const rawAddr = cleanAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                    const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                    const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                    const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+
+                    const proximityParam = '&proximity=-51.517,-29.170';
+                    const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR${proximityParam}&limit=1`;
+                    
+                    const geocodeRes = await fetch(geocodeUrl);
+                    if (geocodeRes.ok) {
+                        const geocodeData = await geocodeRes.json();
+                        const feature = geocodeData.features?.[0];
+                        
+                        if (!feature || (feature.relevance && feature.relevance < 0.45)) {
+                            return {
+                                approved: false,
+                                reason: `O endereço "${rawAddr}" NÃO FOI ENCONTRADO no sistema de mapas (Mapbox). Peça ao cliente a confirmação exata da rua, número e bairro ou um ponto de referência.`
+                            };
+                        }
+                    }
+                } catch (err: any) {
+                    console.error('[Supervisor Gatekeeper] Mapbox address verification error:', err);
+                }
             }
         }
 
