@@ -249,6 +249,12 @@ export const SupervisorService = {
                                 reason: `O endereço "${rawAddr}" NÃO FOI ENCONTRADO no sistema de mapas (Mapbox). Peça ao cliente a confirmação exata da rua, número e bairro ou um ponto de referência.`
                             };
                         }
+
+                        // Enriquece o endereço com a localização oficial verificada pelo Mapbox (Rua, Número, Bairro Oficial, Cidade, CEP)
+                        if (feature.place_name) {
+                            toolArgs.endereco_completo = feature.place_name;
+                            logToFile(`[Supervisor Gatekeeper] Endereço verificado e atualizado com Mapbox: "${feature.place_name}"`);
+                        }
                     }
                 } catch (err: any) {
                     console.error('[Supervisor Gatekeeper] Mapbox address verification error:', err);

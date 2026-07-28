@@ -1549,8 +1549,37 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         data: updateData
                                     });
                                 } else {
-                                    // Create pending orders for each delivery address
+                                    // Create pending orders for each delivery address verified by Mapbox
                                     for (const singleAddr of addressesToCreate) {
+                                        let verifiedAddr = singleAddr;
+                                        let orderLat: number | null = latitude;
+                                        let orderLng: number | null = longitude;
+
+                                        if (mapboxToken) {
+                                            try {
+                                                const rawAddr = singleAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                                const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                                                const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                                                const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+                                                const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                                
+                                                const geocodeRes = await fetch(geocodeUrl);
+                                                if (geocodeRes.ok) {
+                                                    const geocodeData = await geocodeRes.json();
+                                                    const feature = geocodeData.features?.[0];
+                                                    if (feature) {
+                                                        if (feature.place_name) verifiedAddr = feature.place_name;
+                                                        if (feature.center) {
+                                                            orderLng = feature.center[0];
+                                                            orderLat = feature.center[1];
+                                                        }
+                                                    }
+                                                }
+                                            } catch (e: any) {
+                                                console.error('[confirmar_pedido] Geocoding singleAddr exception:', e.message);
+                                            }
+                                        }
+
                                         const singleOrderTotal = itemsToCreate.length > 0
                                             ? itemsToCreate.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
                                             : finalTotal;
@@ -1570,7 +1599,7 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         }
 
                                         order = await prisma.order.create({ data: orderData });
-                                        logToFile(`[confirmar_pedido] Pedido gerado com sucesso para endereço: "${singleAddr}" (ID: ${order.id})`);
+                                        logToFile(`[confirmar_pedido] Pedido gerado com sucesso com endereço oficial do Mapbox: "${verifiedAddr}" (ID: ${order.id})`);
                                     }
                                 }
                                 }
