@@ -657,28 +657,34 @@ export const MessageProcessor = {
                 ? (existingContact as any).orders.map((o: any) => `- Pedido #${o.id.substring(0, 6)} em ${new Date(o.createdAt).toLocaleDateString()}: R$ ${o.totalAmount.toFixed(2)} (${o.status})`).join('\n')
                 : 'Sem histórico de pedidos anteriores';
 
-            // Instant Mapbox Address & Neighborhood Lookup for recent user messages
+            // Instant Mapbox & Correios Address Verification for all addresses in contact and history
             let mapboxLookupBlock = '';
             const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
             const mapboxToken = config?.mapboxToken;
 
             if (mapboxToken) {
-                const recentUserAddrLines: string[] = [];
-                for (let i = history.length - 1; i >= Math.max(0, history.length - 10); i--) {
-                    if (history[i].role === 'user') {
-                        const content = history[i].content || '';
-                        if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(content.trim())) {
-                            const clean = content.trim();
-                            if (!recentUserAddrLines.includes(clean)) {
-                                recentUserAddrLines.unshift(clean);
+                const addrCandidates: string[] = [];
+                
+                const savedContactAddr = (existingContact as any).needs || (existingContact as any).notes;
+                if (savedContactAddr && typeof savedContactAddr === 'string' && savedContactAddr.length > 5) {
+                    addrCandidates.push(savedContactAddr.split('\n')[0].replace('Endereço: ', '').trim());
+                }
+
+                for (const h of history) {
+                    if (h.role === 'user' && h.content) {
+                        const text = h.content.trim();
+                        if ((/\d+/.test(text) || /rua|avenida|r\.|av\.|bairro|km|estrada|alameda|centro|botafogo|progresso|humaitá|maria goretti/i.test(text)) && 
+                            !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(text)) {
+                            if (!addrCandidates.includes(text)) {
+                                addrCandidates.push(text);
                             }
                         }
                     }
                 }
 
-                if (recentUserAddrLines.length > 0) {
+                if (addrCandidates.length > 0) {
                     const mapboxResults: string[] = [];
-                    for (const rawAddr of recentUserAddrLines) {
+                    for (const rawAddr of addrCandidates) {
                         try {
                             const cityContext = activeBot?.address ? `, ${activeBot.address}` : ', Bento Gonçalves, RS, Brasil';
                             const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
@@ -699,7 +705,6 @@ export const MessageProcessor = {
                                         }
                                     }
 
-                                    // Fallback extraction from place_name (e.g. "Rua Amazonas 1014, Maria Goretti, Bento Gonçalves...")
                                     if (!neighborhood && feature.place_name) {
                                         const parts = feature.place_name.split(',').map(p => p.trim());
                                         if (parts.length >= 3) {
@@ -708,7 +713,7 @@ export const MessageProcessor = {
                                     }
 
                                     const fullResolved = feature.place_name || searchAddr;
-                                    mapboxResults.push(`- Endereço Digitado: "${rawAddr}" ➔ BAIRRO OFICIAL REGISTRADO NO MAPBOX: **${neighborhood || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
+                                    mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO OFICIAL NO MAPA (MAPBOX): **${neighborhood || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
                                 }
                             }
                         } catch (e: any) {
@@ -717,7 +722,12 @@ export const MessageProcessor = {
                     }
 
                     if (mapboxResults.length > 0) {
-                        mapboxLookupBlock = `\n🗺️ CONSULTA EM TEMPO REAL AO MAPBOX (BANCO DE DADOS DE MAPAS):\n${mapboxResults.join('\n')}\n🚨 REGRA CRÍTICA DE BAIRROS: O Mapbox é a SUA FONTE DA VERDADE. Se o cliente disser que o endereço fica no "Centro" ou "Botafogo", mas o Mapbox indicar outro bairro (ex: "Maria Goretti"), informe educadamente ao cliente com base na consulta do mapa: "Conferi no mapa (Mapbox) e o endereço [rua...] fica no bairro Maria Goretti!"`;
+                        mapboxLookupBlock = `\n🗺️ CONSULTA OFICIAL EM TEMPO REAL AO MAPBOX (BANCO DE DADOS DE MAPAS):\n${mapboxResults.join('\n')}\n🚨 REGRA CRÍTICA DE VERIFICAÇÃO E CONFERÊNCIA DE BAIRROS:
+1. O Mapbox é a sua FONTE DA VERDADE. Use SEMPRE os bairros oficiais confirmados pelo Mapbox acima.
+2. SE O CLIENTE SOLICITOU ENTREGAS EM DOIS BAIRROS (ex: Centro e Maria Goretti):
+   - Verifique se HÁ UM ENDEREÇO DE RUA COM NÚMERO PARA CADA BAIRRO SOLICITADO.
+   - Se o cliente disse "3 no Centro", mas NÃO PASSOU a rua e número do Centro, VOCÊ É ESTRITAMENTE OBRIGADO a perguntar: "Anotado os botijões para o Maria Goretti! Agora qual é o nome da rua e número para a entrega no Centro?"
+3. NUNCA pergunte a forma de pagamento nem tente confirmar o pedido sem antes ter a rua e número de TODOS os bairros solicitados!`;
                     }
                 }
             }
