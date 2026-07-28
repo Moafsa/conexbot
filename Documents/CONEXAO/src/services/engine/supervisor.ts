@@ -67,8 +67,9 @@ export const SupervisorService = {
 
         SUA TAREFA:
         1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil?
-           🚨 ATENÇÃO (RECOMPRA/RETORNO): Se o cliente já concluiu um pedido anterior (estágio Entregue ou Saiu para Entrega) e agora está iniciando um NOVO contato ou querendo fazer um novo pedido (ex: dizendo "quero gás", "quero 1 gas", "quero fazer um pedido", "oi", etc.), você DEVE obrigatoriamente retorná-lo para o estágio inicial de negociação correspondente (como "Escolhendo Pedido"), permitindo que o bot faça uma nova venda do início!
-           🚨 REGRA DE CONFIRMAÇÃO (MANDATÓRIO): Se a última mensagem do assistente na conversa foi uma pergunta para confirmar detalhes finais, endereço ou forma de pagamento (ex: "Você vai pagar em dinheiro, certo?" ou "Posso confirmar o pedido?") e a resposta atual do usuário for afirmativa (ex: "sim", "isso", "pode", "ok", "confirmado"), você DEVE obrigatoriamente classificar como estágio "Pedido Confirmado", mesmo que a conversa pareça repetitiva no histórico devido a testes.
+            🚨 ATENÇÃO (RECOMPRA/RETORNO): Se o cliente já concluiu um pedido anterior (estágio Entregue ou Saiu para Entrega) e agora está iniciando um NOVO contato ou querendo fazer um novo pedido (ex: dizendo "quero gás", "quero 1 gas", "quero fazer um pedido", "oi", etc.), você DEVE obrigatoriamente retorná-lo para o estágio inicial de negociação correspondente (como "Escolhendo Pedido"), permitindo que o bot faça uma nova venda do início!
+            🚨 REGRA DE MULTI-ENTREGAS / MÚLTIPLOS ENDEREÇOS (CRÍTICO): Se o cliente solicitou entregas divididas em mais de 1 local ou endereço (ex: "1 no Centro e 2 no Botafogo"), você DEVE verificar no histórico se os endereços completos de TODOS os locais solicitados foram devidamente coletados. Se ainda faltar o endereço de qualquer um dos locais, MANTENHA o estágio em "Escolhendo Pedido" e oriente o robô na "strategy" a solicitar o endereço do local que falta. NUNCA autorize a transição para "Pedido Confirmado" enquanto houver endereço pendente!
+            🚨 REGRA DE CONFIRMAÇÃO (MANDATÓRIO): Se a última mensagem do assistente na conversa foi uma pergunta para confirmar detalhes finais, endereço ou forma de pagamento (ex: "Você vai pagar em dinheiro, certo?" ou "Posso confirmar o pedido?") e a resposta atual do usuário for afirmativa (ex: "sim", "isso", "pode", "ok", "confirmado"), você DEVE obrigatoriamente classificar como estágio "Pedido Confirmado", desde que todos os endereços solicitados tenham sido fornecidos.
         2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar.
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
@@ -162,7 +163,7 @@ export const SupervisorService = {
         }
         // Fechamento e Confirmação de Pedidos
         if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO' || name === 'GANHO' || name === 'CUSTOMER' || name === 'PEDIDO CONFIRMADO' || name === 'PEDIDO_CONFIRMADO' || name === 'ORDER_CONFIRMED' || name === 'CONFIRMADO') {
-            return "FOCO: FECHAMENTO. O cliente confirmou o pedido. Você DEVE obrigatoriamente chamar a ferramenta \"confirmar_pedido\" para registrar o pedido no banco de dados e enviá-lo para os entregadores. Certifique-se de passar todos os parâmetros necessários (endereco_completo, forma_pagamento, bairro_entrega e itens_descricao se for pedido verbal sem carrinho). NÃO apenas responda em formato texto sem acionar a ferramenta.";
+            return "FOCO: ATENDIMENTO PÓS-PEDIDO CONFIRMADO. O pedido do cliente já foi registrado. NUNCA chame a ferramenta 'confirmar_pedido' novamente. Se o cliente enviar apenas mensagens como 'ok', 'obrigado' ou 'tá bom', responda de forma curta, natural e amigável (ex: 'Por nada! Qualquer coisa é só chamar. 😊'). NÃO repita a mensagem padrão de confirmação de pedido.";
         }
         return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
     }
