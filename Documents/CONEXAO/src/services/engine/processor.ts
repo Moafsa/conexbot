@@ -1391,11 +1391,19 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                 if (mapboxToken && fullAddr) {
                                     try {
                                         const rawAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
-                                        const cityContext = bot.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
-                                        const searchAddr = rawAddr.toLowerCase().includes('bento') ? rawAddr : `${rawAddr}${cityContext}`;
+                                        
+                                        // Default proximity anchor for Serra Gaúcha / Distributor region (-51.517, -29.170)
+                                        let proximityParam = '&proximity=-51.517,-29.170';
+                                        if (existingContact.longitude && existingContact.latitude) {
+                                            proximityParam = `&proximity=${existingContact.longitude},${existingContact.latitude}`;
+                                        }
 
-                                        logToFile(`[confirmar_pedido] Geocoding Mapbox searchAddr: "${searchAddr}"`);
-                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&limit=1`;
+                                        // If street already contains city/state or RS, keep as is; otherwise append regional anchor
+                                        const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre| monte belo|\brs\b)/i.test(rawAddr);
+                                        const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}, Bento Gonçalves, RS, Brasil`;
+
+                                        logToFile(`[confirmar_pedido] Geocoding Mapbox searchAddr: "${searchAddr}" (Proximity: ${proximityParam})`);
+                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR${proximityParam}&limit=1`;
                                         const geocodeRes = await fetch(geocodeUrl);
                                         if (geocodeRes.ok) {
                                             const geocodeData = await geocodeRes.json();
