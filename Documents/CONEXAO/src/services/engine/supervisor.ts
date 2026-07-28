@@ -183,16 +183,33 @@ export const SupervisorService = {
             const historyText = history.map(h => `${h.role}: ${h.content}`).join('\n');
             const addrGiven = toolArgs.endereco_completo || '';
 
-            // Checa se o cliente pediu múltiplos endereços/locais no histórico
-            const multiRequestMatch = historyText.match(/(um no|outro no|1 no|2 no|primeiro no|segundo no|dividido|endereços diferentes|locais diferentes)/i);
+            // Encontra o início do pedido atual no histórico (ignorando pedidos antigos do histórico)
+            let currentOrderStartIndex = 0;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const text = (history[i].content || '').toLowerCase();
+                if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão'))) {
+                    currentOrderStartIndex = i;
+                    break;
+                }
+            }
+            const currentHistory = history.slice(currentOrderStartIndex);
+            const currentHistoryText = currentHistory.map(h => `${h.role}: ${h.content}`).join('\n');
+
+            // Checa se o cliente pediu múltiplos endereços/locais no pedido atual
+            const multiRequestMatch = currentHistoryText.match(/(um no|outro no|1 no|2 no|primeiro no|segundo no|dividido|endereços diferentes|locais diferentes)/i);
 
             if (multiRequestMatch) {
-                // Conta quantos endereços com número ou rua/km foram fornecidos pelo usuário no chat
-                const userAddrLines = history.filter(h => h.role === 'user' && (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)));
-                if (userAddrLines.length < 2 && !addrGiven.includes('\n') && !addrGiven.includes(';')) {
+                // Conta quantos endereços reais (com rua/número/bairro) foram informados no pedido atual
+                const userAddrLinesInCurrentOrder = currentHistory.filter(h => 
+                    h.role === 'user' && 
+                    (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)) &&
+                    !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(h.content.trim())
+                );
+
+                if (userAddrLinesInCurrentOrder.length < 2 && !addrGiven.includes('\n') && !addrGiven.includes(';')) {
                     return {
                         approved: false,
-                        reason: `O cliente solicitou entregas em locais diferentes na conversa, mas apenas 1 endereço foi fornecido até agora. Colete o endereço do segundo local antes de confirmar o pedido.`
+                        reason: `O cliente solicitou entregas em locais diferentes neste atendimento (ex: Centro e Botafogo), mas apenas 1 endereço foi fornecido até agora ("${addrGiven}"). Colete o endereço completo do SEGUNDO local antes de confirmar o pedido.`
                     };
                 }
             }

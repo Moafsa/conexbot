@@ -673,8 +673,9 @@ ${pastOrdersList}
 2. TOM NATURAL E ACOLHEDOR EM RECUSA DE PAGAMENTO:
    - Se o cliente sugerir um método não suportado (ex: cheque ou parcelado em 2x), NUNCA repita a mesma frase robótica de recusa.
    - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
-3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS:
-   - Se o cliente pedir botijões para 2 locais diferentes (ex: 1 no Progresso e 1 no Botafogo), registre ambos os endereços com clareza antes de confirmar o pedido.
+3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS (SEQUÊNCIA OBRIGATÓRIA):
+   - Se o cliente pedir botijões para mais de 1 local (ex: "1 no Centro e 1 no Botafogo"), você DEVE obrigatoriamente coletar o endereço do 1º local e, logo em seguida, pedir o endereço do 2º local (ex: "Anotado o endereço do Centro! Qual é o endereço completo para a entrega no Botafogo?").
+   - É PROIBIDO perguntar a forma de pagamento ou tentar confirmar o pedido antes de ter recebido o endereço completo de TODOS os locais solicitados!
 4. CIDADE E VERIFICAÇÃO DE BAIRRO:
    - A cidade padrão de atendimento é a cidade cadastrada para a empresa (${bot.address || 'Bento Gonçalves, RS'}).
    - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas fornecer o endereço de outro bairro (ex: "BR-470, Pomarosa"), confirme com educação: "Entendi! Você mencionou o Centro, mas o endereço BR-470 fica no bairro Pomarosa. Confirmamos a entrega para o Pomarosa, correto?"
