@@ -1573,27 +1573,33 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
                                 }
 
-                                // Detect if multiple distinct delivery addresses were provided in current conversation turn
-                                let currentOrderStartIndex = 0;
-                                for (let i = history.length - 1; i >= 0; i--) {
-                                    const text = (history[i].content || '').toLowerCase();
-                                    if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão'))) {
-                                        currentOrderStartIndex = i;
-                                        break;
-                                    }
-                                }
-                                const currentHistory = history.slice(currentOrderStartIndex);
-                                const collectedAddresses: string[] = [];
-                                for (const h of currentHistory) {
-                                    if (h.role === 'user' && (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(h.content.trim())) {
-                                        const clean = h.content.trim();
-                                        if (!collectedAddresses.includes(clean)) {
-                                            collectedAddresses.push(clean);
-                                        }
-                                    }
+                                // Detect all distinct delivery addresses for multi-address orders
+                                let addressesToCreate: string[] = [];
+
+                                if (args.endereco_completo && (args.endereco_completo.includes(';') || args.endereco_completo.includes('\n'))) {
+                                    addressesToCreate = args.endereco_completo.split(/;|\n/).map((a: string) => a.trim()).filter((a: string) => a.length > 5);
                                 }
 
-                                const addressesToCreate = collectedAddresses.length > 1 ? collectedAddresses : [fullAddr];
+                                if (addressesToCreate.length <= 1) {
+                                    const allSessionAddresses: string[] = [];
+                                    for (const h of history) {
+                                        if (h.role === 'user') {
+                                            const content = (h.content || '').trim();
+                                            if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
+                                                if (!allSessionAddresses.includes(content)) {
+                                                    allSessionAddresses.push(content);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    const isMultiDeliveryRequest = history.some(h => (h.content || '').match(/(outro no|locais diferentes|dividido|centro e|botafogo e|1 no|2 no|3 no|5 no)/i));
+                                    if (isMultiDeliveryRequest && allSessionAddresses.length >= 2) {
+                                        addressesToCreate = allSessionAddresses;
+                                    } else {
+                                        addressesToCreate = [fullAddr];
+                                    }
+                                }
 
                                 if (existingPendingOrder && addressesToCreate.length === 1) {
                                     logToFile(`[confirmar_pedido] Atualizando pedido pendente existente ID: ${existingPendingOrder.id}`);
