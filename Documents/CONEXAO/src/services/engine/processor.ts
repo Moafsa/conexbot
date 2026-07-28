@@ -1503,7 +1503,29 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
                                 }
 
-                                if (existingPendingOrder) {
+                                // Detect if multiple distinct delivery addresses were provided in current conversation turn
+                                let currentOrderStartIndex = 0;
+                                for (let i = history.length - 1; i >= 0; i--) {
+                                    const text = (history[i].content || '').toLowerCase();
+                                    if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão'))) {
+                                        currentOrderStartIndex = i;
+                                        break;
+                                    }
+                                }
+                                const currentHistory = history.slice(currentOrderStartIndex);
+                                const collectedAddresses: string[] = [];
+                                for (const h of currentHistory) {
+                                    if (h.role === 'user' && (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(h.content.trim())) {
+                                        const clean = h.content.trim();
+                                        if (!collectedAddresses.includes(clean)) {
+                                            collectedAddresses.push(clean);
+                                        }
+                                    }
+                                }
+
+                                const addressesToCreate = collectedAddresses.length > 1 ? collectedAddresses : [fullAddr];
+
+                                if (existingPendingOrder && addressesToCreate.length === 1) {
                                     logToFile(`[confirmar_pedido] Atualizando pedido pendente existente ID: ${existingPendingOrder.id}`);
                                     isOrderUpdate = true;
 
@@ -1527,22 +1549,30 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         data: updateData
                                     });
                                 } else {
-                                    // Create new pending order
-                                    const orderData: any = {
-                                        botId: activeBot.id,
-                                        contactId: existingContact.id,
-                                        totalAmount: finalTotal,
-                                        commissionAmount: 0,
-                                        status: 'PENDING',
-                                    };
+                                    // Create pending orders for each delivery address
+                                    for (const singleAddr of addressesToCreate) {
+                                        const singleOrderTotal = itemsToCreate.length > 0
+                                            ? itemsToCreate.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
+                                            : finalTotal;
 
-                                    if (itemsToCreate.length > 0) {
-                                        orderData.items = {
-                                            create: itemsToCreate
+                                        const orderData: any = {
+                                            botId: activeBot.id,
+                                            contactId: existingContact.id,
+                                            totalAmount: singleOrderTotal,
+                                            commissionAmount: 0,
+                                            status: 'PENDING',
                                         };
-                                    }
 
-                                    order = await prisma.order.create({ data: orderData });
+                                        if (itemsToCreate.length > 0) {
+                                            orderData.items = {
+                                                create: itemsToCreate
+                                            };
+                                        }
+
+                                        order = await prisma.order.create({ data: orderData });
+                                        logToFile(`[confirmar_pedido] Pedido gerado com sucesso para endereço: "${singleAddr}" (ID: ${order.id})`);
+                                    }
+                                }
                                 }
 
                                 // Transition the CRM stage to "PEDIDO CONFIRMADO"
