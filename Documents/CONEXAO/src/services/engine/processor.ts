@@ -675,6 +675,9 @@ ${pastOrdersList}
    - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
 3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS:
    - Se o cliente pedir botijões para 2 locais diferentes (ex: 1 no Progresso e 1 no Botafogo), registre ambos os endereços com clareza antes de confirmar o pedido.
+4. CIDADE E VERIFICAÇÃO DE BAIRRO:
+   - A cidade padrão de atendimento é a cidade cadastrada para a empresa (${bot.address || 'Bento Gonçalves, RS'}).
+   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas fornecer o endereço de outro bairro (ex: "BR-470, Pomarosa"), confirme com educação: "Entendi! Você mencionou o Centro, mas o endereço BR-470 fica no bairro Pomarosa. Confirmamos a entrega para o Pomarosa, correto?"
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
@@ -1387,8 +1390,12 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
 
                                 if (mapboxToken && fullAddr) {
                                     try {
-                                        const cleanAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
-                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`;
+                                        const rawAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                        const cityContext = bot.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                                        const searchAddr = rawAddr.toLowerCase().includes('bento') ? rawAddr : `${rawAddr}${cityContext}`;
+
+                                        logToFile(`[confirmar_pedido] Geocoding Mapbox searchAddr: "${searchAddr}"`);
+                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&limit=1`;
                                         const geocodeRes = await fetch(geocodeUrl);
                                         if (geocodeRes.ok) {
                                             const geocodeData = await geocodeRes.json();
@@ -1396,6 +1403,7 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                             if (center) {
                                                 longitude = center[0];
                                                 latitude = center[1];
+                                                logToFile(`[confirmar_pedido] Mapbox Geocoded: lat=${latitude}, lng=${longitude}`);
                                             }
                                         }
                                     } catch (e: any) {
