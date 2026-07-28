@@ -209,7 +209,7 @@ export const SupervisorService = {
                 if (userAddrLinesInCurrentOrder.length < 2 && !addrGiven.includes('\n') && !addrGiven.includes(';')) {
                     return {
                         approved: false,
-                        reason: `O cliente solicitou entregas em locais diferentes neste atendimento (ex: Centro e Botafogo), mas apenas 1 endereço foi fornecido até agora ("${addrGiven}"). Colete o endereço completo do SEGUNDO local antes de confirmar o pedido.`
+                        reason: `O cliente solicitou entregas em bairros diferentes (ex: Centro e Botafogo), mas apenas 1 endereço foi fornecido até agora ("${addrGiven}"). Pergunte ao cliente a qual dos bairros pertence o endereço "${addrGiven}" e solicite o endereço completo do segundo local antes de confirmar o pedido.`
                     };
                 }
             }
