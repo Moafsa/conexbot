@@ -196,22 +196,23 @@ export const SupervisorService = {
             const currentHistoryText = currentHistory.map(h => `${h.role}: ${h.content}`).join('\n');
 
             // Checa se o cliente pediu múltiplos endereços/locais no pedido atual
-            const multiRequestMatch = currentHistoryText.match(/(um no|outro no|1 no|2 no|primeiro no|segundo no|dividido|endereços diferentes|locais diferentes)/i);
+            const locationMatches = currentHistoryText.match(/(?:no|em|para o|para a)\s+([a-záàâãéèêíóòôõúç\s]{3,20})(?=\s*[,.e]|\s*\d|\s*$)/gi) || [];
+            const requestedLocations = [...new Set(locationMatches.map(l => l.replace(/^(no|em|para o|para a)\s+/i, '').trim()).filter(l => l.length > 2 && !/^(gás|botijão|pedido|dinheiro|pix|cartão|dinheirpo)$/i.test(l)))];
 
-            if (multiRequestMatch) {
-                // Conta quantos endereços reais (com rua/número/bairro) foram informados no pedido atual
-                const userAddrLinesInCurrentOrder = currentHistory.filter(h => 
-                    h.role === 'user' && 
-                    (/\d+/.test(h.content) || /rua|avenida|bairro|km|estrada|alameda/i.test(h.content)) &&
-                    !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(h.content.trim())
-                );
+            const sessionAddrWithNumbers = history.filter(h => 
+                h.role === 'user' && 
+                /\d+/.test(h.content) && 
+                (/rua|avenida|r\.|av\.|bairro|km|estrada|alameda/i.test(h.content) || h.content.trim().length > 8) &&
+                !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(h.content.trim())
+            );
 
-                if (userAddrLinesInCurrentOrder.length < 2 && !addrGiven.includes('\n') && !addrGiven.includes(';')) {
-                    return {
-                        approved: false,
-                        reason: `O cliente solicitou entregas em bairros diferentes (ex: Centro e Botafogo), mas apenas 1 endereço foi fornecido até agora ("${addrGiven}"). Pergunte ao cliente a qual dos bairros pertence o endereço "${addrGiven}" e solicite o endereço completo do segundo local antes de confirmar o pedido.`
-                    };
-                }
+            if ((requestedLocations.length > 1 || currentHistoryText.match(/(outro no|locais diferentes|dividido|endereços diferentes)/i)) && sessionAddrWithNumbers.length < Math.max(2, requestedLocations.length) && !addrGiven.includes(';') && !addrGiven.includes('\n')) {
+                const missingLoc = requestedLocations.find(loc => !sessionAddrWithNumbers.some(a => a.content.toLowerCase().includes(loc.toLowerCase())));
+                const targetLocName = missingLoc ? missingLoc.toUpperCase() : 'SEGUNDO LOCAL';
+                return {
+                    approved: false,
+                    reason: `FALTA O ENDEREÇO DA ENTREGA DO ${targetLocName}! O cliente solicitou entregas em locais diferentes, mas forneceu apenas 1 endereço até agora. Peça ao cliente o nome da rua e número para a entrega do ${targetLocName} antes de confirmar o pedido.`
+                };
             }
 
             // Checa se o endereço fornecido tem rua e número (não é apenas bairro ou cidade)

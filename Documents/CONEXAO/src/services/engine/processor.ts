@@ -751,6 +751,10 @@ ${mapboxLookupBlock}
    - Quando o cliente concordar com o valor, disser "sim", "pode ser", "sem troco" ou "nada":
      - Você É OBRIGADO a EXECUTAR a função "confirmar_pedido" na MESMA RESPOSTA.
      - É ESTRITAMENTE PROIBIDO responder "vou registrar o pedido" ou "pedido confirmado" em texto sem invocar a ferramenta "confirmar_pedido"!
+6. NOME DE BAIRRO SEM RUA E NÚMERO:
+   - Se o cliente mencionar locais/bairros diferentes (ex: "3 no Centro e 2 no Maria Goretti"), CADA BAIRRO EXIGE SEU PRÓPRIO ENDEREÇO DE RUA E NÚMERO.
+   - NUNCA atribua o endereço de um bairro para outro bairro!
+   - Se falta a rua e número de algum dos bairros solicitados, peça imediatamente: "Qual é o nome da rua e o número para a entrega no [Nome do Bairro]?"
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
