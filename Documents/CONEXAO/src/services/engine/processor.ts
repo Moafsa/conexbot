@@ -891,19 +891,11 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                      analysis.nextStage.toUpperCase() === 'CONFIRMADO' ||
                      analysis.nextStage.toUpperCase() === 'ORDER_CONFIRMED');
 
-                // Check if an order was already created for this contact in the last 30 minutes
-                const hasRecentOrder = await prisma.order.findFirst({
-                    where: {
-                        contactId: existingContact.id,
-                        createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) }
-                    }
-                });
-
-                // Inject hard override instruction ONLY if no order has been created yet
-                if (isPedidoConfirmado && toolIteration === 0 && !hasRecentOrder) {
+                // MANDATORY HARD CONSTRAINT: Always force 'confirmar_pedido' tool execution whenever stage is Pedido Confirmado
+                if (isPedidoConfirmado && toolIteration === 0) {
                     messages.push({
                         role: 'system',
-                        content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o endereço e a forma de pagamento. Você DEVE chamar a função confirmar_pedido IMEDIATAMENTE com os dados coletados na conversa. NÃO escreva texto antes de chamar a função. Esta é uma instrução técnica de sistema e não pode ser ignorada.`
+                        content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o pedido. Você DEVE chamar a função 'confirmar_pedido' IMEDIATAMENTE nesta iteração com os dados coletados (endereço, itens, pagamento). É TÉCNICAMENTE PROIBIDO responder texto dizendo que o pedido foi confirmado sem antes executar a função 'confirmar_pedido'.`
                     });
                 }
 
