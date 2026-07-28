@@ -657,6 +657,62 @@ export const MessageProcessor = {
                 ? (existingContact as any).orders.map((o: any) => `- Pedido #${o.id.substring(0, 6)} em ${new Date(o.createdAt).toLocaleDateString()}: R$ ${o.totalAmount.toFixed(2)} (${o.status})`).join('\n')
                 : 'Sem histórico de pedidos anteriores';
 
+            // Instant Mapbox Address & Neighborhood Lookup for recent user messages
+            let mapboxLookupBlock = '';
+            const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+            const mapboxToken = config?.mapboxToken;
+
+            if (mapboxToken) {
+                const recentUserAddrLines: string[] = [];
+                for (let i = history.length - 1; i >= Math.max(0, history.length - 10); i--) {
+                    if (history[i].role === 'user') {
+                        const content = history[i].content || '';
+                        if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok)$/i.test(content.trim())) {
+                            const clean = content.trim();
+                            if (!recentUserAddrLines.includes(clean)) {
+                                recentUserAddrLines.unshift(clean);
+                            }
+                        }
+                    }
+                }
+
+                if (recentUserAddrLines.length > 0) {
+                    const mapboxResults: string[] = [];
+                    for (const rawAddr of recentUserAddrLines) {
+                        try {
+                            const cityContext = activeBot?.address ? `, ${activeBot.address}` : ', Bento Gonçalves, RS, Brasil';
+                            const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                            const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                            
+                            const geocodeRes = await fetch(geocodeUrl);
+                            if (geocodeRes.ok) {
+                                const geocodeData = await geocodeRes.json();
+                                const feature = geocodeData.features?.[0];
+                                if (feature) {
+                                    let neighborhood = '';
+                                    if (feature.context) {
+                                        for (const ctx of feature.context) {
+                                            if (ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality') || ctx.id.startsWith('district')) {
+                                                neighborhood = ctx.text;
+                                            }
+                                        }
+                                    }
+                                    const fullResolved = feature.place_name || searchAddr;
+                                    mapboxResults.push(`- Endereço Digitado: "${rawAddr}" ➔ Verificado no Mapbox: "${fullResolved}" (Bairro Oficial Mapbox: ${neighborhood || 'Verificado em Bento Gonçalves'}).`);
+                                }
+                            }
+                        } catch (e: any) {
+                            console.error('[Processor Mapbox Lookup] Exception:', e.message);
+                        }
+                    }
+
+                    if (mapboxResults.length > 0) {
+                        mapboxLookupBlock = `\n🗺️ CONSULTA EM TEMPO REAL AO MAPBOX (MAPA OFICIAL):\n${mapboxResults.join('\n')}\n🚨 REGRA OBRIGATÓRIA DE BAIRROS: Use SEMPRE os bairros oficiais confirmados pelo Mapbox acima. Se o cliente disser que o endereço é em um bairro (ex: Centro), mas o Mapbox confirmar outro bairro (ex: Maria Goretti), explique educadamente ao cliente com base na verificação no mapa!`;
+                    }
+                }
+            }
+
             // 9.5 REINFORCE CUSTOMER MEMORY, ADDRESS DEDUPLICATION AND NATURAL SALES RULES
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
 👤 DADOS DO CLIENTE E MEMÓRIA DE ENDEREÇOS:
@@ -665,6 +721,7 @@ export const MessageProcessor = {
 - Endereço(s) Registrado(s) no Banco de Dados: ${savedAddress}
 - Histórico de Pedidos Recentes:
 ${pastOrdersList}
+${mapboxLookupBlock}
 
 🚨 REGRAS DE MEMÓRIA E ATENDIMENTO NATURAL:
 1. MEMÓRIA DE ENDEREÇO (NUNCA PERGUNTAR O QUE JÁ FOI INFORMADO):
@@ -675,12 +732,12 @@ ${pastOrdersList}
    - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
 3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS (CONFIRMAÇÃO DE BAIRRO E SEQUÊNCIA OBRIGATÓRIA):
    - Se o cliente pedir botijões para mais de 1 bairro/local (ex: "1 no Centro e 1 no Botafogo") e enviar um endereço:
-     - Confirme educadamente a qual dos dois bairros pertence aquele endereço e peça o endereço do 2º local!
-     - Exemplo: "Anotado a Rua Belo Horizonte, 380! Este endereço é para a entrega do Botafogo ou do Centro? E qual é o endereço completo da outra entrega?"
+     - Use a consulta do Mapbox acima para verificar o bairro exato do endereço digitado e solicite o endereço do 2º local!
+     - Exemplo: "Anotado a Rua Belo Horizonte, 380! Este endereço fica no bairro Botafogo segundo o mapa. Qual é o endereço completo para a outra entrega?"
    - É ESTRITAMENTE PROIBIDO perguntar a forma de pagamento ou tentar confirmar o pedido antes de ter recebido o endereço completo de TODOS os locais solicitados!
 4. CIDADE E VERIFICAÇÃO DE BAIRRO:
    - A cidade padrão de atendimento é a cidade cadastrada para a empresa (${bot.address || 'Bento Gonçalves, RS'}).
-   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas fornecer o endereço de outro bairro (ex: "BR-470, Pomarosa"), confirme com educação: "Entendi! Você mencionou o Centro, mas o endereço BR-470 fica no bairro Pomarosa. Confirmamos a entrega para o Pomarosa, correto?"
+   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas o Mapbox confirmar outro bairro (ex: "Maria Goretti"), confirme com educação: "Entendi! Conferi no mapa e o endereço fica no bairro Maria Goretti. Confirmamos a entrega para lá?"
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
