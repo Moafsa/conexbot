@@ -735,7 +735,7 @@ export const MessageProcessor = {
             const contactSavedAddresses = await prisma.contactAddress.findMany({
                 where: { contactId: existingContact.id },
                 orderBy: { createdAt: 'desc' }
-            });
+            }).catch(() => []);
             const allSavedAddressesText = contactSavedAddresses.length > 0
                 ? contactSavedAddresses.map((sa, idx) => `${idx + 1}. ${sa.label ? `[${sa.label}] ` : ''}${sa.address}`).join(' | ')
                 : (savedAddress || 'Nenhum endereço salvo.');
