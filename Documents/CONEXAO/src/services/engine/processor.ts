@@ -1714,6 +1714,9 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     const orderData: any = {
                                         botId: activeBot.id,
                                         contactId: existingContact.id,
+                                        address: verifiedAddr,
+                                        latitude: orderLat,
+                                        longitude: orderLng,
                                         totalAmount: singleOrderTotal,
                                         commissionAmount: 0,
                                         status: 'PENDING',

@@ -505,6 +505,9 @@ model Order {
   id               String      @id @default(uuid())
   status           String      @default("PENDING")
   totalAmount      Float
+  address          String?
+  latitude         Float?
+  longitude        Float?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   botId            String

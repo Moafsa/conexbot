@@ -425,8 +425,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 }
             };
 
-            let clientLat = customer.latitude;
-            let clientLng = customer.longitude;
+            let clientLat = order.latitude || customer.latitude;
+            let clientLng = order.longitude || customer.longitude;
 
             if (clientLng && clientLat) {
                 renderMarker(clientLng, clientLat);
@@ -434,7 +434,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 const [lng, lat] = geocodedOrdersRef.current[orderId];
                 renderMarker(lng, lat);
             } else {
-                const cleanAddr = cleanAddress(customer.needs || customer.notes || '');
+                const cleanAddr = cleanAddress(order.address || customer.needs || customer.notes || '');
                 if (cleanAddr && mapboxToken) {
                     fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
                         .then(r => r.json())
