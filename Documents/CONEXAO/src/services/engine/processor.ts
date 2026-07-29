@@ -1587,7 +1587,7 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
                                 }
 
-                                // Detect all distinct delivery addresses for multi-address orders
+                                // Detect all distinct delivery addresses for multi-address orders in current order turn only
                                 let addressesToCreate: string[] = [];
 
                                 if (args.endereco_completo && (args.endereco_completo.includes(';') || args.endereco_completo.includes('\n'))) {
@@ -1595,21 +1595,31 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                 }
 
                                 if (addressesToCreate.length <= 1) {
-                                    const allSessionAddresses: string[] = [];
-                                    for (const h of history) {
+                                    let currentTurnStartIndex = 0;
+                                    for (let i = history.length - 1; i >= 0; i--) {
+                                        const text = (history[i].content || '').toLowerCase();
+                                        if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão') || text.includes('preciso') || text.includes('mais '))) {
+                                            currentTurnStartIndex = i;
+                                            break;
+                                        }
+                                    }
+                                    const currentTurnHistory = history.slice(currentTurnStartIndex);
+
+                                    const currentOrderAddresses: string[] = [];
+                                    for (const h of currentTurnHistory) {
                                         if (h.role === 'user') {
                                             const content = (h.content || '').trim();
                                             if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
-                                                if (!allSessionAddresses.includes(content)) {
-                                                    allSessionAddresses.push(content);
+                                                if (!currentOrderAddresses.includes(content)) {
+                                                    currentOrderAddresses.push(content);
                                                 }
                                             }
                                         }
                                     }
 
-                                    const isMultiDeliveryRequest = history.some(h => (h.content || '').match(/(outro no|locais diferentes|dividido|centro e|botafogo e|1 no|2 no|3 no|5 no)/i));
-                                    if (isMultiDeliveryRequest && allSessionAddresses.length >= 2) {
-                                        addressesToCreate = allSessionAddresses;
+                                    const isMultiDeliveryRequest = currentTurnHistory.some(h => (h.content || '').match(/(outro no|locais diferentes|dividido|centro e|botafogo e|1 no|2 no|3 no|5 no|mais \d+ no)/i));
+                                    if (isMultiDeliveryRequest && currentOrderAddresses.length >= 2) {
+                                        addressesToCreate = currentOrderAddresses;
                                     } else {
                                         addressesToCreate = [fullAddr];
                                     }
@@ -1999,18 +2009,28 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                 if (!recentOrder) {
                     logToFile(`[Processor Safety Audit] AI output text claims order is confirmed, but model omitted tool execution and no recent order was created. Triggering direct DB order creation fallback!`);
 
-                    const sessionAddresses: string[] = [];
-                    for (const h of history) {
+                    let currentTurnStartIndex = 0;
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const text = (history[i].content || '').toLowerCase();
+                        if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão') || text.includes('preciso') || text.includes('mais '))) {
+                            currentTurnStartIndex = i;
+                            break;
+                        }
+                    }
+                    const currentTurnHistory = history.slice(currentTurnStartIndex);
+
+                    const currentTurnAddresses: string[] = [];
+                    for (const h of currentTurnHistory) {
                         if (h.role === 'user' && h.content) {
                             const content = h.content.trim();
                             if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
-                                if (!sessionAddresses.includes(content)) sessionAddresses.push(content);
+                                if (!currentTurnAddresses.includes(content)) currentTurnAddresses.push(content);
                             }
                         }
                     }
 
-                    const fullAddr = sessionAddresses.join('; ') || (existingContact as any).needs || (existingContact as any).notes || 'Bento Gonçalves, RS';
-                    const addressesToCreate = sessionAddresses.length > 0 ? sessionAddresses : [fullAddr];
+                    const fullAddr = currentTurnAddresses.join('; ') || (existingContact as any).needs || (existingContact as any).notes || 'Bento Gonçalves, RS';
+                    const addressesToCreate = currentTurnAddresses.length > 0 ? currentTurnAddresses : [fullAddr];
 
                     const activeProducts = await prisma.product.findMany({
                         where: { botId: bot.id, active: true }
