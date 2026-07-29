@@ -962,6 +962,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
             let toolIteration = 0;
             const maxToolIterations = 5;
             let handoffDone = false;
+            let executedAnyToolInTurn = false;
 
             while (toolIteration < maxToolIterations && !handoffDone) {
                 const messages = buildConversationMessages(finalSystemPrompt, history as any);
@@ -1015,6 +1016,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                     // 2. Execute each tool with Supervisor Gatekeeper Verification
                     for (const toolCall of aiResult.toolCalls) {
+                        executedAnyToolInTurn = true;
                         const { name, arguments: argsString } = toolCall.function;
                         logToFile(`[Processor] AI requested Tool Execution: ${name} with args: ${argsString}`);
                         const args = JSON.parse(argsString);
@@ -1574,7 +1576,7 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         });
 
                                         if (!matchedProd) {
-                                            matchedProd = activeProducts[0];
+                                            matchedProd = activeProducts.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
                                         }
 
                                         const prod = matchedProd;
@@ -1633,6 +1635,16 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         addressesToCreate = [fullAddr];
                                     }
                                 }
+
+                                // Strict address deduplication by street key to prevent duplicate cards for same street
+                                const uniqueAddresses: string[] = [];
+                                for (const addr of addressesToCreate) {
+                                    const streetKey = addr.split(',')[0].toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+                                    if (streetKey && !uniqueAddresses.some(u => u.split(',')[0].toLowerCase().trim().replace(/[^a-z0-9]/g, '') === streetKey)) {
+                                        uniqueAddresses.push(addr);
+                                    }
+                                }
+                                addressesToCreate = uniqueAddresses.length > 0 ? uniqueAddresses : [fullAddr];
 
                                 // Clear old stale pending orders for this contact so only fresh confirmed orders appear on Fleet dashboard
                                 await prisma.orderItem.deleteMany({
