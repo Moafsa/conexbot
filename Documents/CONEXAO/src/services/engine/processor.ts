@@ -732,12 +732,20 @@ export const MessageProcessor = {
                 }
             }
 
+            const contactSavedAddresses = await prisma.contactAddress.findMany({
+                where: { contactId: existingContact.id },
+                orderBy: { createdAt: 'desc' }
+            });
+            const allSavedAddressesText = contactSavedAddresses.length > 0
+                ? contactSavedAddresses.map((sa, idx) => `${idx + 1}. ${sa.label ? `[${sa.label}] ` : ''}${sa.address}`).join(' | ')
+                : (savedAddress || 'Nenhum endereço salvo.');
+
             // 9.5 REINFORCE CUSTOMER MEMORY, ADDRESS DEDUPLICATION AND NATURAL SALES RULES
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
 👤 DADOS DO CLIENTE E MEMÓRIA DE ENDEREÇOS:
 - Nome do Cliente: ${existingContact.name || 'Não informado'}
 - Telefone: ${senderPhone}
-- Endereço(s) Registrado(s) no Banco de Dados: ${savedAddress}
+- Endereços Salvos no Perfil do Cliente: ${allSavedAddressesText}
 - Histórico de Pedidos Recentes:
 ${pastOrdersList}
 ${mapboxLookupBlock}
@@ -1545,8 +1553,12 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
 
                                 let itemsToCreate: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
 
+                                const activeProducts = await prisma.product.findMany({
+                                    where: { botId: bot.id, active: true }
+                                });
+
                                 if (hasCart) {
-                                    itemsToCreate = cart!.items.map(item => ({
+                                    itemsToCreate = cart!.items.map((item: any) => ({
                                         productId: item.productId,
                                         quantity: item.quantity,
                                         unitPrice: item.unitPrice
@@ -1559,10 +1571,6 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     if (matchQty) {
                                         parsedQty = parseInt(matchQty[1], 10) || 1;
                                     }
-
-                                    const activeProducts = await prisma.product.findMany({
-                                        where: { botId: bot.id, active: true }
-                                    });
 
                                     if (activeProducts.length > 0) {
                                         const descLower = descFromArgs.toLowerCase();
@@ -1700,7 +1708,7 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                         addrQty = parseInt(qtyMatch[1], 10) || 1;
                                     }
 
-                                    const p13Product = activeProducts.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
+                                    const p13Product = activeProducts.find((p: any) => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
                                     const p13UnitPrice = p13Product ? Number(p13Product.salePrice || p13Product.price || 139) : 139;
 
                                     const singleOrderItems = p13Product ? [{

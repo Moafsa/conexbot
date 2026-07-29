@@ -587,10 +587,24 @@ model Contact {
   latitude         Float?
   longitude        Float?
   loginToken       String?       @unique
-  loginTokenExpires DateTime?
   assignedOrders   Order[]       @relation("DriverOrders")
+  savedAddresses   ContactAddress[]
 
   @@unique([phone, botId])
+}
+
+model ContactAddress {
+  id        String   @id @default(uuid())
+  contactId String
+  label     String?
+  address   String
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
 }
 
 model Conversation {
