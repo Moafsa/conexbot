@@ -1636,11 +1636,18 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
                                 }
 
-                                // Strict address deduplication by street key to prevent duplicate cards for same street
+                                const getStreetKey = (addr: string) => {
+                                    const raw = addr.split(',')[0].replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '');
+                                    return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                };
+
                                 const uniqueAddresses: string[] = [];
                                 for (const addr of addressesToCreate) {
-                                    const streetKey = addr.split(',')[0].toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-                                    if (streetKey && !uniqueAddresses.some(u => u.split(',')[0].toLowerCase().trim().replace(/[^a-z0-9]/g, '') === streetKey)) {
+                                    const key = getStreetKey(addr);
+                                    if (key && !uniqueAddresses.some(u => {
+                                        const uKey = getStreetKey(u);
+                                        return uKey === key || uKey.includes(key) || key.includes(uKey);
+                                    })) {
                                         uniqueAddresses.push(addr);
                                     }
                                 }
@@ -1655,57 +1662,69 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                 }).catch(() => {});
 
                                 // Create pending orders for each delivery address verified by Mapbox
-                                    for (const singleAddr of addressesToCreate) {
-                                        let verifiedAddr = singleAddr;
-                                        let orderLat: number | null = latitude;
-                                        let orderLng: number | null = longitude;
+                                for (const singleAddr of addressesToCreate) {
+                                    let verifiedAddr = singleAddr;
+                                    let orderLat: number | null = latitude;
+                                    let orderLng: number | null = longitude;
 
-                                        if (mapboxToken) {
-                                            try {
-                                                const rawAddr = singleAddr.split('\n')[0].replace('Endereço: ', '').trim();
-                                                const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
-                                                const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
-                                                const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
-                                                const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
-                                                
-                                                const geocodeRes = await fetch(geocodeUrl);
-                                                if (geocodeRes.ok) {
-                                                    const geocodeData = await geocodeRes.json();
-                                                    const feature = geocodeData.features?.[0];
-                                                    if (feature) {
-                                                        if (feature.place_name) verifiedAddr = feature.place_name;
-                                                        if (feature.center) {
-                                                            orderLng = feature.center[0];
-                                                            orderLat = feature.center[1];
-                                                        }
+                                    if (mapboxToken) {
+                                        try {
+                                            const rawAddr = singleAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                            const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                                            const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                                            const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+                                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                            
+                                            const geocodeRes = await fetch(geocodeUrl);
+                                            if (geocodeRes.ok) {
+                                                const geocodeData = await geocodeRes.json();
+                                                const feature = geocodeData.features?.[0];
+                                                if (feature) {
+                                                    if (feature.place_name) verifiedAddr = feature.place_name;
+                                                    if (feature.center) {
+                                                        orderLng = feature.center[0];
+                                                        orderLat = feature.center[1];
                                                     }
                                                 }
-                                            } catch (e: any) {
-                                                console.error('[confirmar_pedido] Geocoding singleAddr exception:', e.message);
                                             }
+                                        } catch (e: any) {
+                                            console.error('[confirmar_pedido] Geocoding singleAddr exception:', e.message);
                                         }
-
-                                        const singleOrderTotal = itemsToCreate.length > 0
-                                            ? itemsToCreate.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0)
-                                            : finalTotal;
-
-                                        const orderData: any = {
-                                            botId: activeBot.id,
-                                            contactId: existingContact.id,
-                                            totalAmount: singleOrderTotal,
-                                            commissionAmount: 0,
-                                            status: 'PENDING',
-                                        };
-
-                                        if (itemsToCreate.length > 0) {
-                                            orderData.items = {
-                                                create: itemsToCreate
-                                            };
-                                        }
-
-                                        order = await prisma.order.create({ data: orderData });
-                                        logToFile(`[confirmar_pedido] Pedido gerado com sucesso com endereço oficial do Mapbox: "${verifiedAddr}" (ID: ${order.id})`);
                                     }
+
+                                    let addrQty = 1;
+                                    const streetSnippet = singleAddr.split(',')[0].replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '').trim();
+                                    const qtyMatch = textToScan.match(new RegExp(`(\\d+)\\s*(?:botij|gás|unid|p13)?[^,.\\n]*?${streetSnippet.replace(/[^a-zA-Z0-9]/g, '\\$&')}`, 'i')) ||
+                                                     textToScan.match(new RegExp(`${streetSnippet.replace(/[^a-zA-Z0-9]/g, '\\$&')}[^,.\\n]*?(\\d+)\\s*(?:botij|gás|unid|p13)?`, 'i'));
+                                    if (qtyMatch) {
+                                        addrQty = parseInt(qtyMatch[1], 10) || 1;
+                                    }
+
+                                    const p13Product = activeProducts.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
+                                    const p13UnitPrice = p13Product ? Number(p13Product.salePrice || p13Product.price || 139) : 139;
+
+                                    const singleOrderItems = p13Product ? [{
+                                        productId: p13Product.id,
+                                        quantity: addrQty,
+                                        unitPrice: p13UnitPrice
+                                    }] : itemsToCreate;
+
+                                    const singleOrderTotal = p13UnitPrice * addrQty;
+
+                                    const orderData: any = {
+                                        botId: activeBot.id,
+                                        contactId: existingContact.id,
+                                        totalAmount: singleOrderTotal,
+                                        commissionAmount: 0,
+                                        status: 'PENDING',
+                                        items: {
+                                            create: singleOrderItems
+                                        }
+                                    };
+
+                                    order = await prisma.order.create({ data: orderData });
+                                    logToFile(`[confirmar_pedido] Pedido gerado com sucesso com endereço oficial do Mapbox: "${verifiedAddr}" (ID: ${order.id})`);
+                                }
 
                                 // Transition the CRM stage to "PEDIDO CONFIRMADO"
                                 const confirmedStage = await prisma.crmStage.findFirst({
