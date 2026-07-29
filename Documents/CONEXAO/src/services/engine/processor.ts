@@ -1985,6 +1985,103 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                 });
             }
 
+            // SAFETY AUDIT: Ensure order is physically created in DB if AI text claims order is confirmed
+            const isTextClaimingOrderConfirmed = /(pedido confirmado|confirmado com sucesso|entregador já está a caminho|pedido registrado|confirmar o pedido)/i.test(cleanResponse);
+
+            if (isTextClaimingOrderConfirmed) {
+                const recentOrder = await prisma.order.findFirst({
+                    where: {
+                        contactId: existingContact.id,
+                        createdAt: { gte: new Date(Date.now() - 60000) }
+                    }
+                });
+
+                if (!recentOrder) {
+                    logToFile(`[Processor Safety Audit] AI output text claims order is confirmed, but model omitted tool execution and no recent order was created. Triggering direct DB order creation fallback!`);
+
+                    const sessionAddresses: string[] = [];
+                    for (const h of history) {
+                        if (h.role === 'user' && h.content) {
+                            const content = h.content.trim();
+                            if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
+                                if (!sessionAddresses.includes(content)) sessionAddresses.push(content);
+                            }
+                        }
+                    }
+
+                    const fullAddr = sessionAddresses.join('; ') || (existingContact as any).needs || (existingContact as any).notes || 'Bento Gonçalves, RS';
+                    const addressesToCreate = sessionAddresses.length > 0 ? sessionAddresses : [fullAddr];
+
+                    const activeProducts = await prisma.product.findMany({
+                        where: { botId: bot.id, active: true }
+                    });
+                    const defaultProduct = activeProducts[0];
+                    const unitPrice = defaultProduct ? Number(defaultProduct.salePrice || defaultProduct.price || 139) : 139;
+
+                    for (const singleAddr of addressesToCreate) {
+                        let verifiedAddr = singleAddr;
+                        let orderLat: number | null = null;
+                        let orderLng: number | null = null;
+
+                        if (mapboxToken) {
+                            try {
+                                const searchAddr = singleAddr.includes('Bento') ? singleAddr : `${singleAddr}, Bento Gonçalves, RS, Brasil`;
+                                const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                const res = await fetch(geocodeUrl);
+                                if (res.ok) {
+                                    const json = await res.json();
+                                    const feature = json.features?.[0];
+                                    if (feature) {
+                                        if (feature.place_name) verifiedAddr = feature.place_name;
+                                        if (feature.center) {
+                                            orderLng = feature.center[0];
+                                            orderLat = feature.center[1];
+                                        }
+                                    }
+                                }
+                            } catch (e: any) {}
+                        }
+
+                        const fallbackOrder = await prisma.order.create({
+                            data: {
+                                botId: activeBot.id,
+                                contactId: existingContact.id,
+                                totalAmount: unitPrice,
+                                commissionAmount: 0,
+                                status: 'PENDING',
+                                ...(defaultProduct ? {
+                                    items: {
+                                        create: [{
+                                            productId: defaultProduct.id,
+                                            quantity: 1,
+                                            unitPrice: unitPrice
+                                        }]
+                                    }
+                                } : {})
+                            }
+                        });
+
+                        logToFile(`[Processor Safety Audit] Created fallback Order ID: ${fallbackOrder.id} for address: "${verifiedAddr}"`);
+                    }
+
+                    const confirmedStage = await prisma.crmStage.findFirst({
+                        where: {
+                            pipeline: { botId: bot.id },
+                            name: { contains: 'CONFIRMADO', mode: 'insensitive' }
+                        }
+                    });
+                    if (confirmedStage) {
+                        await prisma.contact.update({
+                            where: { id: existingContact.id },
+                            data: {
+                                stageId: confirmedStage.id,
+                                funnelStage: confirmedStage.name
+                            }
+                        });
+                    }
+                }
+            }
+
             VectorService.addDocument(bot.id, `User: ${messageText}`, { type: 'chat_history', conversationId: conversation.id }).catch(e => logger.error({ err: e }, 'Vector save error'));
 
             // 13. Outbound Webhook / Middleware Notification
