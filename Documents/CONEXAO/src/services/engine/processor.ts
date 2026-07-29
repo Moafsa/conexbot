@@ -1594,6 +1594,15 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     addressesToCreate = args.endereco_completo.split(/;|\n/).map((a: string) => a.trim()).filter((a: string) => a.length > 5);
                                 }
 
+                                const textToScan = `${args.itens_descricao || ''} ${args.items_description || ''} ${history.slice(-4).map(h => h.content || '').join(' ')}`;
+                                const streetMatches = textToScan.match(/(?:rua|r\.|avenida|av\.|estrada|alameda)\s+[^,.;\n]+,?\s*\d+/gi) || [];
+                                for (const match of streetMatches) {
+                                    const clean = match.trim();
+                                    if (!addressesToCreate.some(a => a.toLowerCase().includes(clean.toLowerCase()) || clean.toLowerCase().includes(a.toLowerCase()))) {
+                                        addressesToCreate.push(clean);
+                                    }
+                                }
+
                                 if (addressesToCreate.length <= 1) {
                                     let currentTurnStartIndex = 0;
                                     for (let i = history.length - 1; i >= 0; i--) {
@@ -1625,31 +1634,15 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
                                 }
 
-                                if (existingPendingOrder && addressesToCreate.length === 1) {
-                                    logToFile(`[confirmar_pedido] Atualizando pedido pendente existente ID: ${existingPendingOrder.id}`);
-                                    isOrderUpdate = true;
+                                // Clear old stale pending orders for this contact so only fresh confirmed orders appear on Fleet dashboard
+                                await prisma.orderItem.deleteMany({
+                                    where: { order: { contactId: existingContact.id, status: 'PENDING' } }
+                                }).catch(() => {});
+                                await prisma.order.deleteMany({
+                                    where: { contactId: existingContact.id, status: 'PENDING' }
+                                }).catch(() => {});
 
-                                    await prisma.orderItem.deleteMany({
-                                        where: { orderId: existingPendingOrder.id }
-                                    });
-
-                                    const updateData: any = {
-                                        totalAmount: finalTotal,
-                                        updatedAt: new Date()
-                                    };
-
-                                    if (itemsToCreate.length > 0) {
-                                        updateData.items = {
-                                            create: itemsToCreate
-                                        };
-                                    }
-
-                                    order = await prisma.order.update({
-                                        where: { id: existingPendingOrder.id },
-                                        data: updateData
-                                    });
-                                } else {
-                                    // Create pending orders for each delivery address verified by Mapbox
+                                // Create pending orders for each delivery address verified by Mapbox
                                     for (const singleAddr of addressesToCreate) {
                                         let verifiedAddr = singleAddr;
                                         let orderLat: number | null = latitude;
