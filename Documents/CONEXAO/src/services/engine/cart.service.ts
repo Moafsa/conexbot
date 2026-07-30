@@ -3,13 +3,21 @@ import prisma from '@/lib/prisma';
 export class CartService {
     /**
      * Obtém ou cria um carrinho ativo para o contato no escopo de um bot.
-     * IMPORTANT: Um novo pedido sempre começa com um carrinho limpo.
+     * Carrinhos ativos sem atualização há mais de 30 minutos são abandonados automaticamente.
      */
     static async getOrCreateCart(botId: string, contactPhone: string) {
         let cart = await prisma.cart.findFirst({
             where: { botId, contactPhone, status: 'ACTIVE' },
             include: { items: { include: { addons: true, product: true } } },
         });
+
+        if (cart && (Date.now() - new Date(cart.updatedAt).getTime() > 30 * 60 * 1000)) {
+            await prisma.cart.update({
+                where: { id: cart.id },
+                data: { status: 'ABANDONED' }
+            }).catch(() => {});
+            cart = null;
+        }
 
         if (!cart) {
             cart = await prisma.cart.create({
