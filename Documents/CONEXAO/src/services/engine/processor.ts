@@ -965,7 +965,90 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                 });
             }
 
+            // ══════════════════════════════════════════════════════════════
+            // ORDER AGENT INTERCEPT — for GAS_DISTRIBUTOR bots
+            // Usa carrinho persistente no BD ao invés de regex no histórico.
+            // Se o agente confirmar pedido, cria o Order e retorna direto.
+            // ══════════════════════════════════════════════════════════════
+            const isOrderBot = (bot.businessType === 'GAS_DISTRIBUTOR' || (bot.businessType || '').includes('GAS'));
+            const isGreeting = /^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|eae|ei|tudo|hello)$/i.test(messageText.trim());
+
+            if (isOrderBot && !isGreeting) {
+                try {
+                    const { runOrderAgent, createOrderFromCartData } = await import('./order-agent');
+                    const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                    const mapboxToken = config?.mapboxToken || bot.mapboxToken;
+
+                    const savedAddresses = await prisma.contactAddress.findMany({
+                        where: { contactId: existingContact.id },
+                        orderBy: { createdAt: 'desc' },
+                        take: 5
+                    }).catch(() => []);
+
+                    const orderCatalog = bot.products
+                        .filter((p: any) => p.active)
+                        .map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            price: Number(p.price),
+                            salePrice: p.salePrice ? Number(p.salePrice) : null,
+                            active: p.active
+                        }));
+
+                    const agentResult = await runOrderAgent({
+                        botId: bot.id,
+                        contactPhone: senderPhone,
+                        contactId: existingContact.id,
+                        userMessage: messageText,
+                        catalog: orderCatalog,
+                        savedAddresses,
+                        bot: activeBot,
+                        mapboxToken: mapboxToken || undefined,
+                        botAddress: bot.address || undefined,
+                        onOrderCreated: async (orderData) => {
+                            const created = await createOrderFromCartData(bot.id, existingContact.id, orderData);
+
+                            // Notify attendant
+                            const itemsText = orderData.items.map(i => {
+                                const prod = bot.products.find((p: any) => p.id === i.productId);
+                                return `${i.quantity}x ${prod?.name || i.productId}`;
+                            }).join(', ');
+
+                            const notifMsg = `📦 *Novo Pedido Confirmado*\n\n*Cliente:* ${existingContact.name || senderPhone}\n*Tel:* ${senderPhone}\n*Endereço:* ${orderData.address}\n*Itens:* ${itemsText}\n*Total:* R$ ${orderData.totalAmount.toFixed(2)}\n*Pagamento:* ${orderData.paymentMethod}${orderData.changeAmount ? `\n*Troco para:* R$ ${orderData.changeAmount}` : ''}`;
+
+                            try {
+                                await prisma.message.create({
+                                    data: { conversationId: conversation.id, role: 'system', content: notifMsg }
+                                });
+                            } catch {}
+
+                            return { orderId: created.orderId };
+                        }
+                    });
+
+                    if (agentResult.reply) {
+                        // Save assistant message to DB
+                        await prisma.message.create({
+                            data: { conversationId: conversation.id, content: agentResult.reply, role: 'assistant' }
+                        });
+
+                        // Send reply to user
+                        await deliverAssistantOutbound({
+                            bot, conversation, contact: existingContact,
+                            channel, senderPhone, messageText: agentResult.reply, mediaItems: []
+                        });
+
+                        logToFile(`[OrderAgent] Reply sent (orderConfirmed=${agentResult.orderConfirmed})`);
+                        releaseLock(lockKey);
+                        return;
+                    }
+                } catch (e: any) {
+                    logToFile(`[OrderAgent] Error, falling back to normal flow: ${e.message}`);
+                }
+            }
+
             // 10. Call AI Provider with Tool Calling support (Loop for recursive tools)
+
             let aiResult: any;
             let toolIteration = 0;
             const maxToolIterations = 5;

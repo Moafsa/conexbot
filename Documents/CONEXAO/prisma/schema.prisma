@@ -437,14 +437,20 @@ model ProductAddon {
 }
 
 model Cart {
-  id           String     @id @default(uuid())
-  botId        String
-  contactPhone String
-  status       String     @default("ACTIVE") // ACTIVE, ABANDONED, COMPLETED
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  items        CartItem[]
-  bot          Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  id              String     @id @default(uuid())
+  botId           String
+  contactPhone    String
+  status          String     @default("ACTIVE") // ACTIVE, ABANDONED, COMPLETED
+  deliveryAddress String?
+  deliveryLat     Float?
+  deliveryLng     Float?
+  paymentMethod   String?    // DINHEIRO | PIX | CARTAO
+  changeAmount    Float?     // troco
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  items           CartItem[]
+  bot             Bot        @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@index([botId, contactPhone])
 }
