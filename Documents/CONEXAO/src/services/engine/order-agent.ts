@@ -98,8 +98,26 @@ const ORDER_AGENT_TOOLS = [
         type: 'function' as const,
         function: {
             name: 'fechar_pedido',
-            description: 'SOMENTE quando o cliente confirmar explicitamente (ex: "pode", "sim", "confirmado", "sem troco"). Converte o carrinho em pedido. Falha se faltar itens, endereço ou pagamento.',
-            parameters: { type: 'object', properties: {} }
+            description: 'SOMENTE quando o cliente confirmar explicitamente (ex: "pode", "sim", "confirmado", "sem troco"). Converte os dados em pedido(s) oficial(is).',
+            parameters: {
+                type: 'object',
+                properties: {
+                    entregas: {
+                        type: 'array',
+                        description: 'Opcional. Se houver entregas para MÚLTIPLOS endereços (ex: 5 no Botafogo e 3 no Municipal), informe cada entrega com seu endereço e quantidade exata.',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                endereco: { type: 'string', description: 'Endereço completo de entrega' },
+                                quantidade: { type: 'number', description: 'Quantidade de botijões para este endereço' },
+                                forma_pagamento: { type: 'string', description: 'DINHEIRO, PIX ou CARTAO' },
+                                troco_para: { type: 'number', description: 'Opcional. Valor para troco' }
+                            },
+                            required: ['endereco', 'quantidade']
+                        }
+                    }
+                }
+            }
         }
     },
     {
@@ -378,21 +396,77 @@ PROIBIÇÕES:
                 result = r.summary;
 
             } else if (name === 'fechar_pedido') {
-                const readiness = await CartService.isReadyForCheckout(ctx.botId, ctx.contactPhone);
-                if (!readiness.ready) {
-                    result = `❌ Não posso fechar o pedido. Faltando: ${readiness.missing.join(', ')}`;
-                } else {
-                    try {
-                        const orderData = await CartService.convertToOrderData(ctx.botId, ctx.contactPhone);
+                if (args.entregas && Array.isArray(args.entregas) && args.entregas.length > 0) {
+                    // MULTI-DELIVERY ORDER CREATION
+                    const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+                    const createdOrders: string[] = [];
+                    let summaryText = '✅ PEDIDOS CRIADOS COM SUCESSO!\n';
+
+                    for (const delivery of args.entregas) {
+                        const prod = ctx.catalog.find(p => p.id === delivery.produto_id) || defaultProduct;
+                        const unitPrice = Number(prod?.salePrice ?? prod?.price ?? 139);
+                        const qty = Number(delivery.quantidade) || 1;
+                        const total = qty * unitPrice;
+                        const payMethod = (delivery.forma_pagamento || 'DINHEIRO').toUpperCase();
+                        const rawAddr = delivery.endereco || 'Endereço não especificado';
+
+                        let verifiedAddr = rawAddr;
+                        let lat: number | null = null;
+                        let lng: number | null = null;
+
+                        if (ctx.mapboxToken) {
+                            try {
+                                const cityCtx = ctx.botAddress ? `, ${ctx.botAddress}` : ', Bento Gonçalves, RS, Brasil';
+                                const searchAddr = rawAddr.includes('Bento') ? rawAddr : `${rawAddr}${cityCtx}`;
+                                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${ctx.mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                const res = await fetch(url);
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    const feature = data.features?.[0];
+                                    if (feature?.place_name) verifiedAddr = feature.place_name;
+                                    if (feature?.center) { lng = feature.center[0]; lat = feature.center[1]; }
+                                }
+                            } catch {}
+                        }
+
+                        const orderData = {
+                            cartId: '',
+                            address: verifiedAddr,
+                            latitude: lat,
+                            longitude: lng,
+                            paymentMethod: payMethod,
+                            changeAmount: delivery.troco_para ?? null,
+                            totalAmount: total,
+                            items: [{ productId: prod?.id || '', quantity: qty, unitPrice }]
+                        };
+
                         const created = await ctx.onOrderCreated(orderData);
-                        orderId = created.orderId;
-                        orderConfirmed = true;
-                        result = `✅ PEDIDO CRIADO! ID: ${orderId}. Total: R$ ${orderData.totalAmount.toFixed(2)}. Endereço: ${orderData.address}. Pagamento: ${orderData.paymentMethod}.`;
-                    } catch (e: any) {
-                        result = `Erro ao criar pedido: ${e.message}`;
+                        createdOrders.push(created.orderId);
+                        summaryText += `- Pedido #${created.orderId.substring(0, 6)}: ${qty}x ${prod?.name || 'Gás 13kg'} (R$ ${total.toFixed(2)}) ➔ ${verifiedAddr}\n`;
+                    }
+
+                    await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                    orderConfirmed = true;
+                    orderId = createdOrders.join(', ');
+                    result = summaryText;
+
+                } else {
+                    // SINGLE DELIVERY CART CHECKOUT
+                    const readiness = await CartService.isReadyForCheckout(ctx.botId, ctx.contactPhone);
+                    if (!readiness.ready) {
+                        result = `❌ Não posso fechar o pedido. Faltando: ${readiness.missing.join(', ')}`;
+                    } else {
+                        try {
+                            const orderData = await CartService.convertToOrderData(ctx.botId, ctx.contactPhone);
+                            const created = await ctx.onOrderCreated(orderData);
+                            orderId = created.orderId;
+                            orderConfirmed = true;
+                            result = `✅ PEDIDO CRIADO! ID: ${orderId}. Total: R$ ${orderData.totalAmount.toFixed(2)}. Endereço: ${orderData.address}. Pagamento: ${orderData.paymentMethod}.`;
+                        } catch (e: any) {
+                            result = `Erro ao criar pedido: ${e.message}`;
+                        }
                     }
                 }
-
             } else if (name === 'cancelar_carrinho') {
                 await CartService.clearCart(ctx.botId, ctx.contactPhone);
                 result = '🗑️ Carrinho cancelado. Pode fazer um novo pedido quando quiser.';

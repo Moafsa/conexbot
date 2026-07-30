@@ -1022,22 +1022,22 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         }
                     });
 
-                    if (agentResult.reply) {
-                        // Save assistant message to DB
-                        await prisma.message.create({
-                            data: { conversationId: conversation.id, content: agentResult.reply, role: 'assistant' }
-                        });
+                    const finalReply = agentResult.reply || (agentResult.cartSummary ? agentResult.cartSummary.summary : 'Pedido anotado! Diga se deseja confirmar ou alterar o endereço/quantidade.');
 
-                        // Send reply to user
-                        await deliverAssistantOutbound({
-                            bot, conversation, contact: existingContact,
-                            channel, senderPhone, messageText: agentResult.reply, mediaItems: []
-                        });
+                    // Save assistant message to DB
+                    await prisma.message.create({
+                        data: { conversationId: conversation.id, content: finalReply, role: 'assistant' }
+                    });
 
-                        logToFile(`[OrderAgent] Reply sent (orderConfirmed=${agentResult.orderConfirmed})`);
-                        releaseLock(lockKey);
-                        return;
-                    }
+                    // Send reply to user
+                    await deliverAssistantOutbound({
+                        bot, conversation, contact: existingContact,
+                        channel, senderPhone, messageText: finalReply, mediaItems: []
+                    });
+
+                    logToFile(`[OrderAgent] Handled turn (orderConfirmed=${agentResult.orderConfirmed})`);
+                    releaseLock(lockKey);
+                    return; // ALWAYS RETURN! Never fall through to legacy processor loop!
                 } catch (e: any) {
                     logToFile(`[OrderAgent] Error, falling back to normal flow: ${e.message}`);
                 }
