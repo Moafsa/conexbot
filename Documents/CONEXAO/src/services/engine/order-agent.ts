@@ -457,7 +457,8 @@ PROIBIÇÕES:
                 }
 
             } else if (name === 'definir_endereco') {
-                const rawAddr = `${args.rua_numero}${args.bairro ? `, ${args.bairro}` : ''}`;
+                const bairroStr = args.bairro || undefined;
+                const rawAddr = `${args.rua_numero}${bairroStr ? `, ${bairroStr}` : ''}`;
                 let resolvedAddr = rawAddr.includes('Bento') || rawAddr.includes('RS') ? rawAddr : `${rawAddr}, Bento Gonçalves - RS`;
                 let lat: number | null = null;
                 let lng: number | null = null;
@@ -490,8 +491,13 @@ PROIBIÇÕES:
                     }
                 }
 
+                // Ensure neighborhood is explicitly included in the address string
+                if (bairroStr && !resolvedAddr.toLowerCase().includes(bairroStr.toLowerCase())) {
+                    resolvedAddr = `${args.rua_numero}, ${bairroStr}, Bento Gonçalves - RS`;
+                }
+
                 const r = await CartService.setDeliveryAddress(
-                    ctx.botId, ctx.contactPhone, resolvedAddr, lat, lng, ctx.contactId
+                    ctx.botId, ctx.contactPhone, resolvedAddr, lat, lng, ctx.contactId, bairroStr
                 );
                 result = r.message;
 

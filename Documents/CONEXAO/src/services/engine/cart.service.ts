@@ -110,7 +110,8 @@ export class CartService {
         address: string,
         lat: number | null,
         lng: number | null,
-        contactId: string
+        contactId: string,
+        label?: string | null
     ) {
         const cart = await this.getOrCreateCart(botId, contactPhone);
         await prisma.cart.update({
@@ -132,11 +133,17 @@ export class CartService {
                 await prisma.contactAddress.create({
                     data: {
                         contactId,
+                        label: label ? label.trim() : undefined,
                         address: cleanAddr,
                         latitude: lat ?? undefined,
                         longitude: lng ?? undefined
                     }
                 }).catch((e: any) => console.error('[CartService] ContactAddress save error:', e?.message));
+            } else if (label && !existing.label) {
+                await prisma.contactAddress.update({
+                    where: { id: existing.id },
+                    data: { label: label.trim() }
+                }).catch(() => {});
             }
 
             // Update contact.needs with latest address
