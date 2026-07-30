@@ -346,11 +346,13 @@ PROIBIÇÕES:
         const multiMatches = Array.from(userMsgLower.matchAll(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij[oõ]es|g[aá]s|p13)?\s*(?:no|na|em|para)?\s*([a-z0-9\s]+?)(?=(?:\s*(?:e|,|\+|\bmais\b)\s*\d+)|$)/gi));
 
         let parsedMultiInstructions: string[] = [];
+        let totalMultiQty = 0;
+        const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
 
         for (const m of multiMatches) {
-            const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
             const rawQty = m[1].toLowerCase();
             const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
+            totalMultiQty += qty;
             const cleanLoc = m[2].replace(/^(bairro|o|a|no|na|em)\s+/, '').trim();
             const normLoc = cleanLoc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 
@@ -373,10 +375,16 @@ PROIBIÇÕES:
             }
         }
 
+        const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+        let addItemInstruction = '';
+        if (cartIsEmpty && defaultProduct && totalMultiQty > 0) {
+            addItemInstruction = `\n🔴 ATENÇÃO CARRINHO VAZIO: O carrinho no sistema está vazio. Chame IMEDIATAMENTE a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${totalMultiQty} para registrar os ${totalMultiQty} botijões no carrinho do banco de dados!`;
+        }
+
         if (parsedMultiInstructions.length > 0) {
-            forcedToolHint += `\n\n🔴 PARSER DE MÚLTIPLAS ENTREGAS (RESULTADO DETERMINÍSTICO):\n${parsedMultiInstructions.join('\n')}\n\nREGRA MANDATÓRIA: Se todos os locais acima tiverem "ENDEREÇO SALVO ENCONTRADO", NÃO peça rua e número para nenhum deles! Apresente imediatamente o resumo separado de cada entrega e pergunte a forma de pagamento (dinheiro, Pix ou cartão). NUNCA troque o endereço de um local pelo outro!`;
+            forcedToolHint += `${addItemInstruction}\n\n🔴 PARSER DE MÚLTIPLAS ENTREGAS (RESULTADO DETERMINÍSTICO):\n${parsedMultiInstructions.join('\n')}\n\nREGRA MANDATÓRIA: Se todos os locais acima tiverem "ENDEREÇO SALVO ENCONTRADO", NÃO peça rua e número para nenhum deles! Apresente imediatamente o resumo separado de cada entrega e pergunte a forma de pagamento (dinheiro, Pix ou cartão). NUNCA troque o endereço de um local pelo outro!`;
         } else {
-            forcedToolHint += `\n\n🔴 INSTRUÇÃO DE MÚLTIPLAS ENTREGAS: O cliente solicitou entregas para MÚLTIPLOS locais/endereços diferentes ("${ctx.userMessage}"). MANTENHA SEPARADAS as quantidades e endereços de cada local. Se faltar a rua e número de algum local (ex: Centro), solicite a rua e número desse local específico. NUNCA junte todos os botijões num único endereço!`;
+            forcedToolHint += `${addItemInstruction}\n\n🔴 INSTRUÇÃO DE MÚLTIPLAS ENTREGAS: O cliente solicitou entregas para MÚLTIPLOS locais/endereços diferentes ("${ctx.userMessage}"). MANTENHA SEPARADAS as quantidades e endereços de cada local. Se faltar a rua e número de algum local (ex: Centro), solicite a rua e número desse local específico. NUNCA junte todos os botijões num único endereço!`;
         }
     } else if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
