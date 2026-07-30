@@ -1677,7 +1677,14 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
 
                                     if (mapboxToken) {
                                         try {
-                                            const rawAddr = singleAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                            const rawAddr = singleAddr.split('\n')[0]
+                                                .replace('Endereço: ', '')
+                                                .replace(/\s+em\s+/gi, ', ')
+                                                .replace(/\s+no\s+/gi, ', ')
+                                                .replace(/\s+na\s+/gi, ', ')
+                                                .replace(/\s+/g, ' ')
+                                                .trim();
+
                                             const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
                                             const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
                                             const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
@@ -1701,11 +1708,32 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
                                     }
 
                                     let addrQty = 1;
-                                    const streetSnippet = singleAddr.split(',')[0].replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '').trim();
-                                    const qtyMatch = textToScan.match(new RegExp(`(\\d+)\\s*(?:botij|gás|unid|p13)?[^,.\\n]*?${streetSnippet.replace(/[^a-zA-Z0-9]/g, '\\$&')}`, 'i')) ||
-                                                     textToScan.match(new RegExp(`${streetSnippet.replace(/[^a-zA-Z0-9]/g, '\\$&')}[^,.\\n]*?(\\d+)\\s*(?:botij|gás|unid|p13)?`, 'i'));
-                                    if (qtyMatch) {
-                                        addrQty = parseInt(qtyMatch[1], 10) || 1;
+                                    const streetWithoutNum = singleAddr.split(',')[0]
+                                        .replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '')
+                                        .replace(/\d+/g, '')
+                                        .trim();
+
+                                    if (streetWithoutNum.length > 2) {
+                                        const regexBefore = new RegExp(`(\\d+)\\s*(?:botij|gás|unid|p13)?[^,.\\n]*?(?:na|no|em|para)?\\s*[^,.\\n]*?${streetWithoutNum.replace(/[^a-zA-Z]/g, '\\$&')}`, 'i');
+                                        const regexAfter = new RegExp(`${streetWithoutNum.replace(/[^a-zA-Z]/g, '\\$&')}[^,.\\n]*?(\\d+)\\s*(?:botij|gás|unid|p13)?`, 'i');
+
+                                        const matchBefore = textToScan.match(regexBefore);
+                                        const matchAfter = textToScan.match(regexAfter);
+
+                                        if (matchBefore) {
+                                            addrQty = parseInt(matchBefore[1], 10) || 1;
+                                        } else if (matchAfter) {
+                                            addrQty = parseInt(matchAfter[1], 10) || 1;
+                                        }
+                                    }
+
+                                    if (addrQty > 20) {
+                                        const directQtyMatch = (history.slice(-3).map((h: any) => h.content || '').join(' ')).match(/(\d+)\s*(?:botij|gás)/i);
+                                        if (directQtyMatch) {
+                                            addrQty = parseInt(directQtyMatch[1], 10) || 1;
+                                        } else {
+                                            addrQty = 1;
+                                        }
                                     }
 
                                     const p13Product = activeProducts.find((p: any) => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
