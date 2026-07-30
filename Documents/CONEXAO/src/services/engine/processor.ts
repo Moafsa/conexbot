@@ -1033,9 +1033,24 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                     // Send reply to user
                     await deliverAssistantOutbound({
-                        bot, conversation, contact: existingContact,
-                        channel, senderPhone, messageText: finalReply, mediaItems: []
+                        channel,
+                        bot: activeBot,
+                        remoteId: senderPhone,
+                        cleanResponse: finalReply,
+                        mediaMatches: [],
+                        options
                     });
+
+                    // Sync response to Chatwoot inbox if connected
+                    if ((channel === 'whatsapp' || channel === 'meta_whatsapp' || channel === 'instagram') && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                        ChatwootService.syncToConversation(
+                            bot,
+                            (existingContact as any).chatwootContactId,
+                            options.chatwootConversationId,
+                            finalReply,
+                            []
+                        ).catch(() => {});
+                    }
 
                     logToFile(`[OrderAgent] Handled turn (orderConfirmed=${agentResult.orderConfirmed})`);
                     return; // ALWAYS RETURN! Never fall through to legacy processor loop!
