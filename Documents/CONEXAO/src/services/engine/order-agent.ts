@@ -325,7 +325,7 @@ PROIBIÇÕES:
         }) as any;
 
         const content = typeof response === 'string' ? response : response?.content;
-        const toolCalls = typeof response === 'object' ? response?.tool_calls : null;
+        const toolCalls = typeof response === 'object' ? (response?.toolCalls || response?.tool_calls) : null;
 
         if (!toolCalls || toolCalls.length === 0) {
             reply = content || reply;
