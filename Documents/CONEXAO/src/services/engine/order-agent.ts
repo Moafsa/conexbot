@@ -375,14 +375,21 @@ PROIBIÇÕES:
                 forcedToolHint += `\n\n🔴 SELEÇÃO DE ENDEREÇO SALVO: O cliente quer usar um endereço salvo. Liste de forma clara e objetiva os endereços salvos acima (1. Municipal, 2. Botafogo, etc.) e pergunte qual deles ele deseja usar para esta entrega.`;
             }
         } else if (ctx.savedAddresses.length > 0) {
-            // Match by exact saved address label OR by neighborhood/street substring inside address
+            // Match by exact saved address label OR by neighborhood/street substring inside address (with typo tolerance)
             const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
-            if (cleanUser.length >= 3) {
+            const normUser = cleanUser.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+            if (normUser.length >= 3) {
                 const found = ctx.savedAddresses.find(a => {
                     const lbl = (a.label || '').toLowerCase();
                     const addr = (a.address || '').toLowerCase();
-                    return (lbl && (cleanUser.includes(lbl) || lbl.includes(cleanUser))) ||
-                           (addr && addr.includes(cleanUser));
+                    const normLbl = lbl.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+                    const normAddr = addr.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+                    return (normLbl && (normUser.includes(normLbl) || normLbl.includes(normUser))) ||
+                           (normAddr && normAddr.includes(normUser)) ||
+                           (normLbl && normUser.length >= 4 && normLbl.substring(0, 4) === normUser.substring(0, 4)) ||
+                           (normAddr && normUser.length >= 5 && normAddr.includes(normUser.substring(0, 5)));
                 });
                 if (found) {
                     matchedAddress = found.address;
