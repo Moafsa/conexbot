@@ -330,8 +330,16 @@ PROIBIÇÕES:
         }
     } else if (!cartSummary.deliveryAddress) {
         // Cart has items but missing address
-        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes)/i.test(userMsgLower);
-        if (isSameAddress && ctx.savedAddresses.length > 0) {
+        const optionMatch = userMsgLower.match(/^(?:o\s*|op[çc][ãa]o\s*|n[úu]mero\s*)?([1-9])\b/i);
+        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes|ja pedi antes|já pedi antes)/i.test(userMsgLower);
+
+        if (optionMatch && ctx.savedAddresses.length > 0) {
+            const idx = parseInt(optionMatch[1], 10) - 1;
+            if (ctx.savedAddresses[idx]) {
+                const selectedAddr = ctx.savedAddresses[idx].address;
+                forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente escolheu a opção ${idx + 1} dos endereços salvos, que corresponde a "${selectedAddr}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${selectedAddr}". Não pergunte nada antes.`;
+            }
+        } else if (isSameAddress && ctx.savedAddresses.length > 0) {
             const lastAddr = ctx.savedAddresses[0].address;
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente disse "${ctx.userMessage}". O endereço salvo do cliente é "${lastAddr}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${lastAddr}". Não pergunte nada antes.`;
         } else {
@@ -341,6 +349,13 @@ PROIBIÇÕES:
                 const addrStr = ctx.userMessage.trim();
                 forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço "${addrStr}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${addrStr}". Não pergunte o bairro, o Mapbox resolve o bairro sozinho.`;
             }
+        }
+    } else if (!cartSummary.paymentMethod) {
+        // Cart has items and address, missing payment method
+        const payMatch = userMsgLower.match(/^(dinheiro|pix|cartao|cartão|crédito|débito)\b/i);
+        if (payMatch) {
+            let payMethodStr = payMatch[1].toUpperCase().replace('CARTÃO', 'CARTAO').replace('DÉBITO', 'CARTAO').replace('CRÉDITO', 'CARTAO');
+            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou a forma de pagamento "${payMethodStr}". Chame AGORA a ferramenta "definir_pagamento" com forma="${payMethodStr}". Não faça perguntas repetidas.`;
         }
     }
 
