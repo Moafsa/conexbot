@@ -555,17 +555,18 @@ PROIBIÇÕES:
     const firstName = (ctx.contactName || '').trim().split(' ')[0];
     const isGenericName = !firstName || /^(cliente|user|usuario|usuário|\d+)$/i.test(firstName);
     const nameSuffix = isGenericName ? '' : `, ${firstName}`;
+    const totalVal = Number(updatedSummary.totalAmount ?? updatedSummary.total ?? 0);
 
     if (orderConfirmed) {
         reply = `🎉 *Pedido Confirmado com Sucesso!*${!isGenericName ? `\n\nObrigado, ${firstName}!` : ''}\n\nSeu pedido foi registrado no sistema e nosso entregador já está a caminho! 😊\n\nSe precisar de mais alguma coisa, é só me avisar!`;
     } else if (updatedSummary.hasItems && updatedSummary.deliveryAddress && updatedSummary.paymentMethod) {
         // ALWAYS present full structured order breakdown before final checkout confirmation!
-        reply = `📋 *RESUMO DO SEU PEDIDO:*\n\n📦 *Itens:*\n${updatedSummary.itemsText}\n\n📍 *Endereço de Entrega:* ${updatedSummary.deliveryAddress}\n💳 *Forma de Pagamento:* ${updatedSummary.paymentMethod}\n💰 *Valor Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}\n\nPodemos confirmar e enviar o seu pedido agora${nameSuffix}? (responda *"sim"* ou *"pode"* para confirmar)`;
+        reply = `📋 *RESUMO DO SEU PEDIDO:*\n\n📦 *Itens:*\n${updatedSummary.itemsText}\n\n📍 *Endereço de Entrega:* ${updatedSummary.deliveryAddress}\n💳 *Forma de Pagamento:* ${updatedSummary.paymentMethod}\n💰 *Valor Total:* R$ ${totalVal.toFixed(2)}\n\nPodemos confirmar e enviar o seu pedido agora${nameSuffix}? (responda *"sim"* ou *"pode"* para confirmar)`;
     } else if (!reply && updatedSummary.hasItems) {
         const missing: string[] = [];
         if (!updatedSummary.deliveryAddress) missing.push('endereço de entrega (rua e número)');
         if (!updatedSummary.paymentMethod) missing.push('forma de pagamento (dinheiro, Pix ou cartão)');
-        reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}\n\nQual será a ${missing.join(' e ')}?`;
+        reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${totalVal.toFixed(2)}\n\nQual será a ${missing.join(' e ')}?`;
     }
 
     return { reply, orderConfirmed, orderId, cartSummary: updatedSummary };

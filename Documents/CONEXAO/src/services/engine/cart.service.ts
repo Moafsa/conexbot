@@ -187,12 +187,14 @@ export class CartService {
                 unitPrice: Number(i.unitPrice),
                 subtotal: i.quantity * Number(i.unitPrice)
             })),
+            itemsText,
             deliveryAddress: cart.deliveryAddress,
             deliveryLat: cart.deliveryLat,
             deliveryLng: cart.deliveryLng,
             paymentMethod: cart.paymentMethod,
             changeAmount: cart.changeAmount,
             total,
+            totalAmount: total,
             summary: cart.items.length === 0
                 ? '🛒 Carrinho vazio.'
                 : `🛒 Carrinho:\n${itemsText}\n📍 Endereço: ${cart.deliveryAddress || 'Não definido'}\n💳 Pagamento: ${cart.paymentMethod || 'Não definido'}\n💰 Total: R$ ${total.toFixed(2)}`
