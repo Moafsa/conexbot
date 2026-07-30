@@ -348,25 +348,32 @@ PROIBIÇÕES:
         } else if (isSameAddress && ctx.savedAddresses.length > 0) {
             matchedAddress = ctx.savedAddresses[0].address;
         } else if (ctx.savedAddresses.length > 0) {
-            // Match by label or address substring (e.g. "municipal", "botafogo", "fortaleza", "gasperi")
+            // Match by exact saved address label (e.g. "Municipal", "Botafogo", "Perfil")
+            const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
             const found = ctx.savedAddresses.find(a => {
                 const lbl = (a.label || '').toLowerCase();
-                const addr = (a.address || '').toLowerCase();
-                const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
-                return (lbl && cleanUser.includes(lbl)) || (lbl && lbl.includes(cleanUser)) ||
-                       (addr && cleanUser.length >= 3 && addr.includes(cleanUser));
+                if (!lbl) return false;
+                return cleanUser.includes(lbl) || lbl.includes(cleanUser);
             });
             if (found) {
                 matchedAddress = found.address;
             }
         }
 
-        if (!matchedAddress && userMsgLower.length >= 3 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
-            matchedAddress = ctx.userMessage.trim();
+        // 4. Check if user provided street + number (e.g. "Fortaleza 380" or "Rua José de Gasperi 79")
+        if (!matchedAddress) {
+            const hasNumber = /\d+/.test(userMsgLower);
+            if (hasNumber && userMsgLower.length >= 4 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
+                matchedAddress = ctx.userMessage.trim();
+            }
         }
 
         if (matchedAddress) {
-            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço/local de entrega "${matchedAddress}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${matchedAddress}". Não pergunte nada antes.`;
+            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço de entrega "${matchedAddress}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${matchedAddress}". Não pergunte nada antes.`;
+        } else if (userMsgLower.length >= 3 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
+            // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso")
+            const cleanBairro = ctx.userMessage.replace(/^(no|na|em|o|a)\s+/i, '').trim();
+            forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}". Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
         }
     } else if (!cartSummary.paymentMethod) {
         // Cart has items and address, missing payment method
