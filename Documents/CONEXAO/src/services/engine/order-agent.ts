@@ -244,8 +244,13 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
                 statusNotice = `\n\nℹ️ Seu pedido #${lastOrder.id.substring(0, 6)} (${itemsStr}) está *em andamento* para ${lastOrder.address}.`;
             }
         }
+
+        const nameClean = (ctx.contactName || '').trim();
+        const isGenericName = !nameClean || /^(cliente|user|usuario|usuário|\d+)$/i.test(nameClean);
+        const salutationName = isGenericName ? '' : `, ${nameClean}`;
+
         return {
-            reply: `Olá, ${ctx.contactName || 'cliente'}! 😊 Como posso ajudar você hoje?${statusNotice}\n\nSe quiser fazer um novo pedido de gás, é só me dizer a quantidade!`,
+            reply: `Olá${salutationName}! 😊 Como posso ajudar você hoje?${statusNotice}\n\nSe quiser fazer um novo pedido de gás, é só me dizer a quantidade!`,
             orderConfirmed: false,
             cartSummary
         };
@@ -555,11 +560,12 @@ PROIBIÇÕES:
             if (!updatedSummary.deliveryAddress) missing.push('endereço de entrega (rua e número)');
             if (!updatedSummary.paymentMethod) missing.push('forma de pagamento (dinheiro, Pix ou cartão)');
 
-            const missingText = missing.length > 0
-                ? `\n\nQual será a ${missing.join(' e ')}?`
-                : `\n\nTudo pronto! Deseja confirmar o pedido agora? (responda "sim" ou "pode")`;
-
-            reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}${missingText}`;
+            if (missing.length > 0) {
+                reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}\n\nQual será a ${missing.join(' e ')}?`;
+            } else {
+                // FULL structured order summary before asking for confirmation!
+                reply = `📋 *RESUMO DO SEU PEDIDO:*\n\n📦 *Itens:*\n${updatedSummary.itemsText}\n\n📍 *Endereço de Entrega:* ${updatedSummary.deliveryAddress}\n💳 *Forma de Pagamento:* ${updatedSummary.paymentMethod}\n💰 *Valor Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}\n\nPodemos confirmar e enviar o seu pedido agora? (responda *"sim"* ou *"pode"* para confirmar)`;
+            }
         }
     }
 
