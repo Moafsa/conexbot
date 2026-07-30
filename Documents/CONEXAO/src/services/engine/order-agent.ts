@@ -367,15 +367,18 @@ PROIBIÇÕES:
                 forcedToolHint += `\n\n🔴 SELEÇÃO DE ENDEREÇO SALVO: O cliente quer usar um endereço salvo. Liste de forma clara e objetiva os endereços salvos acima (1. Municipal, 2. Botafogo, etc.) e pergunte qual deles ele deseja usar para esta entrega.`;
             }
         } else if (ctx.savedAddresses.length > 0) {
-            // Match by exact saved address label (e.g. "Municipal", "Botafogo", "Perfil")
+            // Match by exact saved address label OR by neighborhood/street substring inside address
             const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
-            const found = ctx.savedAddresses.find(a => {
-                const lbl = (a.label || '').toLowerCase();
-                if (!lbl) return false;
-                return cleanUser.includes(lbl) || lbl.includes(cleanUser);
-            });
-            if (found) {
-                matchedAddress = found.address;
+            if (cleanUser.length >= 3) {
+                const found = ctx.savedAddresses.find(a => {
+                    const lbl = (a.label || '').toLowerCase();
+                    const addr = (a.address || '').toLowerCase();
+                    return (lbl && (cleanUser.includes(lbl) || lbl.includes(cleanUser))) ||
+                           (addr && addr.includes(cleanUser));
+                });
+                if (found) {
+                    matchedAddress = found.address;
+                }
             }
         }
 
@@ -390,31 +393,37 @@ PROIBIÇÕES:
         if (matchedAddress) {
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço de entrega "${matchedAddress}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${matchedAddress}". Não pergunte nada antes.`;
         } else if (userMsgLower.length >= 3 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
-            // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso", "juventude")
-            const cleanBairro = ctx.userMessage.replace(/^(no|na|em|o|a)\s+/i, '').trim();
+            const isAskingAddressList = /(quais|ver|listar|meus)\s+(?:os\s+)?endere[çc]/i.test(userMsgLower);
 
-            // STEP 1: VERIFY IF NEIGHBORHOOD IS COVERED BY DISTRIBUTOR
-            let coveredNeighborhoods: string[] = [];
-            if (ctx.bot?.deliveryFeeRules) {
-                try {
-                    const rules = typeof ctx.bot.deliveryFeeRules === 'string'
-                        ? JSON.parse(ctx.bot.deliveryFeeRules)
-                        : ctx.bot.deliveryFeeRules;
-                    if (Array.isArray(rules)) {
-                        coveredNeighborhoods = rules
-                            .map((r: any) => (r.neighborhood || r.bairro || r.region || '').toLowerCase())
-                            .filter(Boolean);
-                    }
-                } catch {}
-            }
-
-            const cleanBairroLower = cleanBairro.toLowerCase();
-            const isCovered = coveredNeighborhoods.length === 0 || coveredNeighborhoods.some(n => cleanBairroLower.includes(n) || n.includes(cleanBairroLower));
-
-            if (!isCovered) {
-                forcedToolHint += `\n\n🔴 ATENÇÃO BAIRRO FORA DA COBERTURA: O cliente mencionou o bairro "${cleanBairro}". Este bairro NÃO está na lista de bairros atendidos pela distribuidora. Informe com educação ao cliente que infelizmente não realizamos entregas no bairro "${cleanBairro}".`;
+            if (isAskingAddressList) {
+                forcedToolHint += `\n\n🔴 CONSULTA DE ENDEREÇOS: O cliente perguntou pelos endereços salvos dele. Liste os endereços salvos acima de forma simpática e objetiva, perguntando qual deles ele quer usar. NÃO diga que isso é um bairro.`;
             } else {
-                forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}" (que é um bairro atendido pela distribuidora). Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
+                // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso", "juventude")
+                const cleanBairro = ctx.userMessage.replace(/^(no|na|em|o|a)\s+/i, '').trim();
+
+                // STEP 1: VERIFY IF NEIGHBORHOOD IS COVERED BY DISTRIBUTOR
+                let coveredNeighborhoods: string[] = [];
+                if (ctx.bot?.deliveryFeeRules) {
+                    try {
+                        const rules = typeof ctx.bot.deliveryFeeRules === 'string'
+                            ? JSON.parse(ctx.bot.deliveryFeeRules)
+                            : ctx.bot.deliveryFeeRules;
+                        if (Array.isArray(rules)) {
+                            coveredNeighborhoods = rules
+                                .map((r: any) => (r.neighborhood || r.bairro || r.region || '').toLowerCase())
+                                .filter(Boolean);
+                        }
+                    } catch {}
+                }
+
+                const cleanBairroLower = cleanBairro.toLowerCase();
+                const isCovered = coveredNeighborhoods.length === 0 || coveredNeighborhoods.some(n => cleanBairroLower.includes(n) || n.includes(cleanBairroLower));
+
+                if (!isCovered) {
+                    forcedToolHint += `\n\n🔴 ATENÇÃO BAIRRO FORA DA COBERTURA: O cliente mencionou o bairro "${cleanBairro}". Este bairro NÃO está na lista de bairros atendidos pela distribuidora. Informe com educação ao cliente que infelizmente não realizamos entregas no bairro "${cleanBairro}".`;
+                } else {
+                    forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}" (que é um bairro atendido pela distribuidora). Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
+                }
             }
         }
     } else if (!cartSummary.paymentMethod) {
