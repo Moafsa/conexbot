@@ -94,7 +94,7 @@ export class CartService {
 
     /**
      * Define o endereço de entrega do carrinho (validado externamente via Mapbox antes de chamar).
-     * Também salva o endereço no perfil do cliente (ContactAddress) se ainda não existir.
+     * Também salva o endereço no perfil do cliente (ContactAddress) e atualiza Contact.needs.
      */
     static async setDeliveryAddress(
         botId: string,
@@ -111,13 +111,30 @@ export class CartService {
         });
 
         // Save to ContactAddress profile if not already saved
-        const existing = await prisma.contactAddress.findFirst({
-            where: { contactId, address: { contains: address.split(',')[0] } }
-        }).catch(() => null);
+        if (address && address.length > 5 && contactId) {
+            const cleanAddr = address.trim();
+            const existing = await prisma.contactAddress.findFirst({
+                where: {
+                    contactId,
+                    address: { contains: cleanAddr.substring(0, 10), mode: 'insensitive' }
+                }
+            }).catch(() => null);
 
-        if (!existing && address.length > 5) {
-            await prisma.contactAddress.create({
-                data: { contactId, address, latitude: lat ?? undefined, longitude: lng ?? undefined }
+            if (!existing) {
+                await prisma.contactAddress.create({
+                    data: {
+                        contactId,
+                        address: cleanAddr,
+                        latitude: lat ?? undefined,
+                        longitude: lng ?? undefined
+                    }
+                }).catch((e: any) => console.error('[CartService] ContactAddress save error:', e?.message));
+            }
+
+            // Update contact.needs with latest address
+            await prisma.contact.update({
+                where: { id: contactId },
+                data: { needs: cleanAddr }
             }).catch(() => {});
         }
 

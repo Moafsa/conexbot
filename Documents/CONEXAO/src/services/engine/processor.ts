@@ -975,15 +975,11 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
             if (isOrderBot && !isGreeting) {
                 try {
-                    const { runOrderAgent, createOrderFromCartData } = await import('./order-agent');
+                    const { runOrderAgent, createOrderFromCartData, getContactSavedAddresses } = await import('./order-agent');
                     const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
                     const mapboxToken = config?.mapboxToken || bot.mapboxToken;
 
-                    const savedAddresses = await prisma.contactAddress.findMany({
-                        where: { contactId: existingContact.id },
-                        orderBy: { createdAt: 'desc' },
-                        take: 5
-                    }).catch(() => []);
+                    const savedAddresses = await getContactSavedAddresses(existingContact.id, existingContact);
 
                     const orderCatalog = bot.products
                         .filter((p: any) => p.active)

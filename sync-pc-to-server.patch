@@ -1,0 +1,3164 @@
+diff --git a/Documents/CONEXAO/Dockerfile b/Documents/CONEXAO/Dockerfile
+index 22472c7..0f74eaf 100644
+--- a/Documents/CONEXAO/Dockerfile
++++ b/Documents/CONEXAO/Dockerfile
+@@ -45,7 +45,8 @@ EXPOSE 3000
+ ENV PORT=3000
+ ENV HOSTNAME="0.0.0.0"
+ 
+-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
++# Use 127.0.0.1 (not localhost): Alpine resolves localhost to ::1 first; Node binds IPv4 only → false unhealthy / 502
++HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+     CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health 2>/dev/null || wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
+ 
+ CMD ["node", "server.js"]
+diff --git a/Documents/CONEXAO/conexbot-wp/admin/conexbot-admin.js b/Documents/CONEXAO/conexbot-wp/admin/conexbot-admin.js
+index 7f475a7..1d2e0dc 100644
+--- a/Documents/CONEXAO/conexbot-wp/admin/conexbot-admin.js
++++ b/Documents/CONEXAO/conexbot-wp/admin/conexbot-admin.js
+@@ -1,115 +1,144 @@
+-(function() {
++/**
++ * Conexbot — painel WordPress (sem inline PHP no JS).
++ */
++(function () {
+     'use strict';
+ 
+-    document.addEventListener('DOMContentLoaded', function() {
+-        // 1. Botão Desconectar
+-        const btnDisconnect = document.getElementById('conexbot-disconnect');
+-        if (btnDisconnect) {
+-            btnDisconnect.addEventListener('click', function(e) {
+-                e.preventDefault();
+-                if (confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
+-                    var data = new FormData();
+-                    data.append('action', 'conexbot_disconnect');
+-                    data.append('security', conexbotAdmin.nonceSave);
++    function init() {
++        if (typeof conexbotAdmin === 'undefined') {
++            return;
++        }
++        var ajaxurl = conexbotAdmin.ajaxurl;
+ 
+-                    fetch(conexbotAdmin.ajaxurl, { method: 'POST', body: data })
+-                    .then(() => window.location.reload());
++        var disconnect = document.getElementById('conexbot-disconnect');
++        if (disconnect) {
++            disconnect.addEventListener('click', function (e) {
++                e.preventDefault();
++                if (!confirm('Deseja realmente desconectar sua conta? A automação e o CRM pararão de funcionar.')) {
++                    return;
+                 }
++                var data = new FormData();
++                data.append('action', 'conexbot_disconnect');
++                data.append('security', conexbotAdmin.nonceSave);
++                fetch(ajaxurl, { method: 'POST', body: data }).then(function () {
++                    window.location.reload();
++                });
+             });
+         }
+ 
+-        // 2. Salvar Configurações (Bot ID)
+-        const btnSave = document.getElementById('conexbot-save-settings');
+-        if (btnSave) {
+-            btnSave.addEventListener('click', function() {
+-                const botIdInput = document.getElementById('conexbot-bot-id');
+-                const botId = botIdInput ? botIdInput.value : '';
+-                
++        var saveBtn = document.getElementById('conexbot-save-settings');
++        if (saveBtn) {
++            saveBtn.addEventListener('click', function () {
++                var botInput = document.getElementById('conexbot-bot-id');
++                var botId = botInput ? botInput.value : '';
+                 var data = new FormData();
+                 data.append('action', 'conexbot_save_setup');
+                 data.append('token', conexbotAdmin.token);
+                 data.append('bot_id', botId);
+                 data.append('security', conexbotAdmin.nonceSetup);
+-
+-                const originalText = btnSave.textContent;
+-                btnSave.textContent = 'Salvando...';
+-                btnSave.disabled = true;
+-
+-                fetch(conexbotAdmin.ajaxurl, { method: 'POST', body: data })
+-                .then(r => r.json())
+-                .then(res => {
+-                    if (res.success) {
+-                        alert('Configurações salvas!');
+-                        window.location.reload();
+-                    } else {
+-                        alert('Erro ao salvar: ' + (res.data || 'Falha no servidor.'));
+-                        btnSave.textContent = originalText;
+-                        btnSave.disabled = false;
+-                    }
+-                })
+-                .catch(err => {
+-                    console.error(err);
+-                    alert('Erro de conexão.');
+-                    btnSave.textContent = originalText;
+-                    btnSave.disabled = false;
+-                });
++                var originalText = saveBtn.textContent;
++                saveBtn.textContent = 'Salvando...';
++                saveBtn.disabled = true;
++                fetch(ajaxurl, { method: 'POST', body: data })
++                    .then(function (r) {
++                        return r.json();
++                    })
++                    .then(function (res) {
++                        if (res.success) {
++                            alert('Configurações salvas!');
++                            window.location.reload();
++                        } else {
++                            var errMsg =
++                                res.data && typeof res.data === 'object' && res.data.message
++                                    ? res.data.message
++                                    : typeof res.data === 'string'
++                                      ? res.data
++                                      : 'Não foi possível salvar.';
++                            alert('Erro ao salvar: ' + errMsg);
++                            saveBtn.textContent = originalText;
++                            saveBtn.disabled = false;
++                        }
++                    })
++                    .catch(function () {
++                        alert('Erro de rede ao salvar.');
++                        saveBtn.textContent = originalText;
++                        saveBtn.disabled = false;
++                    });
+             });
+         }
+ 
+-        // 3. Sincronização em Massa
+-        const btnBulkSync = document.getElementById('conexbot-bulk-sync');
+-        if (btnBulkSync) {
+-            btnBulkSync.addEventListener('click', function() {
+-                if (confirm('Deseja enviar todos os seus produtos publicados para a inteligência artificial agora?')) {
+-                    var data = new FormData();
+-                    data.append('action', 'conexbot_bulk_sync_ajax');
+-                    data.append('security', conexbotAdmin.nonceSave);
+-
+-                    const originalText = btnBulkSync.textContent;
+-                    btnBulkSync.textContent = 'Sincronizando...';
+-                    btnBulkSync.disabled = true;
+-
+-                    fetch(conexbotAdmin.ajaxurl, { method: 'POST', body: data })
+-                    .then(r => r.json())
+-                    .then(res => {
+-                        alert(res.data.message);
+-                        btnBulkSync.textContent = originalText;
+-                        btnBulkSync.disabled = false;
++        var bulk = document.getElementById('conexbot-bulk-sync');
++        if (bulk) {
++            bulk.addEventListener('click', function () {
++                if (!confirm('Deseja enviar todos os seus produtos publicados para a inteligência artificial agora?')) {
++                    return;
++                }
++                var data = new FormData();
++                data.append('action', 'conexbot_bulk_sync_ajax');
++                data.append('security', conexbotAdmin.nonceSave);
++                var originalBulk = bulk.textContent;
++                bulk.textContent = 'Sincronizando...';
++                bulk.disabled = true;
++                fetch(ajaxurl, { method: 'POST', body: data })
++                    .then(function (r) {
++                        return r.json();
++                    })
++                    .then(function (res) {
++                        if (res.data && res.data.message) {
++                            alert(res.data.message);
++                        } else {
++                            alert('Sincronização concluída.');
++                        }
++                        bulk.textContent = originalBulk;
++                        bulk.disabled = false;
+                     })
+-                    .catch(err => {
+-                        console.error(err);
+-                        alert('Erro na sincronização.');
+-                        btnBulkSync.textContent = originalText;
+-                        btnBulkSync.disabled = false;
++                    .catch(function () {
++                        bulk.textContent = originalBulk;
++                        bulk.disabled = false;
++                        alert('Erro de rede.');
+                     });
+-                }
+             });
+         }
+ 
+-        // 4. Onboarding Message Listener
+-        window.addEventListener('message', function(event) {
+-            if (event.origin !== "https://app.conext.click") return;
+-            
+-            if (event.data && event.data.type === 'CONEXBOT_AUTH' && event.data.token) {
++        if (document.getElementById('conexbot-onboarding-iframe')) {
++            window.addEventListener('message', function (event) {
++                if (event.origin !== 'https://app.conext.click' && event.origin !== 'http://localhost:3000') {
++                    return;
++                }
++                if (!event.data || event.data.type !== 'CONEXBOT_AUTH' || !event.data.token) {
++                    return;
++                }
+                 var data = new FormData();
+                 data.append('action', 'conexbot_save_token_ajax');
+                 data.append('token', event.data.token);
+                 data.append('security', conexbotAdmin.nonceSave);
++                fetch(ajaxurl, { method: 'POST', body: data })
++                    .then(function (r) {
++                        return r.json();
++                    })
++                    .then(function (res) {
++                        if (res.success) {
++                            window.location.href = conexbotAdmin.dashboardUrl;
++                        } else {
++                            var msg =
++                                res.data && typeof res.data === 'object' && res.data.message
++                                    ? res.data.message
++                                    : typeof res.data === 'string'
++                                      ? res.data
++                                      : 'Erro ao salvar conexão.';
++                            alert(msg);
++                        }
++                    })
++                    .catch(function () {
++                        alert('Erro de rede ao salvar.');
++                    });
++            });
++        }
++    }
+ 
+-                fetch(conexbotAdmin.ajaxurl, { method: 'POST', body: data })
+-                .then(r => r.json())
+-                .then(res => {
+-                    if (res.success) {
+-                        window.location.href = conexbotAdmin.dashboardUrl;
+-                    } else {
+-                        alert('Erro ao salvar conexão: ' + (res.data || 'Erro desconhecido.'));
+-                    }
+-                })
+-                .catch(err => {
+-                    console.error(err);
+-                    alert('Erro de comunicação com o servidor WP.');
+-                });
+-            }
+-        });
+-    });
++    if (document.readyState === 'loading') {
++        document.addEventListener('DOMContentLoaded', init);
++    } else {
++        init();
++    }
+ })();
+diff --git a/Documents/CONEXAO/conexbot-wp/admin/settings-page.php b/Documents/CONEXAO/conexbot-wp/admin/settings-page.php
+index 4123eac..d606724 100644
+--- a/Documents/CONEXAO/conexbot-wp/admin/settings-page.php
++++ b/Documents/CONEXAO/conexbot-wp/admin/settings-page.php
+@@ -261,7 +261,6 @@ function conexbot_render_admin_page() {
+                 </div>
+             </div>
+ 
+-
+         <?php elseif (isset($_GET['start_onboarding'])): ?>
+             <!-- 2. TELA DE ONBOARDING: Só carrega o iframe quando você clica em "Começar" -->
+             <div class="iframe-container">
+@@ -289,8 +288,11 @@ function conexbot_render_admin_page() {
+             <!-- 3. TELA DE BOAS-VINDAS: Tela padrão sem iframe (evita auto-connect) -->
+             <div class="conexbot-card">
+                 <div class="conexbot-logo">
+-                    <img src="https://app.conext.click/logo-colored.png" alt="ConextBot" style="width: 100%; height: auto;">
+-                
++                    <img src="https://app.conext.click/logo-colored.svg" alt="ConextBot" style="width: 100%; height: auto;">
++                </div>
++                <h1 class="conexbot-h1">Turbine seu WordPress com IA</h1>
++                <p class="conexbot-p">O Conext.click integra a inteligência artificial mais avançada diretamente ao seu WooCommerce e WhatsApp. Automatize vendas e gerencie leads sem sair do painel.</p>
++
+                 <div class="conexbot-steps">
+                     <div class="conexbot-step">
+                         <div class="conexbot-step-num">1</div>
+diff --git a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
+index 6ad0584..ddd057d 100644
+--- a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
++++ b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
+@@ -225,8 +225,7 @@ add_action('wp_footer', function () {
+  * Hook para quando um novo comentário é inserido
+  */
+ add_action('wp_insert_comment', 'conexbot_on_new_comment', 10, 2);
+-function conexbot_on_new_comment($comment_ID, $comment)
+-{
++function conexbot_on_new_comment($comment_ID, $comment) {
+     // Evitar loop: meta is_conexbot_reply só existe DEPOIS que wp_insert_comment retorna;
+     // o hook wp_insert_comment dispara antes, então precisamos deste flag na inserção via AJAX.
+     if (!empty($GLOBALS['conexbot_inserting_bot_reply'])) {
+diff --git a/Documents/CONEXAO/conext-writer/includes/class-conext-licensing.php b/Documents/CONEXAO/conext-writer/includes/class-conext-licensing.php
+index cb4bfc9..2d67cac 100644
+--- a/Documents/CONEXAO/conext-writer/includes/class-conext-licensing.php
++++ b/Documents/CONEXAO/conext-writer/includes/class-conext-licensing.php
+@@ -7,6 +7,11 @@ class Conext_Licensing {
+ 
+     private static $api_url = 'https://app.conext.click'; // URL da plataforma Conext
+ 
++    /** URL do site sem barra final — alinha com a normalização no servidor de licenças */
++    private static function site_url_for_license_api() {
++        return untrailingslashit(get_site_url());
++    }
++
+     /**
+      * Busca os planos disponíveis diretamente no SaaS
+      */
+@@ -63,7 +68,7 @@ class Conext_Licensing {
+         $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
+             'body' => json_encode([
+                 'licenseKey' => $key,
+-                'siteUrl' => get_site_url()
++                'siteUrl' => self::site_url_for_license_api(),
+             ]),
+             'headers' => ['Content-Type' => 'application/json']
+         ]);
+@@ -143,7 +148,7 @@ class Conext_Licensing {
+         $response = wp_remote_post(self::$api_url . '/api/licensing/verify', [
+             'body' => json_encode([
+                 'licenseKey' => $key,
+-                'siteUrl' => get_site_url()
++                'siteUrl' => self::site_url_for_license_api(),
+             ]),
+             'headers' => ['Content-Type' => 'application/json']
+         ]);
+diff --git a/Documents/CONEXAO/docker-compose.production.yml b/Documents/CONEXAO/docker-compose.production.yml
+index 5df40ed..48311ab 100644
+--- a/Documents/CONEXAO/docker-compose.production.yml
++++ b/Documents/CONEXAO/docker-compose.production.yml
+@@ -1,6 +1,12 @@
+ # Override para produção: app Next.js + rede Traefik
+ # Uso: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+-# Definir CONEXBOT_DOMAIN (ex: conexbot.seudominio.com) e .env com segredos
++# Definir CONEXBOT_DOMAIN (ex.: app.conext.click) e .env com segredos
++
++x-logging: &default-logging
++  driver: json-file
++  options:
++    max-size: "50m"
++    max-file: "3"
+ 
+ services:
+   app:
+@@ -9,11 +15,13 @@ services:
+       dockerfile: Dockerfile
+     container_name: conext-app
+     restart: unless-stopped
++    logging: *default-logging
+     depends_on:
+       postgres:
+         condition: service_healthy
+     environment:
+       DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-password123}@postgres:5432/conext_db?schema=public
++      REDIS_URL: redis://redis:6379
+       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-with-openssl-rand-base64-32}
+       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.conext.click}
+       UZAPI_URL: http://uzapi:8080
+@@ -21,7 +29,6 @@ services:
+       WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
+       INTERNAL_WEBHOOK_URL: http://app:3000
+       NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL:-https://app.conext.click}
+-      REDIS_URL: redis://redis:6379
+       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+@@ -38,6 +45,8 @@ services:
+       S3_ACCESS_KEY: minioadmin
+       S3_SECRET_KEY: minioadmin
+       S3_BUCKET: media
++      CHATWOOT_BASE_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
++      CHATWOOT_SUPERADMIN_TOKEN: ${CHATWOOT_SUPERADMIN_TOKEN:-}
+     networks:
+       - default
+       - proxy
+@@ -50,6 +59,45 @@ services:
+       - "traefik.http.services.conexbot.loadbalancer.server.port=3000"
+     command: sh -c "prisma migrate deploy && exec node server.js"
+ 
++  message-worker:
++    build:
++      context: .
++      dockerfile: Dockerfile.worker
++    image: conexao-worker
++    container_name: conext-worker
++    restart: unless-stopped
++    logging: *default-logging
++    depends_on:
++      postgres:
++        condition: service_healthy
++      redis:
++        condition: service_healthy
++    environment:
++      DATABASE_URL: postgresql://admin:${POSTGRES_PASSWORD:-password123}@postgres:5432/conext_db?schema=public
++      REDIS_URL: redis://redis:6379
++      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-with-openssl-rand-base64-32}
++      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.conext.click}
++      UZAPI_URL: http://uzapi:8080
++      UZAPI_SECRET_KEY: ${UZAPI_SECRET_KEY:-admin_token_123}
++      WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
++      INTERNAL_WEBHOOK_URL: http://app:3000
++      NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL:-https://app.conext.click}
++      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
++      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
++      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
++      MINIO_ENDPOINT: http://minio:9000
++      MINIO_PUBLIC_URL: https://bs3.conext.click
++      MINIO_ACCESS_KEY: minioadmin
++      MINIO_SECRET_KEY: minioadmin
++      MINIO_BUCKET: media
++      S3_ENDPOINT: http://minio:9000
++      S3_PUBLIC_URL: https://bs3.conext.click
++      S3_REGION: us-east-1
++      S3_ACCESS_KEY: minioadmin
++      S3_SECRET_KEY: minioadmin
++      S3_BUCKET: media
++      WORKER_CONCURRENCY: "4"
++
+   minio:
+     networks:
+       - default
+@@ -60,6 +108,69 @@ services:
+       - default
+       - proxy
+ 
++  chatwoot-web:
++    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
++    container_name: conext-chatwoot-web
++    restart: unless-stopped
++    logging: *default-logging
++    depends_on:
++      postgres:
++        condition: service_healthy
++      redis:
++        condition: service_healthy
++    environment:
++      RAILS_ENV: production
++      NODE_ENV: production
++      INSTALLATION_ENV: docker
++      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:-51fc1fb0019b047767bc67088a675893fa0fb6ac37e3205ec4ebadd3d59ea646}
++      FRONTEND_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
++      POSTGRES_HOST: postgres
++      POSTGRES_DATABASE: chatwoot_production
++      POSTGRES_USERNAME: admin
++      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
++      REDIS_URL: redis://redis:6379/1
++      ACTIVE_STORAGE_SERVICE: local
++    volumes:
++      - chatwoot_storage:/app/storage
++    networks:
++      - default
++      - proxy
++    labels:
++      - "traefik.enable=true"
++      - "traefik.docker.network=proxy"
++      - "traefik.http.routers.chatwoot.rule=Host(`woot.conext.click`)"
++      - "traefik.http.routers.chatwoot.entrypoints=web"
++      - "traefik.http.services.chatwoot.loadbalancer.server.port=3000"
++    command: sh -c "rm -f tmp/pids/server.pid && bundle exec rails db:chatwoot_prepare && bundle exec rails s -p 3000 -b 0.0.0.0"
++
++  chatwoot-worker:
++    image: ghcr.io/fazer-ai/chatwoot:v4.14.0-fazer-ai.74
++    container_name: conext-chatwoot-worker
++    restart: unless-stopped
++    logging: *default-logging
++    depends_on:
++      postgres:
++        condition: service_healthy
++      redis:
++        condition: service_healthy
++    environment:
++      RAILS_ENV: production
++      NODE_ENV: production
++      INSTALLATION_ENV: docker
++      SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE:-51fc1fb0019b047767bc67088a675893fa0fb6ac37e3205ec4ebadd3d59ea646}
++      FRONTEND_URL: ${CHATWOOT_BASE_URL:-http://woot.conext.click}
++      POSTGRES_HOST: postgres
++      POSTGRES_DATABASE: chatwoot_production
++      POSTGRES_USERNAME: admin
++      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
++      REDIS_URL: redis://redis:6379/1
++      ACTIVE_STORAGE_SERVICE: local
++    volumes:
++      - chatwoot_storage:/app/storage
++    networks:
++      - default
++    command: bundle exec sidekiq -C config/sidekiq.yml
++
+ networks:
+   proxy:
+     external: true
+diff --git a/Documents/CONEXAO/docker-compose.yml b/Documents/CONEXAO/docker-compose.yml
+index bc4f4f5..a4ae4ee 100644
+--- a/Documents/CONEXAO/docker-compose.yml
++++ b/Documents/CONEXAO/docker-compose.yml
+@@ -1,8 +1,15 @@
++x-logging: &default-logging
++  driver: json-file
++  options:
++    max-size: "50m"
++    max-file: "3"
++
+ services:
+   postgres:
+     image: pgvector/pgvector:pg16
+     container_name: conext-postgres
+     restart: unless-stopped
++    logging: *default-logging
+     environment:
+       POSTGRES_USER: admin
+       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+@@ -21,6 +28,7 @@ services:
+     image: redis:7-alpine
+     container_name: conext-redis
+     restart: unless-stopped
++    logging: *default-logging
+     ports:
+       - "6380:6379"
+     volumes:
+@@ -30,12 +38,19 @@ services:
+       interval: 10s
+       timeout: 5s
+       retries: 5
+-    command: redis-server --appendonly yes
++    command: >
++      redis-server
++      --appendonly yes
++      --maxmemory 1536mb
++      --maxmemory-policy allkeys-lru
++      --save 900 1
++      --save 300 10
+ 
+   uzapi:
+     image: asternic/wuzapi:latest
+     container_name: conext-uzapi
+     restart: unless-stopped
++    logging: *default-logging
+     environment:
+       WUZAPI_ADMIN_TOKEN: ${UZAPI_SECRET_KEY:-admin_token_123}
+       API_KEY: ${UZAPI_SECRET_KEY:-admin_token_123}
+@@ -55,6 +70,7 @@ services:
+   minio:
+     image: minio/minio
+     container_name: conext-minio
++    logging: *default-logging
+     ports:
+       - "9002:9000"
+       - "9003:9001"
+@@ -68,6 +84,7 @@ services:
+ 
+   createbuckets:
+     image: minio/mc
++    logging: *default-logging
+     depends_on:
+       - minio
+     entrypoint: >
+@@ -87,3 +104,4 @@ volumes:
+   wuzapi_data:
+   wuzapi_sessions:
+   miniodata:
++  chatwoot_storage:
+diff --git a/Documents/CONEXAO/next.config.ts b/Documents/CONEXAO/next.config.ts
+index cd6383d..bad1f80 100644
+--- a/Documents/CONEXAO/next.config.ts
++++ b/Documents/CONEXAO/next.config.ts
+@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
+     eslint: {
+         ignoreDuringBuilds: true,
+     },
++    async redirects() {
++        return [
++            { source: '/logo-colored.png', destination: '/logo-colored.svg', permanent: false },
++        ];
++    },
+     /* config options here */
+     experimental: {
+         serverActions: {
+@@ -25,7 +30,23 @@ const nextConfig: NextConfig = {
+                     {
+                         key: 'Content-Security-Policy',
+                         value: "frame-ancestors *",
+-                    }
++                    },
++                    {
++                        key: 'X-Content-Type-Options',
++                        value: 'nosniff',
++                    },
++                    {
++                        key: 'Referrer-Policy',
++                        value: 'strict-origin-when-cross-origin',
++                    },
++                    {
++                        key: 'Permissions-Policy',
++                        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
++                    },
++                    {
++                        key: 'Strict-Transport-Security',
++                        value: 'max-age=31536000; includeSubDomains',
++                    },
+                 ],
+             },
+             {
+diff --git a/Documents/CONEXAO/prisma.config.ts b/Documents/CONEXAO/prisma.config.ts
+new file mode 100644
+index 0000000..9735158
+--- /dev/null
++++ b/Documents/CONEXAO/prisma.config.ts
+@@ -0,0 +1,6 @@
++export default {
++  schema: "prisma/schema.prisma",
++  datasource: {
++    url: process.env.DATABASE_URL,
++  },
++};
+diff --git a/Documents/CONEXAO/prisma/migrations/20260317190000_add_message_tool_columns/migration.sqlnpx b/Documents/CONEXAO/prisma/migrations/20260317190000_add_message_tool_columns/migration.sqlnpx
+deleted file mode 100644
+index 9b68555..0000000
+Binary files a/Documents/CONEXAO/prisma/migrations/20260317190000_add_message_tool_columns/migration.sqlnpx and /dev/null differ
+diff --git a/Documents/CONEXAO/prisma/migrations/20260326120000_add_bot_is_wordpress/migration.sql b/Documents/CONEXAO/prisma/migrations/20260326120000_add_bot_is_wordpress/migration.sql
+new file mode 100644
+index 0000000..a343051
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260326120000_add_bot_is_wordpress/migration.sql
+@@ -0,0 +1,2 @@
++-- Align DB with schema: Bot.isWordpress (WP sync / multi-bot features)
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "isWordpress" BOOLEAN NOT NULL DEFAULT false;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260326213000_add_product_external_url/migration.sql b/Documents/CONEXAO/prisma/migrations/20260326213000_add_product_external_url/migration.sql
+new file mode 100644
+index 0000000..0de60ca
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260326213000_add_product_external_url/migration.sql
+@@ -0,0 +1,2 @@
++-- Schema had externalUrl on Product; DB was missing the column (P2022 on queries including products).
++ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "externalUrl" TEXT;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260408160000_writer_plugin_schema_align/migration.sql b/Documents/CONEXAO/prisma/migrations/20260408160000_writer_plugin_schema_align/migration.sql
+new file mode 100644
+index 0000000..05179ea
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260408160000_writer_plugin_schema_align/migration.sql
+@@ -0,0 +1,39 @@
++-- Align DB with schema: AI Writer / licensing (missing from prior deploys)
++
++-- CreateEnum
++CREATE TYPE "SubscriptionType" AS ENUM ('PRIMARY', 'WRITER_PLUGIN');
++
++-- AlterTable Plan
++ALTER TABLE "Plan" ADD COLUMN "postLimit" INTEGER DEFAULT 0;
++ALTER TABLE "Plan" ADD COLUMN "wordLimit" INTEGER DEFAULT 0;
++ALTER TABLE "Plan" ADD COLUMN "type" "SubscriptionType" NOT NULL DEFAULT 'PRIMARY';
++
++-- AlterTable Subscription
++ALTER TABLE "Subscription" ADD COLUMN "type" "SubscriptionType" NOT NULL DEFAULT 'PRIMARY';
++ALTER TABLE "Subscription" ADD COLUMN "writerPostsUsed" INTEGER NOT NULL DEFAULT 0;
++ALTER TABLE "Subscription" ADD COLUMN "writerWordsUsed" INTEGER NOT NULL DEFAULT 0;
++
++-- Unique on tenantId only was created as a unique index (not a named constraint)
++DROP INDEX IF EXISTS "Subscription_tenantId_key";
++
++CREATE UNIQUE INDEX "Subscription_tenantId_type_key" ON "Subscription"("tenantId", "type");
++
++-- AlterTable Payment
++ALTER TABLE "Payment" ADD COLUMN "type" "SubscriptionType" NOT NULL DEFAULT 'PRIMARY';
++
++-- CreateTable LicenseKey
++CREATE TABLE "LicenseKey" (
++    "id" TEXT NOT NULL,
++    "key" TEXT NOT NULL,
++    "siteUrl" TEXT,
++    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
++    "subscriptionId" TEXT NOT NULL,
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" TIMESTAMP(3) NOT NULL,
++
++    CONSTRAINT "LicenseKey_pkey" PRIMARY KEY ("id")
++);
++
++CREATE UNIQUE INDEX "LicenseKey_key_key" ON "LicenseKey"("key");
++
++ALTER TABLE "LicenseKey" ADD CONSTRAINT "LicenseKey_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260408161000_plan_interval_enum/migration.sql b/Documents/CONEXAO/prisma/migrations/20260408161000_plan_interval_enum/migration.sql
+new file mode 100644
+index 0000000..d48d876
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260408161000_plan_interval_enum/migration.sql
+@@ -0,0 +1,7 @@
++-- Align Plan.interval with Prisma enum PlanInterval
++
++CREATE TYPE "PlanInterval" AS ENUM ('MONTHLY','YEARLY','QUARTERLY','SEMIANNUAL');
++
++ALTER TABLE "Plan" ALTER COLUMN interval DROP DEFAULT;
++ALTER TABLE "Plan" ALTER COLUMN interval TYPE "PlanInterval" USING interval::"PlanInterval";
++ALTER TABLE "Plan" ALTER COLUMN interval SET DEFAULT 'MONTHLY'::"PlanInterval";
+diff --git a/Documents/CONEXAO/prisma/migrations/20260527120000_add_globalconfig_missing_columns/migration.sql b/Documents/CONEXAO/prisma/migrations/20260527120000_add_globalconfig_missing_columns/migration.sql
+new file mode 100644
+index 0000000..11192ab
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260527120000_add_globalconfig_missing_columns/migration.sql
+@@ -0,0 +1,5 @@
++-- GlobalConfig columns present in schema but missing from production DB
++ALTER TABLE "GlobalConfig" ADD COLUMN IF NOT EXISTS "chatwootSuperAdminToken" TEXT;
++ALTER TABLE "GlobalConfig" ADD COLUMN IF NOT EXISTS "chatwootBaseUrl" TEXT;
++ALTER TABLE "GlobalConfig" ADD COLUMN IF NOT EXISTS "mapboxToken" TEXT;
++ALTER TABLE "GlobalConfig" ADD COLUMN IF NOT EXISTS "anthropicApiKey" TEXT;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260527120100_add_tenant_anthropic_api_key/migration.sql b/Documents/CONEXAO/prisma/migrations/20260527120100_add_tenant_anthropic_api_key/migration.sql
+new file mode 100644
+index 0000000..e3e8be0
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260527120100_add_tenant_anthropic_api_key/migration.sql
+@@ -0,0 +1 @@
++ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "anthropicApiKey" TEXT;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260527130000_add_agency_hub_tables/migration.sql b/Documents/CONEXAO/prisma/migrations/20260527130000_add_agency_hub_tables/migration.sql
+new file mode 100644
+index 0000000..39d2074
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260527130000_add_agency_hub_tables/migration.sql
+@@ -0,0 +1,64 @@
++-- Agency Intelligence Hub tables (in schema but never migrated)
++
++CREATE TABLE IF NOT EXISTS "ClientAudit" (
++    "id" TEXT NOT NULL,
++    "clientId" TEXT NOT NULL,
++    "agencyId" TEXT NOT NULL,
++    "scores" JSONB NOT NULL,
++    "report" JSONB NOT NULL,
++    "missions" JSONB NOT NULL DEFAULT '[]',
++    "overallScore" INTEGER NOT NULL DEFAULT 0,
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "ClientAudit_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX IF NOT EXISTS "ClientAudit_clientId_idx" ON "ClientAudit"("clientId");
++CREATE INDEX IF NOT EXISTS "ClientAudit_agencyId_idx" ON "ClientAudit"("agencyId");
++
++ALTER TABLE "ClientAudit" DROP CONSTRAINT IF EXISTS "ClientAudit_clientId_fkey";
++ALTER TABLE "ClientAudit" ADD CONSTRAINT "ClientAudit_clientId_fkey"
++    FOREIGN KEY ("clientId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++
++CREATE TABLE IF NOT EXISTS "ClientTask" (
++    "id" TEXT NOT NULL,
++    "title" TEXT NOT NULL,
++    "description" TEXT,
++    "squadId" TEXT NOT NULL,
++    "agentId" TEXT NOT NULL,
++    "clientId" TEXT NOT NULL,
++    "agencyId" TEXT NOT NULL,
++    "status" TEXT NOT NULL DEFAULT 'PENDING',
++    "dueDate" TIMESTAMP(3),
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "ClientTask_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX IF NOT EXISTS "ClientTask_clientId_idx" ON "ClientTask"("clientId");
++CREATE INDEX IF NOT EXISTS "ClientTask_agencyId_idx" ON "ClientTask"("agencyId");
++
++ALTER TABLE "ClientTask" DROP CONSTRAINT IF EXISTS "ClientTask_clientId_fkey";
++ALTER TABLE "ClientTask" ADD CONSTRAINT "ClientTask_clientId_fkey"
++    FOREIGN KEY ("clientId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++
++CREATE TABLE IF NOT EXISTS "AgentTemplate" (
++    "id" TEXT NOT NULL,
++    "squadId" TEXT NOT NULL,
++    "squadName" TEXT NOT NULL,
++    "name" TEXT NOT NULL,
++    "role" TEXT NOT NULL,
++    "emoji" TEXT NOT NULL DEFAULT '🤖',
++    "systemPrompt" TEXT NOT NULL,
++    "tasks" JSONB NOT NULL DEFAULT '[]',
++    "llmProvider" TEXT NOT NULL DEFAULT 'anthropic',
++    "llmModel" TEXT NOT NULL DEFAULT 'claude-sonnet-4-5',
++    "isCustom" BOOLEAN NOT NULL DEFAULT false,
++    "agencyId" TEXT,
++    "isActive" BOOLEAN NOT NULL DEFAULT true,
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    CONSTRAINT "AgentTemplate_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX IF NOT EXISTS "AgentTemplate_squadId_idx" ON "AgentTemplate"("squadId");
++CREATE INDEX IF NOT EXISTS "AgentTemplate_agencyId_idx" ON "AgentTemplate"("agencyId");
+diff --git a/Documents/CONEXAO/prisma/migrations/20260527130100_schema_drift_bot_contact/migration.sql b/Documents/CONEXAO/prisma/migrations/20260527130100_schema_drift_bot_contact/migration.sql
+new file mode 100644
+index 0000000..1d48d55
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260527130100_schema_drift_bot_contact/migration.sql
+@@ -0,0 +1,13 @@
++-- Bot columns in schema but missing from production DB
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "chatwootInboxId" TEXT;
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "aiAgentStatus" TEXT NOT NULL DEFAULT 'ACTIVE';
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "niche" TEXT NOT NULL DEFAULT 'GENERIC';
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "deliveryFeeType" TEXT NOT NULL DEFAULT 'FIXED';
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "deliveryFeeRules" JSONB DEFAULT '[]';
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "mapboxToken" TEXT;
++
++-- Contact columns in schema but missing from production DB
++ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "contactType" TEXT NOT NULL DEFAULT 'CUSTOMER';
++ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "driverStatus" TEXT;
++ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "dispatchKeywords" TEXT;
++ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "activeJobs" INTEGER NOT NULL DEFAULT 0;
+diff --git a/Documents/CONEXAO/prisma/migrations/20260603120000_add_bot_onboarding_data/migration.sql b/Documents/CONEXAO/prisma/migrations/20260603120000_add_bot_onboarding_data/migration.sql
+new file mode 100644
+index 0000000..5a0023c
+--- /dev/null
++++ b/Documents/CONEXAO/prisma/migrations/20260603120000_add_bot_onboarding_data/migration.sql
+@@ -0,0 +1,2 @@
++-- Bot.onboardingData: restaurant onboarding / order memory (schema drift fix)
++ALTER TABLE "Bot" ADD COLUMN IF NOT EXISTS "onboardingData" JSONB;
+diff --git a/Documents/CONEXAO/prisma/schema.prisma b/Documents/CONEXAO/prisma/schema.prisma
+index d356f66..af45336 100644
+--- a/Documents/CONEXAO/prisma/schema.prisma
++++ b/Documents/CONEXAO/prisma/schema.prisma
+@@ -247,6 +247,7 @@ model Bot {
+   productCategories       ProductCategory[]
+   productAddonGroups      ProductAddonGroup[]
+   carts                   Cart[]
++  vectorStores            VectorStore[]
+   smtpConfigs             SmtpConfig[]
+ }
+ 
+@@ -944,3 +945,13 @@ enum FunnelStage {
+   SUPPORT
+   CHURNED
+ }
++
++model VectorStore {
++  id        String                       @id @default(uuid())
++  content   String
++  metadata  Json?
++  embedding Unsupported("vector(1536)")?
++  botId     String
++  createdAt DateTime                     @default(now())
++  bot       Bot                          @relation(fields: [botId], references: [id], onDelete: Cascade)
++}
+diff --git a/Documents/CONEXAO/prisma/seed-products.js b/Documents/CONEXAO/prisma/seed-products.js
+index c3200dc..068f7a7 100644
+--- a/Documents/CONEXAO/prisma/seed-products.js
++++ b/Documents/CONEXAO/prisma/seed-products.js
+@@ -68,20 +68,28 @@ async function main() {
+     console.log(`Product processed: ${product.name}`);
+ 
+     for (const planData of plans) {
+-      await prisma.plan.upsert({
+-        where: { name: planData.name }, // This assumes plan names are unique globally, which might not be true in real scenarios, but for seeding official ones it's fine.
+-        update: {
+-          price: planData.price,
+-          messageLimit: planData.messageLimit,
+-          botLimit: planData.botLimit,
+-          trialDays: planData.trialDays,
+-          productCatalogId: product.id
+-        },
+-        create: {
+-          ...planData,
+-          productCatalogId: product.id
+-        }
++      const existing = await prisma.plan.findFirst({
++        where: { name: planData.name },
+       });
++      if (existing) {
++        await prisma.plan.update({
++          where: { id: existing.id },
++          data: {
++            price: planData.price,
++            messageLimit: planData.messageLimit,
++            botLimit: planData.botLimit,
++            trialDays: planData.trialDays,
++            productCatalogId: product.id,
++          },
++        });
++      } else {
++        await prisma.plan.create({
++          data: {
++            ...planData,
++            productCatalogId: product.id,
++          },
++        });
++      }
+       console.log(`  - Plan processed: ${planData.name}`);
+     }
+   }
+diff --git a/Documents/CONEXAO/public/logo-colored.svg b/Documents/CONEXAO/public/logo-colored.svg
+new file mode 100644
+index 0000000..afd8f63
+--- /dev/null
++++ b/Documents/CONEXAO/public/logo-colored.svg
+@@ -0,0 +1,10 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" role="img" aria-label="ConextBot">
++  <defs>
++    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="0%">
++      <stop offset="0%" style="stop-color:#7c3aed"/>
++      <stop offset="100%" style="stop-color:#a78bfa"/>
++    </linearGradient>
++  </defs>
++  <text x="0" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="32" font-weight="800" fill="url(#g)">CONEXT</text>
++  <text x="168" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="800" fill="#7c3aed">.click</text>
++</svg>
+diff --git a/Documents/CONEXAO/scratch/inspect_keys.js b/Documents/CONEXAO/scratch/inspect_keys.js
+deleted file mode 100644
+index abf2bef..0000000
+--- a/Documents/CONEXAO/scratch/inspect_keys.js
++++ /dev/null
+@@ -1,23 +0,0 @@
+-const { PrismaClient } = require('@prisma/client');
+-const prisma = new PrismaClient();
+-
+-async function main() {
+-    try {
+-        const keys = await prisma.licenseKey.findMany({
+-            include: {
+-                subscription: {
+-                    include: {
+-                        tenant: true
+-                    }
+-                }
+-            }
+-        });
+-        console.log(JSON.stringify(keys, null, 2));
+-    } catch (e) {
+-        console.error(e);
+-    } finally {
+-        await prisma.$disconnect();
+-    }
+-}
+-
+-main();
+diff --git a/Documents/CONEXAO/scripts/reindex-all-bots.mjs b/Documents/CONEXAO/scripts/reindex-all-bots.mjs
+new file mode 100644
+index 0000000..ecbd370
+--- /dev/null
++++ b/Documents/CONEXAO/scripts/reindex-all-bots.mjs
+@@ -0,0 +1,30 @@
++import prisma from '../src/lib/prisma.js';
++import { KnowledgeService } from '../src/services/engine/knowledge.js';
++
++async function main() {
++  const bots = await prisma.bot.findMany({
++    select: { id: true, name: true, knowledgeBase: true, scrapedContent: true },
++  });
++
++  for (const bot of bots) {
++    const hasContent =
++      (bot.knowledgeBase?.length || 0) > 50 || (bot.scrapedContent?.length || 0) > 50;
++    if (!hasContent) {
++      console.log(`skip ${bot.name} (sem base de conhecimento)`);
++      continue;
++    }
++    console.log(`reindex ${bot.name}...`);
++    const result = await KnowledgeService.reindex(bot.id);
++    console.log(`  ok: ${JSON.stringify(result)}`);
++  }
++
++  const count = await prisma.$queryRaw`SELECT COUNT(*)::int AS n FROM "VectorStore"`;
++  console.log(`VectorStore total: ${count[0]?.n ?? 0}`);
++}
++
++main()
++  .catch((e) => {
++    console.error(e);
++    process.exit(1);
++  })
++  .finally(() => prisma.$disconnect());
+diff --git a/Documents/CONEXAO/src/app/api/admin/marketplace/sync/route.ts b/Documents/CONEXAO/src/app/api/admin/marketplace/sync/route.ts
+index 5d9237d..1908d72 100644
+--- a/Documents/CONEXAO/src/app/api/admin/marketplace/sync/route.ts
++++ b/Documents/CONEXAO/src/app/api/admin/marketplace/sync/route.ts
+@@ -70,20 +70,26 @@ export async function GET() {
+ 
+             const planResults = [];
+             for (const planData of plans) {
+-                const plan = await prisma.plan.upsert({
++                const existing = await prisma.plan.findFirst({
+                     where: { name: planData.name },
+-                    update: {
+-                        price: planData.price,
+-                        messageLimit: planData.messageLimit,
+-                        botLimit: planData.botLimit,
+-                        trialDays: planData.trialDays,
+-                        productCatalogId: product.id
+-                    },
+-                    create: {
+-                        ...planData,
+-                        productCatalogId: product.id
+-                    }
+                 });
++                const plan = existing
++                    ? await prisma.plan.update({
++                        where: { id: existing.id },
++                        data: {
++                            price: planData.price,
++                            messageLimit: planData.messageLimit,
++                            botLimit: planData.botLimit,
++                            trialDays: planData.trialDays,
++                            productCatalogId: product.id,
++                        },
++                    })
++                    : await prisma.plan.create({
++                        data: {
++                            ...planData,
++                            productCatalogId: product.id,
++                        },
++                    });
+                 planResults.push(plan.name);
+             }
+             results.push({ product: product.name, plans: planResults });
+diff --git a/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/route.ts b/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/route.ts
+index 3bb7b67..61c9633 100644
+--- a/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/route.ts
++++ b/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/route.ts
+@@ -114,14 +114,14 @@ Estrutura do JSON de Resposta:
+ }
+ `;
+ 
+-export async function POST(req: Request, { params }: { params: { id: string } }) {
++export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+     try {
+         const session = await getServerSession(authOptions) as any;
+         if (!session?.user) {
+             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+         }
+ 
+-        const clientId = params.id;
++        const { id: clientId } = await params;
+ 
+         // 1. Validar se o solicitante é uma agência e gerencia este cliente
+         const agency = await prisma.agency.findUnique({
+@@ -142,6 +142,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
+                     include: {
+                         channels: true
+                     },
++                    orderBy: { createdAt: 'desc' },
+                     take: 1
+                 }
+             }
+diff --git a/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/status/[jobId]/route.ts b/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/status/[jobId]/route.ts
+index c732de3..71dc35f 100644
+--- a/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/status/[jobId]/route.ts
++++ b/Documents/CONEXAO/src/app/api/agency/clients/[id]/audit/status/[jobId]/route.ts
+@@ -4,15 +4,14 @@ import { getServerSession } from 'next-auth';
+ import { authOptions } from '@/lib/auth';
+ import prisma from '@/lib/prisma';
+ 
+-export async function GET(req: Request, { params }: { params: { id: string, jobId: string } }) {
++export async function GET(req: Request, { params }: { params: Promise<{ id: string, jobId: string }> }) {
+     try {
+         const session = await getServerSession(authOptions) as any;
+         if (!session?.user) {
+             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+         }
+ 
+-        const clientId = params.id;
+-        const jobId = params.jobId;
++        const { id: clientId, jobId } = await params;
+ 
+         // Validar permissão
+         const agency = await prisma.agency.findUnique({
+diff --git a/Documents/CONEXAO/src/app/api/ai/architect/route.ts b/Documents/CONEXAO/src/app/api/ai/architect/route.ts
+index 4c51afc..ce21817 100644
+--- a/Documents/CONEXAO/src/app/api/ai/architect/route.ts
++++ b/Documents/CONEXAO/src/app/api/ai/architect/route.ts
+@@ -19,30 +19,31 @@ export async function POST(req: Request) {
+         const userId = (session.user as any).id;
+         const userEmail = (session.user as any).email;
+ 
+-        let tenant = await prisma.tenant.findUnique({
+-            where: { id: userId },
+-            select: {
+-                openaiApiKey: true,
+-                geminiApiKey: true,
+-                openrouterApiKey: true
+-            }
+-        });
++        // Busca tenant por ID; fallback por email (caso session.user.id não esteja definido, ex: JWT antigo)
++        let tenant = userId
++            ? await prisma.tenant.findUnique({
++                where: { id: userId },
++                select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
++            })
++            : null;
+ 
+         if (!tenant && userEmail) {
+             tenant = await prisma.tenant.findUnique({
+                 where: { email: userEmail },
+-                select: {
+-                    openaiApiKey: true,
+-                    geminiApiKey: true,
+-                    openrouterApiKey: true
+-                }
++                select: { openaiApiKey: true, geminiApiKey: true, openrouterApiKey: true }
+             });
+         }
+ 
+         if (!tenant) {
+-            return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
++            return NextResponse.json({ error: 'Tenant not found. Try logging out and back in.' }, { status: 404 });
+         }
+ 
++        // Log para diagnóstico (tenant encontrado, chaves presentes)
++        const hasOpenAI = !!(tenant.openaiApiKey);
++        const hasGemini = !!(tenant.geminiApiKey);
++        const hasOpenRouter = !!(tenant.openrouterApiKey);
++        console.log('[AI Architect] Tenant OK. Keys: OpenAI=', hasOpenAI, 'Gemini=', hasGemini, 'OpenRouter=', hasOpenRouter, '| userId=', userId, 'email=', userEmail);
++
+         const { message, history, extractedTexts, botId } = await req.json();
+ 
+         let botContext = "";
+@@ -82,7 +83,7 @@ export async function POST(req: Request) {
+ 
+         const dummyBot = {
+             aiProvider: provider,
+-            aiModel: provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
++            aiModel: provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini',
+             tenant: effectiveTenant
+         };
+ 
+@@ -170,7 +171,7 @@ FORMATO JSON:
+             { role: "user", content: detailedUserMessage }
+         ];
+ 
+-        let aiResult;
++        let aiResult: any;
+         try {
+             aiResult = await safeChatCompletion({
+                 bot: dummyBot,
+@@ -180,26 +181,40 @@ FORMATO JSON:
+             }) as any;
+         } catch (error: any) {
+             console.error('[AI Architect] SafeChatCompletion Error:', error);
+-            return NextResponse.json({ 
+-                error: 'Falha na chamada de IA. Verifique se as chaves configuradas estão válidas.', 
+-                details: error.message 
++            return NextResponse.json({
++                error: error?.message || 'Falha na chamada de IA. Verifique se as chaves configuradas estão válidas.',
++                details: error.message,
++                content: error?.message || 'Falha na chamada de IA. Verifique suas chaves em Configurações.'
+             }, { status: 500 });
+         }
+ 
+-        let parsedResponse;
++        let parsedResponse: any;
+         try {
+             const responseContent = typeof aiResult === 'string' ? aiResult : aiResult.content;
+-            
++
+             if (!responseContent) {
+-                 return NextResponse.json({ 
+-                     error: 'Falha na chamada de IA. Resposta vazia. Verifique as chaves e os créditos da OpenAI/Gemini/OpenRouter.' 
+-                 }, { status: 500 });
++                return NextResponse.json({
++                    error: 'Falha na chamada de IA. Resposta vazia. Verifique as chaves e os créditos da OpenAI/Gemini/OpenRouter.',
++                    content: 'Falha na chamada de IA. Resposta vazia.'
++                }, { status: 500 });
+             }
+-            
++
+             parsedResponse = JSON.parse(responseContent || '{}');
+         } catch (error: any) {
+             console.error('[AI Architect] JSON Parse Error:', error);
+-            return NextResponse.json({ error: 'Falha ao processar a resposta gerada pela IA.', details: error.message }, { status: 500 });
++            return NextResponse.json({
++                error: 'Falha ao processar a resposta gerada pela IA.',
++                details: error.message,
++                content: 'A IA retornou uma resposta inválida. Tente novamente ou verifique suas chaves em Configurações.'
++            }, { status: 500 });
++        }
++
++        if (!parsedResponse.content && parsedResponse.nextStep) {
++            console.error('[AI Architect] AI returned empty content. Raw:', JSON.stringify(parsedResponse).substring(0, 300));
++            return NextResponse.json({
++                error: 'Resposta incompleta da IA',
++                content: 'A IA não retornou texto. Verifique se as chaves OpenAI/Gemini em Configurações estão válidas e com crédito.'
++            }, { status: 500 });
+         }
+ 
+         // 🛑 SAFETY: Prevent premature 'done'
+@@ -241,9 +256,10 @@ FORMATO JSON:
+         }
+ 
+         return NextResponse.json(parsedResponse);
+-    } catch (error) {
++    } catch (error: any) {
+         console.error('[AI Architect] Error:', error);
+-        return NextResponse.json({ error: 'Failed' }, { status: 500 });
++        const msg = error?.message || 'Failed';
++        return NextResponse.json({ error: msg, details: process.env.NODE_ENV === 'development' ? String(error) : undefined }, { status: 500 });
+     }
+ }
+ 
+diff --git a/Documents/CONEXAO/src/app/api/auth/register/route.ts b/Documents/CONEXAO/src/app/api/auth/register/route.ts
+index c1a3fb5..e1b0443 100644
+--- a/Documents/CONEXAO/src/app/api/auth/register/route.ts
++++ b/Documents/CONEXAO/src/app/api/auth/register/route.ts
+@@ -1,3 +1,4 @@
++export const dynamic = 'force-dynamic';
+ import { NextResponse } from 'next/server';
+ import bcrypt from 'bcryptjs';
+ import prisma from '@/lib/prisma';
+@@ -87,15 +88,15 @@ export async function POST(req: Request) {
+                 subscriptions: plan ? {
+                     create: {
+                         planId: plan.id,
++                        type,
+                         status: trial === 'true' ? 'TRIALING' : 'PENDING',
+                         gateway: trial === 'true' ? 'SYSTEM' : 'ASAAS',
+-                        type: type as any,
+                         licenseKeys: type === 'WRITER_PLUGIN' ? {
+                             create: {
+                                 key: `CNX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+-                            }
+-                        } : undefined
+-                    }
++                            },
++                        } : undefined,
++                    },
+                 } : undefined,
+                 usageCounter: {
+                     create: {
+diff --git a/Documents/CONEXAO/src/app/api/licensing/verify/route.ts b/Documents/CONEXAO/src/app/api/licensing/verify/route.ts
+index 7c03768..86c0ee1 100644
+--- a/Documents/CONEXAO/src/app/api/licensing/verify/route.ts
++++ b/Documents/CONEXAO/src/app/api/licensing/verify/route.ts
+@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
+ import { NextRequest, NextResponse } from 'next/server';
+ import prisma from '@/lib/prisma';
+ import { isSubscriptionActive } from '@/lib/subscription';
++import { canonicalLicensingSiteUrl } from '@/lib/licensing-site-url';
+ 
+ export async function POST(req: NextRequest) {
+     try {
+@@ -17,10 +18,10 @@ export async function POST(req: NextRequest) {
+                 subscription: {
+                     include: {
+                         plan: true,
+-                        tenant: true
+-                    }
+-                }
+-            }
++                        tenant: true,
++                    },
++                },
++            },
+         });
+ 
+         if (!keyRecord) {
+@@ -29,27 +30,39 @@ export async function POST(req: NextRequest) {
+ 
+         const subscription = keyRecord.subscription;
+         const isTrial = subscription.status === 'TRIALING';
+-        const postLimit = (isTrial || subscription.status === 'FREE') ? 5 : (subscription.plan?.postLimit || 0);
++        const postLimit =
++            isTrial || subscription.status === 'FREE'
++                ? 5
++                : subscription.plan?.postLimit || 0;
+ 
+-        // Permitimos PENDING para integração, mas avisamos o status
+         const isActive = isSubscriptionActive(subscription.status);
+         const isPending = subscription.status === 'PENDING';
+ 
+         if (!isActive && !isPending) {
+-            return NextResponse.json({ 
+-                error: 'Subscription is inactive',
+-                status: subscription.status 
+-            }, { status: 403 });
++            return NextResponse.json(
++                {
++                    error: 'Subscription is inactive',
++                    status: subscription.status,
++                },
++                { status: 403 },
++            );
+         }
+ 
+-        // Multi-Site Support: We update the siteUrl to the current one, but we don't block.
+-        // Consumption is tracked at the subscription level, not per site.
+-        if (siteUrl && keyRecord.siteUrl !== siteUrl) {
+-            console.log(`[Licensing] Updating siteUrl for key ${licenseKey}: ${keyRecord.siteUrl || 'none'} -> ${siteUrl}`);
+-            await prisma.licenseKey.update({
+-                where: { id: keyRecord.id },
+-                data: { siteUrl }
+-            });
++        // Multi-site: atualiza siteUrl sem bloquear (créditos na subscrição). Grava URL canónica.
++        if (siteUrl) {
++            const canonical = canonicalLicensingSiteUrl(siteUrl);
++            const storedCanon = keyRecord.siteUrl
++                ? canonicalLicensingSiteUrl(keyRecord.siteUrl)
++                : '';
++            if (canonical !== storedCanon) {
++                console.log(
++                    `[Licensing] Updating siteUrl for key ${licenseKey}: ${keyRecord.siteUrl || 'none'} -> ${canonical}`,
++                );
++                await prisma.licenseKey.update({
++                    where: { id: keyRecord.id },
++                    data: { siteUrl: canonical },
++                });
++            }
+         }
+ 
+         return NextResponse.json({
+@@ -62,12 +75,10 @@ export async function POST(req: NextRequest) {
+             status: subscription.status,
+             customer: subscription.tenant.name,
+             isTrial: isTrial,
+-            isPending: isPending
++            isPending: isPending,
+         });
+-
+     } catch (error) {
+         console.error('[Licensing API] Error verifying key:', error);
+         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+     }
+ }
+-
+diff --git a/Documents/CONEXAO/src/app/api/marketing/ads/route.ts b/Documents/CONEXAO/src/app/api/marketing/ads/route.ts
+index 0044838..61f0b6f 100644
+--- a/Documents/CONEXAO/src/app/api/marketing/ads/route.ts
++++ b/Documents/CONEXAO/src/app/api/marketing/ads/route.ts
+@@ -15,8 +15,7 @@ export async function GET(req: Request) {
+             MetaAdsService.listCampaigns(tenantId),
+             MetaAdsService.getInsights(tenantId),
+             MetaAdsService.getAccountBalance(tenantId).catch(() => null),
+-            // Tenta Google Ads se configurado
+-            require("@/services/marketing/google-ads-service").GoogleAdsService.getCampaignInsights(tenantId).catch(() => null)
++            GoogleAdsService.getCampaignInsights(tenantId).catch(() => null)
+         ]);
+ 
+         return NextResponse.json({ 
+diff --git a/Documents/CONEXAO/src/app/api/products/magic-import/route.ts b/Documents/CONEXAO/src/app/api/products/magic-import/route.ts
+index 2792c89..3687132 100644
+--- a/Documents/CONEXAO/src/app/api/products/magic-import/route.ts
++++ b/Documents/CONEXAO/src/app/api/products/magic-import/route.ts
+@@ -4,7 +4,13 @@ import authOptions from '@/lib/auth';
+ import prisma from '@/lib/prisma';
+ import OpenAI from 'openai';
+ 
+-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
++export const dynamic = 'force-dynamic';
++
++function getOpenAI() {
++    const apiKey = process.env.OPENAI_API_KEY;
++    if (!apiKey) throw new Error('OpenAI API Key not configured');
++    return new OpenAI({ apiKey });
++}
+ 
+ export async function POST(req: Request) {
+     try {
+@@ -32,7 +38,7 @@ export async function POST(req: Request) {
+         if (!bot) return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
+ 
+         // Call OpenAI to structure the menu
+-        const response = await openai.chat.completions.create({
++        const response = await getOpenAI().chat.completions.create({
+             model: 'gpt-4o-mini',
+             messages: [
+                 {
+diff --git a/Documents/CONEXAO/src/app/api/v1/bot-info/[id]/route.ts b/Documents/CONEXAO/src/app/api/v1/bot-info/[id]/route.ts
+index 2fda95c..ce05a3a 100644
+--- a/Documents/CONEXAO/src/app/api/v1/bot-info/[id]/route.ts
++++ b/Documents/CONEXAO/src/app/api/v1/bot-info/[id]/route.ts
+@@ -1,19 +1,22 @@
+ export const dynamic = 'force-dynamic';
+-import { NextResponse } from 'next/server';
++import { NextResponse, type NextRequest } from 'next/server';
+ import prisma from '@/lib/prisma';
+ 
+-export async function GET(req: Request, { params }: { params: any }) {
++export async function GET(
++    _req: NextRequest,
++    context: { params: Promise<{ id: string }> }
++) {
+     try {
+-        const { id } = await params;
+-        
++        const { id } = await context.params;
++
+         const bot = await prisma.bot.findUnique({
+             where: { id },
+             select: {
+                 id: true,
+                 name: true,
+                 businessType: true,
+-                status: true
+-            }
++                status: true,
++            },
+         });
+ 
+         if (!bot) {
+diff --git a/Documents/CONEXAO/src/app/api/webhooks/asaas/route.ts b/Documents/CONEXAO/src/app/api/webhooks/asaas/route.ts
+index c82dd3d..3f04d60 100644
+--- a/Documents/CONEXAO/src/app/api/webhooks/asaas/route.ts
++++ b/Documents/CONEXAO/src/app/api/webhooks/asaas/route.ts
+@@ -162,10 +162,17 @@ export async function POST(req: Request) {
+             });
+ 
+             if (subscription) {
+-                await prisma.subscription.update({
+-                    where: { id: subscription.id },
+-                    data: { status: 'PAST_DUE' },
++                // Só marca PAST_DUE se o pagamento em questão ainda não foi quitado
++                // (evita webhook atrasado sobrescrever ACTIVE após quitação manual no superadmin)
++                const paymentRecord = await prisma.payment.findUnique({
++                    where: { externalId: externalId },
+                 });
++                if (!paymentRecord || (paymentRecord.status !== 'PAID' && paymentRecord.status !== 'RECEIVED' && paymentRecord.status !== 'CONFIRMED')) {
++                    await prisma.subscription.update({
++                        where: { id: subscription.id },
++                        data: { status: 'PAST_DUE' },
++                    });
++                }
+             }
+         }
+ 
+diff --git a/Documents/CONEXAO/src/app/api/webhooks/wordpress/route.ts b/Documents/CONEXAO/src/app/api/webhooks/wordpress/route.ts
+index 54ea5bb..2d0af8d 100644
+--- a/Documents/CONEXAO/src/app/api/webhooks/wordpress/route.ts
++++ b/Documents/CONEXAO/src/app/api/webhooks/wordpress/route.ts
+@@ -3,19 +3,7 @@ import { NextResponse } from 'next/server';
+ import { MessageProcessor } from '@/services/engine/processor';
+ import prisma from '@/lib/prisma';
+ import { verifyWpToken } from '@/lib/wp-token';
+-import fs from 'fs';
+-import path from 'path';
+-
+-function logToFile(msg: string) {
+-    const timestamp = new Date().toISOString();
+-    const line = `[${timestamp}] ${msg}\n`;
+-    const logPath = process.platform === 'win32' ? path.join(process.cwd(), 'debug-today.log') : '/tmp/debug-today.log';
+-    try {
+-        fs.appendFileSync(logPath, line);
+-    } catch (e) {
+-        console.error('Failed to log to file:', e);
+-    }
+-}
++import { logToFile } from '@/services/engine/logger';
+ 
+ export async function POST(req: Request) {
+     try {
+diff --git a/Documents/CONEXAO/src/app/chat-embed/[botId]/page.tsx b/Documents/CONEXAO/src/app/chat-embed/[botId]/page.tsx
+index 7b5e0e8..f465e91 100644
+--- a/Documents/CONEXAO/src/app/chat-embed/[botId]/page.tsx
++++ b/Documents/CONEXAO/src/app/chat-embed/[botId]/page.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import React, { useState, useEffect, useRef } from 'react';
++import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+ import { useParams } from 'next/navigation';
+ 
+ interface Message {
+@@ -9,6 +9,16 @@ interface Message {
+     timestamp: Date;
+ }
+ 
++function getOrCreateSessionId(botId: string): string {
++    const key = `conext_session_${botId}`;
++    let sId = localStorage.getItem(key);
++    if (!sId) {
++        sId = Math.random().toString(36).substring(2, 15);
++        localStorage.setItem(key, sId);
++    }
++    return sId;
++}
++
+ export default function WebChatWidget() {
+     const params = useParams();
+     const botId = params.botId as string;
+@@ -17,64 +27,69 @@ export default function WebChatWidget() {
+     const [loading, setLoading] = useState(false);
+     const [botName, setBotName] = useState('Assistente IA');
+     const [sessionId, setSessionId] = useState('');
++    /** Mesmo valor que o estado, preenchido antes do paint — evita enviar com "" e gravar em remoteId errado (ex.: web_user). */
++    const sessionIdRef = useRef<string>('');
++    const [sessionReady, setSessionReady] = useState(false);
+     const [userContext, setUserContext] = useState<{ name?: string, email?: string }>({});
+     const scrollRef = useRef<HTMLDivElement>(null);
+ 
+-    useEffect(() => {
+-        // Inicializar ID de sessão único
+-        if (typeof window !== 'undefined') {
+-            const searchParams = new URLSearchParams(window.location.search);
+-            const wpName = searchParams.get('name');
+-            const wpEmail = searchParams.get('email');
+-            
+-            if (wpName || wpEmail) {
+-                setUserContext({ name: wpName || undefined, email: wpEmail || undefined });
+-            }
++    useLayoutEffect(() => {
++        if (typeof window === 'undefined' || !botId) return;
+ 
+-            let sId = localStorage.getItem(`conext_session_${botId}`);
+-            if (!sId) {
+-                sId = Math.random().toString(36).substring(2, 15);
+-                localStorage.setItem(`conext_session_${botId}`, sId);
+-            }
+-            setSessionId(sId);
+-            
+-            // Buscar informações do bot
+-            fetch(`/api/v1/bot-info/${botId}`)
+-                .then(res => res.json())
+-                .then(data => {
+-                    if (data.name) setBotName(data.name);
+-                })
+-                .catch(err => console.error('Error fetching bot info:', err));
+-
+-            // Buscar histórico de mensagens
+-            fetch(`/api/v1/webchat/history?botId=${botId}&sessionId=${sId}`)
+-                .then(res => res.json())
+-                .then(data => {
+-                    if (data.messages && data.messages.length > 0) {
+-                        setMessages(data.messages.map((m: any) => ({
+-                            role: m.role,
+-                            content: m.content,
+-                            timestamp: new Date(m.timestamp)
+-                        })));
+-                    } else {
+-                        // Mensagem de boas-vindas se não houver histórico
+-                        setMessages([{
+-                            role: 'assistant',
+-                            content: wpName ? `Olá ${wpName}! Como posso ajudar você hoje?` : 'Olá! Como posso ajudar você hoje?',
+-                            timestamp: new Date()
+-                        }]);
+-                    }
+-                })
+-                .catch(err => {
+-                    console.error('Error fetching history:', err);
++        const searchParams = new URLSearchParams(window.location.search);
++        const wpName = searchParams.get('name');
++        const wpEmail = searchParams.get('email');
++
++        if (wpName || wpEmail) {
++            setUserContext({ name: wpName || undefined, email: wpEmail || undefined });
++        }
++
++        const sId = getOrCreateSessionId(botId);
++        sessionIdRef.current = sId;
++        setSessionId(sId);
++        setSessionReady(true);
++    }, [botId]);
++
++    useEffect(() => {
++        if (!sessionReady || !botId) return;
++
++        const searchParams = new URLSearchParams(window.location.search);
++        const wpName = searchParams.get('name');
++        const sId = sessionIdRef.current;
++
++        fetch(`/api/v1/bot-info/${botId}`)
++            .then(res => res.json())
++            .then(data => {
++                if (data.name) setBotName(data.name);
++            })
++            .catch(err => console.error('Error fetching bot info:', err));
++
++        fetch(`/api/v1/webchat/history?botId=${encodeURIComponent(botId)}&sessionId=${encodeURIComponent(sId)}`)
++            .then(res => res.json())
++            .then(data => {
++                if (data.messages && data.messages.length > 0) {
++                    setMessages(data.messages.map((m: any) => ({
++                        role: m.role,
++                        content: m.content,
++                        timestamp: new Date(m.timestamp)
++                    })));
++                } else {
+                     setMessages([{
+                         role: 'assistant',
+-                        content: 'Olá! Como posso ajudar você hoje?',
++                        content: wpName ? `Olá ${wpName}! Como posso ajudar você hoje?` : 'Olá! Como posso ajudar você hoje?',
+                         timestamp: new Date()
+                     }]);
+-                });
+-        }
+-    }, [botId]);
++                }
++            })
++            .catch(err => {
++                console.error('Error fetching history:', err);
++                setMessages([{
++                    role: 'assistant',
++                    content: 'Olá! Como posso ajudar você hoje?',
++                    timestamp: new Date()
++                }]);
++            });
++    }, [botId, sessionReady]);
+ 
+     useEffect(() => {
+         if (scrollRef.current) {
+@@ -83,7 +98,10 @@ export default function WebChatWidget() {
+     }, [messages]);
+ 
+     const handleSend = async () => {
+-        if (!input.trim() || loading) return;
++        if (!input.trim() || loading || !sessionReady) return;
++
++        const sid = sessionIdRef.current || sessionId;
++        if (!sid) return;
+ 
+         const userMsg: Message = {
+             role: 'user',
+@@ -102,7 +120,7 @@ export default function WebChatWidget() {
+                 body: JSON.stringify({
+                     botId,
+                     message: userMsg.content,
+-                    sessionId,
++                    sessionId: sid,
+                     contactInfo: userContext
+                 })
+             });
+@@ -178,14 +196,16 @@ export default function WebChatWidget() {
+                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-1 pl-4 focus-within:ring-2 focus-within:ring-violet-500/20 transition-all">
+                     <input 
+                         className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 py-2"
+-                        placeholder="Digite sua mensagem..."
++                        placeholder={sessionReady ? 'Digite sua mensagem...' : 'Carregando...'}
+                         value={input}
++                        disabled={!sessionReady || loading}
+                         onChange={(e) => setInput(e.target.value)}
+                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                     />
+                     <button 
+                         onClick={handleSend}
+-                        className="w-9 h-9 bg-violet-600 rounded-full flex items-center justify-center text-white hover:bg-violet-700 transition-colors"
++                        disabled={!sessionReady || loading}
++                        className="w-9 h-9 bg-violet-600 rounded-full flex items-center justify-center text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+                     >
+                         <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                     </button>
+diff --git a/Documents/CONEXAO/src/app/dashboard/agency/clients/[id]/audit/page.tsx b/Documents/CONEXAO/src/app/dashboard/agency/clients/[id]/audit/page.tsx
+index ef2a6d0..b5b341d 100644
+--- a/Documents/CONEXAO/src/app/dashboard/agency/clients/[id]/audit/page.tsx
++++ b/Documents/CONEXAO/src/app/dashboard/agency/clients/[id]/audit/page.tsx
+@@ -99,11 +99,29 @@ export default function ClientAuditPage() {
+     };
+ 
+     const pollAuditStatus = (jobId: string) => {
++        let attempts = 0;
++        const maxAttempts = 60; // ~3 minutes at 3s intervals
++
+         const interval = setInterval(async () => {
++            attempts++;
++            if (attempts > maxAttempts) {
++                clearInterval(interval);
++                setError('A auditoria está demorando mais que o esperado. Tente novamente em alguns instantes.');
++                setAuditing(false);
++                return;
++            }
++
+             try {
+                 const res = await fetch(`/api/agency/clients/${clientId}/audit/status/${jobId}`);
+                 const data = await res.json();
+ 
++                if (!res.ok) {
++                    clearInterval(interval);
++                    setError(data.error || 'Erro ao consultar status da auditoria.');
++                    setAuditing(false);
++                    return;
++                }
++
+                 if (data.status === 'COMPLETED') {
+                     clearInterval(interval);
+                     setAudit({
+diff --git a/Documents/CONEXAO/src/app/dashboard/finance/page.tsx b/Documents/CONEXAO/src/app/dashboard/finance/page.tsx
+index 06dee74..1f34157 100644
+--- a/Documents/CONEXAO/src/app/dashboard/finance/page.tsx
++++ b/Documents/CONEXAO/src/app/dashboard/finance/page.tsx
+@@ -40,7 +40,8 @@ function ErrorBanner() {
+     );
+ }
+ 
+-export default function FinancePage() {
++function FinancePageContent() {
++    const searchParams = useSearchParams();
+     const [loading, setLoading] = useState(true);
+     const [stats, setStats] = useState<any>(null);
+     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+@@ -68,6 +69,13 @@ export default function FinancePage() {
+         return () => clearTimeout(timeout);
+     }, [ordersPage, ordersSearch]);
+ 
++    useEffect(() => {
++        const q = searchParams.get('search') || searchParams.get('clientEmail');
++        if (q) {
++            setOrdersSearch(q);
++        }
++    }, [searchParams]);
++
+     const fetchOrders = async (page = 1, search = '') => {
+         setTableLoading(true);
+         try {
+@@ -170,7 +178,8 @@ export default function FinancePage() {
+     }
+ 
+     const { summary, asaas, subscriptions, invoices } = stats || {};
+-    const subscription = subscriptions?.find((s: any) => s.type !== 'WRITER_PLUGIN') || subscriptions?.[0];
++    const subscription =
++        subscriptions?.find((s: any) => s.type !== "WRITER_PLUGIN") ?? subscriptions?.[0];
+ 
+     return (
+         <div className="space-y-8 animate-fade-in h-full overflow-y-auto custom-scrollbar p-4 md:p-8">
+@@ -268,6 +277,7 @@ export default function FinancePage() {
+                                 <Receipt size={20} className="text-purple-400" />
+                                 Assinatura
+                             </h3>
++                        </div>
+                         <div className="space-y-6">
+                             {(subscriptions && subscriptions.length > 0) ? (
+                                 subscriptions.map((sub: any) => (
+@@ -319,7 +329,6 @@ export default function FinancePage() {
+                                 Alterar Plano / Upgrade
+                             </button>
+                         </div>
+-                        </div>
+                     </div>
+ 
+                     {/* Invoices List inside right column */}
+@@ -556,6 +565,18 @@ export default function FinancePage() {
+     );
+ }
+ 
++export default function FinancePage() {
++    return (
++        <Suspense fallback={
++            <div className="flex items-center justify-center min-h-[60vh]">
++                <Loader2 className="animate-spin text-white/30" size={32} />
++            </div>
++        }>
++            <FinancePageContent />
++        </Suspense>
++    );
++}
++
+ function StatCard({ title, value, icon, trend, color, error }: any) {
+     const colors: any = {
+         green: "border-green-500/30 text-green-400 bg-green-500/5",
+diff --git a/Documents/CONEXAO/src/app/dashboard/layout.tsx b/Documents/CONEXAO/src/app/dashboard/layout.tsx
+index a198336..dfbbbb9 100644
+--- a/Documents/CONEXAO/src/app/dashboard/layout.tsx
++++ b/Documents/CONEXAO/src/app/dashboard/layout.tsx
+@@ -12,29 +12,35 @@ export default async function DashboardLayout({
+ }) {
+     const prisma = (await import('@/lib/prisma')).default;
+     const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } }) as any;
+-    
++
+     let trialBanner = null;
+ 
+-    // Check if user has an active subscription
+     const session = await import('next-auth').then(m => m.getServerSession(require('@/lib/auth').authOptions)) as any;
+-    
+-    // Redirect unauthenticated users to login
++
+     if (!session?.user) {
+         const { redirect } = await import('next/navigation');
+         redirect('/auth/login?callbackUrl=/dashboard');
+     }
+ 
+-    // --- Impersonation Logic (declared at top level) ---
+     const cookieStore = await (await import('next/headers')).cookies();
+     const impersonateId = cookieStore.get('impersonate_id')?.value;
+     const isImpersonating = Boolean(
+         impersonateId && (session?.user?.role === 'SUPERADMIN' || session?.user?.role === 'ADMIN')
+     );
+-    // --------------------------------------------------
++
++    const tenantInclude = {
++        subscriptions: { include: { licenseKeys: true } },
++        usageCounter: true,
++        agency: true,
++        managedBy: {
++            include: {
++                tenant: { select: { name: true, whatsapp: true, email: true } }
++            }
++        },
++    };
+ 
+     let tenant = null;
+     if (session?.user?.email) {
+-        // Determine target tenant (impersonation or self)
+         let targetId: string | undefined = session.user.id;
+         if (isImpersonating) {
+             targetId = impersonateId;
+@@ -43,41 +49,14 @@ export default async function DashboardLayout({
+         if (targetId) {
+             tenant = await prisma.tenant.findUnique({
+                 where: { id: targetId },
+-                include: {
+-                    subscriptions: {
+-                        include: { licenseKeys: true }
+-                    },
+-                    usageCounter: true,
+-                    agency: true,
+-                    managedBy: {
+-                        include: {
+-                            tenant: { select: { name: true, whatsapp: true, email: true } }
+-                        }
+-                    },
+-                }
++                include: tenantInclude,
+             });
+         } else {
+-            // Fallback: look up by email if id missing
+             tenant = await prisma.tenant.findUnique({
+                 where: { email: session.user.email },
+-                include: {
+-                    subscriptions: {
+-                        include: { licenseKeys: true }
+-                    },
+-                    usageCounter: true,
+-                    agency: true,
+-                    managedBy: {
+-                        include: {
+-                            tenant: { select: { name: true, whatsapp: true, email: true } }
+-                        }
+-                    },
+-                }
++                include: tenantInclude,
+             });
+         }
+-        
+-        // Let SUPERADMIN, ADMIN pass without sub check.
+-        // For AGENCY, check if approved.
+-        // For normal users, require at least one subscription.
+ 
+         if (tenant && tenant.role === 'AGENCY' && !isImpersonating && tenant.agency?.status !== 'APPROVED') {
+             return (
+@@ -88,7 +67,7 @@ export default async function DashboardLayout({
+                         </div>
+                         <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Conta em Análise</h1>
+                         <p className="text-gray-400">
+-                            Sua conta de agência foi criada com sucesso e está sendo analisada pelo nosso time. 
++                            Sua conta de agência foi criada com sucesso e está sendo analisada pelo nosso time.
+                             Você receberá um email assim que for aprovado.
+                         </p>
+                         <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-sm text-gray-500">
+@@ -106,7 +85,7 @@ export default async function DashboardLayout({
+         const isAgencyClient = !!(tenant?.agencyId && tenant?.role === 'USER');
+ 
+         if (tenant && tenant.role === 'USER' && !isImpersonating) {
+-            const activeSubs = tenant.subscriptions.filter((s: any) =>
++            const activeSubs = tenant.subscriptions.filter((s: { status: string }) =>
+                 ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status)
+             );
+             const hasSub = activeSubs.length > 0;
+@@ -117,19 +96,19 @@ export default async function DashboardLayout({
+                 redirect('/pricing');
+             }
+ 
+-            // Banner logic
+-            const prioritizedSub = activeSubs.find((s: any) => s.status === 'TRIALING') || activeSubs.find((s: any) => s.status === 'PAST_DUE');
++            const prioritizedSub = activeSubs.find((s: { status: string }) => s.status === 'TRIALING')
++                || activeSubs.find((s: { status: string }) => s.status === 'PAST_DUE');
+ 
+             if (prioritizedSub?.status === 'TRIALING' && tenant.usageCounter?.periodEnd) {
+                 const diffTime = tenant.usageCounter.periodEnd.getTime() - new Date().getTime();
+                 const trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+-                
++
+                 if (trialDaysLeft >= 0) {
+                     trialBanner = (
+                         <div className="bg-red-600/90 text-white text-center py-2 px-4 shadow-md w-full relative z-50 animate-fade-in flex flex-col sm:flex-row items-center justify-center gap-2 group border-b border-red-500/50">
+                             <span className="flex items-center gap-2 font-semibold">
+                                 <AlertTriangle size={18} className="animate-pulse" />
+-                                ⏳ ALERTA: Seu período de teste termina em {trialDaysLeft} {trialDaysLeft === 1 ? 'dia' : 'dias'}. 
++                                ⏳ ALERTA: Seu período de teste termina em {trialDaysLeft} {trialDaysLeft === 1 ? 'dia' : 'dias'}.
+                             </span>
+                             <Link href="/pricing" className="bg-white text-red-700 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider hover:bg-gray-100 transition-colors shadow-sm ml-2">
+                                 Assine Agora
+@@ -159,20 +138,20 @@ export default async function DashboardLayout({
+         hasPrimary: Boolean(session?.user && (
+             session.user.role === 'SUPERADMIN' ||
+             session.user.role === 'ADMIN' ||
+-            isAgencyClient || // agency clients always have access to primary features
+-            tenant?.subscriptions?.some((s: any) => s.type === 'PRIMARY' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
++            isAgencyClient ||
++            tenant?.subscriptions?.some((s: { type: string; status: string }) => s.type === 'PRIMARY' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
+         )),
+         hasWriter: Boolean(session?.user && (
+             session.user.role === 'SUPERADMIN' ||
+             session.user.role === 'ADMIN' ||
+-            tenant?.subscriptions?.some((s: any) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
++            tenant?.subscriptions?.some((s: { type: string; status: string }) => s.type === 'WRITER_PLUGIN' && ['ACTIVE', 'TRIALING', 'PENDING', 'PAST_DUE'].includes(s.status))
+         )),
+     };
+ 
+     const agencyInfo = isAgencyClient ? {
+-        name: (tenant as any)?.managedBy?.tenant?.name || 'Sua Agência',
+-        whatsapp: (tenant as any)?.managedBy?.tenant?.whatsapp || null,
+-        email: (tenant as any)?.managedBy?.tenant?.email || null,
++        name: tenant?.managedBy?.tenant?.name || 'Sua Agência',
++        whatsapp: tenant?.managedBy?.tenant?.whatsapp || null,
++        email: tenant?.managedBy?.tenant?.email || null,
+     } : null;
+ 
+     return (
+diff --git a/Documents/CONEXAO/src/app/dashboard/marketing/page.tsx b/Documents/CONEXAO/src/app/dashboard/marketing/page.tsx
+index ae81f9b..ee69792 100644
+--- a/Documents/CONEXAO/src/app/dashboard/marketing/page.tsx
++++ b/Documents/CONEXAO/src/app/dashboard/marketing/page.tsx
+@@ -81,7 +81,7 @@ function MarketingContent() {
+             const query = selectedClientId ? `?clientId=${selectedClientId}` : "";
+             const res = await fetch(`/api/bots${query}`);
+             const data = await res.json();
+-            if (res.ok) setBots(data);
++            if (res.ok) setBots(Array.isArray(data) ? data : []);
+         } catch (error) {
+             console.error("Erro ao buscar bots:", error);
+         } finally {
+@@ -105,12 +105,12 @@ function MarketingContent() {
+             const recsData = recsRes.ok ? await recsRes.json() : { recommendations: [] };
+ 
+             setData({
+-                campaigns: adsData.campaigns || [],
++                campaigns: Array.isArray(adsData.campaigns) ? adsData.campaigns : [],
+                 insights: adsData.insights || null,
+-                googleAds: adsData.googleAds || null,
++                googleAds: Array.isArray(adsData.googleAds) ? adsData.googleAds : null,
+                 postsCount: statsData.postsCount || 0,
+-                recentPosts: postsData,
+-                recommendations: recsData.recommendations || []
++                recentPosts: Array.isArray(postsData) ? postsData : [],
++                recommendations: Array.isArray(recsData.recommendations) ? recsData.recommendations : []
+             });
+         } catch (error) {
+             console.error("Erro ao buscar dados de marketing:", error);
+@@ -122,7 +122,7 @@ function MarketingContent() {
+             const res = await fetch("/api/agency/clients");
+             if (res.ok) {
+                 const clients = await res.json();
+-                setAgencyClients(clients);
++                setAgencyClients(Array.isArray(clients) ? clients : []);
+                 setIsAgency(true);
+             }
+         } catch (e) {
+@@ -294,7 +294,8 @@ function MarketingContent() {
+                     metaInsights: data.insights,
+                     metaCampaigns: data.campaigns,
+                     googleAds: data.googleAds,
+-                    recentPosts: data.recentPosts || []
++                    recentPosts: data.recentPosts || [],
++                    recommendations: data.recommendations || [],
+                 }} refresh={fetchMarketingData} onEdit={(post: any) => {
+                     setEditingPost(post);
+                     setShowEditModal(true);
+@@ -483,20 +484,23 @@ function CampaignModal({ onClose, selectedClientId, onSuccess }: any) {
+ 
+ function OverviewTab({ stats, refresh, onEdit }: any) {
+     const [platformFilter, setPlatformFilter] = useState("ALL"); // ALL, META, GOOGLE
++    const [draftPage, setDraftPage] = useState(1);
++    const [historyPage, setHistoryPage] = useState(1);
++    const ITEMS_PER_PAGE = 5;
+ 
+     const postsCount = stats.postsCount || 0;
+-    const recentPosts = stats.recentPosts || [];
++    const recentPosts = Array.isArray(stats.recentPosts) ? stats.recentPosts : [];
+ 
+-    // Parse Meta
+-    const metaCampaigns = stats.metaCampaigns || [];
++    // Parse Meta (API returns numeric fields as strings)
++    const metaCampaigns = Array.isArray(stats.metaCampaigns) ? stats.metaCampaigns : [];
+     const metaInsights = stats.metaInsights || { spend: 0, impressions: 0, clicks: 0 };
+-    const metaSpend = metaInsights.spend || 0;
+-    const metaImpressions = metaInsights.impressions || 0;
+-    const metaClicks = metaInsights.clicks || 0;
++    const metaSpend = Number(metaInsights.spend || 0);
++    const metaImpressions = Number(metaInsights.impressions || 0);
++    const metaClicks = Number(metaInsights.clicks || 0);
+     const metaActiveCount = metaCampaigns.filter((c: any) => c.status === 'ACTIVE').length;
+ 
+     // Parse Google
+-    const googleCampaigns = stats.googleAds || [];
++    const googleCampaigns = Array.isArray(stats.googleAds) ? stats.googleAds : [];
+     const googleSpend = googleCampaigns.reduce((acc: number, cur: any) => acc + (cur.metrics?.cost_micros ? cur.metrics.cost_micros / 1000000 : 0), 0);
+     const googleImpressions = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.impressions || 0), 0);
+     const googleClicks = googleCampaigns.reduce((acc: number, cur: any) => acc + Number(cur.metrics?.clicks || 0), 0);
+@@ -527,12 +531,6 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
+ 
+     const displayCtr = displayImpressions > 0 ? ((displayClicks / displayImpressions) * 100) : 0;
+ 
+-
+-    // Paginação
+-    const [draftPage, setDraftPage] = useState(1);
+-    const [historyPage, setHistoryPage] = useState(1);
+-    const ITEMS_PER_PAGE = 5;
+-
+     const drafts = recentPosts.filter((p: any) => p.status === 'DRAFT');
+     const history = recentPosts.filter((p: any) => p.status !== 'DRAFT');
+ 
+@@ -1149,7 +1147,7 @@ function SEOTab() {
+                             className="flex-1 bg-transparent border-none outline-none px-4 text-white placeholder:text-gray-600"
+                         />
+                         <button 
+-                            onClick={handleSearch}
++                            onClick={() => handleSearch()}
+                             disabled={loading}
+                             className="bg-emerald-500 hover:bg-emerald-600 px-6 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                         >
+diff --git a/Documents/CONEXAO/src/app/dashboard/writer/page.tsx b/Documents/CONEXAO/src/app/dashboard/writer/page.tsx
+index f2d3f3c..da91c0b 100644
+--- a/Documents/CONEXAO/src/app/dashboard/writer/page.tsx
++++ b/Documents/CONEXAO/src/app/dashboard/writer/page.tsx
+@@ -25,12 +25,12 @@ export default async function WriterDashboardPage() {
+ 
+     const tenant = await prisma.tenant.findUnique({
+         where: { email: session.user.email },
+-        include: { 
++        include: {
+             subscriptions: {
+-                include: { licenseKeys: true, plan: true }
+-            }, 
+-            usageCounter: true 
+-        }
++                include: { licenseKeys: true, plan: true },
++            },
++            usageCounter: true,
++        },
+     });
+ 
+     if (!tenant) return <div className="p-8 text-white">Tenant não encontrado.</div>;
+diff --git a/Documents/CONEXAO/src/app/docs/agenda/page.tsx b/Documents/CONEXAO/src/app/docs/agenda/page.tsx
+index c294266..f6f201b 100644
+--- a/Documents/CONEXAO/src/app/docs/agenda/page.tsx
++++ b/Documents/CONEXAO/src/app/docs/agenda/page.tsx
+@@ -46,7 +46,10 @@ export default function AgendaDocsPage() {
+                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xs border-4 border-white/5 shadow-2xl">01.</div>
+                         <div>
+                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-3">Horário de Disponibilidade</h4>
+-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">"Segunda a Sexta, das 09h às 18h". Configure os limites de atuação do bot em **Configurações &gt; Geral**.</p>
++                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
++                                <span className="not-italic">&quot;Segunda a Sexta, das 09h às 18h&quot;</span>. Configure os limites de atuação do bot em{' '}
++                                <strong className="not-italic">Configurações &gt; Geral</strong>.
++                            </p>
+                         </div>
+                     </div>
+ 
+@@ -54,7 +57,9 @@ export default function AgendaDocsPage() {
+                         <div className="w-10 h-10 rounded-full bg-purple-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xs border-4 border-white/5 shadow-2xl">02.</div>
+                         <div>
+                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-3">Vínculo Google Calendar</h4>
+-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Em **Meus Bots &gt; Google Setup**, autorize o acesso à sua conta. Isso permitirá a leitura e escrita automática de eventos.</p>
++                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
++                                Em <strong className="not-italic">Meus Bots &gt; Google Setup</strong>, autorize o acesso à sua conta. Isso permitirá a leitura e escrita automática de eventos.
++                            </p>
+                         </div>
+                     </div>
+ 
+diff --git a/Documents/CONEXAO/src/app/docs/automation/page.tsx b/Documents/CONEXAO/src/app/docs/automation/page.tsx
+index 7f925cb..b7f8247 100644
+--- a/Documents/CONEXAO/src/app/docs/automation/page.tsx
++++ b/Documents/CONEXAO/src/app/docs/automation/page.tsx
+@@ -99,7 +99,7 @@ export default function FollowUpDocsPage() {
+                     <Bot size={24} />
+                 </div>
+                 <p className="text-sm text-gray-500 leading-relaxed italic">
+-                    "Ative o follow-up no menu **Editar Bot &gt; Automações**. Use as variáveis dinâmicas e deixe a IA cuidar da persuasão final."
++                    Ative o follow-up no menu <strong className="not-italic">Editar Bot &gt; Automações</strong>. Use as variáveis dinâmicas e deixe a IA cuidar da persuasão final.
+                 </p>
+             </section>
+         </div>
+diff --git a/Documents/CONEXAO/src/app/docs/wordpress/page.tsx b/Documents/CONEXAO/src/app/docs/wordpress/page.tsx
+index ca95323..977df77 100644
+--- a/Documents/CONEXAO/src/app/docs/wordpress/page.tsx
++++ b/Documents/CONEXAO/src/app/docs/wordpress/page.tsx
+@@ -51,8 +51,11 @@ export default function WordPressDocsPage() {
+                     <div className="flex gap-6 items-start">
+                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-black text-white text-xs border-4 border-white/5 shadow-2xl">01.</div>
+                         <div>
+-                            <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-2">Upload e Ativação</h4>
+-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Baixe o `.zip` acima e instale via **Plugins &gt; Novo** no seu painel WordPress.</p>
++                            <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-2">Download e Ativação</h4>
++                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
++                                Baixe o arquivo <code className="text-purple-300 not-italic">.zip</code> do plugin no seu painel Conext (ou o link acima) e instale via{' '}
++                                <strong className="not-italic">Plugins &gt; Adicionar Novo</strong> no seu WordPress.
++                            </p>
+                         </div>
+                     </div>
+ 
+@@ -60,7 +63,9 @@ export default function WordPressDocsPage() {
+                         <div className="w-10 h-10 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center font-black text-white text-xs border-4 border-white/5 shadow-2xl">02.</div>
+                         <div>
+                             <h4 className="font-black text-gray-200 uppercase text-xs tracking-[0.2em] mb-2">Chave de API (Token)</h4>
+-                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">Em **ConextBot &gt; Configurações**, insira seu Token de API pessoal para validar a conexão segura com nosso servidor.</p>
++                            <p className="text-sm text-gray-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
++                                Em <strong className="not-italic">ConextBot &gt; Configurações</strong>, insira seu Token de API pessoal para validar a conexão segura com nosso servidor.
++                            </p>
+                         </div>
+                     </div>
+ 
+diff --git a/Documents/CONEXAO/src/app/embed/layout.tsx b/Documents/CONEXAO/src/app/embed/layout.tsx
+index ad9aace..4b73bbb 100644
+--- a/Documents/CONEXAO/src/app/embed/layout.tsx
++++ b/Documents/CONEXAO/src/app/embed/layout.tsx
+@@ -77,6 +77,7 @@ export default function EmbedLayout({
+                 <div className="flex items-center gap-8">
+                     <div className="flex items-center gap-2">
+                         <img src="https://bs3.conext.click/media/system/logo-white-1773758797708-logo-white.png" alt="ConextBot" className="h-7 w-auto" />
++                        <span className="text-lg font-black tracking-tighter text-white">CONEXT<span className="text-purple-500 text-xs shadow-sm">.click</span></span>
+                     </div>
+                     
+                     <nav className="hidden sm:flex items-center gap-1">
+diff --git a/Documents/CONEXAO/src/components/Dashboard/CRMContactPanel.tsx b/Documents/CONEXAO/src/components/Dashboard/CRMContactPanel.tsx
+index fe4a805..d266880 100644
+--- a/Documents/CONEXAO/src/components/Dashboard/CRMContactPanel.tsx
++++ b/Documents/CONEXAO/src/components/Dashboard/CRMContactPanel.tsx
+@@ -239,13 +239,36 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
+                                 </div>
+                             ) : (
+                                 messages.map((msg: any) => (
+-                                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+-                                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
+-                                            ? 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
+-                                            : 'bg-indigo-600 text-white rounded-tr-none shadow-lg'
+-                                            }`}>
++                                    <div
++                                        key={msg.id}
++                                        className={`flex ${
++                                            msg.role === 'user'
++                                                ? 'justify-start'
++                                                : msg.role === 'system'
++                                                  ? 'justify-center'
++                                                  : 'justify-end'
++                                        }`}
++                                    >
++                                        <div
++                                            className={`max-w-[85%] p-3 rounded-2xl text-sm ${
++                                                msg.role === 'user'
++                                                    ? 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
++                                                    : msg.role === 'system'
++                                                      ? 'bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-center'
++                                                      : 'bg-indigo-600 text-white rounded-tr-none shadow-lg'
++                                            }`}
++                                        >
+                                             {msg.content}
+-                                            <p className={`text-[9px] mt-1 ${msg.role === 'user' ? 'text-gray-400' : 'text-indigo-200'}`}>
++                                            <p
++                                                className={`text-[9px] mt-1 ${
++                                                    msg.role === 'user'
++                                                        ? 'text-gray-400'
++                                                        : msg.role === 'system'
++                                                          ? 'text-amber-600'
++                                                          : 'text-indigo-200'
++                                                }`}
++                                            >
++                                                {msg.role === 'system' ? 'Registro CRM · ' : ''}
+                                                 {new Date(msg.createdAt).toLocaleTimeString()}
+                                             </p>
+                                         </div>
+diff --git a/Documents/CONEXAO/src/components/Dashboard/ProductManager.tsx b/Documents/CONEXAO/src/components/Dashboard/ProductManager.tsx
+index 0bd0fb8..319ebe2 100644
+--- a/Documents/CONEXAO/src/components/Dashboard/ProductManager.tsx
++++ b/Documents/CONEXAO/src/components/Dashboard/ProductManager.tsx
+@@ -22,8 +22,10 @@ interface Product {
+     addonGroups?: {
+         id: string;
+         name: string;
+-        maxChoices: number;
+-        addons: { id: string; name: string; price: number }[];
++        minSelect?: number;
++        maxSelect?: number;
++        maxChoices?: number;
++        addons?: { id: string; name: string; price: number }[];
+     }[];
+ }
+ 
+@@ -198,9 +200,9 @@ export function ProductManager({ botId }: { botId: string }) {
+             addonGroups: product.addonGroups ? product.addonGroups.map(g => ({
+                 id: g.id,
+                 name: g.name,
+-                minSelect: g.minSelect || 0,
+-                maxSelect: g.maxSelect || 1,
+-                addons: g.addons ? g.addons.map((a: any) => ({ id: a.id, name: a.name, price: a.price })) : []
++                minSelect: g.minSelect ?? 0,
++                maxSelect: g.maxSelect ?? g.maxChoices ?? 1,
++                addons: g.addons ? g.addons.map((a) => ({ id: a.id, name: a.name, price: a.price })) : []
+             })) : []
+         });
+         setIsModalOpen(true);
+diff --git a/Documents/CONEXAO/src/lib/ai-provider.ts b/Documents/CONEXAO/src/lib/ai-provider.ts
+index cf64f0a..d5d2019 100644
+--- a/Documents/CONEXAO/src/lib/ai-provider.ts
++++ b/Documents/CONEXAO/src/lib/ai-provider.ts
+@@ -83,7 +83,7 @@ export class GeminiWrapper {
+     chat = {
+         completions: {
+             create: async (body: any) => {
+-                let model = body.model || 'gemini-1.5-flash';
++                let model = body.model || 'gemini-2.5-flash';
+                 model = model.replace(/^models\//, '');
+                 let systemContent = "";
+                 const contents = body.messages.map((m: any) => {
+@@ -223,15 +223,15 @@ export async function getAiClient(options: {
+         const apiKey = resolveKey('geminiApiKey', 'GEMINI_API_KEY');
+         if (!apiKey) throw new Error('Gemini API Key not configured');
+ 
+-        // Force upgrade legacy gemini models and fix invalid ones
+-        if (model.includes('gemini-1.5') || model.includes('gemini-1.0') || model.includes('gemini-2.0') || model.includes('2.5')) {
+-            if (!model.includes('flash') && !model.includes('pro')) {
+-                model = 'gemini-1.5-flash';
+-            } else if (model.includes('2.5')) {
+-                model = 'gemini-2.0-flash'; // 2.5 doesn't exist yet, use 2.0
+-            }
++        // Force upgrade legacy/deprecated gemini models (gemini-1.5-flash-latest retorna 404)
++        if (model.includes('gemini-1.5-flash-latest') || model.includes('gemini-1.0') || !model.includes('gemini-2')) {
++            model = 'gemini-2.5-flash';
++        } else if (model.includes('2.5')) {
++            model = 'gemini-2.5-flash';
++        } else if (model.includes('2.0')) {
++            model = 'gemini-2.5-flash';
+         } else {
+-            model = 'gemini-1.5-flash';
++            model = 'gemini-2.5-flash';
+         }
+ 
+         return {
+diff --git a/Documents/CONEXAO/src/lib/licensing-site-url.ts b/Documents/CONEXAO/src/lib/licensing-site-url.ts
+new file mode 100644
+index 0000000..68fa74d
+--- /dev/null
++++ b/Documents/CONEXAO/src/lib/licensing-site-url.ts
+@@ -0,0 +1,47 @@
++/**
++ * Comparação tolerante de siteUrl para licença WordPress (http vs https, barra final, etc.).
++ */
++export function licensingSiteFingerprint(raw: string): string {
++    const s = raw.trim();
++    if (!s) return '';
++    try {
++        const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
++        const u = new URL(withScheme);
++        const host = u.hostname.toLowerCase();
++        const port =
++            u.port && !['80', '443'].includes(u.port) ? `:${u.port}` : '';
++        let path = u.pathname || '/';
++        if (path.length > 1 && path.endsWith('/')) {
++            path = path.slice(0, -1);
++        }
++        const pathPart = path === '/' ? '' : path;
++        return `${host}${port}${pathPart}`;
++    } catch {
++        return s.toLowerCase();
++    }
++}
++
++export function licensingSiteUrlsMatch(a: string, b: string): boolean {
++    return licensingSiteFingerprint(a) === licensingSiteFingerprint(b);
++}
++
++/** URL canónica gravada na primeira ativação (sempre https salvo porta não padrão). */
++export function canonicalLicensingSiteUrl(raw: string): string {
++    const s = raw.trim();
++    if (!s) return '';
++    try {
++        const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
++        const u = new URL(withScheme);
++        const host = u.hostname.toLowerCase();
++        const port =
++            u.port && !['80', '443'].includes(u.port) ? `:${u.port}` : '';
++        let path = u.pathname || '/';
++        if (path.length > 1 && path.endsWith('/')) {
++            path = path.slice(0, -1);
++        }
++        const pathPart = path === '/' ? '' : path;
++        return `https://${host}${port}${pathPart}`;
++    } catch {
++        return s;
++    }
++}
+diff --git a/Documents/CONEXAO/src/lib/queue.ts b/Documents/CONEXAO/src/lib/queue.ts
+index 4fe9cbb..2311aba 100644
+--- a/Documents/CONEXAO/src/lib/queue.ts
++++ b/Documents/CONEXAO/src/lib/queue.ts
+@@ -15,6 +15,11 @@ export interface MessageJob {
+ 
+ const QUEUE_NAME = 'message-processing';
+ 
++const JOB_RETENTION = {
++    removeOnComplete: { count: 50, age: 3600 },
++    removeOnFail: { count: 100, age: 86_400 },
++} as const;
++
+ let messageQueue: Queue<MessageJob> | null = null;
+ 
+ export function getMessageQueue(): Queue<MessageJob> {
+@@ -24,8 +29,7 @@ export function getMessageQueue(): Queue<MessageJob> {
+             defaultJobOptions: {
+                 attempts: 3,
+                 backoff: { type: 'exponential', delay: 2000 },
+-                removeOnComplete: 100,
+-                removeOnFail: 500,
++                ...JOB_RETENTION,
+             },
+         });
+     }
+@@ -59,6 +63,7 @@ export function startMessageWorker(concurrency = 4): Worker<MessageJob> {
+         {
+             connection: getRedis(),
+             concurrency,
++            ...JOB_RETENTION,
+         }
+     );
+ 
+@@ -85,8 +90,7 @@ export function getAuditQueue(): Queue<AuditJob> {
+             connection: getRedis(),
+             defaultJobOptions: {
+                 attempts: 1, // Let's not retry AI tasks blindly to save money
+-                removeOnComplete: 100,
+-                removeOnFail: 500,
++                ...JOB_RETENTION,
+             },
+         });
+     }
+@@ -109,6 +113,7 @@ export function startAuditWorker(concurrency = 2): Worker<AuditJob> {
+         {
+             connection: getRedis(),
+             concurrency,
++            ...JOB_RETENTION,
+         }
+     );
+ 
+diff --git a/Documents/CONEXAO/src/services/engine/processor.ts b/Documents/CONEXAO/src/services/engine/processor.ts
+index 123eca5..a9ce02e 100644
+--- a/Documents/CONEXAO/src/services/engine/processor.ts
++++ b/Documents/CONEXAO/src/services/engine/processor.ts
+@@ -67,7 +67,7 @@ import { VectorService } from './vector';
+ import { FunnelStage } from '@prisma/client';
+ import { ChatwootService } from './chatwoot';
+ import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
+-import { format, addHours } from 'date-fns';
++import { format, addMinutes } from 'date-fns';
+ import { mercadoLivreTools } from './mcp/mercadolivre';
+ 
+ const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
+@@ -815,44 +815,91 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
+                             } catch (e: any) { toolResult = `Erro ao agendar: ${e.message}`; }
+                         } else if (name === 'chamar_humano') {
+                             try {
+-                                if (handoffDone || (conversation.pausedUntil && new Date(conversation.pausedUntil) > new Date())) {
++                                if (handoffDone) {
+                                     toolResult = "Atendimento humano já solicitado. O bot está pausado e aguardando um atendente.";
+-                                    handoffDone = true;
+                                 } else {
+                                     logToFile(`[Processor] Handoff requested: ${args.motivo}`);
+                                     const humanStage = await prisma.crmStage.findFirst({
+                                         where: { botId: bot.id, name: { contains: 'HUMAN', mode: 'insensitive' } }
+                                     });
++                                    const humanStageName = humanStage?.name || 'ATENDIMENTO HUMANO';
+                                     await prisma.contact.update({
+                                         where: { id: existingContact.id },
+-                                        data: { 
+-                                            funnelStage: humanStage?.name || 'ATENDIMENTO HUMANO',
+-                                            stageId: humanStage?.id || undefined
+-                                        }
++                                        data: {
++                                            funnelStage: humanStageName,
++                                            stageId: humanStage?.id || undefined,
++                                            lastAiInsight: `Transbordo humano: ${args.motivo}`,
++                                            lastActive: new Date(),
++                                        },
+                                     });
+-                                    // SILENCER
+-                                    const pauseMinutes = typeof (bot as any).handoffPause === 'number' ? (bot as any).handoffPause : 1440;
+-                                    const pausedUntil = new Date(Date.now() + pauseMinutes * 60000);
++                                    // Bot silenciado por N minutos (configurável por bot.handoffPause; default 1440 = 24h)
++                                    (existingContact as { funnelStage?: string }).funnelStage = humanStageName;
++                                    const pauseMinutes = Number((bot as any).handoffPause ?? 1440);
++                                    const pausedUntil = addMinutes(new Date(), Number.isFinite(pauseMinutes) && pauseMinutes > 0 ? pauseMinutes : 1440);
+                                     await prisma.conversation.update({
+                                         where: { id: conversation.id },
+-                                        data: { pausedUntil } as any
++                                        data: { pausedUntil } as any,
+                                     });
+                                     const title = `🚨 Atendimento Humano Solicitado`;
+                                     const message = `*${title}*\n\nO cliente *${existingContact.name || 'Sem nome'}* solicitou um humano.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Motivo: ${args.motivo}\n- Bot: ${bot.name}`;
+-                                    
+-                                    const channels = bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'];
++                                    const channels = (bot.notifyChannels?.split(',') || ['INTERNAL', 'WHATSAPP', 'EMAIL'])
++                                        .map((c: string) => c.trim().toUpperCase())
++                                        .filter(Boolean);
+                                     const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
+                                     const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
+ 
+                                     if (channels.includes('INTERNAL')) await NotificationService.createInternalNotification(bot.tenantId, 'HUMAN_REQUESTED', title, message);
+-                                    
++                                    let whatsappHandoffOk = true;
+                                     if (channels.includes('WHATSAPP') && whatsappNotifyTarget) {
+-                                        await NotificationService.sendWhatsAppAsBot(identifier, whatsappNotifyTarget, message);
++                                        const last4 = String(whatsappNotifyTarget).replace(/\D/g, '').slice(-4);
++                                        const sessionForHandoff = bot.sessionName || identifier;
++                                        console.log(
++                                            `[Processor] chamar_humano: WhatsApp -> ****${last4} | sessão UzAPI do bot: ${sessionForHandoff ? `"${sessionForHandoff}"` : 'VAZIO (conecte o WhatsApp deste bot)'}`
++                                        );
++                                        whatsappHandoffOk = await NotificationService.sendHandoffWhatsAppFromBotSession(
++                                            sessionForHandoff,
++                                            whatsappNotifyTarget,
++                                            message
++                                        );
++                                        if (!whatsappHandoffOk) {
++                                            console.warn(
++                                                '[Processor] chamar_humano: WhatsApp ao humano falhou — use a sessão deste bot (mesmo que atende o cliente) na UzAPI.'
++                                            );
++                                        }
++                                    } else if (channels.includes('WHATSAPP') && !whatsappNotifyTarget) {
++                                        console.warn('[Processor] chamar_humano: WHATSAPP nas notificações, mas sem número — preencha "WhatsApp de Suporte" no bot ou WhatsApp no perfil da conta.');
++                                        whatsappHandoffOk = false;
++                                    } else if (!channels.includes('WHATSAPP')) {
++                                        console.warn(
++                                            `[Processor] chamar_humano: canal WHATSAPP desligado (notifyChannels="${(bot as { notifyChannels?: string }).notifyChannels || '—'}") — não envia WhatsApp ao humano.`
++                                        );
++                                    }
++                                    {
++                                        const destDigits = whatsappNotifyTarget?.replace(/\D/g, '') || '';
++                                        const destMask = destDigits ? `****${destDigits.slice(-4)}` : '—';
++                                        let envioLinha: string;
++                                        if (!channels.includes('WHATSAPP')) {
++                                            envioLinha = 'WhatsApp ao atendente: não (canal WHATSAPP desligado no bot).';
++                                        } else if (!whatsappNotifyTarget) {
++                                            envioLinha = 'WhatsApp ao atendente: não (sem número transbordo/perfil).';
++                                        } else if (whatsappHandoffOk) {
++                                            envioLinha = `WhatsApp ao atendente: enviado para ${destMask}.`;
++                                        } else {
++                                            envioLinha = `WhatsApp ao atendente: não entregue (destino ${destMask}; sessão UzAPI do bot ou API).`;
++                                        }
++                                        await prisma.message.create({
++                                            data: {
++                                                conversationId: conversation.id,
++                                                role: 'system',
++                                                content: `[Para o humano — texto enviado / previsto]\n${message}\n\n${envioLinha}`,
++                                            },
++                                        });
+                                     }
+                                     if (channels.includes('EMAIL')) await NotificationService.sendEmail(bot.tenant.email, title, message);
+-                                    
++                                    toolResult = whatsappHandoffOk
++                                        ? "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado."
++                                        : "Seu pedido foi registrado no painel (notificação interna). O WhatsApp ao atendente não foi entregue: verifique o número de transbordo/perfil e se este bot está conectado na UzAPI (mesma sessão do atendimento). O bot foi pausado.";
+                                     handoffDone = true;
+-                                    toolResult = "Um atendente humano foi notificado e assumirá a conversa em breve. O bot foi pausado.";
+                                 }
+                             } catch (e: any) { toolResult = `Erro no handoff: ${e.message}`; }
+                         } else if (name === 'gerar_fatura') {
+@@ -1354,8 +1401,18 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
+             return { text: cleanResponse, media: mediaMatches.map((m: any) => m[1]) };
+ 
+         } catch (error: any) {
+-            logToFile(`[Processor] ERROR: ${error?.message || error}`);
+-            return null;
++            const raw = error?.message || String(error);
++            console.error('[Processor] ERROR:', raw);
++            logToFile(`[Processor] ERROR: ${raw}`);
++            const isAiQuota =
++                /429|quota|All AI providers|rate limit|exceeded|billing|Gemini API Error|insufficient|resource_exhausted/i.test(
++                    raw
++                );
++            return {
++                text: isAiQuota
++                    ? 'O serviço de IA está indisponível agora (limite de uso ou quota excedida). Confira as chaves de API no painel (OpenAI / Gemini / OpenRouter) ou tente de novo em alguns minutos.'
++                    : 'Erro ao processar a mensagem. Tente novamente em instantes.',
++            };
+         }
+     },
+ };
+diff --git a/Documents/CONEXAO/src/services/engine/wordpress.ts b/Documents/CONEXAO/src/services/engine/wordpress.ts
+index fac98a8..4cf5809 100644
+--- a/Documents/CONEXAO/src/services/engine/wordpress.ts
++++ b/Documents/CONEXAO/src/services/engine/wordpress.ts
+@@ -1,19 +1,52 @@
+ import { logToFile } from './logger';
+ 
++/**
++ * URL pública do WordPress (ajax). Preferir campo do bot; senão derivar do primeiro produto com link absoluto.
++ */
++function resolveWordPressBaseUrl(bot: any): string | null {
++    const direct = (bot.websiteUrl || '').trim();
++    if (direct) {
++        return direct.replace(/\/$/, '');
++    }
++    const products = bot.products as Array<{ externalUrl?: string | null }> | undefined;
++    if (products?.length) {
++        for (const p of products) {
++            const u = p?.externalUrl;
++            if (!u || typeof u !== 'string' || !u.startsWith('http')) continue;
++            try {
++                const parsed = new URL(u);
++                return `${parsed.protocol}//${parsed.host}`;
++            } catch {
++                continue;
++            }
++        }
++    }
++    return null;
++}
++
+ export const WordpressService = {
+     /**
+      * Envia uma resposta da IA de volta para o WordPress
+      */
+     async sendReply(bot: any, postId: number, parentId: number, message: string): Promise<boolean> {
+-        if (!bot.websiteUrl) {
+-            logToFile(`[WordpressService] Error: Bot ${bot.id} has no websiteUrl`);
++        const baseUrl = resolveWordPressBaseUrl(bot);
++        if (!baseUrl) {
++            const msg = `[WordpressService] Error: Bot ${bot.id} has no websiteUrl and no product URL to infer site`;
++            logToFile(msg);
++            console.error(msg);
+             return false;
+         }
+ 
+-        const token = bot.webhookToken || bot.id; // Usar webhookToken como segredo compartilhado
+-        const ajaxUrl = `${bot.websiteUrl.replace(/\/$/, '')}/wp-admin/admin-ajax.php`;
++        if (!(bot.websiteUrl || '').trim()) {
++            logToFile(`[WordpressService] Using inferred base URL from catalog: ${baseUrl}`);
++        }
++
++        // O plugin WP valida contra conexbot_bot_id (UUID) ou conexbot_api_token (CONEXT).
++        // webhookToken existe no Prisma mas não é salvo no WordPress — priorizar bot.id.
++        const token = bot.id || bot.webhookToken;
++        const ajaxUrl = `${baseUrl}/wp-admin/admin-ajax.php`;
+ 
+-        logToFile(`[WordpressService] Sending reply to ${bot.websiteUrl} (Post: ${postId}, Parent: ${parentId})`);
++        logToFile(`[WordpressService] Sending reply to ${baseUrl} (Post: ${postId}, Parent: ${parentId})`);
+ 
+         try {
+             const formData = new URLSearchParams();
+diff --git a/Documents/CONEXAO/src/services/marketing/marketing-ia-service.ts b/Documents/CONEXAO/src/services/marketing/marketing-ia-service.ts
+index c1846fb..eb301f7 100644
+--- a/Documents/CONEXAO/src/services/marketing/marketing-ia-service.ts
++++ b/Documents/CONEXAO/src/services/marketing/marketing-ia-service.ts
+@@ -542,8 +542,6 @@ export const MarketingIAService = {
+      */
+     async generateRecommendations(tenantId: string) {
+         try {
+-            const { MetaAdsService } = require("./meta-ads-service");
+-            
+             // 1. Coleta de dados reais
+             const [insights, keywordHistory, recentPosts] = await Promise.all([
+                 MetaAdsService.getInsights(tenantId).catch(() => null),
+diff --git a/Documents/CONEXAO/src/services/notification/service.ts b/Documents/CONEXAO/src/services/notification/service.ts
+index b92e9c6..b2cbbbc 100644
+--- a/Documents/CONEXAO/src/services/notification/service.ts
++++ b/Documents/CONEXAO/src/services/notification/service.ts
+@@ -41,7 +41,7 @@ export class NotificationService {
+     }
+ 
+     /**
+-     * Sends a WhatsApp message using a specific bot's session
++     * WhatsApp usando uma sessão UzAPI específica (ex.: o próprio bot em transbordo).
+      */
+     static async sendWhatsAppAsBot(botSessionName: string, to: string, message: string) {
+         try {
+@@ -70,29 +70,62 @@ export class NotificationService {
+     }
+ 
+     /**
+-     * Sends a WhatsApp message using the System Bot
++     * WhatsApp genérico (alertas de limite, etc.): usa o bot de sistema do admin.
+      */
+-    static async sendWhatsApp(to: string, message: string) {
++    static async sendWhatsApp(to: string, message: string): Promise<boolean> {
+         try {
+             const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+-            if (!config || !config.systemBotId) {
++            if (!config?.systemBotId) {
+                 console.warn('[NotificationService] System Bot not configured');
+                 return false;
+             }
+ 
+-            const bot = await prisma.bot.findUnique({ where: { id: config.systemBotId } });
+-            if (!bot || !bot.sessionName) {
++            const sysBot = await prisma.bot.findUnique({ where: { id: config.systemBotId } });
++            if (!sysBot?.sessionName) {
+                 console.warn('[NotificationService] System Bot or session not found');
+                 return false;
+             }
+ 
+-            return this.sendWhatsAppAsBot(bot.sessionName, to, message);
++            return this.sendWhatsAppAsBot(sysBot.sessionName, to, message);
+         } catch (error) {
+             console.error('[NotificationService] WhatsApp Error:', error);
+             return false;
+         }
+     }
+ 
++    /**
++     * Transbordo humano (chamar_humano): sempre pela sessão UzAPI do bot que está na conversa — não usa bot de sistema.
++     */
++    static async sendHandoffWhatsAppFromBotSession(
++        sessionName: string,
++        to: string,
++        message: string
++    ): Promise<boolean> {
++        try {
++            const token = sessionName?.trim();
++            if (!token) {
++                console.warn('[NotificationService] Handoff WhatsApp: bot sem sessionName (conecte o bot na UzAPI)');
++                return false;
++            }
++            const cleanTo = PhoneUtils.normalizeBrazilWhatsAppE164(to);
++            if (!cleanTo) {
++                console.warn('[NotificationService] Handoff WhatsApp: número vazio após normalização');
++                return false;
++            }
++            const remoteJid = `${cleanTo}@s.whatsapp.net`;
++            const sent = await UzapiService.sendMessage(token, remoteJid, message);
++            if (!sent) {
++                console.warn('[NotificationService] Handoff WhatsApp falhou (UzAPI — use a sessão deste mesmo bot)');
++                return false;
++            }
++            console.log('[NotificationService] Handoff WhatsApp: enviado com sucesso');
++            return true;
++        } catch (error) {
++            console.error('[NotificationService] Handoff WhatsApp Error:', error);
++            return false;
++        }
++    }
++
+     /**
+      * Creates an internal notification (the "bell")
+      */
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/LEIA-ME.txt b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/LEIA-ME.txt
+new file mode 100644
+index 0000000..faa9b62
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/LEIA-ME.txt
+@@ -0,0 +1,10 @@
++Backup do servidor Conexão em 20260327-164540
++Origem: /root/conexbot/Documents/CONEXAO
++
++- codigo-completo.tar.gz — extrair: tar -xzf codigo-completo.tar.gz -C DESTINO
++  (npm ci && npx prisma generate no destino)
++- patch-alteracoes-locais.diff — alterações não commitadas antes do pull
++- Inclui pasta src/services/engine/outbound/ e demais arquivos locais.
++
++Para recuperar só as correções do servidor sobre uma árvore git nova:
++  cd DESTINO && git apply /caminho/para/patch-alteracoes-locais.diff
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/arquivos-modificados-e-novos.txt b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/arquivos-modificados-e-novos.txt
+new file mode 100644
+index 0000000..c874b57
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/arquivos-modificados-e-novos.txt
+@@ -0,0 +1,14 @@
++ M conexbot-wp/conexbot-wp.php
++ M docker-compose.production.yml
++ M src/app/api/webhooks/whatsapp/route.ts
++ M src/services/engine/buffering.ts
++ M src/services/engine/processor.ts
++ M src/services/engine/uzapi.ts
++ M src/services/engine/wordpress.ts
++?? _backup_servidor_20260327-164540/arquivos-modificados-e-novos.txt
++?? _backup_servidor_20260327-164540/codigo-completo.tar.gz
++?? _backup_servidor_20260327-164540/git-log-head.txt
++?? _backup_servidor_20260327-164540/git-status.txt
++?? _backup_servidor_20260327-164540/patch-alteracoes-locais.diff
++?? src/services/engine/outbound/deliver-assistant.ts
++?? ../../RESTAURAR-BACKUP.md
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/codigo-completo.tar.gz b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/codigo-completo.tar.gz
+new file mode 100644
+index 0000000..45e7ef1
+Binary files /dev/null and b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/codigo-completo.tar.gz differ
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-log-head.txt b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-log-head.txt
+new file mode 100644
+index 0000000..f1128bb
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-log-head.txt
+@@ -0,0 +1,5 @@
++aae77c4 fix(wordpress): inferir URL do site pelos produtos quando websiteUrl vazio; log webhook em /tmp
++8263c47 Merge branch 'main' of https://github.com/Moafsa/conexbot
++76f9790 sync: update wordpress webhook and plugin with server refinements
++1a76b12 fix(wordpress): comentários — resolver bot (UUID/CONEXT) e AJAX aceitar UUID do bot na resposta IA
++215d507 fix(webchat): sessão estável antes de enviar — histórico bate com o CRM após F5
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-status.txt b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-status.txt
+new file mode 100644
+index 0000000..6c81f88
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/git-status.txt
+@@ -0,0 +1,22 @@
++On branch main
++Your branch is ahead of 'origin/main' by 43 commits.
++  (use "git push" to publish your local commits)
++
++Changes not staged for commit:
++  (use "git add <file>..." to update what will be committed)
++  (use "git restore <file>..." to discard changes in working directory)
++	modified:   conexbot-wp/conexbot-wp.php
++	modified:   docker-compose.production.yml
++	modified:   src/app/api/webhooks/whatsapp/route.ts
++	modified:   src/services/engine/buffering.ts
++	modified:   src/services/engine/processor.ts
++	modified:   src/services/engine/uzapi.ts
++	modified:   src/services/engine/wordpress.ts
++
++Untracked files:
++  (use "git add <file>..." to include in what will be committed)
++	_backup_servidor_20260327-164540/
++	src/services/engine/outbound/
++	../../RESTAURAR-BACKUP.md
++
++no changes added to commit (use "git add" and/or "git commit -a")
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/patch-alteracoes-locais.diff b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/patch-alteracoes-locais.diff
+new file mode 100644
+index 0000000..34485de
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/_backup_servidor_20260327-164540/patch-alteracoes-locais.diff
+@@ -0,0 +1,372 @@
++diff --git a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
++index 71d43a2..5e668c9 100644
++--- a/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
+++++ b/Documents/CONEXAO/conexbot-wp/conexbot-wp.php
++@@ -165,7 +165,11 @@ add_action('wp_footer', function() {
++  */
++ add_action('wp_insert_comment', 'conexbot_on_new_comment', 10, 2);
++ function conexbot_on_new_comment($comment_ID, $comment) {
++-    // Evitar loop infinito (não notificar se o autor for o próprio bot)
+++    // Evitar loop: meta is_conexbot_reply só existe DEPOIS que wp_insert_comment retorna;
+++    // o hook wp_insert_comment dispara antes, então precisamos deste flag na inserção via AJAX.
+++    if (! empty($GLOBALS['conexbot_inserting_bot_reply'])) {
+++        return;
+++    }
++     if (get_comment_meta($comment_ID, 'is_conexbot_reply', true)) {
++         return;
++     }
++@@ -238,10 +242,12 @@ function conexbot_ai_reply_callback() {
++         'comment_approved'     => 1,
++     ];
++ 
+++    $GLOBALS['conexbot_inserting_bot_reply'] = true;
++     $comment_id = wp_insert_comment($comment_data);
+++    unset($GLOBALS['conexbot_inserting_bot_reply']);
++ 
++     if ($comment_id) {
++-        // Marcar este comentário como sendo do Bot para evitar recursividade
+++        // Marcar este comentário como sendo do Bot (útil se outro código notificar depois)
++         add_comment_meta($comment_id, 'is_conexbot_reply', '1');
++         wp_send_json_success(['comment_id' => $comment_id]);
++     } else {
++diff --git a/Documents/CONEXAO/docker-compose.production.yml b/Documents/CONEXAO/docker-compose.production.yml
++index c4732f1..1d20129 100644
++--- a/Documents/CONEXAO/docker-compose.production.yml
+++++ b/Documents/CONEXAO/docker-compose.production.yml
++@@ -1,6 +1,6 @@
++ # Override para produção: app Next.js + rede Traefik
++ # Uso: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
++-# Definir CONEXBOT_DOMAIN (ex: conexbot.seudominio.com) e .env com segredos
+++# Definir CONEXBOT_DOMAIN (ex.: app.conext.click) e .env com segredos
++ 
++ services:
++   app:
++diff --git a/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts b/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
++index b97d755..b94e3e7 100644
++--- a/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
+++++ b/Documents/CONEXAO/src/app/api/webhooks/whatsapp/route.ts
++@@ -96,7 +96,9 @@ export async function POST(req: Request) {
++             const fromMe = info.FromMe || info.fromMe || false;
++ 
++             const cleanPhone = PhoneUtils.normalize(senderPhone);
++-            logToFile(`Processing message: From=${senderPhone}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
+++            /** JID do chat (WuzAPI Info.Chat) — usar no envio; normalize() pode alterar o número internacional */
+++            const chatJid = String(info.Chat || info.chat || senderPhone || '').trim();
+++            logToFile(`Processing message: From=${senderPhone}, Chat=${chatJid}, Me=${fromMe}, Body=${messageBody}, Normalized=${cleanPhone}`);
++ 
++             const isGroup = senderPhone.includes('@g.us');
++             const botDoc = await prisma.bot.findUnique({ where: { sessionName }, include: { tenant: true } });
++@@ -244,7 +246,7 @@ export async function POST(req: Request) {
++ 
++                         if (transcription) {
++                             const { BufferingService } = await import('@/services/engine/buffering');
++-                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio').catch(err => {
+++                            BufferingService.add(sessionName, cleanPhone, transcription, 'whatsapp', 'audio', chatJid).catch(err => {
++                                 logToFile(`BUFFER ERROR (Audio): ${err?.message || err}`);
++                             });
++                         }
++@@ -377,7 +379,7 @@ export async function POST(req: Request) {
++                         // Passar direto ao Processor (evita race com buffer que recebia "")
++                         const textToProcess = `[IMAGEM ENVIADA PELO USUÁRIO (Descrição)]: ${description}`;
++                         logToFile(`Sending image description (${textToProcess.length} chars) to Processor for ${cleanPhone}`);
++-                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image' }).catch(err => {
+++                        MessageProcessor.process(sessionName, cleanPhone, textToProcess, 'whatsapp', 'sessionName', { inputType: 'image', whatsappChatJid: chatJid }).catch(err => {
++                             logToFile(`PROCESSOR ERROR (Image): ${err?.message || err}`);
++                         });
++                     } else {
++@@ -390,12 +392,12 @@ export async function POST(req: Request) {
++                 // Text Message Handling with Smart Buffering
++                 try {
++                     const { BufferingService } = await import('@/services/engine/buffering');
++-                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp');
+++                    BufferingService.add(sessionName, cleanPhone, messageBody, 'whatsapp', 'text', chatJid);
++                     logToFile(`Message buffered for ${cleanPhone}`);
++                 } catch (e: any) {
++                     logToFile(`BUFFER ERROR: ${e.message}`);
++                     // Fallback to direct processing if buffering fails
++-                    MessageProcessor.process(sessionName, cleanPhone, messageBody).catch(err => {
+++                    MessageProcessor.process(sessionName, cleanPhone, messageBody, 'whatsapp', 'sessionName', { inputType: 'text', whatsappChatJid: chatJid }).catch(err => {
++                         logToFile(`PROCESSOR ERROR: ${err?.message || err}`);
++                     });
++                 }
++diff --git a/Documents/CONEXAO/src/services/engine/buffering.ts b/Documents/CONEXAO/src/services/engine/buffering.ts
++index aa96aa5..bcffa4e 100644
++--- a/Documents/CONEXAO/src/services/engine/buffering.ts
+++++ b/Documents/CONEXAO/src/services/engine/buffering.ts
++@@ -5,9 +5,11 @@ interface BufferedChat {
++     messages: string[];
++     timer: NodeJS.Timeout | null;
++     sessionName: string;
++-    contactId: string; // phone
+++    contactId: string; // phone normalizado (CRM)
++     channel: 'whatsapp' | 'simulator';
++     hadAudio: boolean; // se alguma mensagem veio de áudio, responder com TTS
+++    /** Info.Chat do WuzAPI — envio da resposta deve usar este JID */
+++    whatsappChatJid?: string;
++ }
++ 
++ // In-memory storage for active buffers
++@@ -19,7 +21,7 @@ export const BufferingService = {
++      * Add a message to the buffer.
++      * If a timer exists, clear it and restart (debounce).
++      */
++-    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text') {
+++    async add(sessionName: string, contactId: string, text: string, channel: 'whatsapp' | 'simulator', inputType: 'text' | 'audio' | 'image' = 'text', whatsappChatJid?: string) {
++         const key = `${sessionName}:${contactId}`;
++ 
++         // Get bot configuration for buffer delay
++@@ -42,7 +44,8 @@ export const BufferingService = {
++             }
++             console.log(`[Buffering] Buffer disabled (delay=0) for ${contactId}. Processing immediately (${contentToProcess.length} chars).`);
++             MessageProcessor.process(sessionName, contactId, contentToProcess, channel, 'sessionName', { 
++-                inputType: inputType as any 
+++                inputType: inputType as any,
+++                whatsappChatJid,
++             }).catch(err => console.error('[Buffering] Immediate process error:', err));
++             return;
++         }
++@@ -56,9 +59,12 @@ export const BufferingService = {
++                 sessionName,
++                 contactId,
++                 channel,
++-                hadAudio: false
+++                hadAudio: false,
+++                whatsappChatJid: whatsappChatJid || undefined,
++             };
++             activeBuffers.set(key, buffer);
+++        } else if (whatsappChatJid && !buffer.whatsappChatJid) {
+++            buffer.whatsappChatJid = whatsappChatJid;
++         }
++ 
++         // Add message part
++@@ -112,7 +118,7 @@ export const BufferingService = {
++             combinedText,
++             buffer.channel,
++             'sessionName',
++-            { inputType: flushInputType as any }
+++            { inputType: flushInputType as any, whatsappChatJid: buffer.whatsappChatJid }
++         ).catch(err => console.error('[Buffering] Process error:', err));
++     }
++ };
++diff --git a/Documents/CONEXAO/src/services/engine/processor.ts b/Documents/CONEXAO/src/services/engine/processor.ts
++index 9315ffe..5724a9a 100644
++--- a/Documents/CONEXAO/src/services/engine/processor.ts
+++++ b/Documents/CONEXAO/src/services/engine/processor.ts
++@@ -1,8 +1,8 @@
++ import OpenAI from 'openai';
++ import prisma from '@/lib/prisma';
++ import { buildSystemPrompt, buildConversationMessages } from './prompts';
++-import { UzapiService } from './uzapi';
++ import { logToFile } from './logger';
+++import { deliverAssistantOutbound } from './outbound/deliver-assistant';
++ import { NotificationService } from '../notification/service';
++ import { PhoneUtils } from '@/lib/phone-utils';
++ 
++@@ -42,10 +42,6 @@ import { ChatwootService } from './chatwoot';
++ import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
++ import { format } from 'date-fns';
++ 
++-import fs from 'fs';
++-import path from 'path';
++-
++-
++ const MEDIA_TAG_REGEX = /\[ENVIAR_MEDIA:([^\]]+)\]/g;
++ const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fechado|pode ser)\b/i;
++ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
++@@ -53,27 +49,28 @@ const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b
++ const processingLocks = new Map<string, Promise<any>>();
++ 
++ export const MessageProcessor = {
++-    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+++    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
++         const senderPhone = channel === 'whatsapp' ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
++-        console.log(`[Processor] DEBUG: Processing message from ${senderPhone} (V3-RECURSIVE-HACK)`);
++-        // Concurrency Lock: prevent same phone processing parallelly
++-        const existingLock = processingLocks.get(senderPhone);
+++        // Lock por canal + identificador: WhatsApp e WordPress nunca competem pela mesma chave
+++        const lockKey = `${channel}:${senderPhone}`;
+++        console.log(`[Processor] DEBUG: Processing message from ${lockKey} (V3-RECURSIVE-HACK)`);
+++        const existingLock = processingLocks.get(lockKey);
++         if (existingLock) {
++-            logToFile(`[Processor] WAITING for existing lock: ${senderPhone}`);
+++            logToFile(`[Processor] WAITING for existing lock: ${lockKey}`);
++             await existingLock;
++         }
++ 
++         const currentProcess = this._executeInternal(identifier, senderPhone, messageText, channel, searchBy, options);
++-        processingLocks.set(senderPhone, currentProcess);
+++        processingLocks.set(lockKey, currentProcess);
++ 
++         try {
++             return await currentProcess;
++         } finally {
++-            processingLocks.delete(senderPhone);
+++            processingLocks.delete(lockKey);
++         }
++     },
++ 
++-    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+++    async _executeInternal(identifier: string, senderPhone: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
++         try {
++             logToFile(`[Processor] START: ${identifier} / ${senderPhone} / "${messageText}" / ${channel}`);
++ 
++@@ -708,59 +705,15 @@ export const MessageProcessor = {
++                 }
++             }
++ 
++-            // 14. Primary Channel Sending
++-            if (channel === 'whatsapp' && bot.sessionName) {
++-                if (options.inputType === 'audio') {
++-                    const { VoiceService } = await import('./voice');
++-                    try {
++-                        const audioPath = await VoiceService.speak(
++-                            cleanResponse,
++-                            bot.tenant?.openaiApiKey,
++-                            (bot.tenant as any)?.elevenLabsApiKey,
++-                            bot.voiceId
++-                        );
++-
++-                        const hasElevenLabs = !!(bot.tenant as any)?.elevenLabsApiKey;
++-                        const hasVoiceId = !!bot.voiceId;
++-                        logToFile(`[Processor] TTS Config: elevenLabs=${hasElevenLabs}, voiceId=${hasVoiceId}`);
++-                        if (!hasElevenLabs || !hasVoiceId) {
++-                            logToFile(`[Processor] HINT: Configure Dashboard -> Settings -> AI (ElevenLabs API Key) and Edit Bot -> Voice ID for audio replies.`);
++-                        }
++-
++-                        const audioBuffer = fs.readFileSync(audioPath);
++-                        // Ensure correct extension and mimetype for WuzAPI
++-                        const dataUri = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
++-                        const sent = await UzapiService.sendMedia(bot.sessionName, senderPhone, 'audio', dataUri, '');
++-
++-                        if (sent) {
++-                            logToFile(`[Processor] Audio reply sent successfully.`);
++-                        } else {
++-                            logToFile(`[Processor] sendMedia (audio) returned false; falling back to text.`);
++-                            await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
++-                        }
++-                    } catch (e: any) {
++-                        logToFile(`[Processor] TTS or send failed: ${e.message}; sending text fallback.`);
++-                        await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
++-                    }
++-                } else {
++-                    await UzapiService.sendMessage(bot.sessionName, senderPhone, cleanResponse);
++-                }
++-
++-                for (const match of mediaMatches as any[]) {
++-                    const media = (bot.media as any[]).find((m: any) => m.id === match[1]);
++-                    if (media) await UzapiService.sendMedia(bot.sessionName, senderPhone, media.type, media.url, media.description || media.filename);
++-                }
++-            } else if (channel === 'wordpress') {
++-                const { WordpressService } = await import('./wordpress');
++-                // senderPhone contains "wp_post_{postId}_comment_{commentId}"
++-                const parts = senderPhone.split('_');
++-                const postId = parseInt(parts[2]);
++-                const commentId = parseInt(parts[4]);
++-                
++-                if (!isNaN(postId) && !isNaN(commentId)) {
++-                    await WordpressService.sendReply(bot, postId, commentId, cleanResponse);
++-                }
++-            }
+++            // 14. Entrega por canal (WhatsApp ‖ WordPress — ver outbound/deliver-assistant.ts)
+++            await deliverAssistantOutbound({
+++                channel,
+++                bot,
+++                remoteId: senderPhone,
+++                cleanResponse,
+++                mediaMatches: mediaMatches as RegExpMatchArray[],
+++                options,
+++            });
++ 
++             // 15. Subscription Autonomy (Cancellation & Status)
++             const CANCELLATION_KEYWORDS = /(cancelar|encerrar|parar|desistir).*(assinatura|plano|serviço|mensalidade)/i;
++diff --git a/Documents/CONEXAO/src/services/engine/uzapi.ts b/Documents/CONEXAO/src/services/engine/uzapi.ts
++index ca55293..fa84be6 100644
++--- a/Documents/CONEXAO/src/services/engine/uzapi.ts
+++++ b/Documents/CONEXAO/src/services/engine/uzapi.ts
++@@ -1,3 +1,5 @@
+++import { logToFile } from './logger';
+++
++ const UZAPI_URL = process.env.UZAPI_URL || 'http://127.0.0.1:21465';
++ const ADMIN_TOKEN =
++     process.env.UZAPI_SECRET_KEY ||
++@@ -5,6 +7,18 @@ const ADMIN_TOKEN =
++     process.env.API_KEY ||
++     'admin_token_123';
++ 
+++/**
+++ * WuzAPI costuma esperar JID (ex.: 5511999999999@s.whatsapp.net).
+++ * O processor grava contatos só com dígitos; notificações do sistema já usam @s.whatsapp.net.
+++ */
+++function formatRecipientJid(to: string): string {
+++    const t = String(to).trim();
+++    if (!t) return t;
+++    if (t.includes('@')) return t;
+++    const digits = t.replace(/\D/g, '');
+++    return digits ? `${digits}@s.whatsapp.net` : t;
+++}
+++
++ export const UzapiService = {
++     // Helper: Ensure user exists in WuzAPI
++     async ensureUser(sessionName: string, webhookUrl: string): Promise<boolean> {
++@@ -68,6 +82,7 @@ export const UzapiService = {
++ 
++     async sendMessage(sessionName: string, to: string, text: string): Promise<boolean> {
++         try {
+++            const phone = formatRecipientJid(to);
++             const res = await fetch(`${UZAPI_URL}/chat/send/text`, {
++                 method: 'POST',
++                 headers: {
++@@ -75,19 +90,25 @@ export const UzapiService = {
++                     'Token': sessionName,
++                 },
++                 body: JSON.stringify({
++-                    Phone: to,
+++                    Phone: phone,
++                     Body: text,
++                 }),
++             });
++ 
++             if (!res.ok) {
++-                console.error('UZAPI send error:', await res.text());
+++                const errBody = await res.text();
+++                console.error('UZAPI send error:', errBody);
+++                logToFile(
+++                    `[UZAPI] sendMessage failed session=${sessionName} to=${phone} status=${res.status} body=${errBody.slice(0, 300)}`,
+++                    'Uzapi'
+++                );
++                 return false;
++             }
++ 
++             return true;
++         } catch (error) {
++             console.error('UZAPI connection error:', error);
+++            logToFile(`[UZAPI] sendMessage exception: ${error}`, 'Uzapi');
++             return false;
++         }
++     },
++@@ -105,8 +126,9 @@ export const UzapiService = {
++                     : (type === 'video') ? 'chat/send/video'
++                         : 'chat/send/image';
++ 
+++            const phone = formatRecipientJid(to);
++             const body: Record<string, string> = {
++-                Phone: to,
+++                Phone: phone,
++                 [type === 'audio' ? 'Audio' : 'Url']: url,
++             };
++ 
++diff --git a/Documents/CONEXAO/src/services/engine/wordpress.ts b/Documents/CONEXAO/src/services/engine/wordpress.ts
++index 334ee87..4cf5809 100644
++--- a/Documents/CONEXAO/src/services/engine/wordpress.ts
+++++ b/Documents/CONEXAO/src/services/engine/wordpress.ts
++@@ -41,7 +41,9 @@ export const WordpressService = {
++             logToFile(`[WordpressService] Using inferred base URL from catalog: ${baseUrl}`);
++         }
++ 
++-        const token = bot.webhookToken || bot.id; // Usar webhookToken como segredo compartilhado
+++        // O plugin WP valida contra conexbot_bot_id (UUID) ou conexbot_api_token (CONEXT).
+++        // webhookToken existe no Prisma mas não é salvo no WordPress — priorizar bot.id.
+++        const token = bot.id || bot.webhookToken;
++         const ajaxUrl = `${baseUrl}/wp-admin/admin-ajax.php`;
++ 
++         logToFile(`[WordpressService] Sending reply to ${baseUrl} (Post: ${postId}, Parent: ${parentId})`);
+diff --git a/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/src/app/api/simulator/route.ts b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/src/app/api/simulator/route.ts
+new file mode 100644
+index 0000000..a4cd33b
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/Documents/CONEXAO/src/app/api/simulator/route.ts
+@@ -0,0 +1,38 @@
++export const dynamic = 'force-dynamic';
++
++import { NextResponse } from 'next/server';
++import prisma from '@/lib/prisma';
++import { MessageProcessor } from '@/services/engine/processor';
++
++export async function POST(req: Request) {
++    try {
++        const body = await req.json();
++        const { botId, message, sessionId } = body as { botId?: string; message?: string; sessionId?: string };
++
++        if (!botId || !message) {
++            return NextResponse.json({ error: 'Parâmetros botId e message são obrigatórios' }, { status: 400 });
++        }
++
++        const bot = await prisma.bot.findUnique({ where: { id: String(botId).trim() } });
++        if (!bot) return NextResponse.json({ error: 'Bot não encontrado' }, { status: 404 });
++
++        const response = await MessageProcessor.process(
++            bot.id,
++            sessionId || 'sim_user',
++            String(message),
++            'simulator',
++            'id'
++        );
++
++        if (!response) {
++            // Simulator should never be blocked by handoff pause; null here indicates an internal issue.
++            return NextResponse.json({ error: 'A IA não retornou uma resposta' }, { status: 500 });
++        }
++
++        // Simulator.tsx expects { response: string }
++        return NextResponse.json({ response: response.text, media: response.media || [] });
++    } catch (error: any) {
++        return NextResponse.json({ error: 'Erro interno', detail: error?.message || String(error) }, { status: 500 });
++    }
++}
++
+diff --git a/_local_untracked_backup_20260423T121708Z/RESTAURAR-BACKUP.md b/_local_untracked_backup_20260423T121708Z/RESTAURAR-BACKUP.md
+new file mode 100644
+index 0000000..64045c3
+--- /dev/null
++++ b/_local_untracked_backup_20260423T121708Z/RESTAURAR-BACKUP.md
+@@ -0,0 +1,35 @@
++# Restaurar do Backup (se algo quebrar após o pull)
++
++**Backup criado em:** `/root/conexbot-backup-20260318-144755`  
++**Data:** 18/03/2025
++
++## Situação atual
++- Projeto atualizado para o GitHub (commit: `638897c` - fix webhook e audio)
++- Backup completo do estado anterior está em `/root/conexbot-backup-20260318-144755`
++
++## Se algo não funcionar e quiser restaurar
++
++### Opção 1: Restaurar TUDO (voltar ao estado exato do backup)
++```bash
++rm -rf /root/conexbot
++cp -a /root/conexbot-backup-20260318-144755 /root/conexbot
++```
++
++### Opção 2: Restaurar só os arquivos que mudaram (copiar diferenças)
++```bash
++# Listar arquivos diferentes entre backup e atual
++diff -rq /root/conexbot-backup-20260318-144755/Documents /root/conexbot/Documents 2>/dev/null | grep "differ"
++
++# Sobrescrever com os arquivos do backup (restaura as versões que funcionavam)
++rsync -av /root/conexbot-backup-20260318-144755/Documents/CONEXAO/ /root/conexbot/Documents/CONEXAO/
++```
++
++### Opção 3: Restaurar um arquivo específico
++```bash
++cp /root/conexbot-backup-20260318-144755/Documents/CONEXAO/caminho/do/arquivo /root/conexbot/Documents/CONEXAO/caminho/do/arquivo
++```
++
++## Remover o backup (quando não precisar mais)
++```bash
++rm -rf /root/conexbot-backup-20260318-144755
++```
+diff --git a/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151325.tar.gz b/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151325.tar.gz
+new file mode 100644
+index 0000000..6da86e2
+Binary files /dev/null and b/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151325.tar.gz differ
+diff --git a/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151328.tar.gz b/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151328.tar.gz
+new file mode 100644
+index 0000000..6da86e2
+Binary files /dev/null and b/_local_untracked_backup_20260423T121708Z/backups/conexbot-pre-merge-20260330-151328.tar.gz differ

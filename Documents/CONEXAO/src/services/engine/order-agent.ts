@@ -142,6 +142,66 @@ export interface OrderAgentResult {
     cartSummary?: any;
 }
 
+// ─── Helper: Aggregate All Saved Addresses for a Contact ───────────────────
+
+export async function getContactSavedAddresses(contactId: string, contact?: any): Promise<Array<{ address: string; label?: string | null }>> {
+    const list: Array<{ address: string; label?: string | null }> = [];
+    const seen = new Set<string>();
+
+    const addUnique = (addr: string | null | undefined, label: string) => {
+        if (!addr || typeof addr !== 'string') return;
+        const clean = addr.trim();
+        if (clean.length < 5) return;
+        const key = clean.toLowerCase();
+        if (!seen.has(key)) {
+            seen.add(key);
+            list.push({ address: clean, label });
+        }
+    };
+
+    // 1. Fetch from ContactAddress table
+    const dbAddresses = await prisma.contactAddress.findMany({
+        where: { contactId },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+    }).catch(() => []);
+
+    for (const a of dbAddresses) {
+        addUnique(a.address, a.label || 'Endereço Salvo');
+    }
+
+    // 2. Check contact.needs
+    if (contact?.needs) {
+        addUnique(contact.needs, 'Perfil do Cliente');
+        // Auto-persist to ContactAddress if missing
+        if (!dbAddresses.some((a: any) => a.address.toLowerCase().includes(contact.needs.substring(0, 10).toLowerCase()))) {
+            prisma.contactAddress.create({
+                data: { contactId, address: contact.needs.trim(), label: 'Perfil' }
+            }).catch(() => {});
+        }
+    }
+
+    // 3. Check contact.notes
+    if (contact?.notes) {
+        const noteMatch = contact.notes.match(/(?:rua|r\.|av\.|bairro|avenida)\s+[^\n.,]+/i);
+        if (noteMatch) addUnique(noteMatch[0], 'Notas do Cliente');
+    }
+
+    // 4. Check past orders
+    const pastOrders = await prisma.order.findMany({
+        where: { contactId, address: { not: null } },
+        select: { address: true },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+    }).catch(() => []);
+
+    for (const o of pastOrders) {
+        addUnique(o.address, 'Pedido Anterior');
+    }
+
+    return list;
+}
+
 export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentResult> {
     const cartSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
 
@@ -170,30 +230,30 @@ ENDEREÇOS SALVOS DO CLIENTE:
 ${savedAddressesText}
 
 FLUXO OBRIGATÓRIO PARA CADA PEDIDO:
-PASSO 1 → adicionar_item (SEMPRE O PRIMEIRO PASSO quando o carrinho estiver vazio ou o cliente pedir um produto)
-PASSO 2 → definir_endereco (só quando o cliente fornecer RUA + NÚMERO)
+PASSO 1 → adicionar_item (SEMPRE O PRIMEIRO PASSO quando o carrinho estiver vazio)
+PASSO 2 → definir_endereco (quando o cliente fornecer rua e número OU pedir "o mesmo endereço")
 PASSO 3 → definir_pagamento (após o cliente informar a forma de pagamento)
 PASSO 4 → fechar_pedido (SOMENTE após confirmação explícita do cliente)
 
 REGRAS ABSOLUTAS:
-1. CARRINHO VAZIO: Se o carrinho está vazio (🛒 Carrinho vazio), a PRIMEIRA ferramenta a chamar É SEMPRE "adicionar_item". Nunca passe para endereço ou pagamento sem antes ter items no carrinho.
-2. QUANTIDADE: Use EXATAMENTE o número que o cliente disse nesta mensagem (ex: "3", "2", "um"). NUNCA use números de ruas, casas ou CEPs como quantidade.
-3. PRODUTO: Use o produto mais próximo ao que o cliente pediu. Para "gás", "botijão", "gas" → use o produto de gás 13kg do catálogo.
-4. ENDEREÇO: Só chame "definir_endereco" quando tiver RUA + NÚMERO. Bairro sozinho não é suficiente → pergunte a rua e o número.
-5. PAGAMENTO: Só chame "definir_pagamento" depois de o cliente informar como vai pagar.
-6. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado, sem troco, etc.) E o carrinho já tiver itens + endereço + pagamento.
-7. Responda em português brasileiro, de forma natural e simpática.
-8. Após cada ação, informe o estado atual do carrinho ao cliente.
+1. CARRINHO VAZIO: Se o carrinho está vazio (🛒 Carrinho vazio), a PRIMEIRA ferramenta a chamar É SEMPRE "adicionar_item".
+2. QUANTIDADE: Use EXATAMENTE a quantidade dita pelo cliente. NUNCA use números de casas ou CEPs como quantidade.
+3. PRODUTO: Para "gás", "botijão" → use o produto de gás 13kg do catálogo.
+4. "O MESMO ENDEREÇO": Se o cliente disser "o mesmo", "mesmo de antes", "mesmo endereço" ou "o da Fortaleza": REAPROVEITE O 1º ENDEREÇO DA LISTA DE ENDEREÇOS SALVOS ACIMA E CHAME A FERRAMENTA "definir_endereco" COM ELE IMEDIATAMENTE!
+5. NOVO ENDEREÇO COM RUA E NÚMERO: Se o cliente forneceu rua e número (ex: "R. José de Gasperi, 79"), chame a ferramenta "definir_endereco" IMEDIATAMENTE. O Mapbox identifica o bairro automaticamente!
+6. PAGAMENTO: Só chame "definir_pagamento" quando o cliente disser dinheiro, Pix ou cartão.
+7. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado, sem troco) E o carrinho estiver completo (itens + endereço + pagamento).
+8. Responda em português brasileiro, de forma natural e simpática.
 
 PROIBIÇÕES:
-- NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou incompleto
-- NUNCA invente dados — use somente o que o cliente disse
-- NUNCA use saudações como motivo para fechar pedido
-- NUNCA pule o passo "adicionar_item" quando o carrinho estiver vazio`;
+- NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou sem endereço/pagamento
+- NUNCA pergunte bairro se o cliente já forneceu a rua e o número
+- NUNCA invente dados`;
 
-    // ── Forced first-tool injection: when cart is empty AND user mentions quantity + product ──
-    // This prevents the agent from skipping adicionar_item and going straight to address/payment
+    // ── Forced tool hints for item addition AND address definition ──
     let forcedToolHint = '';
+    const userMsgLower = ctx.userMessage.toLowerCase().trim();
+
     if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
         if (qtyMatch) {
@@ -202,7 +262,21 @@ PROIBIÇÕES:
                 const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
                 const rawQty = qtyMatch[1].toLowerCase();
                 const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
-                forcedToolHint = `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+                forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+            }
+        }
+    } else if (!cartSummary.deliveryAddress) {
+        // Cart has items but missing address
+        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes)/i.test(userMsgLower);
+        if (isSameAddress && ctx.savedAddresses.length > 0) {
+            const lastAddr = ctx.savedAddresses[0].address;
+            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente disse "${ctx.userMessage}". O endereço salvo do cliente é "${lastAddr}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${lastAddr}". Não pergunte nada antes.`;
+        } else {
+            // Check if user provided street + number (e.g. "R. José de Gasperi, 79" or "Fortaleza 380")
+            const streetMatch = ctx.userMessage.match(/(?:rua|r\.|av\.|avenida|estrada|servid[ãa]o)?\s*([a-z0-9\sáàâãéèêíóôõúç.-]+,?\s*\d+)/i);
+            if (streetMatch && streetMatch[1].length > 4 && !/^(dinheiro|pix|cartao|cartão)$/i.test(userMsgLower)) {
+                const addrStr = ctx.userMessage.trim();
+                forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço "${addrStr}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${addrStr}". Não pergunte o bairro, o Mapbox resolve o bairro sozinho.`;
             }
         }
     }
