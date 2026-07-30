@@ -222,6 +222,34 @@ export async function getContactSavedAddresses(contactId: string, contact?: any)
 
 export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentResult> {
     const cartSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
+    const cartIsEmpty = !cartSummary.hasItems;
+    const userMsgLower = ctx.userMessage.toLowerCase().trim();
+
+    // ── Early Exit for Greetings ──
+    const isGreeting = /^(oi|olá|ola|bom dia|boa tarde|boa noite|e ai|e aí|tudo bem|opa|oie)$/i.test(userMsgLower);
+
+    // Fetch last order for contact
+    const lastOrder = await prisma.order.findFirst({
+        where: { contactId: ctx.contactId },
+        include: { items: { include: { product: true } } },
+        orderBy: { createdAt: 'desc' }
+    }).catch(() => null);
+
+    if (isGreeting && cartIsEmpty) {
+        let statusNotice = '';
+        if (lastOrder) {
+            const isOngoing = ['PENDING', 'OUT_FOR_DELIVERY'].includes(lastOrder.status);
+            if (isOngoing) {
+                const itemsStr = lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+                statusNotice = `\n\nℹ️ Seu pedido #${lastOrder.id.substring(0, 6)} (${itemsStr}) está *em andamento* para ${lastOrder.address}.`;
+            }
+        }
+        return {
+            reply: `Olá, ${ctx.contactName || 'cliente'}! 😊 Como posso ajudar você hoje?${statusNotice}\n\nSe quiser fazer um novo pedido de gás, é só me dizer a quantidade!`,
+            orderConfirmed: false,
+            cartSummary
+        };
+    }
 
     const catalogText = ctx.catalog.length > 0
         ? ctx.catalog.map(p => `- ID: ${p.id} | Nome: ${p.name} | Preço: R$ ${Number(p.salePrice ?? p.price).toFixed(2)}`).join('\n')
@@ -231,12 +259,30 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         ? ctx.savedAddresses.map((a, i) => `${i + 1}. ${a.label ? `[${a.label}] ` : ''}${a.address}`).join('\n')
         : 'Nenhum endereço salvo.';
 
-    const cartIsEmpty = !cartSummary.hasItems;
+    let lastOrderContext = 'Nenhum pedido anterior.';
+    if (lastOrder) {
+        const statusMap: Record<string, string> = {
+            PENDING: 'Em andamento (aguardando entregador)',
+            OUT_FOR_DELIVERY: 'A caminho para entrega',
+            DELIVERED: 'Entregue com sucesso',
+            COMPLETED: 'Concluído',
+            CANCELLED: 'Cancelado'
+        };
+        const statusFormatted = statusMap[lastOrder.status] || lastOrder.status;
+        const dateFormatted = new Date(lastOrder.createdAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        lastOrderContext = `Último Pedido (#${lastOrder.id.substring(0, 6)}): ${lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ')} (R$ ${Number(lastOrder.totalAmount).toFixed(2)}) em ${dateFormatted} | Status: ${statusFormatted} | Endereço: ${lastOrder.address}`;
+    }
+
     const cartReadyHint = !cartIsEmpty && cartSummary.deliveryAddress && cartSummary.paymentMethod
         ? '\n\n⚠️ CARRINHO PRONTO: O carrinho já tem itens, endereço e pagamento. Se o cliente confirmar, chame fechar_pedido.'
         : '';
 
     const systemPrompt = `Você é o AGENTE DE PEDIDOS. Sua única função é registrar pedidos corretamente no sistema.
+
+NOME DO CLIENTE: ${ctx.contactName || 'Cliente'}
+
+ÚLTIMO PEDIDO DO CLIENTE:
+${lastOrderContext}
 
 CATÁLOGO DE PRODUTOS DISPONÍVEIS:
 ${catalogText}
@@ -261,7 +307,8 @@ REGRAS ABSOLUTAS:
 5. NOVO ENDEREÇO COM RUA E NÚMERO: Se o cliente forneceu rua e número (ex: "R. José de Gasperi, 79"), chame a ferramenta "definir_endereco" IMEDIATAMENTE. O Mapbox identifica o bairro automaticamente!
 6. PAGAMENTO: Só chame "definir_pagamento" quando o cliente disser dinheiro, Pix ou cartão.
 7. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado, sem troco) E o carrinho estiver completo (itens + endereço + pagamento).
-8. Responda em português brasileiro, de forma natural e simpática.
+8. CONSULTA DE PEDIDO: Se o cliente perguntar "onde está meu pedido?" ou "qual o status?", responda com o status do Último Pedido informado acima. NUNCA crie um novo pedido nesses casos!
+9. Responda em português brasileiro, de forma natural e simpática.
 
 PROIBIÇÕES:
 - NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou sem endereço/pagamento
@@ -270,7 +317,6 @@ PROIBIÇÕES:
 
     // ── Forced tool hints for item addition AND address definition ──
     let forcedToolHint = '';
-    const userMsgLower = ctx.userMessage.toLowerCase().trim();
 
     if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
@@ -281,10 +327,6 @@ PROIBIÇÕES:
             const rawQty = qtyMatch[1].toLowerCase();
             const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
-        } else if (/^(sim|pode|confirmar|confirmado|ok|pode ser|com certeza)$/i.test(userMsgLower) && defaultProduct) {
-            // Check if user message or recent history mentions a quantity
-            const qtyInContext = ctx.userMessage.match(/\d+/) || (ctx.savedAddresses.length > 0 ? null : null);
-            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente disse "${ctx.userMessage}" confirmando o pedido. Se a quantidade de botijões foi informada na conversa, chame a ferramenta "adicionar_item" com essa quantidade (ou quantidade=1 se não especificado) E em seguida "fechar_pedido".`;
         }
     } else if (!cartSummary.deliveryAddress) {
         // Cart has items but missing address
