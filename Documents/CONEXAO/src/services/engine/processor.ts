@@ -994,6 +994,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         botId: bot.id,
                         contactPhone: senderPhone,
                         contactId: existingContact.id,
+                        contactName: existingContact.name || undefined,
                         userMessage: messageText,
                         catalog: orderCatalog,
                         savedAddresses,
