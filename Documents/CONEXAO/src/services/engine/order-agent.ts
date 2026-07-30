@@ -435,7 +435,7 @@ PROIBIÇÕES:
 
             } else if (name === 'definir_endereco') {
                 const rawAddr = `${args.rua_numero}${args.bairro ? `, ${args.bairro}` : ''}`;
-                let resolvedAddr = rawAddr;
+                let resolvedAddr = rawAddr.includes('Bento') || rawAddr.includes('RS') ? rawAddr : `${rawAddr}, Bento Gonçalves - RS`;
                 let lat: number | null = null;
                 let lng: number | null = null;
 
@@ -451,12 +451,16 @@ PROIBIÇÕES:
                             const data = await res.json();
                             const feature = data.features?.[0];
                             if (feature) {
-                                if (feature.relevance && feature.relevance < 0.4) {
+                                if (feature.relevance && feature.relevance < 0.3) {
                                     result = `❌ Endereço "${rawAddr}" não encontrado no mapa. Por favor informe a rua e número corretamente.`;
                                     toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
                                     continue;
                                 }
-                                if (feature.place_name) resolvedAddr = feature.place_name;
+                                const placeTypes = feature.place_type || [];
+                                const isSpecificAddress = placeTypes.includes('address') || placeTypes.includes('poi') || placeTypes.includes('building') || /\d+/.test(feature.place_name || '');
+                                if (isSpecificAddress && feature.place_name) {
+                                    resolvedAddr = feature.place_name;
+                                }
                                 if (feature.center) { lng = feature.center[0]; lat = feature.center[1]; }
                             }
                         }
