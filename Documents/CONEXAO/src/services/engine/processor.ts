@@ -1039,7 +1039,17 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     releaseLock(lockKey);
                     return; // ALWAYS RETURN! Never fall through to legacy processor loop!
                 } catch (e: any) {
-                    logToFile(`[OrderAgent] Error, falling back to normal flow: ${e.message}`);
+                    logToFile(`[OrderAgent] Exception in OrderAgent block: ${e.message}`);
+                    const fallbackReply = 'Recebi o seu pedido! Em breve nosso entregador estará a caminho.';
+                    await prisma.message.create({
+                        data: { conversationId: conversation.id, content: fallbackReply, role: 'assistant' }
+                    }).catch(() => {});
+                    await deliverAssistantOutbound({
+                        bot, conversation, contact: existingContact,
+                        channel, senderPhone, messageText: fallbackReply, mediaItems: []
+                    }).catch(() => {});
+                    releaseLock(lockKey);
+                    return; // NEVER fall through to legacy loop!
                 }
             }
 

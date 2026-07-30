@@ -274,14 +274,17 @@ PROIBIÇÕES:
 
     if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
-        if (qtyMatch) {
-            const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
-            if (defaultProduct) {
-                const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
-                const rawQty = qtyMatch[1].toLowerCase();
-                const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
-                forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
-            }
+        const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+
+        if (qtyMatch && defaultProduct) {
+            const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
+            const rawQty = qtyMatch[1].toLowerCase();
+            const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
+            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+        } else if (/^(sim|pode|confirmar|confirmado|ok|pode ser|com certeza)$/i.test(userMsgLower) && defaultProduct) {
+            // Check if user message or recent history mentions a quantity
+            const qtyInContext = ctx.userMessage.match(/\d+/) || (ctx.savedAddresses.length > 0 ? null : null);
+            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente disse "${ctx.userMessage}" confirmando o pedido. Se a quantidade de botijões foi informada na conversa, chame a ferramenta "adicionar_item" com essa quantidade (ou quantidade=1 se não especificado) E em seguida "fechar_pedido".`;
         }
     } else if (!cartSummary.deliveryAddress) {
         // Cart has items but missing address

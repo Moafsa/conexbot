@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { safeChatCompletion } from '@/lib/ai-provider';
+import { logToFile } from './logger';
 
 export const SupervisorService = {
     /**
