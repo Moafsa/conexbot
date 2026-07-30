@@ -492,11 +492,14 @@ PROIBIÇÕES:
     const updatedSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
     if (!reply && updatedSummary.hasItems) {
         const missing: string[] = [];
-        if (!updatedSummary.deliveryAddress) missing.push('rua e número para entrega');
+        if (!updatedSummary.deliveryAddress) missing.push('endereço de entrega (rua e número)');
         if (!updatedSummary.paymentMethod) missing.push('forma de pagamento (dinheiro, Pix ou cartão)');
-        
-        const missingText = missing.length > 0 ? `\n\nPor favor, me informe a ${missing.join(' e ')} para continuarmos!` : '';
-        reply = `${updatedSummary.summary}${missingText}`;
+
+        const missingText = missing.length > 0
+            ? `\n\nQual será a ${missing.join(' e ')}?`
+            : `\n\nTudo pronto! Deseja confirmar o pedido agora? (responda "sim" ou "pode")`;
+
+        reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${updatedSummary.totalAmount.toFixed(2)}${missingText}`;
     }
 
     return { reply, orderConfirmed, orderId, cartSummary: updatedSummary };
