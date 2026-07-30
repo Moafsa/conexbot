@@ -461,6 +461,13 @@ PROIBIÇÕES:
                 result = r.summary;
 
             } else if (name === 'fechar_pedido') {
+                const isExplicitConfirmation = /^(sim|pode|pode sim|pode fechar|pode enviar|confirma|confirmar|confirmado|ok|certeza|manda|mandar|sem troco|pode mandar|isso|correto|esta certo|está certo)$/i.test(userMsgLower);
+                if (!isExplicitConfirmation) {
+                    result = '❌ O pedido NÃO pode ser fechado ainda porque o cliente NÃO respondeu "sim" ou "pode" para confirmar. Exiba o resumo do pedido ao cliente e aguarde a confirmação dele.';
+                    toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
+                    continue;
+                }
+
                 if (args.entregas && Array.isArray(args.entregas) && args.entregas.length > 0) {
                     // MULTI-DELIVERY ORDER CREATION
                     const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
