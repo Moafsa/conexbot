@@ -371,9 +371,32 @@ PROIBIÇÕES:
         if (matchedAddress) {
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço de entrega "${matchedAddress}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${matchedAddress}". Não pergunte nada antes.`;
         } else if (userMsgLower.length >= 3 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
-            // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso")
+            // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso", "juventude")
             const cleanBairro = ctx.userMessage.replace(/^(no|na|em|o|a)\s+/i, '').trim();
-            forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}". Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
+
+            // STEP 1: VERIFY IF NEIGHBORHOOD IS COVERED BY DISTRIBUTOR
+            let coveredNeighborhoods: string[] = [];
+            if (ctx.bot?.deliveryFeeRules) {
+                try {
+                    const rules = typeof ctx.bot.deliveryFeeRules === 'string'
+                        ? JSON.parse(ctx.bot.deliveryFeeRules)
+                        : ctx.bot.deliveryFeeRules;
+                    if (Array.isArray(rules)) {
+                        coveredNeighborhoods = rules
+                            .map((r: any) => (r.neighborhood || r.bairro || r.region || '').toLowerCase())
+                            .filter(Boolean);
+                    }
+                } catch {}
+            }
+
+            const cleanBairroLower = cleanBairro.toLowerCase();
+            const isCovered = coveredNeighborhoods.length === 0 || coveredNeighborhoods.some(n => cleanBairroLower.includes(n) || n.includes(cleanBairroLower));
+
+            if (!isCovered) {
+                forcedToolHint += `\n\n🔴 ATENÇÃO BAIRRO FORA DA COBERTURA: O cliente mencionou o bairro "${cleanBairro}". Este bairro NÃO está na lista de bairros atendidos pela distribuidora. Informe com educação ao cliente que infelizmente não realizamos entregas no bairro "${cleanBairro}".`;
+            } else {
+                forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}" (que é um bairro atendido pela distribuidora). Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
+            }
         }
     } else if (!cartSummary.paymentMethod) {
         // Cart has items and address, missing payment method
@@ -439,7 +462,7 @@ PROIBIÇÕES:
                 let lat: number | null = null;
                 let lng: number | null = null;
 
-                // Validate with Mapbox if token available
+                // STEP 2: FULL STREET ADDRESS MAPBOX VERIFICATION
                 if (ctx.mapboxToken) {
                     try {
                         const cityCtx = ctx.botAddress ? `, ${ctx.botAddress}` : ', Bento Gonçalves, RS, Brasil';
@@ -450,19 +473,17 @@ PROIBIÇÕES:
                         if (res.ok) {
                             const data = await res.json();
                             const feature = data.features?.[0];
-                            if (feature) {
-                                if (feature.relevance && feature.relevance < 0.3) {
-                                    result = `❌ Endereço "${rawAddr}" não encontrado no mapa. Por favor informe a rua e número corretamente.`;
-                                    toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
-                                    continue;
-                                }
-                                const placeTypes = feature.place_type || [];
-                                const isSpecificAddress = placeTypes.includes('address') || placeTypes.includes('poi') || placeTypes.includes('building') || /\d+/.test(feature.place_name || '');
-                                if (isSpecificAddress && feature.place_name) {
-                                    resolvedAddr = feature.place_name;
-                                }
-                                if (feature.center) { lng = feature.center[0]; lat = feature.center[1]; }
+                            if (!feature || (feature.relevance && feature.relevance < 0.4)) {
+                                result = `❌ O endereço "${rawAddr}" não foi localizado no Mapa (Mapbox). Peça educadamente para o cliente verificar a rua ou o número da residência.`;
+                                toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
+                                continue;
                             }
+                            const placeTypes = feature.place_type || [];
+                            const isSpecificAddress = placeTypes.includes('address') || placeTypes.includes('poi') || placeTypes.includes('building') || /\d+/.test(feature.place_name || '');
+                            if (isSpecificAddress && feature.place_name) {
+                                resolvedAddr = feature.place_name;
+                            }
+                            if (feature.center) { lng = feature.center[0]; lat = feature.center[1]; }
                         }
                     } catch (e: any) {
                         console.error('[OrderAgent] Mapbox error:', e.message);
