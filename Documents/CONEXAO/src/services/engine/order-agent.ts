@@ -489,7 +489,17 @@ PROIBIÇÕES:
         if (orderConfirmed) break;
     }
 
-    return { reply, orderConfirmed, orderId, cartSummary: await CartService.getCartSummary(ctx.botId, ctx.contactPhone) };
+    const updatedSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
+    if (!reply && updatedSummary.hasItems) {
+        const missing: string[] = [];
+        if (!updatedSummary.deliveryAddress) missing.push('rua e número para entrega');
+        if (!updatedSummary.paymentMethod) missing.push('forma de pagamento (dinheiro, Pix ou cartão)');
+        
+        const missingText = missing.length > 0 ? `\n\nPor favor, me informe a ${missing.join(' e ')} para continuarmos!` : '';
+        reply = `${updatedSummary.summary}${missingText}`;
+    }
+
+    return { reply, orderConfirmed, orderId, cartSummary: updatedSummary };
 }
 
 // ─── Helper: Build Order from Cart Data ───────────────────────────────────

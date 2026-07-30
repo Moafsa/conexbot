@@ -1022,7 +1022,9 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         }
                     });
 
-                    const finalReply = agentResult.reply || (agentResult.cartSummary ? agentResult.cartSummary.summary : 'Pedido anotado! Diga se deseja confirmar ou alterar o endereço/quantidade.');
+                    const { CartService } = await import('./cart.service');
+                    const freshSummary = await CartService.getCartSummary(bot.id, senderPhone);
+                    const finalReply = agentResult.reply || freshSummary.summary || 'Pedido anotado! Diga se deseja confirmar ou alterar o endereço/quantidade.';
 
                     // Save assistant message to DB
                     await prisma.message.create({
@@ -1036,19 +1038,9 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     });
 
                     logToFile(`[OrderAgent] Handled turn (orderConfirmed=${agentResult.orderConfirmed})`);
-                    releaseLock(lockKey);
                     return; // ALWAYS RETURN! Never fall through to legacy processor loop!
                 } catch (e: any) {
                     logToFile(`[OrderAgent] Exception in OrderAgent block: ${e.message}`);
-                    const fallbackReply = 'Recebi o seu pedido! Em breve nosso entregador estará a caminho.';
-                    await prisma.message.create({
-                        data: { conversationId: conversation.id, content: fallbackReply, role: 'assistant' }
-                    }).catch(() => {});
-                    await deliverAssistantOutbound({
-                        bot, conversation, contact: existingContact,
-                        channel, senderPhone, messageText: fallbackReply, mediaItems: []
-                    }).catch(() => {});
-                    releaseLock(lockKey);
                     return; // NEVER fall through to legacy loop!
                 }
             }
