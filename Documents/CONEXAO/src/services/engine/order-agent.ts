@@ -315,15 +315,27 @@ REGRAS ABSOLUTAS:
 8. CONSULTA DE PEDIDO: Se o cliente perguntar "onde está meu pedido?" ou "qual o status?", responda com o status do Último Pedido informado acima. NUNCA crie um novo pedido nesses casos!
 9. Responda em português brasileiro, de forma natural e simpática.
 
+10. MÚLTIPLAS ENTREGAS: Se o cliente solicitar entregas para mais de 1 local (ex: "4 no Centro e 7 no Municipal"):
+- MANTENHA as entregas separadas por local com suas respectivas quantidades e endereços.
+- Solicite a rua e o número de cada local que ainda não tiver endereço completo.
+- Na hora de fechar, chame a ferramenta "fechar_pedido" usando o parâmetro "entregas" contendo a lista de todas as entregas.
+
 PROIBIÇÕES:
 - NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou sem endereço/pagamento
 - NUNCA pergunte bairro se o cliente já forneceu a rua e o número
+- NUNCA junte pedidos de múltiplos locais diferentes num único endereço simples
 - NUNCA invente dados`;
 
     // ── Forced tool hints for item addition AND address definition ──
     let forcedToolHint = '';
 
-    if (cartIsEmpty) {
+    const isMultiDelivery = /(?:mais|\be\b|\bambos\b|\boutro\b).*(?:no|na|em|para)\s+/i.test(userMsgLower) ||
+                            (/(?:no|na|em)\s+[a-z0-9\s]+.*(?:no|na|em)\s+[a-z0-9\s]+/i.test(userMsgLower)) ||
+                            (/,\s*mais\s+\d+/i.test(userMsgLower));
+
+    if (isMultiDelivery) {
+        forcedToolHint += `\n\n🔴 INSTRUÇÃO DE MÚLTIPLAS ENTREGAS: O cliente solicitou entregas para MÚLTIPLOS locais/endereços diferentes ("${ctx.userMessage}"). MANTENHA SEPARADAS as quantidades e endereços de cada local. Se faltar a rua e número de algum local (ex: Centro), solicite a rua e número desse local específico. NUNCA junte todos os botijões num único endereço!`;
+    } else if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
         const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
 
