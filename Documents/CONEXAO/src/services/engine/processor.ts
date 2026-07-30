@@ -971,9 +971,8 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
             // Se o agente confirmar pedido, cria o Order e retorna direto.
             // ══════════════════════════════════════════════════════════════
             const isOrderBot = (bot.businessType === 'GAS_DISTRIBUTOR' || (bot.businessType || '').includes('GAS'));
-            const isGreeting = /^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|eae|ei|tudo|hello)$/i.test(messageText.trim());
 
-            if (isOrderBot && !isGreeting) {
+            if (isOrderBot) {
                 try {
                     const { runOrderAgent, createOrderFromCartData, getContactSavedAddresses } = await import('./order-agent');
                     const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
