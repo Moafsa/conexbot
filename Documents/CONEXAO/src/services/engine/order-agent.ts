@@ -298,6 +298,14 @@ ${cartSummary.summary}${cartReadyHint}
 ENDEREÇOS SALVOS DO CLIENTE:
 ${savedAddressesText}
 
+BUSCA HIERÁRQUICA DE ENDEREÇOS E BAIRROS:
+1. TABELA DE ENDEREÇOS SALVOS DO CLIENTE (Nível 1):
+   - Se o cliente mencionar um bairro ou rótulo que ele JÁ possui cadastrado (ex: "Conceição", "Municipal", "Botafogo"), SELECIONE IMEDIATAMENTE o endereço completo correspondente da lista de Endereços Salvos!
+2. TABELA DE BAIRROS ATENDIDOS DA DISTRIBUIDORA (Nível 2):
+   - Se o cliente citar um bairro que NÃO está nos endereços salvos dele, mas CONSTA na tabela de bairros atendidos pela distribuidora (ex: "Borgo", "Juventude"), confirme o bairro e solicite a rua e o número da residência naquele bairro.
+3. FORA DA ÁREA DE COBERTURA (Nível 3):
+   - Se o bairro informado não existir na tabela de endereços salvos nem na tabela de bairros atendidos, informe educadamente que a distribuidora não entrega naquela região.
+
 FLUXO OBRIGATÓRIO PARA CADA PEDIDO:
 PASSO 1 → adicionar_item (SEMPRE O PRIMEIRO PASSO quando o carrinho estiver vazio)
 PASSO 2 → definir_endereco (quando o cliente fornecer rua e número OU pedir "o mesmo endereço")
