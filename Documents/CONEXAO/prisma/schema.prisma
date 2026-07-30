@@ -593,6 +593,7 @@ model Contact {
   latitude         Float?
   longitude        Float?
   loginToken       String?       @unique
+  loginTokenExpires DateTime?
   assignedOrders   Order[]       @relation("DriverOrders")
   savedAddresses   ContactAddress[]
 

@@ -99,8 +99,8 @@ export async function POST(req: Request) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const customerName = order.contact?.name || 'Cliente';
         const customerPhone = order.contact?.phone ? order.contact.phone.replace(/\D/g, '') : 'Não informado';
-        const rawAddress = order.contact?.notes || order.contact?.needs || 'Endereço a confirmar';
-        const deliveryAddress = cleanAddress(rawAddress) || 'Endereço a confirmar';
+        const rawAddress = order.address || order.contact?.notes || order.contact?.needs || 'Endereço a confirmar';
+        const deliveryAddress = cleanAddress(rawAddress) || order.address || 'Endereço a confirmar';
         const orderItemsStr = (order.items && order.items.length > 0)
             ? order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ')
             : (order.notes || order.description || '1x Botijão P13');
@@ -137,9 +137,7 @@ export async function POST(req: Request) {
             templateComponents
         });
         if (!sentResult.success) {
-            return NextResponse.json({ 
-                error: sentResult.error || `Falha ao enviar notificação para o entregador via WhatsApp.` 
-            }, { status: 500 });
+            console.warn(`[Dispatch Warning] Outbound notification warning to driver ${driver.phone}: ${sentResult.error}`);
         }
 
         // 6. Assign conversation in Chatwoot
