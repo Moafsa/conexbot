@@ -338,17 +338,20 @@ PROIBIÇÕES:
     } else if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
         const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+        const mentionsAddress = /(endere[çc]|salvo|mesmo|ja tem|já tem|cadastrad)/i.test(userMsgLower);
 
         if (qtyMatch && defaultProduct) {
             const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
             const rawQty = qtyMatch[1].toLowerCase();
             const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+        } else if (mentionsAddress) {
+            forcedToolHint += `\n\n🔴 CARRINHO VAZIO: O cliente mencionou os endereços salvos, mas o carrinho ainda está vazio. Responda com simpatia e objetividade (sem frases robóticas): "Entendi, ${ctx.contactName || 'amigo'}! Já tenho seus endereços salvos aqui. Quantos botijões de gás (P13) você vai precisar hoje?"`;
         }
     } else if (!cartSummary.deliveryAddress) {
         // Cart has items but missing address
         const optionMatch = userMsgLower.match(/^(?:o\s*|op[çc][ãa]o\s*|n[úu]mero\s*)?([1-9])\b/i);
-        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes|ja pedi antes|já pedi antes)/i.test(userMsgLower);
+        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes|ja pedi antes|já pedi antes|ja tem|já tem|usando|salvo)/i.test(userMsgLower);
 
         let matchedAddress: string | null = null;
 
@@ -358,7 +361,11 @@ PROIBIÇÕES:
                 matchedAddress = ctx.savedAddresses[idx].address;
             }
         } else if (isSameAddress && ctx.savedAddresses.length > 0) {
-            matchedAddress = ctx.savedAddresses[0].address;
+            if (ctx.savedAddresses.length === 1) {
+                matchedAddress = ctx.savedAddresses[0].address;
+            } else {
+                forcedToolHint += `\n\n🔴 SELEÇÃO DE ENDEREÇO SALVO: O cliente quer usar um endereço salvo. Liste de forma clara e objetiva os endereços salvos acima (1. Municipal, 2. Botafogo, etc.) e pergunte qual deles ele deseja usar para esta entrega.`;
+            }
         } else if (ctx.savedAddresses.length > 0) {
             // Match by exact saved address label (e.g. "Municipal", "Botafogo", "Perfil")
             const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
