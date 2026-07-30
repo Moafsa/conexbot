@@ -381,13 +381,19 @@ PROIBIÇÕES:
     } else if (cartIsEmpty) {
         const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
         const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+        const mentionsProduct = /\b(p13|g[aá]s|botij[aã]o|botij[oõ]es)\b/i.test(userMsgLower);
         const mentionsAddress = /(endere[çc]|salvo|mesmo|ja tem|já tem|cadastrad)/i.test(userMsgLower);
+        const mentionsPayment = /\b(dinheiro|pix|cartao|cartão|crédito|débito)\b/i.test(userMsgLower);
 
-        if (qtyMatch && defaultProduct) {
+        if ((qtyMatch || mentionsProduct) && defaultProduct) {
             const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
-            const rawQty = qtyMatch[1].toLowerCase();
+            const rawQty = qtyMatch ? qtyMatch[1].toLowerCase() : '1';
             const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
             forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+        } else if (mentionsPayment) {
+            const payMatch = userMsgLower.match(/(dinheiro|pix|cartao|cartão|crédito|débito)/i);
+            const payStr = payMatch ? payMatch[1].toUpperCase() : 'DINHEIRO';
+            forcedToolHint += `\n\n🔴 CARRINHO VAZIO: O cliente informou a forma de pagamento (${payStr}), mas o carrinho está vazio. Responda de forma simpática e direta: "Entendi, ${ctx.contactName || 'amigo'}! A forma de pagamento será ${payStr}. Quantos botijões de gás (P13) você deseja pedir hoje para que eu possa montar o seu carrinho?"`;
         } else if (mentionsAddress) {
             forcedToolHint += `\n\n🔴 CARRINHO VAZIO: O cliente mencionou os endereços salvos, mas o carrinho ainda está vazio. Responda com simpatia e objetividade (sem frases robóticas): "Entendi, ${ctx.contactName || 'amigo'}! Já tenho seus endereços salvos aqui. Quantos botijões de gás (P13) você vai precisar hoje?"`;
         }
