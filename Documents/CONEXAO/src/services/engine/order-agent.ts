@@ -153,41 +153,70 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         ? ctx.savedAddresses.map((a, i) => `${i + 1}. ${a.label ? `[${a.label}] ` : ''}${a.address}`).join('\n')
         : 'Nenhum endereço salvo.';
 
+    const cartIsEmpty = !cartSummary.hasItems;
+    const cartReadyHint = !cartIsEmpty && cartSummary.deliveryAddress && cartSummary.paymentMethod
+        ? '\n\n⚠️ CARRINHO PRONTO: O carrinho já tem itens, endereço e pagamento. Se o cliente confirmar, chame fechar_pedido.'
+        : '';
+
     const systemPrompt = `Você é o AGENTE DE PEDIDOS. Sua única função é registrar pedidos corretamente no sistema.
 
 CATÁLOGO DE PRODUTOS DISPONÍVEIS:
 ${catalogText}
 
 ESTADO ATUAL DO CARRINHO:
-${cartSummary.summary}
+${cartSummary.summary}${cartReadyHint}
 
 ENDEREÇOS SALVOS DO CLIENTE:
 ${savedAddressesText}
 
+FLUXO OBRIGATÓRIO PARA CADA PEDIDO:
+PASSO 1 → adicionar_item (SEMPRE O PRIMEIRO PASSO quando o carrinho estiver vazio ou o cliente pedir um produto)
+PASSO 2 → definir_endereco (só quando o cliente fornecer RUA + NÚMERO)
+PASSO 3 → definir_pagamento (após o cliente informar a forma de pagamento)
+PASSO 4 → fechar_pedido (SOMENTE após confirmação explícita do cliente)
+
 REGRAS ABSOLUTAS:
-1. QUANTIDADE: Use EXATAMENTE o número que o cliente disse nesta mensagem. NUNCA use números de ruas ou casas como quantidade.
-2. ENDEREÇO: Só chame "definir_endereco" quando tiver RUA + NÚMERO. Bairro sozinho não é suficiente.
-3. PAGAMENTO: Só chame "definir_pagamento" depois de o cliente informar como vai pagar.
-4. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado).
-5. Se o cliente pede para ADICIONAR mais itens, some ao carrinho existente, não substitua.
-6. Responda em português brasileiro, de forma natural e simpática.
-7. Após cada ação, informe o estado atual do carrinho ao cliente.
+1. CARRINHO VAZIO: Se o carrinho está vazio (🛒 Carrinho vazio), a PRIMEIRA ferramenta a chamar É SEMPRE "adicionar_item". Nunca passe para endereço ou pagamento sem antes ter items no carrinho.
+2. QUANTIDADE: Use EXATAMENTE o número que o cliente disse nesta mensagem (ex: "3", "2", "um"). NUNCA use números de ruas, casas ou CEPs como quantidade.
+3. PRODUTO: Use o produto mais próximo ao que o cliente pediu. Para "gás", "botijão", "gas" → use o produto de gás 13kg do catálogo.
+4. ENDEREÇO: Só chame "definir_endereco" quando tiver RUA + NÚMERO. Bairro sozinho não é suficiente → pergunte a rua e o número.
+5. PAGAMENTO: Só chame "definir_pagamento" depois de o cliente informar como vai pagar.
+6. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado, sem troco, etc.) E o carrinho já tiver itens + endereço + pagamento.
+7. Responda em português brasileiro, de forma natural e simpática.
+8. Após cada ação, informe o estado atual do carrinho ao cliente.
 
 PROIBIÇÕES:
-- NUNCA chame "fechar_pedido" se o carrinho estiver incompleto
-- NUNCA invente dados — use somente o que o cliente disse nesta conversa
-- NUNCA use "bom dia" ou saudações como motivo para fechar pedido`;
+- NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou incompleto
+- NUNCA invente dados — use somente o que o cliente disse
+- NUNCA use saudações como motivo para fechar pedido
+- NUNCA pule o passo "adicionar_item" quando o carrinho estiver vazio`;
+
+    // ── Forced first-tool injection: when cart is empty AND user mentions quantity + product ──
+    // This prevents the agent from skipping adicionar_item and going straight to address/payment
+    let forcedToolHint = '';
+    if (cartIsEmpty) {
+        const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
+        if (qtyMatch) {
+            const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+            if (defaultProduct) {
+                const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
+                const rawQty = qtyMatch[1].toLowerCase();
+                const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
+                forcedToolHint = `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
+            }
+        }
+    }
 
     const messages: any[] = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: ctx.userMessage }
+        { role: 'user', content: ctx.userMessage + forcedToolHint }
     ];
 
     let reply = '';
     let orderConfirmed = false;
     let orderId: string | undefined;
     let iterations = 0;
-    const MAX_ITER = 5;
+    const MAX_ITER = 6;
 
     while (iterations < MAX_ITER) {
         iterations++;
@@ -207,6 +236,7 @@ PROIBIÇÕES:
             reply = content || reply;
             break;
         }
+
 
         // Process tool calls
         const toolResults: any[] = [];
