@@ -557,7 +557,28 @@ ${hasPending
         }
     } else if (cartIsEmpty) {
         stateDesc = `Carrinho vazio. Aguardando pedido.`;
-        nextStep = `Se o cliente mencionar apenas o produto sem quantidade (ex: "gas", "botijão"), pergunte "Quantos botijões você precisa?" antes de adicionar ao carrinho. Se informar quantidade + produto, adicione imediatamente.`;
+
+        // ── Deterministic detection: NUMBER + PRODUCT in message ──────────
+        // Catches: "6 gas", "pedi 6 gas", "quero 3 botíjões", "preciso de 4 p13"
+        // Does NOT catch: "gas" alone, "botíjão" alone (those trigger ask-for-qty)
+        const productMentioned = /\b(g[aá]s|bot[il][aã]o?|botij[oõ][aã]o?s?|p\s*13|kg)\b/i.test(ctx.userMessage);
+        const numberInMsg = ctx.userMessage.match(/(\d+|um|uma|dois|duas|tr[eê]s|tres|quatro|cinco|seis|sete|oito|nove|dez)/i);
+
+        let cartQtyHint = '';
+        if (productMentioned && numberInMsg) {
+            const rawQty = numberInMsg[1].toLowerCase();
+            const detectedQty = NUM_WORDS[rawQty] ?? parseInt(rawQty, 10);
+            const defProduct = ctx.catalog.find(p =>
+                p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') ||
+                p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas'))
+            ) || ctx.catalog.find(p => p.active);
+
+            if (defProduct && detectedQty > 0 && detectedQty <= 100) {
+                cartQtyHint = `\n\nPEDIDO DETECTADO PELO SISTEMA: O cliente quer ${detectedQty}x ${defProduct.name} (ID: ${defProduct.id}). Chame adicionar_item com produto_id="${defProduct.id}" e quantidade=${detectedQty} imediatamente. Não pergunte a quantidade de novo.`;
+            }
+        }
+
+        nextStep = `Se o cliente mencionar apenas o produto SEM quantidade (ex: "gas", "botijão", "p13" isolados), pergunte "Quantos botijões você precisa?" antes de adicionar ao carrinho. Se a mensagem contém número + produto, adicione ao carrinho imediatamente.${cartQtyHint}`;
     } else if (!cartSummary.deliveryAddress) {
         stateDesc = `Carrinho com itens. Aguardando endereço de entrega.`;
         nextStep = `Pergunte para qual endereço será a entrega. Se o cliente mencionar um bairro com endereço salvo, use o endereço salvo diretamente sem pedir rua e número.${singleAddrHint}`;
@@ -596,7 +617,8 @@ REGRAS DE NEGÓCIO:
 5. FECHAMENTO: Só chame fechar_pedido quando o cliente confirmar explicitamente com "sim", "pode", "confirmo" ou similar.
 6. MULTI-ENTREGA: Se houver um PLANO DE MULTI-ENTREGA ATIVO acima, use os dados do plano. Quando fechar, chame fechar_pedido — o sistema cria pedidos separados automaticamente para cada endereço.
 7. STATUS: Se o cliente perguntar sobre o status do pedido, informe com base no ÚLTIMO PEDIDO.
-8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas.`;
+8. REFERÊNCIA A MENSAGEM ANTERIOR: Se o cliente disser "ja falei", "ja disse", "coloquei ali", "falei antes" ou similar, responda com naturalidade: reconheça que não conseguiu ver a mensagem anterior e peça para ele repetir a informação. Ex: "Desculpa, não consegui capturar a informação anterior. Pode repetir a quantidade para mim?".
+9. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas.`;
 
     const messages: any[] = [
         { role: 'system', content: systemPrompt },
