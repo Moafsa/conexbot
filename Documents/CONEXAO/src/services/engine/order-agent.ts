@@ -611,14 +611,13 @@ ${multiDeliveryBlock}
 
 REGRAS DE NEGÓCIO:
 1. QUANTIDADE: Se o cliente mencionar apenas o produto sem quantidade (ex: "gás", "botijão", "p13"), SEMPRE pergunte quantos botijões ele precisa antes de chamar adicionar_item. Nunca assuma quantidade.
-2. ENDEREÇO SALVO: Se o cliente mencionar um bairro que corresponde a um endereço salvo, use o endereço salvo diretamente. Não peça rua e número.
+2. ENDEREÇO SALVO: NUNCA assuma ou escolha um endereço salvo automaticamente. VOCÊ SÓ PODE usar um endereço salvo se o cliente mencionar explicitamente o nome da rua ou do bairro na mensagem atual. Caso contrário, pergunte para onde é a entrega.
 3. BAIRRO SEM ENDEREÇO: Se o cliente mencionar um bairro sem endereço salvo, pergunte a rua e o número naquele bairro.
 4. PAGAMENTO: Só chame definir_pagamento quando o cliente informar "dinheiro", "Pix" ou "cartão".
 5. FECHAMENTO: Só chame fechar_pedido quando o cliente confirmar explicitamente com "sim", "pode", "confirmo" ou similar.
 6. MULTI-ENTREGA: Se houver um PLANO DE MULTI-ENTREGA ATIVO acima, use os dados do plano. Quando fechar, chame fechar_pedido — o sistema cria pedidos separados automaticamente para cada endereço.
 7. STATUS: Se o cliente perguntar sobre o status do pedido, informe com base no ÚLTIMO PEDIDO.
-8. REFERÊNCIA A MENSAGEM ANTERIOR: Se o cliente disser "ja falei", "ja disse", "coloquei ali", "falei antes" ou similar, responda com naturalidade: reconheça que não conseguiu ver a mensagem anterior e peça para ele repetir a informação. Ex: "Desculpa, não consegui capturar a informação anterior. Pode repetir a quantidade para mim?".
-9. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas.`;
+8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas. Responda APENAS ao que foi solicitado no estado atual.`;
 
     const messages: any[] = [
         { role: 'system', content: systemPrompt },
