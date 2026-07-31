@@ -1,43 +1,75 @@
 /**
- * ORDER AGENT — Agente dedicado exclusivamente ao gerenciamento de pedidos.
+ * ORDER AGENT — Agente dedicado ao gerenciamento de pedidos de gás.
  *
- * Responsabilidades:
- * - Recebe contexto limpo (catálogo + carrinho + endereços salvos)
- * - Usa ferramentas estruturadas para ANOTAR o pedido no banco de dados
- * - NUNCA interpreta quantidades ou endereços via regex no histórico
- * - NUNCA cria o Order diretamente — só prepara o Cart
+ * Arquitetura:
+ * - Estado do carrinho: persistido no banco via CartService (itens, endereço, pagamento)
+ * - Estado de multi-entrega: persistido no Redis com TTL 2h (plano de entregas)
+ * - Sem histórico de conversa bruto: o agente trabalha 100% com dados estruturados atuais
+ * - Sem "forcedToolHints" de comando: o system prompt descreve o estado e o próximo passo
  *
- * O fluxo é:
- * 1. adicionar_item   → adiciona produto ao CartItem com quantidade exata
- * 2. definir_endereco → valida Mapbox + salva no Cart + salva em ContactAddress
- * 3. definir_pagamento → salva forma de pagamento no Cart
- * 4. ver_carrinho      → retorna estado atual para o agente confirmar com cliente
- * 5. fechar_pedido     → converte Cart → Order (só com Cart completo)
+ * Fluxo de multi-entrega:
+ * 1. Código detecta e parseia deterministically ("4 no municipal e 5 no conceição")
+ * 2. Código resolve endereços salvos por busca normalizada (fuzzy)
+ * 3. Plano salvo no Redis: { deliveries: [{qty, label, address, needsAddress}], totalQty, productId }
+ * 4. Total de itens adicionado ao Cart para registro no banco
+ * 5. A cada turno o plano é carregado do Redis e injetado no system prompt como dados estruturados
+ * 6. fechar_pedido com entregas[] cria Orders separados no banco
  */
 
 import { safeChatCompletion } from '@/lib/ai-provider';
 import { CartService } from './cart.service';
+import { getRedis } from '@/lib/redis';
 import prisma from '@/lib/prisma';
 
-// ─── Tool Definitions for the Order Agent LLM ─────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DeliveryEntry {
+    qty: number;
+    label: string;
+    address: string | null;
+    needsAddress: boolean;
+}
+
+interface MultiDeliveryPlan {
+    deliveries: DeliveryEntry[];
+    totalQty: number;
+    productId: string;
+}
+
+// ─── Redis Helpers ────────────────────────────────────────────────────────────
+
+const MULTI_PLAN_KEY = (botId: string, phone: string) => `multi_delivery:${botId}:${phone}`;
+
+async function saveMultiPlan(botId: string, phone: string, plan: MultiDeliveryPlan): Promise<void> {
+    await getRedis().setex(MULTI_PLAN_KEY(botId, phone), 7200, JSON.stringify(plan));
+}
+
+async function loadMultiPlan(botId: string, phone: string): Promise<MultiDeliveryPlan | null> {
+    try {
+        const raw = await getRedis().get(MULTI_PLAN_KEY(botId, phone));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+async function clearMultiPlan(botId: string, phone: string): Promise<void> {
+    await getRedis().del(MULTI_PLAN_KEY(botId, phone)).catch(() => {});
+}
+
+// ─── Tool Definitions ─────────────────────────────────────────────────────────
 
 const ORDER_AGENT_TOOLS = [
     {
         type: 'function' as const,
         function: {
             name: 'adicionar_item',
-            description: 'Adiciona um produto ao carrinho com quantidade exata informada pelo cliente. Use o produto mais próximo do catálogo. NUNCA deduza a quantidade — use exatamente o número que o cliente disse.',
+            description: 'Adiciona produto ao carrinho com a quantidade EXATA informada pelo cliente. NUNCA chame sem quantidade explícita do cliente.',
             parameters: {
                 type: 'object',
                 properties: {
-                    produto_id: {
-                        type: 'string',
-                        description: 'ID do produto no catálogo (use os IDs fornecidos no contexto)'
-                    },
-                    quantidade: {
-                        type: 'number',
-                        description: 'Quantidade exata que o cliente pediu. NUNCA use número de casa ou CEP como quantidade.'
-                    }
+                    produto_id: { type: 'string', description: 'ID do produto no catálogo' },
+                    quantidade: { type: 'number', description: 'Quantidade exata dita pelo cliente. Nunca assuma ou invente.' }
                 },
                 required: ['produto_id', 'quantidade']
             }
@@ -47,18 +79,12 @@ const ORDER_AGENT_TOOLS = [
         type: 'function' as const,
         function: {
             name: 'definir_endereco',
-            description: 'Define o endereço de entrega do carrinho. Só chame quando o cliente fornecer rua e número. NUNCA chame apenas com nome de bairro.',
+            description: 'Define o endereço de entrega do pedido simples. Só chame quando tiver rua E número completos. Nunca chame apenas com nome de bairro.',
             parameters: {
                 type: 'object',
                 properties: {
-                    rua_numero: {
-                        type: 'string',
-                        description: 'Rua e número de entrega exatamente como o cliente informou. Ex: "Rua Fortaleza, 380"'
-                    },
-                    bairro: {
-                        type: 'string',
-                        description: 'Bairro informado pelo cliente. Pode ser corrigido pelo Mapbox.'
-                    }
+                    rua_numero: { type: 'string', description: 'Rua e número exatos. Ex: "Rua Fortaleza, 380"' },
+                    bairro: { type: 'string', description: 'Nome do bairro (opcional, complemento)' }
                 },
                 required: ['rua_numero']
             }
@@ -67,20 +93,28 @@ const ORDER_AGENT_TOOLS = [
     {
         type: 'function' as const,
         function: {
-            name: 'definir_pagamento',
-            description: 'Define a forma de pagamento. Chame depois de confirmar a forma com o cliente.',
+            name: 'atualizar_endereco_entrega',
+            description: 'Atualiza o endereço de uma entrega pendente no plano de multi-entrega. Use quando o cliente fornecer a rua e número para um local que ainda estava sem endereço.',
             parameters: {
                 type: 'object',
                 properties: {
-                    forma: {
-                        type: 'string',
-                        enum: ['DINHEIRO', 'PIX', 'CARTAO'],
-                        description: 'Forma de pagamento escolhida pelo cliente'
-                    },
-                    troco_para: {
-                        type: 'number',
-                        description: 'Valor para troco (se dinheiro). Null se não precisar.'
-                    }
+                    label: { type: 'string', description: 'Nome do bairro/local da entrega a atualizar. Ex: "Centro"' },
+                    rua_numero: { type: 'string', description: 'Rua e número informados pelo cliente para aquele local' }
+                },
+                required: ['label', 'rua_numero']
+            }
+        }
+    },
+    {
+        type: 'function' as const,
+        function: {
+            name: 'definir_pagamento',
+            description: 'Define a forma de pagamento depois que o cliente informar.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    forma: { type: 'string', enum: ['DINHEIRO', 'PIX', 'CARTAO'], description: 'Forma de pagamento' },
+                    troco_para: { type: 'number', description: 'Valor para troco em dinheiro. Null se não aplicável.' }
                 },
                 required: ['forma']
             }
@@ -89,29 +123,21 @@ const ORDER_AGENT_TOOLS = [
     {
         type: 'function' as const,
         function: {
-            name: 'ver_carrinho',
-            description: 'Mostra o estado atual do carrinho para verificação.',
-            parameters: { type: 'object', properties: {} }
-        }
-    },
-    {
-        type: 'function' as const,
-        function: {
             name: 'fechar_pedido',
-            description: 'SOMENTE quando o cliente confirmar explicitamente (ex: "pode", "sim", "confirmado", "sem troco"). Converte os dados em pedido(s) oficial(is).',
+            description: 'Fecha o pedido APENAS quando o cliente confirmar explicitamente ("sim", "pode", "confirmo", "ok"). Para multi-entrega, o parâmetro "entregas" é preenchido automaticamente com base no plano ativo.',
             parameters: {
                 type: 'object',
                 properties: {
                     entregas: {
                         type: 'array',
-                        description: 'Opcional. Se houver entregas para MÚLTIPLOS endereços (ex: 5 no Botafogo e 3 no Municipal), informe cada entrega com seu endereço e quantidade exata.',
+                        description: 'Lista de entregas para pedidos multi-endereço (opcional — se houver plano ativo no Redis, será usado automaticamente).',
                         items: {
                             type: 'object',
                             properties: {
-                                endereco: { type: 'string', description: 'Endereço completo de entrega' },
-                                quantidade: { type: 'number', description: 'Quantidade de botijões para este endereço' },
-                                forma_pagamento: { type: 'string', description: 'DINHEIRO, PIX ou CARTAO' },
-                                troco_para: { type: 'number', description: 'Opcional. Valor para troco' }
+                                endereco: { type: 'string' },
+                                quantidade: { type: 'number' },
+                                forma_pagamento: { type: 'string' },
+                                troco_para: { type: 'number' }
                             },
                             required: ['endereco', 'quantidade']
                         }
@@ -124,18 +150,19 @@ const ORDER_AGENT_TOOLS = [
         type: 'function' as const,
         function: {
             name: 'cancelar_carrinho',
-            description: 'Descarta o carrinho atual. Use se cliente cancelar ou quiser recomeçar.',
+            description: 'Cancela e limpa o carrinho atual. Use se o cliente quiser recomeçar ou cancelar o pedido.',
             parameters: { type: 'object', properties: {} }
         }
     }
 ];
 
-// ─── Main Order Agent Function ─────────────────────────────────────────────
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface OrderAgentContext {
     botId: string;
     contactPhone: string;
     contactId: string;
+    contactName?: string;
     userMessage: string;
     catalog: Array<{ id: string; name: string; price: number; salePrice?: number | null; active: boolean }>;
     savedAddresses: Array<{ address: string; label?: string | null }>;
@@ -160,9 +187,117 @@ export interface OrderAgentResult {
     cartSummary?: any;
 }
 
-// ─── Helper: Aggregate All Saved Addresses for a Contact ───────────────────
+// ─── Text Normalization (accent-insensitive fuzzy match) ──────────────────────
 
-export async function getContactSavedAddresses(contactId: string, contact?: any): Promise<Array<{ address: string; label?: string | null }>> {
+function normalize(text: string): string {
+    return text.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+}
+
+function fuzzyMatch(needle: string, haystack: string): boolean {
+    const n = normalize(needle);
+    const h = normalize(haystack);
+    if (!n || !h || n.length < 2 || h.length < 2) return false;
+    return h.includes(n) || n.includes(h) ||
+        (n.length >= 4 && h.startsWith(n.substring(0, 4)));
+}
+
+// ─── Find Saved Address by Label or Neighborhood ─────────────────────────────
+
+function findSavedAddress(
+    query: string,
+    savedAddresses: Array<{ address: string; label?: string | null }>
+): { address: string; label?: string | null } | null {
+    const q = normalize(query);
+    if (q.length < 2) return null;
+
+    return savedAddresses.find(a => {
+        const lbl = normalize(a.label || '');
+        const addr = normalize(a.address || '');
+        return (lbl && fuzzyMatch(q, lbl)) ||
+               (addr && addr.includes(q)) ||
+               (lbl && q.length >= 4 && lbl.startsWith(q.substring(0, 4)));
+    }) || null;
+}
+
+// ─── Multi-Delivery Parser ────────────────────────────────────────────────────
+
+interface ParsedDelivery {
+    qty: number;
+    rawLocation: string;
+}
+
+const NUM_WORDS: Record<string, number> = {
+    um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4,
+    cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10
+};
+
+function parseMultiDelivery(text: string): ParsedDelivery[] | null {
+    const lower = text.toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents for regex
+
+    // Match "N [product?] no/na/em/para/pra LOCATION" — greedy up to next connector or end
+    const pattern = /(\d+|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\s*(?:botij[oa]o?es?|g[a]s|p\s*13)?\s*(?:no|na|em|para|pra)\s+([a-z][a-z\s]{1,25}?)(?=\s+e\s+\d|\s+e\s+(?:um|uma|dois|duas|tres|quatro|cinco)|\s*,\s*|\s*$)/g;
+
+    const matches = Array.from(lower.matchAll(pattern));
+    if (matches.length < 2) return null;
+
+    return matches.map(m => {
+        const rawQty = m[1].toLowerCase();
+        const qty = NUM_WORDS[rawQty] ?? parseInt(rawQty, 10) ?? 1;
+        const rawLocation = m[2].trim().replace(/\s+$/, '');
+        return { qty, rawLocation };
+    });
+}
+
+// ─── Mapbox Geocoding ─────────────────────────────────────────────────────────
+
+async function geocodeAddress(
+    rawAddr: string,
+    mapboxToken: string,
+    botAddress?: string
+): Promise<{ resolvedAddr: string; lat: number | null; lng: number | null; valid: boolean }> {
+    const cityCtx = botAddress || 'Bento Gonçalves, RS, Brasil';
+    const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(rawAddr);
+    const searchAddr = hasCity ? rawAddr : `${rawAddr}, ${cityCtx}`;
+
+    try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+        const res = await fetch(url);
+        if (!res.ok) return { resolvedAddr: rawAddr, lat: null, lng: null, valid: true };
+
+        const data = await res.json();
+        const feature = data.features?.[0];
+        if (!feature || (feature.relevance && feature.relevance < 0.35)) {
+            return { resolvedAddr: rawAddr, lat: null, lng: null, valid: false };
+        }
+
+        let resolvedAddr = rawAddr;
+        const placeTypes = feature.place_type || [];
+        const isSpecific = placeTypes.includes('address') || placeTypes.includes('poi') ||
+            placeTypes.includes('building') || /\d+/.test(feature.place_name || '');
+        if (isSpecific && feature.place_name) {
+            resolvedAddr = feature.place_name;
+        }
+
+        return {
+            resolvedAddr,
+            lat: feature.center ? feature.center[1] : null,
+            lng: feature.center ? feature.center[0] : null,
+            valid: true
+        };
+    } catch {
+        return { resolvedAddr: rawAddr, lat: null, lng: null, valid: true };
+    }
+}
+
+// ─── Helper: Get Contact Saved Addresses ─────────────────────────────────────
+
+export async function getContactSavedAddresses(
+    contactId: string,
+    contact?: any
+): Promise<Array<{ address: string; label?: string | null }>> {
     const list: Array<{ address: string; label?: string | null }> = [];
     const seen = new Set<string>();
 
@@ -177,7 +312,6 @@ export async function getContactSavedAddresses(contactId: string, contact?: any)
         }
     };
 
-    // 1. Fetch from ContactAddress table
     const dbAddresses = await prisma.contactAddress.findMany({
         where: { contactId },
         orderBy: { createdAt: 'desc' },
@@ -188,24 +322,20 @@ export async function getContactSavedAddresses(contactId: string, contact?: any)
         addUnique(a.address, a.label || 'Endereço Salvo');
     }
 
-    // 2. Check contact.needs
     if (contact?.needs) {
         addUnique(contact.needs, 'Perfil do Cliente');
-        // Auto-persist to ContactAddress if missing
-        if (!dbAddresses.some((a: any) => a.address.toLowerCase().includes(contact.needs.substring(0, 10).toLowerCase()))) {
+        if (!dbAddresses.some((a: any) => a.address.toLowerCase().includes((contact.needs || '').substring(0, 10).toLowerCase()))) {
             prisma.contactAddress.create({
                 data: { contactId, address: contact.needs.trim(), label: 'Perfil' }
             }).catch(() => {});
         }
     }
 
-    // 3. Check contact.notes
     if (contact?.notes) {
         const noteMatch = contact.notes.match(/(?:rua|r\.|av\.|bairro|avenida)\s+[^\n.,]+/i);
-        if (noteMatch) addUnique(noteMatch[0], 'Notas do Cliente');
+        if (noteMatch) addUnique(noteMatch[0], 'Notas');
     }
 
-    // 4. Check past orders
     const pastOrders = await prisma.order.findMany({
         where: { contactId, address: { not: null } },
         select: { address: true },
@@ -220,15 +350,15 @@ export async function getContactSavedAddresses(contactId: string, contact?: any)
     return list;
 }
 
+// ─── Main Order Agent ─────────────────────────────────────────────────────────
+
 export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentResult> {
     const cartSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
     const cartIsEmpty = !cartSummary.hasItems;
     const userMsgLower = ctx.userMessage.toLowerCase().trim();
 
-    // ── Early Exit for Greetings ──
-    const isGreeting = /^(oi|olá|ola|bom dia|boa tarde|boa noite|e ai|e aí|tudo bem|opa|oie)$/i.test(userMsgLower);
-
-    // Fetch last order for contact
+    // ── Early Exit: Pure Greetings ────────────────────────────────────────────
+    const isGreeting = /^(oi|olá|ola|bom dia|boa tarde|boa noite|e ai|e aí|tudo bem|opa|oie|hey|hi)$/i.test(userMsgLower.trim());
     const lastOrder = await prisma.order.findFirst({
         where: { contactId: ctx.contactId },
         include: { items: { include: { product: true } } },
@@ -236,18 +366,15 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
     }).catch(() => null);
 
     if (isGreeting && cartIsEmpty) {
-        let statusNotice = '';
-        if (lastOrder) {
-            const isOngoing = ['PENDING', 'OUT_FOR_DELIVERY'].includes(lastOrder.status);
-            if (isOngoing) {
-                const itemsStr = lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
-                statusNotice = `\n\nℹ️ Seu pedido #${lastOrder.id.substring(0, 6)} (${itemsStr}) está *em andamento* para ${lastOrder.address}.`;
-            }
-        }
-
         const nameClean = (ctx.contactName || '').trim();
         const isGenericName = !nameClean || /^(cliente|user|usuario|usuário|\d+)$/i.test(nameClean);
         const salutationName = isGenericName ? '' : `, ${nameClean}`;
+
+        let statusNotice = '';
+        if (lastOrder && ['PENDING', 'OUT_FOR_DELIVERY'].includes(lastOrder.status)) {
+            const itemsStr = lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ');
+            statusNotice = `\n\nℹ️ Seu pedido (${itemsStr}) está *em andamento* para ${lastOrder.address}.`;
+        }
 
         return {
             reply: `Olá${salutationName}! 😊 Como posso ajudar você hoje?${statusNotice}\n\nSe quiser fazer um novo pedido de gás, é só me dizer a quantidade!`,
@@ -256,261 +383,233 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         };
     }
 
+    // ── Load Multi-Delivery Plan from Redis ───────────────────────────────────
+    let multiPlan = await loadMultiPlan(ctx.botId, ctx.contactPhone);
+
+    // ── Detect New Multi-Delivery in Current Message ──────────────────────────
+    const parsedDeliveries = parseMultiDelivery(ctx.userMessage);
+    const isNewMultiDelivery = parsedDeliveries && parsedDeliveries.length >= 2;
+
+    if (isNewMultiDelivery && parsedDeliveries) {
+        // Clear any previous plan
+        if (multiPlan) await clearMultiPlan(ctx.botId, ctx.contactPhone);
+        if (!cartIsEmpty) await CartService.clearCart(ctx.botId, ctx.contactPhone);
+
+        // Find default product (P13 / gas)
+        const defaultProduct = ctx.catalog.find(p =>
+            p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') ||
+            p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas'))
+        ) || ctx.catalog.find(p => p.active) || ctx.catalog[0];
+
+        // Resolve addresses for each delivery
+        const deliveries: DeliveryEntry[] = parsedDeliveries.map(d => {
+            const savedAddr = findSavedAddress(d.rawLocation, ctx.savedAddresses);
+            return {
+                qty: d.qty,
+                label: d.rawLocation,
+                address: savedAddr ? savedAddr.address : null,
+                needsAddress: !savedAddr
+            };
+        });
+
+        const totalQty = deliveries.reduce((s, d) => s + d.qty, 0);
+        multiPlan = { deliveries, totalQty, productId: defaultProduct?.id || '' };
+
+        // Persist plan to Redis
+        await saveMultiPlan(ctx.botId, ctx.contactPhone, multiPlan);
+
+        // Add total quantity to cart (so CartItems record is created in DB)
+        if (defaultProduct) {
+            await CartService.addItem(ctx.botId, ctx.contactPhone, defaultProduct.id, totalQty);
+        }
+    }
+
+    // ── Handle Address Update for Pending Multi-Delivery Entry ────────────────
+    // If there's a multi-plan with pending address AND the user's message looks like a street
+    if (multiPlan) {
+        const pendingEntry = multiPlan.deliveries.find(d => d.needsAddress);
+        if (pendingEntry) {
+            const hasStreetNumber = /\d+/.test(userMsgLower);
+            const isPaymentMsg = /\b(dinheiro|pix|cartao|cartão|crédito|débito)\b/i.test(userMsgLower);
+            const isConfirmation = /^(sim|pode|confirmo|ok|confirmado)$/i.test(userMsgLower.trim());
+
+            if (hasStreetNumber && !isPaymentMsg && !isConfirmation && userMsgLower.length >= 5) {
+                const cityCtx = ctx.botAddress || 'Bento Gonçalves, RS, Brasil';
+                const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(ctx.userMessage);
+                const resolved = hasCity
+                    ? ctx.userMessage.trim()
+                    : `${ctx.userMessage.trim()}, ${pendingEntry.label}, ${cityCtx}`;
+
+                pendingEntry.address = resolved;
+                pendingEntry.needsAddress = false;
+                await saveMultiPlan(ctx.botId, ctx.contactPhone, multiPlan);
+            }
+        }
+    }
+
+    // ── Catalog Text ──────────────────────────────────────────────────────────
     const catalogText = ctx.catalog.length > 0
-        ? ctx.catalog.map(p => `- ID: ${p.id} | Nome: ${p.name} | Preço: R$ ${Number(p.salePrice ?? p.price).toFixed(2)}`).join('\n')
+        ? ctx.catalog.filter(p => p.active).map(p =>
+            `- ID: ${p.id} | ${p.name} | R$ ${Number(p.salePrice ?? p.price).toFixed(2)}`
+          ).join('\n')
         : 'Nenhum produto cadastrado.';
 
+    // ── Saved Addresses Text ──────────────────────────────────────────────────
     const savedAddressesText = ctx.savedAddresses.length > 0
         ? ctx.savedAddresses.map((a, i) => `${i + 1}. ${a.label ? `[${a.label}] ` : ''}${a.address}`).join('\n')
         : 'Nenhum endereço salvo.';
 
+    // ── Last Order Context ────────────────────────────────────────────────────
     let lastOrderContext = 'Nenhum pedido anterior.';
     if (lastOrder) {
         const statusMap: Record<string, string> = {
-            PENDING: 'Em andamento (aguardando entregador)',
-            OUT_FOR_DELIVERY: 'A caminho para entrega',
-            DELIVERED: 'Entregue com sucesso',
-            COMPLETED: 'Concluído',
-            CANCELLED: 'Cancelado'
+            PENDING: 'Em andamento', OUT_FOR_DELIVERY: 'A caminho',
+            DELIVERED: 'Entregue', COMPLETED: 'Concluído', CANCELLED: 'Cancelado'
         };
-        const statusFormatted = statusMap[lastOrder.status] || lastOrder.status;
-        const dateFormatted = new Date(lastOrder.createdAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        lastOrderContext = `Último Pedido (#${lastOrder.id.substring(0, 6)}): ${lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ')} (R$ ${Number(lastOrder.totalAmount).toFixed(2)}) em ${dateFormatted} | Status: ${statusFormatted} | Endereço: ${lastOrder.address}`;
+        lastOrderContext = `${lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ')} | R$ ${Number(lastOrder.totalAmount).toFixed(2)} | ${statusMap[lastOrder.status] || lastOrder.status} | ${lastOrder.address}`;
     }
 
-    const cartReadyHint = !cartIsEmpty && cartSummary.deliveryAddress && cartSummary.paymentMethod
-        ? '\n\n⚠️ CARRINHO PRONTO: O carrinho já tem itens, endereço e pagamento. Se o cliente confirmar, chame fechar_pedido.'
+    // ── Covered Neighborhoods ─────────────────────────────────────────────────
+    let coveredNeighborhoodsList: string[] = [];
+    if (ctx.bot?.deliveryFeeRules) {
+        try {
+            const rules = typeof ctx.bot.deliveryFeeRules === 'string'
+                ? JSON.parse(ctx.bot.deliveryFeeRules)
+                : ctx.bot.deliveryFeeRules;
+            if (Array.isArray(rules)) {
+                coveredNeighborhoodsList = rules
+                    .map((r: any) => r.neighborhood || r.bairro || r.region)
+                    .filter(Boolean);
+            }
+        } catch {}
+    }
+    const coveredText = coveredNeighborhoodsList.length > 0
+        ? `\nBAIRROS ATENDIDOS: ${coveredNeighborhoodsList.join(', ')}`
         : '';
 
-    const systemPrompt = `Você é o AGENTE DE PEDIDOS. Sua única função é registrar pedidos corretamente no sistema.
+    // ── Multi-Delivery Context Block ──────────────────────────────────────────
+    let multiDeliveryBlock = '';
+    if (multiPlan) {
+        const unitPrice = Number(
+            ctx.catalog.find(p => p.id === multiPlan!.productId)?.salePrice ??
+            ctx.catalog.find(p => p.id === multiPlan!.productId)?.price ?? 139
+        );
+        const totalVal = multiPlan.totalQty * unitPrice;
 
-NOME DO CLIENTE: ${ctx.contactName || 'Cliente'}
+        const lines = multiPlan.deliveries.map(d => {
+            const sub = (d.qty * unitPrice).toFixed(2);
+            if (d.needsAddress || !d.address) {
+                return `  - ${d.qty}x P13 → ${d.label} ❌ aguardando rua e número`;
+            }
+            return `  - ${d.qty}x P13 → ${d.address} ✅ (R$ ${sub})`;
+        });
 
-ÚLTIMO PEDIDO DO CLIENTE:
-${lastOrderContext}
+        const hasPending = multiPlan.deliveries.some(d => d.needsAddress || !d.address);
+        const allReady = !hasPending;
 
-CATÁLOGO DE PRODUTOS DISPONÍVEIS:
-${catalogText}
+        multiDeliveryBlock = `\nPLANO DE MULTI-ENTREGA ATIVO:
+${lines.join('\n')}
+Total geral: R$ ${totalVal.toFixed(2)}
+${hasPending
+    ? `AGUARDANDO: Solicite a rua e número para as entregas marcadas com ❌.`
+    : cartSummary.paymentMethod
+        ? `PRONTO: Todos os endereços confirmados e pagamento definido (${cartSummary.paymentMethod}). Aguardando confirmação do cliente.`
+        : `AGUARDANDO: Todos os endereços confirmados. Pergunte a forma de pagamento (dinheiro, Pix ou cartão).`
+}`;
+    }
 
-ESTADO ATUAL DO CARRINHO:
-${cartSummary.summary}${cartReadyHint}
-
-ENDEREÇOS SALVOS DO CLIENTE:
-${savedAddressesText}
-
-BUSCA HIERÁRQUICA DE ENDEREÇOS E BAIRROS:
-1. TABELA DE ENDEREÇOS SALVOS DO CLIENTE (Nível 1):
-   - Se o cliente mencionar um bairro ou rótulo que ele JÁ possui cadastrado (ex: "Conceição", "Municipal", "Botafogo"), SELECIONE IMEDIATAMENTE o endereço completo correspondente da lista de Endereços Salvos!
-2. TABELA DE BAIRROS ATENDIDOS DA DISTRIBUIDORA (Nível 2):
-   - Se o cliente citar um bairro que NÃO está nos endereços salvos dele, mas CONSTA na tabela de bairros atendidos pela distribuidora (ex: "Borgo", "Juventude"), confirme o bairro e solicite a rua e o número da residência naquele bairro.
-3. FORA DA ÁREA DE COBERTURA (Nível 3):
-   - Se o bairro informado não existir na tabela de endereços salvos nem na tabela de bairros atendidos, informe educadamente que a distribuidora não entrega naquela região.
-
-FLUXO OBRIGATÓRIO PARA CADA PEDIDO:
-PASSO 1 → adicionar_item (SEMPRE O PRIMEIRO PASSO quando o carrinho estiver vazio)
-PASSO 2 → definir_endereco (quando o cliente fornecer rua e número OU pedir "o mesmo endereço")
-PASSO 3 → definir_pagamento (após o cliente informar a forma de pagamento)
-PASSO 4 → fechar_pedido (SOMENTE após confirmação explícita do cliente)
-
-REGRAS ABSOLUTAS:
-1. CARRINHO VAZIO: Se o carrinho está vazio (🛒 Carrinho vazio), a PRIMEIRA ferramenta a chamar É SEMPRE "adicionar_item".
-2. QUANTIDADE: Use EXATAMENTE a quantidade dita pelo cliente. NUNCA use números de casas ou CEPs como quantidade.
-3. PRODUTO: Para "gás", "botijão" → use o produto de gás 13kg do catálogo.
-4. "O MESMO ENDEREÇO": Se o cliente disser "o mesmo", "mesmo de antes", "mesmo endereço" ou "o da Fortaleza": REAPROVEITE O 1º ENDEREÇO DA LISTA DE ENDEREÇOS SALVOS ACIMA E CHAME A FERRAMENTA "definir_endereco" COM ELE IMEDIATAMENTE!
-5. NOVO ENDEREÇO COM RUA E NÚMERO: Se o cliente forneceu rua e número (ex: "R. José de Gasperi, 79"), chame a ferramenta "definir_endereco" IMEDIATAMENTE. O Mapbox identifica o bairro automaticamente!
-6. PAGAMENTO: Só chame "definir_pagamento" quando o cliente disser dinheiro, Pix ou cartão.
-7. FECHAR: Só chame "fechar_pedido" quando o cliente CONFIRMAR EXPLICITAMENTE (sim, pode, ok, confirmado, sem troco) E o carrinho estiver completo (itens + endereço + pagamento).
-8. CONSULTA DE PEDIDO: Se o cliente perguntar "onde está meu pedido?" ou "qual o status?", responda com o status do Último Pedido informado acima. NUNCA crie um novo pedido nesses casos!
-9. Responda em português brasileiro, de forma natural e simpática.
-
-10. MÚLTIPLAS ENTREGAS: Se o cliente solicitar entregas para mais de 1 local (ex: "4 no Centro e 7 no Municipal"):
-- MANTENHA as entregas separadas por local com suas respectivas quantidades e endereços.
-- Solicite a rua e o número de cada local que ainda não tiver endereço completo.
-- Na hora de fechar, chame a ferramenta "fechar_pedido" usando o parâmetro "entregas" contendo a lista de todas as entregas.
-
-PROIBIÇÕES:
-- NUNCA chame "fechar_pedido" se o carrinho estiver vazio ou sem endereço/pagamento
-- NUNCA pergunte bairro se o cliente já forneceu a rua e o número
-- NUNCA junte pedidos de múltiplos locais diferentes num único endereço simples
-- NUNCA invente dados`;
-
-    // ── Forced tool hints for item addition AND address definition ──
-    let forcedToolHint = '';
-
-    const isMultiDelivery = /(?:mais|\be\b|\bambos\b|\boutro\b).*(?:no|na|em|para)\s+/i.test(userMsgLower) ||
-                            (/(?:no|na|em)\s+[a-z0-9\s]+.*(?:no|na|em)\s+[a-z0-9\s]+/i.test(userMsgLower)) ||
-                            (/,\s*mais\s+\d+/i.test(userMsgLower));
-
-    if (isMultiDelivery) {
-        // Parse items per location: e.g. "4 no municipal e 5 no conceição"
-        const multiMatches = Array.from(userMsgLower.matchAll(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij[oõ]es|g[aá]s|p13)?\s*(?:no|na|em|para)?\s*([a-z0-9\s]+?)(?=(?:\s*(?:e|,|\+|\bmais\b)\s*\d+)|$)/gi));
-
-        let parsedMultiInstructions: string[] = [];
-        let totalMultiQty = 0;
-        const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
-
-        for (const m of multiMatches) {
-            const rawQty = m[1].toLowerCase();
-            const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
-            totalMultiQty += qty;
-            const cleanLoc = m[2].replace(/^(bairro|o|a|no|na|em)\s+/, '').trim();
-            const normLoc = cleanLoc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-
-            if (normLoc.length >= 3) {
-                // Find in saved addresses
-                const foundSaved = ctx.savedAddresses.find(a => {
-                    const normLbl = (a.label || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-                    const normAddr = (a.address || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-                    return (normLbl && (normLoc.includes(normLbl) || normLbl.includes(normLoc))) ||
-                           (normAddr && normAddr.includes(normLoc)) ||
-                           (normLbl && normLoc.length >= 4 && normLbl.substring(0, 4) === normLoc.substring(0, 4)) ||
-                           (normAddr && normLoc.length >= 5 && normAddr.includes(normLoc.substring(0, 5)));
-                });
-
-                if (foundSaved) {
-                    parsedMultiInstructions.push(`- Entrega de ${qty} botijão(ões) para "${cleanLoc}": Usar ENDEREÇO SALVO ENCONTRADO -> "${foundSaved.address}"`);
-                } else {
-                    parsedMultiInstructions.push(`- Entrega de ${qty} botijão(ões) para o bairro "${cleanLoc}": Nenhum endereço salvo encontrado para "${cleanLoc}". Pergunte a rua e o número.`);
+    // ── Single Address Neighborhood Hint ─────────────────────────────────────
+    // Only when cart has items but no address yet (not multi-delivery)
+    let singleAddrHint = '';
+    if (!multiPlan && !cartIsEmpty && !cartSummary.deliveryAddress) {
+        const cleanMsg = userMsgLower.replace(/^(no|na|em|o|a|para|pra)\s+/i, '').trim();
+        if (cleanMsg.length >= 3 && !/\b(dinheiro|pix|cartao|cartão)\b/i.test(cleanMsg)) {
+            const foundSaved = findSavedAddress(cleanMsg, ctx.savedAddresses);
+            if (foundSaved) {
+                singleAddrHint = `\nENDEREÇO IDENTIFICADO: O cliente mencionou "${cleanMsg}", que corresponde ao endereço salvo: "${foundSaved.address}". Chame definir_endereco com rua_numero="${foundSaved.address}" imediatamente, sem pedir confirmação.`;
+            } else if (coveredNeighborhoodsList.length > 0) {
+                const isCovered = coveredNeighborhoodsList.some(n => fuzzyMatch(cleanMsg, n));
+                if (isCovered) {
+                    singleAddrHint = `\nBAIRRO ATENDIDO: "${cleanMsg}" é um bairro coberto. Pergunte a rua e o número nesse bairro.`;
+                } else if (cleanMsg.length >= 4 && !/\d/.test(cleanMsg)) {
+                    singleAddrHint = `\nBAIRRO FORA DA COBERTURA: "${cleanMsg}" não está na lista de bairros atendidos. Informe o cliente educadamente.`;
                 }
             }
-        }
-
-        const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
-        let addItemInstruction = '';
-        if (cartIsEmpty && defaultProduct && totalMultiQty > 0) {
-            addItemInstruction = `\n🔴 ATENÇÃO CARRINHO VAZIO: O carrinho no sistema está vazio. Chame IMEDIATAMENTE a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${totalMultiQty} para registrar os ${totalMultiQty} botijões no carrinho do banco de dados!`;
-        }
-
-        if (parsedMultiInstructions.length > 0) {
-            forcedToolHint += `${addItemInstruction}\n\n🔴 PARSER DE MÚLTIPLAS ENTREGAS (RESULTADO DETERMINÍSTICO):\n${parsedMultiInstructions.join('\n')}\n\nREGRA MANDATÓRIA: Se todos os locais acima tiverem "ENDEREÇO SALVO ENCONTRADO", NÃO peça rua e número para nenhum deles! Apresente imediatamente o resumo separado de cada entrega e pergunte a forma de pagamento (dinheiro, Pix ou cartão). NUNCA troque o endereço de um local pelo outro!`;
-        } else {
-            forcedToolHint += `${addItemInstruction}\n\n🔴 INSTRUÇÃO DE MÚLTIPLAS ENTREGAS: O cliente solicitou entregas para MÚLTIPLOS locais/endereços diferentes ("${ctx.userMessage}"). MANTENHA SEPARADAS as quantidades e endereços de cada local. Se faltar a rua e número de algum local (ex: Centro), solicite a rua e número desse local específico. NUNCA junte todos os botijões num único endereço!`;
-        }
-    } else if (cartIsEmpty) {
-        const qtyMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|três|tres|quatro|cinco)\s*(?:botij|gás|gas|g[aá]s|p13|kg)/i);
-        const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
-        const mentionsProduct = /\b(p13|g[aá]s|botij[aã]o|botij[oõ]es)\b/i.test(userMsgLower);
-        const mentionsAddress = /(endere[çc]|salvo|mesmo|ja tem|já tem|cadastrad)/i.test(userMsgLower);
-        const mentionsPayment = /\b(dinheiro|pix|cartao|cartão|crédito|débito)\b/i.test(userMsgLower);
-
-        if ((qtyMatch || mentionsProduct) && defaultProduct) {
-            const numWords: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5 };
-            const rawQty = qtyMatch ? qtyMatch[1].toLowerCase() : '1';
-            const qty = numWords[rawQty] ?? parseInt(rawQty, 10) ?? 1;
-            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O carrinho está vazio e o cliente pediu ${qty} unidade(s) de "${defaultProduct.name}" (ID: ${defaultProduct.id}). Chame AGORA a ferramenta "adicionar_item" com produto_id="${defaultProduct.id}" e quantidade=${qty}. Não responda texto antes de chamar a ferramenta.`;
-        } else if (mentionsPayment) {
-            const payMatch = userMsgLower.match(/(dinheiro|pix|cartao|cartão|crédito|débito)/i);
-            const payStr = payMatch ? payMatch[1].toUpperCase() : 'DINHEIRO';
-            forcedToolHint += `\n\n🔴 CARRINHO VAZIO: O cliente informou a forma de pagamento (${payStr}), mas o carrinho está vazio. Responda de forma simpática e direta: "Entendi, ${ctx.contactName || 'amigo'}! A forma de pagamento será ${payStr}. Quantos botijões de gás (P13) você deseja pedir hoje para que eu possa montar o seu carrinho?"`;
-        } else if (mentionsAddress) {
-            forcedToolHint += `\n\n🔴 CARRINHO VAZIO: O cliente mencionou os endereços salvos, mas o carrinho ainda está vazio. Responda com simpatia e objetividade (sem frases robóticas): "Entendi, ${ctx.contactName || 'amigo'}! Já tenho seus endereços salvos aqui. Quantos botijões de gás (P13) você vai precisar hoje?"`;
-        }
-    } else if (!cartSummary.deliveryAddress) {
-        // Cart has items but missing address
-        const optionMatch = userMsgLower.match(/^(?:o\s*|op[çc][ãa]o\s*|n[úu]mero\s*)?([1-9])\b/i);
-        const isSameAddress = /(o mesmo|mesmo|no mesmo|mesmo de antes|ja pedi antes|já pedi antes|ja tem|já tem|usando|salvo)/i.test(userMsgLower);
-
-        let matchedAddress: string | null = null;
-
-        if (optionMatch && ctx.savedAddresses.length > 0) {
-            const idx = parseInt(optionMatch[1], 10) - 1;
-            if (ctx.savedAddresses[idx]) {
-                matchedAddress = ctx.savedAddresses[idx].address;
-            }
-        } else if (isSameAddress && ctx.savedAddresses.length > 0) {
-            if (ctx.savedAddresses.length === 1) {
-                matchedAddress = ctx.savedAddresses[0].address;
-            } else {
-                forcedToolHint += `\n\n🔴 SELEÇÃO DE ENDEREÇO SALVO: O cliente quer usar um endereço salvo. Liste de forma clara e objetiva os endereços salvos acima (1. Municipal, 2. Botafogo, etc.) e pergunte qual deles ele deseja usar para esta entrega.`;
-            }
-        } else if (ctx.savedAddresses.length > 0) {
-            // Match by exact saved address label OR by neighborhood/street substring inside address (with typo tolerance)
-            const cleanUser = userMsgLower.replace(/^(no|na|em|o|a)\s+/, '').trim();
-            const normUser = cleanUser.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-
-            if (normUser.length >= 3) {
-                const found = ctx.savedAddresses.find(a => {
-                    const lbl = (a.label || '').toLowerCase();
-                    const addr = (a.address || '').toLowerCase();
-                    const normLbl = lbl.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-                    const normAddr = addr.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-
-                    return (normLbl && (normUser.includes(normLbl) || normLbl.includes(normUser))) ||
-                           (normAddr && normAddr.includes(normUser)) ||
-                           (normLbl && normUser.length >= 4 && normLbl.substring(0, 4) === normUser.substring(0, 4)) ||
-                           (normAddr && normUser.length >= 5 && normAddr.includes(normUser.substring(0, 5)));
-                });
-                if (found) {
-                    matchedAddress = found.address;
-                }
-            }
-        }
-
-        // 4. Check if user provided street + number (e.g. "Fortaleza 380" or "Rua José de Gasperi 79")
-        if (!matchedAddress) {
-            const hasNumber = /\d+/.test(userMsgLower);
-            if (hasNumber && userMsgLower.length >= 4 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
-                matchedAddress = ctx.userMessage.trim();
-            }
-        }
-
-        if (matchedAddress) {
-            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou o endereço de entrega "${matchedAddress}". Chame AGORA a ferramenta "definir_endereco" com rua_numero="${matchedAddress}". Não pergunte nada antes.`;
-        } else if (userMsgLower.length >= 3 && !/^(dinheiro|pix|cartao|cartão|crédito|débito)$/i.test(userMsgLower)) {
-            const isAskingAddressList = /(quais|ver|listar|meus)\s+(?:os\s+)?endere[çc]/i.test(userMsgLower);
-
-            if (isAskingAddressList) {
-                forcedToolHint += `\n\n🔴 CONSULTA DE ENDEREÇOS: O cliente perguntou pelos endereços salvos dele. Liste os endereços salvos acima de forma simpática e objetiva, perguntando qual deles ele quer usar. NÃO diga que isso é um bairro.`;
-            } else {
-                // User provided a neighborhood or area name without street/number (e.g. "borgo", "centro", "progresso", "juventude")
-                const cleanBairro = ctx.userMessage.replace(/^(no|na|em|o|a)\s+/i, '').trim();
-
-                // STEP 1: VERIFY IF NEIGHBORHOOD IS COVERED BY DISTRIBUTOR
-                let coveredNeighborhoods: string[] = [];
-                if (ctx.bot?.deliveryFeeRules) {
-                    try {
-                        const rules = typeof ctx.bot.deliveryFeeRules === 'string'
-                            ? JSON.parse(ctx.bot.deliveryFeeRules)
-                            : ctx.bot.deliveryFeeRules;
-                        if (Array.isArray(rules)) {
-                            coveredNeighborhoods = rules
-                                .map((r: any) => (r.neighborhood || r.bairro || r.region || '').toLowerCase())
-                                .filter(Boolean);
-                        }
-                    } catch {}
-                }
-
-                const cleanBairroLower = cleanBairro.toLowerCase();
-                const isCovered = coveredNeighborhoods.length === 0 || coveredNeighborhoods.some(n => cleanBairroLower.includes(n) || n.includes(cleanBairroLower));
-
-                if (!isCovered) {
-                    forcedToolHint += `\n\n🔴 ATENÇÃO BAIRRO FORA DA COBERTURA: O cliente mencionou o bairro "${cleanBairro}". Este bairro NÃO está na lista de bairros atendidos pela distribuidora. Informe com educação ao cliente que infelizmente não realizamos entregas no bairro "${cleanBairro}".`;
-                } else {
-                    forcedToolHint += `\n\n🔴 INSTRUÇÃO DE ENDEREÇO: O cliente mencionou o bairro/região "${cleanBairro}" (que é um bairro atendido pela distribuidora). Pergunte educadamente qual é o nome da rua e o número da residência no bairro ${cleanBairro}. NÃO chame definir_endereco ainda sem a rua e o número.`;
-                }
-            }
-        }
-    } else if (!cartSummary.paymentMethod) {
-        // Cart has items and address, missing payment method
-        const payMatch = userMsgLower.match(/^(dinheiro|pix|cartao|cartão|crédito|débito)\b/i);
-        if (payMatch) {
-            let payMethodStr = payMatch[1].toUpperCase().replace('CARTÃO', 'CARTAO').replace('DÉBITO', 'CARTAO').replace('CRÉDITO', 'CARTAO');
-            forcedToolHint += `\n\n🔴 AÇÃO IMEDIATA OBRIGATÓRIA: O cliente informou a forma de pagamento "${payMethodStr}". Chame AGORA a ferramenta "definir_pagamento" com forma="${payMethodStr}". Não faça perguntas repetidas.`;
         }
     }
+
+    // ── Determine Current State + Next Step ───────────────────────────────────
+    let stateDesc: string;
+    let nextStep: string;
+
+    if (multiPlan) {
+        const hasPending = multiPlan.deliveries.some(d => d.needsAddress || !d.address);
+        if (hasPending) {
+            const pending = multiPlan.deliveries.find(d => d.needsAddress || !d.address);
+            stateDesc = `Multi-entrega em andamento. Aguardando endereço para: "${pending?.label}".`;
+            nextStep = `Pergunte a rua e o número para "${pending?.label}". Não continue sem isso.`;
+        } else if (!cartSummary.paymentMethod) {
+            stateDesc = `Multi-entrega com todos os endereços confirmados. Aguardando forma de pagamento.`;
+            nextStep = `Pergunte a forma de pagamento (dinheiro, Pix ou cartão).`;
+        } else {
+            stateDesc = `Multi-entrega completa: endereços e pagamento confirmados.`;
+            nextStep = `Apresente o resumo completo (ver PLANO DE MULTI-ENTREGA) e pergunte se o cliente confirma.`;
+        }
+    } else if (cartIsEmpty) {
+        stateDesc = `Carrinho vazio. Aguardando pedido.`;
+        nextStep = `Se o cliente mencionar apenas o produto sem quantidade (ex: "gas", "botijão"), pergunte "Quantos botijões você precisa?" antes de adicionar ao carrinho. Se informar quantidade + produto, adicione imediatamente.`;
+    } else if (!cartSummary.deliveryAddress) {
+        stateDesc = `Carrinho com itens. Aguardando endereço de entrega.`;
+        nextStep = `Pergunte para qual endereço será a entrega. Se o cliente mencionar um bairro com endereço salvo, use o endereço salvo diretamente sem pedir rua e número.${singleAddrHint}`;
+    } else if (!cartSummary.paymentMethod) {
+        stateDesc = `Carrinho com itens e endereço confirmado. Aguardando forma de pagamento.`;
+        nextStep = `Pergunte a forma de pagamento: dinheiro, Pix ou cartão.`;
+    } else {
+        stateDesc = `Carrinho completo: itens, endereço e pagamento definidos.`;
+        nextStep = `Apresente o resumo do pedido e pergunte se o cliente confirma ("sim" ou "pode").`;
+    }
+
+    // ── System Prompt ─────────────────────────────────────────────────────────
+    const systemPrompt = `Você é um atendente simpático e eficiente de uma distribuidora de gás. Seu objetivo é registrar pedidos de forma natural, humanizada e sem erros.
+
+CLIENTE: ${ctx.contactName || 'Cliente'}
+ÚLTIMO PEDIDO: ${lastOrderContext}
+
+CATÁLOGO DISPONÍVEL:
+${catalogText}
+
+ENDEREÇOS SALVOS DO CLIENTE:
+${savedAddressesText}${coveredText}
+
+ESTADO ATUAL: ${stateDesc}
+PRÓXIMO PASSO: ${nextStep}
+
+CARRINHO:
+${cartSummary.summary}
+${multiDeliveryBlock}
+
+REGRAS DE NEGÓCIO:
+1. QUANTIDADE: Se o cliente mencionar apenas o produto sem quantidade (ex: "gás", "botijão", "p13"), SEMPRE pergunte quantos botijões ele precisa antes de chamar adicionar_item. Nunca assuma quantidade.
+2. ENDEREÇO SALVO: Se o cliente mencionar um bairro que corresponde a um endereço salvo, use o endereço salvo diretamente. Não peça rua e número.
+3. BAIRRO SEM ENDEREÇO: Se o cliente mencionar um bairro sem endereço salvo, pergunte a rua e o número naquele bairro.
+4. PAGAMENTO: Só chame definir_pagamento quando o cliente informar "dinheiro", "Pix" ou "cartão".
+5. FECHAMENTO: Só chame fechar_pedido quando o cliente confirmar explicitamente com "sim", "pode", "confirmo" ou similar.
+6. MULTI-ENTREGA: Se houver um PLANO DE MULTI-ENTREGA ATIVO acima, use os dados do plano. Quando fechar, chame fechar_pedido — o sistema cria pedidos separados automaticamente para cada endereço.
+7. STATUS: Se o cliente perguntar sobre o status do pedido, informe com base no ÚLTIMO PEDIDO.
+8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas.`;
 
     const messages: any[] = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: ctx.userMessage + forcedToolHint }
+        { role: 'user', content: ctx.userMessage }
     ];
 
     let reply = '';
     let orderConfirmed = false;
     let orderId: string | undefined;
     let iterations = 0;
-    const MAX_ITER = 6;
 
-    while (iterations < MAX_ITER) {
+    // ── Agent Loop ────────────────────────────────────────────────────────────
+    while (iterations < 6) {
         iterations++;
 
         const response = await safeChatCompletion({
@@ -518,72 +617,59 @@ PROIBIÇÕES:
             messages,
             tools: ORDER_AGENT_TOOLS,
             tool_choice: 'auto',
-            temperature: 0.1
+            temperature: 0.15
         }) as any;
 
         const content = typeof response === 'string' ? response : response?.content;
-        const toolCalls = typeof response === 'object' ? (response?.toolCalls || response?.tool_calls) : null;
+        const toolCalls = typeof response === 'object'
+            ? (response?.toolCalls || response?.tool_calls)
+            : null;
 
         if (!toolCalls || toolCalls.length === 0) {
             reply = content || reply;
             break;
         }
 
-
-        // Process tool calls
         const toolResults: any[] = [];
 
         for (const tc of toolCalls) {
             const name = tc.function?.name;
             let args: any = {};
             try { args = JSON.parse(tc.function?.arguments || '{}'); } catch {}
-
             let result = '';
 
+            // ── Tool: adicionar_item ────────────────────────────────────────
             if (name === 'adicionar_item') {
                 try {
                     const r = await CartService.addItem(ctx.botId, ctx.contactPhone, args.produto_id, args.quantidade);
                     result = r.message;
                 } catch (e: any) {
-                    result = `Erro: ${e.message}`;
+                    result = `Erro ao adicionar item: ${e.message}`;
                 }
 
+            // ── Tool: definir_endereco ──────────────────────────────────────
             } else if (name === 'definir_endereco') {
                 const bairroStr = args.bairro || undefined;
                 const rawAddr = `${args.rua_numero}${bairroStr ? `, ${bairroStr}` : ''}`;
-                let resolvedAddr = rawAddr.includes('Bento') || rawAddr.includes('RS') ? rawAddr : `${rawAddr}, Bento Gonçalves - RS`;
+                let resolvedAddr = rawAddr.includes('Bento') || rawAddr.includes('RS')
+                    ? rawAddr
+                    : `${rawAddr}, Bento Gonçalves - RS`;
                 let lat: number | null = null;
                 let lng: number | null = null;
 
-                // STEP 2: FULL STREET ADDRESS MAPBOX VERIFICATION
                 if (ctx.mapboxToken) {
-                    try {
-                        const cityCtx = ctx.botAddress ? `, ${ctx.botAddress}` : ', Bento Gonçalves, RS, Brasil';
-                        const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(rawAddr);
-                        const searchAddr = hasCity ? rawAddr : `${rawAddr}${cityCtx}`;
-                        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${ctx.mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
-                        const res = await fetch(url);
-                        if (res.ok) {
-                            const data = await res.json();
-                            const feature = data.features?.[0];
-                            if (!feature || (feature.relevance && feature.relevance < 0.4)) {
-                                result = `❌ O endereço "${rawAddr}" não foi localizado no Mapa (Mapbox). Peça educadamente para o cliente verificar a rua ou o número da residência.`;
-                                toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
-                                continue;
-                            }
-                            const placeTypes = feature.place_type || [];
-                            const isSpecificAddress = placeTypes.includes('address') || placeTypes.includes('poi') || placeTypes.includes('building') || /\d+/.test(feature.place_name || '');
-                            if (isSpecificAddress && feature.place_name) {
-                                resolvedAddr = feature.place_name;
-                            }
-                            if (feature.center) { lng = feature.center[0]; lat = feature.center[1]; }
-                        }
-                    } catch (e: any) {
-                        console.error('[OrderAgent] Mapbox error:', e.message);
+                    const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
+                    if (!geo.valid) {
+                        result = `❌ Endereço "${rawAddr}" não localizado. Peça ao cliente para verificar a rua e o número.`;
+                        toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                        continue;
                     }
+                    resolvedAddr = geo.resolvedAddr;
+                    lat = geo.lat;
+                    lng = geo.lng;
                 }
 
-                // Ensure neighborhood is explicitly included in the address string
+                // Ensure neighborhood is in address string
                 if (bairroStr && !resolvedAddr.toLowerCase().includes(bairroStr.toLowerCase())) {
                     resolvedAddr = `${args.rua_numero}, ${bairroStr}, Bento Gonçalves - RS`;
                 }
@@ -593,136 +679,202 @@ PROIBIÇÕES:
                 );
                 result = r.message;
 
+            // ── Tool: atualizar_endereco_entrega ────────────────────────────
+            } else if (name === 'atualizar_endereco_entrega') {
+                const freshPlan = await loadMultiPlan(ctx.botId, ctx.contactPhone);
+                if (freshPlan) {
+                    const entry = freshPlan.deliveries.find(d =>
+                        fuzzyMatch(args.label, d.label) || fuzzyMatch(d.label, args.label)
+                    );
+                    if (entry) {
+                        const cityCtx = ctx.botAddress || 'Bento Gonçalves, RS, Brasil';
+                        const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(args.rua_numero);
+                        entry.address = hasCity
+                            ? args.rua_numero
+                            : `${args.rua_numero}, ${entry.label}, ${cityCtx}`;
+                        entry.needsAddress = false;
+                        await saveMultiPlan(ctx.botId, ctx.contactPhone, freshPlan);
+                        multiPlan = freshPlan;
+                        result = `✅ Endereço atualizado para ${entry.label}: ${entry.address}`;
+                    } else {
+                        result = `Entrega "${args.label}" não encontrada no plano.`;
+                    }
+                } else {
+                    result = 'Nenhum plano de multi-entrega ativo.';
+                }
+
+            // ── Tool: definir_pagamento ─────────────────────────────────────
             } else if (name === 'definir_pagamento') {
                 const r = await CartService.setPaymentMethod(
                     ctx.botId, ctx.contactPhone, args.forma, args.troco_para ?? null
                 );
                 result = r.message;
 
-            } else if (name === 'ver_carrinho') {
-                const r = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
-                result = r.summary;
-
+            // ── Tool: fechar_pedido ─────────────────────────────────────────
             } else if (name === 'fechar_pedido') {
-                const isExplicitConfirmation = /^(sim|pode|pode sim|pode fechar|pode enviar|confirma|confirmar|confirmado|ok|certeza|manda|mandar|sem troco|pode mandar|isso|correto|esta certo|está certo)$/i.test(userMsgLower);
-                if (!isExplicitConfirmation) {
-                    result = '❌ O pedido NÃO pode ser fechado ainda porque o cliente NÃO respondeu "sim" ou "pode" para confirmar. Exiba o resumo do pedido ao cliente e aguarde a confirmação dele.';
-                    toolResults.push({ tool_call_id: tc.id, role: 'tool', content: result });
+                const isConfirmed = /^(sim|pode|pode sim|pode fechar|pode enviar|confirma|confirmar|confirmado|ok|certeza|manda|mandar|sem troco|pode mandar|isso|correto|esta certo|está certo|vai|pode ir|claro|perfeito)$/i.test(userMsgLower.trim());
+                if (!isConfirmed) {
+                    result = '❌ Aguardando confirmação explícita do cliente. Apresente o resumo e aguarde "sim" ou "pode".';
+                    toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
                     continue;
                 }
 
-                if (args.entregas && Array.isArray(args.entregas) && args.entregas.length > 0) {
-                    // MULTI-DELIVERY ORDER CREATION
-                    const defaultProduct = ctx.catalog.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')) || ctx.catalog[0];
+                // Prefer Redis plan for multi-delivery
+                const freshPlan = await loadMultiPlan(ctx.botId, ctx.contactPhone);
+
+                if (freshPlan && freshPlan.deliveries.length > 0) {
+                    const hasPending = freshPlan.deliveries.some(d => d.needsAddress || !d.address);
+                    if (hasPending) {
+                        result = '❌ Ainda há endereços pendentes no plano. Solicite rua e número antes de fechar.';
+                        toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                        continue;
+                    }
+
+                    const defProd = ctx.catalog.find(p => p.id === freshPlan.productId) ||
+                        ctx.catalog.find(p => p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13'))) ||
+                        ctx.catalog.find(p => p.active) || ctx.catalog[0];
+
+                    const payMethod = (cartSummary.paymentMethod || 'DINHEIRO').toUpperCase();
+                    const changeAmt = cartSummary.changeAmount ?? null;
+                    const unitPrice = Number(defProd?.salePrice ?? defProd?.price ?? 139);
+
                     const createdOrders: string[] = [];
-                    let summaryText = '✅ PEDIDOS CRIADOS COM SUCESSO!\n';
+                    let summaryText = '';
 
-                    for (const delivery of args.entregas) {
-                        const prod = ctx.catalog.find(p => p.id === delivery.produto_id) || defaultProduct;
-                        const unitPrice = Number(prod?.salePrice ?? prod?.price ?? 139);
-                        const qty = Number(delivery.quantidade) || 1;
-                        const total = qty * unitPrice;
-                        const payMethod = (delivery.forma_pagamento || 'DINHEIRO').toUpperCase();
-                        const rawAddr = delivery.endereco || 'Endereço não especificado';
-
+                    for (const delivery of freshPlan.deliveries) {
+                        const total = delivery.qty * unitPrice;
+                        const rawAddr = delivery.address!;
                         let verifiedAddr = rawAddr;
                         let lat: number | null = null;
                         let lng: number | null = null;
 
                         if (ctx.mapboxToken) {
-                            try {
-                                const cityCtx = ctx.botAddress ? `, ${ctx.botAddress}` : ', Bento Gonçalves, RS, Brasil';
-                                const searchAddr = rawAddr.includes('Bento') ? rawAddr : `${rawAddr}${cityCtx}`;
-                                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${ctx.mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
-                                const res = await fetch(url);
-                                if (res.ok) {
-                                    const data = await res.json();
-                                    const feature = data.features?.[0];
-                                    if (feature?.place_name) verifiedAddr = feature.place_name;
-                                    if (feature?.center) { lng = feature.center[0]; lat = feature.center[1]; }
-                                }
-                            } catch {}
+                            const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
+                            if (geo.valid) { verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng; }
                         }
 
-                        const orderData = {
-                            cartId: '',
+                        const created = await ctx.onOrderCreated({
                             address: verifiedAddr,
                             latitude: lat,
                             longitude: lng,
                             paymentMethod: payMethod,
-                            changeAmount: delivery.troco_para ?? null,
+                            changeAmount: changeAmt,
                             totalAmount: total,
-                            items: [{ productId: prod?.id || '', quantity: qty, unitPrice }]
-                        };
+                            items: [{ productId: defProd?.id || '', quantity: delivery.qty, unitPrice }]
+                        });
 
-                        const created = await ctx.onOrderCreated(orderData);
                         createdOrders.push(created.orderId);
-                        summaryText += `- Pedido #${created.orderId.substring(0, 6)}: ${qty}x ${prod?.name || 'Gás 13kg'} (R$ ${total.toFixed(2)}) ➔ ${verifiedAddr}\n`;
+                        summaryText += `✅ Pedido #${created.orderId.substring(0, 6)}: ${delivery.qty}x ${defProd?.name || 'P13'} → ${verifiedAddr} (R$ ${total.toFixed(2)})\n`;
                     }
 
                     await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                    await clearMultiPlan(ctx.botId, ctx.contactPhone);
+                    orderConfirmed = true;
+                    orderId = createdOrders.join(', ');
+                    result = summaryText;
+
+                } else if (args.entregas && Array.isArray(args.entregas) && args.entregas.length > 0) {
+                    // LLM-provided entregas array (fallback path)
+                    const defProd = ctx.catalog.find(p => p.active &&
+                        (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13'))
+                    ) || ctx.catalog.find(p => p.active) || ctx.catalog[0];
+
+                    const createdOrders: string[] = [];
+                    let summaryText = '';
+
+                    for (const delivery of args.entregas) {
+                        const prod = ctx.catalog.find(p => p.id === delivery.produto_id) || defProd;
+                        const unitPrice = Number(prod?.salePrice ?? prod?.price ?? 139);
+                        const qty = Number(delivery.quantidade) || 1;
+                        const total = qty * unitPrice;
+                        const payMethod = (delivery.forma_pagamento || cartSummary.paymentMethod || 'DINHEIRO').toUpperCase();
+                        const rawAddr = delivery.endereco || '';
+                        let verifiedAddr = rawAddr;
+                        let lat: number | null = null;
+                        let lng: number | null = null;
+
+                        if (ctx.mapboxToken && rawAddr) {
+                            const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
+                            if (geo.valid) { verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng; }
+                        }
+
+                        const created = await ctx.onOrderCreated({
+                            address: verifiedAddr, latitude: lat, longitude: lng,
+                            paymentMethod: payMethod, changeAmount: delivery.troco_para ?? null,
+                            totalAmount: total,
+                            items: [{ productId: prod?.id || '', quantity: qty, unitPrice }]
+                        });
+
+                        createdOrders.push(created.orderId);
+                        summaryText += `✅ Pedido #${created.orderId.substring(0, 6)}: ${qty}x ${prod?.name || 'P13'} → ${verifiedAddr}\n`;
+                    }
+
+                    await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                    await clearMultiPlan(ctx.botId, ctx.contactPhone);
                     orderConfirmed = true;
                     orderId = createdOrders.join(', ');
                     result = summaryText;
 
                 } else {
-                    // SINGLE DELIVERY CART CHECKOUT
+                    // Single-address checkout from Cart
                     const readiness = await CartService.isReadyForCheckout(ctx.botId, ctx.contactPhone);
                     if (!readiness.ready) {
-                        result = `❌ Não posso fechar o pedido. Faltando: ${readiness.missing.join(', ')}`;
+                        result = `❌ Pedido incompleto. Faltando: ${readiness.missing.join(', ')}`;
                     } else {
                         try {
                             const orderData = await CartService.convertToOrderData(ctx.botId, ctx.contactPhone);
                             const created = await ctx.onOrderCreated(orderData);
                             orderId = created.orderId;
                             orderConfirmed = true;
-                            result = `✅ PEDIDO CRIADO! ID: ${orderId}. Total: R$ ${orderData.totalAmount.toFixed(2)}. Endereço: ${orderData.address}. Pagamento: ${orderData.paymentMethod}.`;
+                            await clearMultiPlan(ctx.botId, ctx.contactPhone);
+                            result = `✅ Pedido criado! Total: R$ ${orderData.totalAmount.toFixed(2)} | ${orderData.address} | ${orderData.paymentMethod}`;
                         } catch (e: any) {
                             result = `Erro ao criar pedido: ${e.message}`;
                         }
                     }
                 }
+
+            // ── Tool: cancelar_carrinho ─────────────────────────────────────
             } else if (name === 'cancelar_carrinho') {
                 await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                await clearMultiPlan(ctx.botId, ctx.contactPhone);
                 result = '🗑️ Carrinho cancelado. Pode fazer um novo pedido quando quiser.';
             }
 
             toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
         }
 
-        // Add assistant message with tool calls + tool results to messages
-        messages.push({
-            role: 'assistant',
-            content: content || null,
-            tool_calls: toolCalls
-        });
+        messages.push({ role: 'assistant', content: content || null, tool_calls: toolCalls });
         messages.push(...toolResults);
 
         if (orderConfirmed) break;
     }
 
+    // ── Post-processing: Build final reply if LLM didn't produce one ──────────
     const updatedSummary = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
     const firstName = (ctx.contactName || '').trim().split(' ')[0];
     const isGenericName = !firstName || /^(cliente|user|usuario|usuário|\d+)$/i.test(firstName);
     const nameSuffix = isGenericName ? '' : `, ${firstName}`;
-    const totalVal = Number(updatedSummary.totalAmount ?? updatedSummary.total ?? 0);
+    const totalVal = Number(updatedSummary.totalAmount ?? 0);
+    const isMultiOrder = orderId?.includes(',');
 
     if (orderConfirmed) {
-        reply = `🎉 *Pedido Confirmado com Sucesso!*${!isGenericName ? `\n\nObrigado, ${firstName}!` : ''}\n\nSeu pedido foi registrado no sistema e nosso entregador já está a caminho! 😊\n\nSe precisar de mais alguma coisa, é só me avisar!`;
-    } else if (updatedSummary.hasItems && updatedSummary.deliveryAddress && updatedSummary.paymentMethod) {
-        // ALWAYS present full structured order breakdown before final checkout confirmation!
-        reply = `📋 *RESUMO DO SEU PEDIDO:*\n\n📦 *Itens:*\n${updatedSummary.itemsText}\n\n📍 *Endereço de Entrega:* ${updatedSummary.deliveryAddress}\n💳 *Forma de Pagamento:* ${updatedSummary.paymentMethod}\n💰 *Valor Total:* R$ ${totalVal.toFixed(2)}\n\nPodemos confirmar e enviar o seu pedido agora${nameSuffix}? (responda *"sim"* ou *"pode"* para confirmar)`;
+        reply = `🎉 *Pedido${isMultiOrder ? 's' : ''} Confirmado${isMultiOrder ? 's' : ''}!*${!isGenericName ? `\n\nObrigado, ${firstName}!` : ''}\n\nSeu${isMultiOrder ? 's' : ''} pedido${isMultiOrder ? 's foram registrados' : ' foi registrado'} e nosso entregador já está a caminho! 😊\n\nSe precisar de mais alguma coisa, é só avisar!`;
+    } else if (!reply && updatedSummary.hasItems && updatedSummary.deliveryAddress && updatedSummary.paymentMethod) {
+        reply = `📋 *Resumo do Pedido:*\n\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress}\n💳 *Pagamento:* ${updatedSummary.paymentMethod}\n💰 *Total:* R$ ${totalVal.toFixed(2)}\n\nPosso confirmar${nameSuffix}? (responda *"sim"* ou *"pode"*)`;
     } else if (!reply && updatedSummary.hasItems) {
         const missing: string[] = [];
-        if (!updatedSummary.deliveryAddress) missing.push('endereço de entrega (rua e número)');
-        if (!updatedSummary.paymentMethod) missing.push('forma de pagamento (dinheiro, Pix ou cartão)');
-        reply = `🛒 *Carrinho Atual:*\n${updatedSummary.itemsText}\n📍 *Endereço:* ${updatedSummary.deliveryAddress || 'Não informado'}\n💳 *Pagamento:* ${updatedSummary.paymentMethod || 'Não informado'}\n💰 *Total:* R$ ${totalVal.toFixed(2)}\n\nQual será a ${missing.join(' e ')}?`;
+        if (!updatedSummary.deliveryAddress) missing.push('endereço de entrega');
+        if (!updatedSummary.paymentMethod) missing.push('forma de pagamento');
+        if (missing.length > 0) {
+            reply = `🛒 ${updatedSummary.itemsText}\n\nAinda preciso saber: ${missing.join(' e ')}.`;
+        }
     }
 
     return { reply, orderConfirmed, orderId, cartSummary: updatedSummary };
 }
 
-// ─── Helper: Build Order from Cart Data ───────────────────────────────────
+// ─── Helper: Create Order from Cart Data ─────────────────────────────────────
 
 export async function createOrderFromCartData(
     botId: string,
@@ -737,6 +889,8 @@ export async function createOrderFromCartData(
             latitude: orderData.latitude,
             longitude: orderData.longitude,
             totalAmount: orderData.totalAmount,
+            paymentMethod: orderData.paymentMethod,
+            changeAmount: orderData.changeAmount,
             status: 'PENDING',
             items: {
                 create: orderData.items.map(item => ({
