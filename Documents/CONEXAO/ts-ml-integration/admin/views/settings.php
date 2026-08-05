@@ -165,9 +165,21 @@ if (isset($_POST['add_account'])) {
                         $error = $wpdb->last_error;
                         $account_error = __('Erro ao adicionar conta:', 'ts-ml-integration') . ' ' . $error;
                     } elseif ($result > 0) {
-                        // Success - redirect to avoid duplicate submissions
+                        $new_account_id = $wpdb->insert_id;
+                        $oauth_url = '';
+                        if (class_exists('TS_ML_API_Handler')) {
+                            $oauth_result = TS_ML_API_Handler::instance()->get_oauth_url($new_account_id, $country);
+                            if (!is_wp_error($oauth_result)) {
+                                $oauth_url = $oauth_result;
+                            }
+                        }
+
+                        if (!empty($oauth_url)) {
+                            wp_redirect($oauth_url);
+                            exit;
+                        }
+
                         $redirect_url = admin_url('admin.php?page=ts-ml-settings&account_added=1');
-                        $debug_info[] = 'Redirecionando para: ' . $redirect_url;
                         wp_redirect($redirect_url);
                         exit;
                     } else {
@@ -218,6 +230,8 @@ if (isset($_POST['save_settings']) && check_admin_referer('ts_ml_save_settings')
     update_option('ts_ml_auto_sync_orders', isset($_POST['auto_sync_orders']) ? 'yes' : 'no');
     update_option('ts_ml_sync_deletions', isset($_POST['sync_deletions']) ? 'yes' : 'no');
     update_option('ts_ml_sync_status_changes', isset($_POST['sync_status_changes']) ? 'yes' : 'no');
+    update_option('ts_ml_sync_only_with_photos', isset($_POST['sync_only_with_photos']) ? 'yes' : 'no');
+    update_option('ts_ml_sync_only_ready', isset($_POST['sync_only_ready']) ? 'yes' : 'no');
     update_option('ts_ml_ai_enabled', isset($_POST['ai_enabled']) ? 'yes' : 'no');
     update_option('ts_ml_ai_api_key', sanitize_text_field($_POST['ai_api_key'] ?? ''));
     update_option('ts_ml_ai_model', sanitize_text_field($_POST['ai_model'] ?? 'gpt-3.5-turbo'));
@@ -344,718 +358,421 @@ if (!isset($settings_saved)) {
     }
     ?>
 
-        <!-- CONEXTBOT SAAS CONNECTION -->
+        <!-- CABEÇALHO DE CONEXÃO SAAS CONEXTBOT (1-CLIQUE) -->
         <?php
-        $saas_url = get_option('ts_ml_saas_url', 'https://app.conext.click');
+        $saas_url = get_option('ts_ml_saas_url');
         $shop_url = home_url();
+        $shop_host = parse_url($shop_url, PHP_URL_HOST);
+
+        if (empty($saas_url) || (!empty($shop_host) && strpos($saas_url, $shop_host) !== false)) {
+            $saas_url = 'https://app.conext.click';
+            update_option('ts_ml_saas_url', $saas_url);
+        }
+
         $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=saas_callback');
-        $connect_url = $saas_url . '/dashboard/integrations/wordpress/connect?shop_url=' . urlencode($shop_url) . '&redirect_uri=' . urlencode($redirect_uri);
+        $connect_url = rtrim($saas_url, '/') . '/dashboard/integrations/wordpress/connect?shop_url=' . urlencode($shop_url) . '&redirect_uri=' . urlencode($redirect_uri);
         $is_saas_connected = (get_option('ts_ml_use_saas') === 'yes' && !empty(get_option('ts_ml_bot_id')));
-        $is_manual_mode = isset($_GET['mode']) && $_GET['mode'] === 'manual';
         ?>
-        <div class="ts-ml-saas-card" style="background: #ffffff; border: 1px solid #e5e5e5; padding: 25px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+
+        <div class="ts-ml-saas-hero-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
             <?php if (!$is_saas_connected) : ?>
-                <div style="text-align: center; padding: 20px 10px;">
-                    <div style="font-size: 50px; margin-bottom: 15px;">🔌</div>
-                    <h2 style="margin-top: 0; color: #1d2327; font-size: 24px; font-weight: 600;"><?php esc_html_e('Conecte sua Loja ao Conextbot', 'ts-ml-integration'); ?></h2>
-                    <p style="font-size: 15px; color: #64748b; max-width: 600px; margin: 0 auto 25px auto; line-height: 1.6;">
-                        <?php esc_html_e('Habilite o cérebro de Inteligência Artificial para responder perguntas automaticamente e sincronize seus produtos, preços e estoque com o Mercado Livre em tempo real através do nosso SaaS.', 'ts-ml-integration'); ?>
+                <div style="text-align: center; padding: 15px 10px;">
+                    <div style="font-size: 44px; margin-bottom: 10px;">⚡</div>
+                    <h2 style="margin: 0 0 10px 0; color: #0f172a; font-size: 22px; font-weight: 700;"><?php esc_html_e('Conexão Conextbot SaaS (1-Clique)', 'ts-ml-integration'); ?></h2>
+                    <p style="font-size: 14px; color: #64748b; max-width: 600px; margin: 0 auto 20px auto; line-height: 1.5;">
+                        <?php esc_html_e('Conecte sua loja ao Conextbot SaaS para validar sua licença e autenticar sua conta no Mercado Livre sem precisar configurar chaves de desenvolvedor.', 'ts-ml-integration'); ?>
                     </p>
                     
-                    <a href="<?php echo esc_url($connect_url); ?>" class="button button-primary button-hero" style="background: #00a32a; border-color: #00a32a; font-size: 16px; padding: 5px 35px; height: auto; line-height: 2.2; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,163,42,0.2); font-weight: 600;">
-                        <?php esc_html_e('Conectar Minha Loja Agora', 'ts-ml-integration'); ?>
+                    <a href="<?php echo esc_url($connect_url); ?>" class="button button-primary button-hero" style="background: #10b981; border-color: #10b981; font-size: 15px; padding: 4px 30px; height: auto; line-height: 2.2; border-radius: 6px; font-weight: 700; box-shadow: 0 4px 6px -1px rgba(16,185,129,0.3);">
+                        🔌 <?php esc_html_e('Conectar Loja ao Conextbot SaaS', 'ts-ml-integration'); ?>
                     </a>
 
-                    <div style="margin-top: 25px; font-size: 13px; color: #94a3b8;">
-                        <?php esc_html_e('Não requer criação de chaves de desenvolvedor. Autenticação oficial e simplificada por OAuth.', 'ts-ml-integration'); ?>
+                    <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
+                        <?php esc_html_e('Conexão segura e instantânea intermediada pelo aplicativo mestre em app.conext.click.', 'ts-ml-integration'); ?>
                     </div>
-
-                    <?php if (!$is_manual_mode) : ?>
-                        <p style="margin-top: 25px; margin-bottom: 0; font-size: 13px;"><a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings&mode=manual')); ?>" style="color: #64748b; text-decoration: underline;"><?php esc_html_e('Configuração avançada para desenvolvedores (manual sem SaaS)', 'ts-ml-integration'); ?></a></p>
-                    <?php else : ?>
-                        <p style="margin-top: 25px; margin-bottom: 0; font-size: 13px;"><a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>" style="color: #64748b; text-decoration: underline;"><?php esc_html_e('Voltar para conexão simplificada de 1 clique (Recomendado)', 'ts-ml-integration'); ?></a></p>
-                    <?php endif; ?>
                 </div>
             <?php else : ?>
-                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 18px; margin-bottom: 18px;">
                     <div style="display: flex; align-items: center;">
-                        <span style="font-size: 32px; margin-right: 15px;">✅</span>
+                        <div style="background: #ecfdf5; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 15px;">
+                            ✅
+                        </div>
                         <div>
-                            <h2 style="margin: 0; color: #1d2327; font-size: 20px; font-weight: 600;"><?php esc_html_e('Loja Conectada ao Conextbot', 'ts-ml-integration'); ?></h2>
-                            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
+                            <h2 style="margin: 0; color: #0f172a; font-size: 18px; font-weight: 700;"><?php esc_html_e('Loja Conectada ao Conextbot SaaS', 'ts-ml-integration'); ?></h2>
+                            <p style="margin: 3px 0 0 0; color: #64748b; font-size: 13px;">
                                 <?php esc_html_e('Integração ativa e sincronizando em segundo plano através do SaaS centralizado.', 'ts-ml-integration'); ?>
                             </p>
                         </div>
                     </div>
                     
-                    <form method="post" action="" onsubmit="return confirm('<?php esc_attr_e('Tem certeza que deseja desconectar sua loja do Conextbot SaaS? Isso desativará a IA e a sincronização.', 'ts-ml-integration'); ?>');">
-                        <?php wp_nonce_field('ts_ml_disconnect_saas'); ?>
-                        <input type="submit" name="disconnect_saas" class="button button-secondary" style="color: #d63638; border-color: #d63638; font-weight: 600; padding: 5px 15px;" value="<?php esc_attr_e('Desconectar Loja', 'ts-ml-integration'); ?>" />
-                    </form>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <a href="<?php echo esc_url($saas_url . '/dashboard/integrations'); ?>" target="_blank" class="button button-secondary" style="font-weight: 600;">
+                            🔗 <?php esc_html_e('Painel Conextbot', 'ts-ml-integration'); ?>
+                        </a>
+                        <form method="post" action="" onsubmit="return confirm('<?php esc_attr_e('Tem certeza que deseja desconectar sua loja do Conextbot SaaS?', 'ts-ml-integration'); ?>');">
+                            <?php wp_nonce_field('ts_ml_disconnect_saas'); ?>
+                            <input type="submit" name="disconnect_saas" class="button button-secondary" style="color: #ef4444; border-color: #fca5a5; font-weight: 600;" value="<?php esc_attr_e('Desconectar', 'ts-ml-integration'); ?>" />
+                        </form>
+                    </div>
                 </div>
 
-                <table class="form-table">
-                    <tr>
-                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Status da Conexão', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <?php
-                            $token_check = TS_ML_API_Handler::instance()->get_valid_token(0);
-                            if (!is_wp_error($token_check)) {
-                                echo '<span style="color: #00a32a; font-weight: bold; display: inline-flex; align-items: center;"><span style="display: inline-block; width: 8px; height: 8px; background: #00a32a; border-radius: 50%; margin-right: 8px;"></span>Ativa e Conectada</span>';
-                            } else {
-                                echo '<span style="color: #d63638; font-weight: bold;">❌ Erro de Conexão: ' . esc_html($token_check->get_error_message()) . '</span>';
-                            }
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Bot ID', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <code><?php echo esc_html(get_option('ts_ml_bot_id')); ?></code>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('URL do SaaS', 'ts-ml-integration'); ?></th>
-                        <td>
-                            <code><?php echo esc_html(get_option('ts_ml_saas_url')); ?></code>
-                        </td>
-                    </tr>
-                </table>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #f8fafc; padding: 15px; border-radius: 8px;">
+                    <div>
+                        <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 3px;"><?php esc_html_e('Status da Conexão', 'ts-ml-integration'); ?></span>
+                        <span style="color: #10b981; font-weight: 700; font-size: 13px;">🟢 Conectada e Ativa</span>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 3px;"><?php esc_html_e('Bot ID', 'ts-ml-integration'); ?></span>
+                        <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid #e2e8f0;"><?php echo esc_html(get_option('ts_ml_bot_id')); ?></code>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 3px;"><?php esc_html_e('Servidor SaaS', 'ts-ml-integration'); ?></span>
+                        <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid #e2e8f0;"><?php echo esc_html(get_option('ts_ml_saas_url')); ?></code>
+                    </div>
+                </div>
             <?php endif; ?>
         </div>
 
-        <?php if ($is_saas_connected) : ?>
-            <div class="notice notice-info" style="border-left-color: #00a32a; padding: 15px; margin-bottom: 25px; background: #fff;">
-                <h3 style="margin-top: 0; color: #00a32a;"><?php esc_html_e('☁️ Conexão via SaaS Conextbot Ativa', 'ts-ml-integration'); ?></h3>
-                <p><?php esc_html_e('A sua loja está integrada ao Conextbot SaaS! Você pode agora conectar e autorizar uma ou mais contas do Mercado Livre abaixo usando o fluxo seguro do SaaS (OAuth simplificado de 1 clique).', 'ts-ml-integration'); ?></p>
-                <p><a href="<?php echo esc_url($saas_url . '/dashboard/integrations'); ?>" target="_blank" class="button button-secondary">🔗 <?php esc_html_e('Ir para o Painel do Conextbot', 'ts-ml-integration'); ?></a></p>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($is_saas_connected || $is_manual_mode) : ?>
-            <?php if ($is_manual_mode && !$is_saas_connected) : ?>
-            <!-- PASSO 1: Credenciais da API (POR PAÍS) -->
-            <h2><?php esc_html_e('🔑 Passo 1: Credenciais da API do Mercado Livre', 'ts-ml-integration'); ?></h2>
-        <div class="notice notice-info">
-            <p><strong><?php esc_html_e('ℹ️ Importante:', 'ts-ml-integration'); ?></strong>
-                <?php esc_html_e('As credenciais da API são configuradas POR PAÍS. Todas as contas do mesmo país compartilham as mesmas credenciais (App ID e Secret Key).', 'ts-ml-integration'); ?>
-            </p>
-        </div>
-        <div class="notice notice-info">
-            <p><strong><?php esc_html_e('Antes de começar:', 'ts-ml-integration'); ?></strong></p>
-            <ol>
-                <li><?php esc_html_e('Acesse', 'ts-ml-integration'); ?> <a
-                        href="https://developers.mercadolivre.com.br/"
-                        target="_blank">developers.mercadolivre.com.br</a>
-                    <?php esc_html_e('e faça login', 'ts-ml-integration'); ?></li>
-                <li><?php esc_html_e('Clique em "Criar nova aplicação"', 'ts-ml-integration'); ?></li>
-                <li><?php esc_html_e('Configure a URL de redirecionamento OAuth:', 'ts-ml-integration'); ?>
-                    <br><code><?php echo esc_html(admin_url('admin.php?page=ts-ml-settings&action=oauth_callback')); ?></code>
-                    <br><small><strong><?php esc_html_e('⚠️ Deve ser idêntica à URL exibida acima.', 'ts-ml-integration'); ?></strong></small>
-                </li>
-                <li><?php esc_html_e('Configure a URL de retorno de notificações (Webhook):', 'ts-ml-integration'); ?>
-                    <br><code><?php
-                    $webhook_url = home_url('/wp-json/ts-ml/v1/webhook');
-                    $webhook_url = '';
-                    if (class_exists('TS_ML_Public')) {
-                        if (method_exists('TS_ML_Public', 'get_webhook_url')) {
-                            $webhook_url = TS_ML_Public::get_webhook_url();
-                        }
-                    }
-
-                    if (empty($webhook_url)) {
-                        // Fallback: force HTTPS if not localhost
-                        if (strpos($webhook_url, 'https://') !== 0) {
-                            if (strpos($webhook_url, 'http://localhost') !== 0 && strpos($webhook_url, 'http://127.0.0.1') !== 0) {
-                                $webhook_url = str_replace('http://', 'https://', $webhook_url);
-                            }
-                        }
-                        $webhook_url = strtolower($webhook_url);
-                    }
-                    echo esc_html($webhook_url);
-                    ?></code>
-                    <br><small><?php esc_html_e('Cole esta URL no campo "URL de retornos de chamada de notificação" no painel do Mercado Livre', 'ts-ml-integration'); ?></small>
-                </li>
-                <li><?php esc_html_e('Copie o App ID e Secret Key gerados', 'ts-ml-integration'); ?></li>
-            </ol>
-        </div>
-        <p>
-            <a href="https://developers.mercadolivre.com.br/" target="_blank" class="button button-primary">
-                <?php esc_html_e('🌐 Criar Aplicação no Mercado Livre', 'ts-ml-integration'); ?>
-            </a>
-        </p>
-
-        <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>">
-            <?php wp_nonce_field('ts_ml_save_api_credentials'); ?>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="app_id_br"><?php esc_html_e('App ID (Brasil)', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <?php
-                        $saved_app_id = get_option('ts_ml_app_id_BR');
-                        ?>
-                        <input type="text" name="app_id_br" id="app_id_br"
-                            value="<?php echo esc_attr($saved_app_id); ?>" class="regular-text"
-                            placeholder="<?php esc_attr_e('Cole o App ID aqui', 'ts-ml-integration'); ?>" />
-                        <?php if (!empty($saved_app_id)) { ?>
-                            <span style="color: #00a32a; margin-left: 10px;">✓
-                                <?php esc_html_e('Salvo', 'ts-ml-integration'); ?></span>
-                            <p class="description" style="color: #00a32a;">
-                                <?php esc_html_e('App ID configurado:', 'ts-ml-integration'); ?>
-                                <code><?php echo esc_html(substr($saved_app_id, 0, 10)); ?>...</code>
-                            </p>
-                        <?php } else { ?>
-                            <p class="description">
-                                <?php esc_html_e('Cole o App ID obtido no Mercado Livre Developers', 'ts-ml-integration'); ?>
-                            </p>
-                        <?php } ?>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label
-                            for="app_secret_br"><?php esc_html_e('Secret Key (Brasil)', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <?php
-                        $saved_app_secret = get_option('ts_ml_app_secret_BR');
-                        ?>
-                        <input type="password" name="app_secret_br" id="app_secret_br" value="" class="regular-text"
-                            placeholder="<?php esc_attr_e('Cole o Secret Key aqui', 'ts-ml-integration'); ?>" />
-                        <?php if (!empty($saved_app_secret)) { ?>
-                            <span style="color: #00a32a; margin-left: 10px;">✓
-                                <?php esc_html_e('Salvo', 'ts-ml-integration'); ?></span>
-                            <p class="description" style="color: #00a32a;">
-                                <?php esc_html_e('Secret Key configurado (oculto por segurança)', 'ts-ml-integration'); ?>
-                            </p>
-                        <?php } else { ?>
-                            <p class="description">
-                                <?php esc_html_e('Cole o Secret Key obtido no Mercado Livre Developers', 'ts-ml-integration'); ?>
-                            </p>
-                        <?php } ?>
-                    </td>
-                </tr>
-            </table>
-
-            <p class="submit">
-                <input type="submit" name="save_api_credentials" class="button button-primary"
-                    value="<?php esc_attr_e('Salvar Credenciais', 'ts-ml-integration'); ?>" />
-            </p>
-        </form>
-
-        <!-- URLs Section -->
-        <h3><?php esc_html_e('📋 URLs para Configurar no Mercado Livre', 'ts-ml-integration'); ?></h3>
-        <div class="notice notice-warning">
-            <p><strong><?php esc_html_e('⚠️ IMPORTANTE: Configure estas URLs no painel do Mercado Livre Developers', 'ts-ml-integration'); ?></strong>
-            </p>
-        </div>
-
-        <table class="form-table">
-            <tr>
-                <th scope="row">
-                    <label><?php esc_html_e('1. URL de Redirecionamento OAuth', 'ts-ml-integration'); ?></label>
-                </th>
-                <td>
-                    <code
-                        style="display: block; padding: 10px; background: #f5f5f5; border: 1px solid #ccc; margin: 5px 0;">
-                        <?php
-                        $oauth_redirect_url = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
-                        // Force HTTPS if not localhost
-                        if (strpos($oauth_redirect_url, 'https://') !== 0 && strpos($oauth_redirect_url, 'http://localhost') !== 0 && strpos($oauth_redirect_url, 'http://127.0.0.1') !== 0) {
-                            $oauth_redirect_url = str_replace('http://', 'https://', $oauth_redirect_url);
-                        }
-                        echo esc_html($oauth_redirect_url);
-                        ?>
-                    </code>
-                    <p class="description">
-                        <strong><?php esc_html_e('⚠️ ATENÇÃO:', 'ts-ml-integration'); ?></strong>
-                        <?php esc_html_e('Esta URL deve ser cadastrada EXATAMENTE assim no Mercado Livre. Se o seu site mudou de domínio ou protocolo (HTTP/HTTPS), você deve atualizar lá.', 'ts-ml-integration'); ?>
-                    </p>
-                    <p class="description">
-                        <?php esc_html_e('Sem essa correspondência exata, o Mercado Livre negará a conexão por segurança.', 'ts-ml-integration'); ?>
-                    </p>
-                </td>
-            </tr>
-            <tr>
-                <th scope="row">
-                    <label><?php esc_html_e('2. URL de Retorno de Notificações (Webhook)', 'ts-ml-integration'); ?></label>
-                </th>
-                <td>
-                    <?php
-                    // Get webhook URL with fallback
-                    $webhook_url_display = '';
-                    if (class_exists('TS_ML_Public')) {
-                        if (method_exists('TS_ML_Public', 'get_webhook_url')) {
-                            try {
-                                $webhook_url_display = TS_ML_Public::get_webhook_url();
-                            } catch (Exception $e) {
-                                // Error getting URL, use fallback
-                                $webhook_url_display = '';
-                            }
-                        }
-                    }
-
-                    // Fallback if class doesn't exist or method failed
-                    if (empty($webhook_url_display)) {
-                        $webhook_url_display = home_url('/wp-json/ts-ml/v1/webhook');
-                        // Force HTTPS if not localhost
-                        if (strpos($webhook_url_display, 'https://') !== 0) {
-                            if (strpos($webhook_url_display, 'http://localhost') !== 0 && strpos($webhook_url_display, 'http://127.0.0.1') !== 0) {
-                                $webhook_url_display = str_replace('http://', 'https://', $webhook_url_display);
-                            }
-                        }
-                        $webhook_url_display = strtolower($webhook_url_display);
-                    }
-                    ?>
-                    <code style="display: block; padding: 10px; background: #f5f5f5; margin: 5px 0;">
-                        <?php echo esc_html($webhook_url_display); ?>
-                    </code>
-                    <p class="description">
-                        <?php esc_html_e('Cole esta URL no campo "URL de retornos de chamada de notificação" no painel do Mercado Livre. Esta URL receberá notificações sobre pedidos, mensagens e atualizações.', 'ts-ml-integration'); ?>
-                        <br><strong><?php esc_html_e('⚠️ IMPORTANTE:', 'ts-ml-integration'); ?></strong>
-                        <?php esc_html_e('O Mercado Livre requer que a URL use apenas letras minúsculas. Esta URL já está formatada corretamente.', 'ts-ml-integration'); ?>
-                    </p>
-                    <button type="button" class="button button-secondary"
-                        onclick="navigator.clipboard.writeText('<?php echo esc_js($webhook_url_display); ?>'); alert('<?php esc_attr_e('URL copiada!', 'ts-ml-integration'); ?>');">
-                        <?php esc_html_e('📋 Copiar URL', 'ts-ml-integration'); ?>
-                    </button>
-                </td>
-            </tr>
-        </table>
-
-        <?php endif; ?>
-
-        <hr style="margin: 40px 0;">
-
-        <!-- PASSO 2: Contas (INDIVIDUAIS) -->
-        <h2><?php esc_html_e('👤 Passo 2: Contas do Mercado Livre', 'ts-ml-integration'); ?></h2>
-        <div class="notice notice-info">
-            <p><strong><?php esc_html_e('ℹ️ Importante:', 'ts-ml-integration'); ?></strong>
-                <?php esc_html_e('Você pode adicionar MÚLTIPLAS contas do Mercado Livre. Cada conta precisa ser conectada individualmente via OAuth para obter seus próprios tokens de acesso.', 'ts-ml-integration'); ?>
-            </p>
-        </div>
-
-        <p><?php esc_html_e('Adicione e conecte suas contas do Mercado Livre para começar a sincronizar produtos, pedidos e mensagens.', 'ts-ml-integration'); ?>
-        </p>
-
-        <div class="ts-ml-accounts-list">
-            <?php
-            global $wpdb;
-            $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
-
-            // Check if table exists
-            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
-
-            if (!$table_exists) {
-                ?>
-                <div class="notice notice-error">
-                    <p><strong><?php esc_html_e('Erro:', 'ts-ml-integration'); ?></strong>
-                        <?php esc_html_e('A tabela de contas não existe. Por favor, desative e reative o plugin para criar as tabelas necessárias.', 'ts-ml-integration'); ?>
-                    </p>
-                    <p>
-                        <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-settings&action=create_tables'), 'create_tables')); ?>"
-                            class="button button-primary">
-                            <?php esc_html_e('Criar Tabelas Agora', 'ts-ml-integration'); ?>
-                        </a>
-                    </p>
+        <!-- SEÇÃO 1: CONTAS DO MERCADO LIVRE -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                <div>
+                    <h2 style="margin: 0; font-size: 18px; color: #0f172a; font-weight: 700;"><?php esc_html_e('🛍️ Contas do Mercado Livre Conectadas', 'ts-ml-integration'); ?></h2>
+                    <p style="margin: 3px 0 0 0; color: #64748b; font-size: 13px;"><?php esc_html_e('Gerencie as contas de vendedor conectadas ao seu site.', 'ts-ml-integration'); ?></p>
                 </div>
-                <?php
-            } else {
-                $accounts = $wpdb->get_results("SELECT * FROM $table_accounts ORDER BY created_at DESC");
+            </div>
 
-                if (empty($accounts)) {
+            <div class="ts-ml-accounts-list">
+                <?php
+                global $wpdb;
+                $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+                $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
+
+                if (!$table_exists) {
                     ?>
-                    <p><?php esc_html_e('Nenhuma conta configurada. Adicione uma conta para começar.', 'ts-ml-integration'); ?>
-                    </p>
+                    <div class="notice notice-error" style="margin: 0;">
+                        <p><strong><?php esc_html_e('Aviso:', 'ts-ml-integration'); ?></strong> <?php esc_html_e('Tabela de contas pendente.', 'ts-ml-integration'); ?>
+                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-settings&action=create_tables'), 'create_tables')); ?>" class="button button-small button-primary">
+                                <?php esc_html_e('Criar Tabelas', 'ts-ml-integration'); ?>
+                            </a>
+                        </p>
+                    </div>
                     <?php
                 } else {
-                    foreach ($accounts as $account) {
+                    $accounts = $wpdb->get_results("SELECT * FROM $table_accounts ORDER BY created_at DESC");
+
+                    if (empty($accounts)) {
                         ?>
-                        <div class="ts-ml-account-card">
-                            <div class="ts-ml-account-card-header">
-                                <h3 style="margin: 0;"><?php echo esc_html($account->account_name); ?></h3>
-                                <div class="ts-ml-account-actions">
-                                    <button type="button" class="button button-secondary edit-account-btn"
-                                        data-id="<?php echo esc_attr($account->id); ?>"
-                                        data-name="<?php echo esc_attr($account->account_name); ?>"
-                                        data-country="<?php echo esc_attr($account->country); ?>">
-                                        <?php esc_html_e('✏️ Editar', 'ts-ml-integration'); ?>
-                                    </button>
-                                    <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-settings&delete_account=' . $account->id), 'delete_account_' . $account->id)); ?>"
-                                        class="button button-link-delete submitdelete"
-                                        onclick="return confirm('<?php esc_attr_e('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.', 'ts-ml-integration'); ?>');">
-                                        <?php esc_html_e('🗑️ Excluir', 'ts-ml-integration'); ?>
-                                    </a>
-                                </div>
-                            </div>
-
-                            <div class="ts-ml-account-details">
-                                <p><strong><?php esc_html_e('ID:', 'ts-ml-integration'); ?></strong>
-                                    <?php echo esc_html($account->id); ?></p>
-                                <p><strong><?php esc_html_e('País:', 'ts-ml-integration'); ?></strong>
-                                    <?php echo esc_html($account->country); ?></p>
-                                <p><strong><?php esc_html_e('Status:', 'ts-ml-integration'); ?></strong>
-                                    <?php echo $account->is_active ? esc_html__('Ativa', 'ts-ml-integration') : esc_html__('Inativa', 'ts-ml-integration'); ?>
-                                </p>
-                            </div>
-
-                            <div id="edit-form-<?php echo esc_attr($account->id); ?>" class="ts-ml-edit-account-form"
-                                style="display:none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                                <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>">
-                                    <?php wp_nonce_field('ts_ml_edit_account'); ?>
-                                    <input type="hidden" name="edit_account" value="1">
-                                    <input type="hidden" name="account_id" value="<?php echo esc_attr($account->id); ?>">
-
-                                    <table class="form-table" style="margin-top: 0;">
-                                        <tr>
-                                            <th scope="row" style="width: 100px; padding: 10px 0;">
-                                                <label><?php esc_html_e('Nome', 'ts-ml-integration'); ?></label>
-                                            </th>
-                                            <td style="padding: 10px 0;">
-                                                <input type="text" name="account_name"
-                                                    value="<?php echo esc_attr($account->account_name); ?>" class="regular-text"
-                                                    style="width: 100%;" required>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th scope="row" style="width: 100px; padding: 10px 0;">
-                                                <label><?php esc_html_e('País', 'ts-ml-integration'); ?></label>
-                                            </th>
-                                            <td style="padding: 10px 0;">
-                                                <select name="country" style="width: 100%;">
-                                                    <option value="BR" <?php selected($account->country, 'BR'); ?>>Brasil</option>
-                                                    <option value="AR" <?php selected($account->country, 'AR'); ?>>Argentina
-                                                    </option>
-                                                    <option value="MX" <?php selected($account->country, 'MX'); ?>>México</option>
-                                                    <option value="CL" <?php selected($account->country, 'CL'); ?>>Chile</option>
-                                                    <option value="CO" <?php selected($account->country, 'CO'); ?>>Colômbia</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                    </table>
-
-                                    <div style="margin-top: 10px;">
-                                        <input type="submit" class="button button-primary"
-                                            value="<?php esc_attr_e('Salvar', 'ts-ml-integration'); ?>">
-                                        <button type="button" class="button cancel-edit-btn"
-                                            data-id="<?php echo esc_attr($account->id); ?>"><?php esc_html_e('Cancelar', 'ts-ml-integration'); ?></button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <div class="ts-ml-account-connection" style="margin-top: 15px;">
-                                <?php if (empty($account->access_token)) { ?>
-                                    <?php
-                                    $oauth_url = '';
-                                    $oauth_error = '';
-                                    if ($is_saas_connected) {
-                                        $bot_id = get_option('ts_ml_bot_id');
-                                        $oauth_url = rtrim($saas_url, '/') . '/dashboard/integrations/wordpress/connect-ml' .
-                                            '?bot_id=' . urlencode($bot_id) .
-                                            '&account_id=' . urlencode($account->id) .
-                                            '&shop_url=' . urlencode($shop_url) .
-                                            '&redirect_uri=' . urlencode(admin_url('admin.php?page=ts-ml-settings'));
-                                    } else {
-                                        if (class_exists('TS_ML_API_Handler')) {
-                                            $oauth_result = TS_ML_API_Handler::instance()->get_oauth_url($account->id, $account->country);
-                                            if (is_wp_error($oauth_result)) {
-                                                $oauth_error = $oauth_result->get_error_message();
-                                            } else {
-                                                $oauth_url = $oauth_result;
-                                            }
-                                        }
-                                    }
-                                    ?>
-                                    <?php if (!empty($oauth_error)) { ?>
-                                        <p class="description" style="color: #d63638;">
-                                            <strong><?php esc_html_e('⚠️ Erro:', 'ts-ml-integration'); ?></strong>
-                                            <?php echo esc_html($oauth_error); ?>
-                                        </p>
-                                    <?php } elseif (!empty($oauth_url)) { ?>
-                                        <a href="<?php echo esc_url($oauth_url); ?>" class="button button-primary" target="_blank">
-                                            <?php esc_html_e('Conectar Conta', 'ts-ml-integration'); ?>
-                                        </a>
-                                    <?php } ?>
-                                <?php } else { ?>
-                                    <p><strong style="color: #00a32a;"><?php esc_html_e('✅ Conectada', 'ts-ml-integration'); ?></strong>
-                                    </p>
-                                    <p class="description">
-                                        <small><?php esc_html_e('Expira em:', 'ts-ml-integration'); ?>
-                                            <?php echo $account->token_expires_at ? esc_html($account->token_expires_at) : esc_html__('N/A', 'ts-ml-integration'); ?></small>
-                                    </p>
-                                <?php } ?>
-                            </div>
+                        <div style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; width: 100%;">
+                            <p style="margin: 0 0 10px 0; color: #64748b;"><?php esc_html_e('Nenhuma conta do Mercado Livre vinculada no momento.', 'ts-ml-integration'); ?></p>
                         </div>
                         <?php
+                    } else {
+                        foreach ($accounts as $account) {
+                            ?>
+                            <div class="ts-ml-account-card" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff;">
+                                <div class="ts-ml-account-card-header" style="background: #f8fafc; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                                    <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;"><?php echo esc_html($account->account_name); ?></h3>
+                                    <div class="ts-ml-account-actions">
+                                        <button type="button" class="button button-small edit-account-btn" data-id="<?php echo esc_attr($account->id); ?>" data-name="<?php echo esc_attr($account->account_name); ?>" data-country="<?php echo esc_attr($account->country); ?>">
+                                            <?php esc_html_e('✏️ Editar', 'ts-ml-integration'); ?>
+                                        </button>
+                                        <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-settings&delete_account=' . $account->id), 'delete_account_' . $account->id)); ?>" class="button button-small button-link-delete" onclick="return confirm('<?php esc_attr_e('Tem certeza que deseja remover esta conta?', 'ts-ml-integration'); ?>');">
+                                            <?php esc_html_e('🗑️ Remover', 'ts-ml-integration'); ?>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <div class="ts-ml-account-details" style="padding: 15px;">
+                                    <p style="margin: 0 0 8px 0; font-size: 13px;"><strong><?php esc_html_e('País:', 'ts-ml-integration'); ?></strong> <?php echo esc_html($account->country); ?></p>
+                                    
+                                    <div style="margin-top: 10px;">
+                                        <?php
+                                        $token_check = TS_ML_API_Handler::instance()->get_valid_token($account->id);
+                                        $is_account_connected = !is_wp_error($token_check) && !empty($account->access_token);
+                                        $oauth_url = TS_ML_API_Handler::instance()->get_oauth_url($account->id, $account->country);
+                                        ?>
+
+                                        <?php if ($is_account_connected) { ?>
+                                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                                <span style="color: #10b981; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center;">
+                                                    <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; margin-right: 6px;"></span>
+                                                    <?php esc_html_e('Conectada e Ativa', 'ts-ml-integration'); ?>
+                                                </span>
+                                                <?php if (!is_wp_error($oauth_url)) { ?>
+                                                    <a href="<?php echo esc_url($oauth_url); ?>" class="button button-small" style="font-size: 11px;">
+                                                        🔄 <?php esc_html_e('Reconectar', 'ts-ml-integration'); ?>
+                                                    </a>
+                                                <?php } ?>
+                                            </div>
+                                        <?php } else { ?>
+                                            <div style="margin-bottom: 8px;">
+                                                <span style="color: #ef4444; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center;">
+                                                    <span style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; display: inline-block; margin-right: 6px;"></span>
+                                                    <?php esc_html_e('Desconectada / Token Pendente', 'ts-ml-integration'); ?>
+                                                </span>
+                                            </div>
+                                            <?php if (!is_wp_error($oauth_url)) { ?>
+                                                <a href="<?php echo esc_url($oauth_url); ?>" class="button button-primary button-small" style="background: #2563eb; border-color: #2563eb; font-weight: 600; width: 100%; text-align: center; display: block;">
+                                                    ⚡ <?php esc_html_e('Conectar no Mercado Livre', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } ?>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+
+                                <div id="edit-form-<?php echo esc_attr($account->id); ?>" class="ts-ml-edit-account-form" style="display:none; padding: 15px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>">
+                                        <?php wp_nonce_field('ts_ml_edit_account'); ?>
+                                        <input type="hidden" name="edit_account" value="1">
+                                        <input type="hidden" name="account_id" value="<?php echo esc_attr($account->id); ?>">
+
+                                        <div style="margin-bottom: 10px;">
+                                            <label style="font-weight: 600; display: block; margin-bottom: 4px;"><?php esc_html_e('Nome', 'ts-ml-integration'); ?></label>
+                                            <input type="text" name="account_name" value="<?php echo esc_attr($account->account_name); ?>" class="regular-text" style="width: 100%;" required>
+                                        </div>
+
+                                        <div style="margin-bottom: 10px;">
+                                            <label style="font-weight: 600; display: block; margin-bottom: 4px;"><?php esc_html_e('País', 'ts-ml-integration'); ?></label>
+                                            <select name="country" style="width: 100%;">
+                                                <option value="BR" <?php selected($account->country, 'BR'); ?>>Brasil</option>
+                                                <option value="AR" <?php selected($account->country, 'AR'); ?>>Argentina</option>
+                                                <option value="MX" <?php selected($account->country, 'MX'); ?>>México</option>
+                                                <option value="CL" <?php selected($account->country, 'CL'); ?>>Chile</option>
+                                                <option value="CO" <?php selected($account->country, 'CO'); ?>>Colômbia</option>
+                                            </select>
+                                        </div>
+
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="submit" class="button button-primary button-small" value="<?php esc_attr_e('Salvar', 'ts-ml-integration'); ?>">
+                                            <button type="button" class="button button-small cancel-edit-btn" data-id="<?php echo esc_attr($account->id); ?>"><?php esc_html_e('Cancelar', 'ts-ml-integration'); ?></button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <?php
+                        }
                     }
                 }
-            }
-            ?>
+                ?>
+            </div>
+
+            <!-- Adicionar Nova Conta -->
+            <div style="margin-top: 25px; background: #ffffff; border: 2px solid #2563eb; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08); position: relative; z-index: 10;">
+                <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                    ➕ <?php esc_html_e('Adicionar Nova Conta do Mercado Livre', 'ts-ml-integration'); ?>
+                </h4>
+                <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <?php wp_nonce_field('ts_ml_add_account'); ?>
+                    <input type="hidden" name="action" value="add_account" />
+                    
+                    <div style="flex: 1; min-width: 240px;">
+                        <label for="account_name" style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 6px; color: #334155;"><?php esc_html_e('Nome da Sua Loja', 'ts-ml-integration'); ?></label>
+                        <input type="text" name="account_name" id="account_name" class="regular-text" style="width: 100%; height: 42px; font-size: 14px; padding: 0 12px; border: 1px solid #94a3b8; border-radius: 6px; background: #ffffff; color: #0f172a; box-shadow: none;" placeholder="Ex: Toy Sport Mercado Livre" required autocomplete="off" />
+                    </div>
+
+                    <div style="width: 140px;">
+                        <label for="country" style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 6px; color: #334155;"><?php esc_html_e('País', 'ts-ml-integration'); ?></label>
+                        <select name="country" id="country" style="width: 100%; height: 42px; font-size: 14px; border: 1px solid #94a3b8; border-radius: 6px; background: #ffffff; color: #0f172a;">
+                            <option value="BR">Brasil</option>
+                            <option value="AR">Argentina</option>
+                            <option value="MX">México</option>
+                            <option value="CL">Chile</option>
+                            <option value="CO">Colômbia</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" name="add_account" class="button button-primary button-large" style="background: #2563eb; border-color: #2563eb; height: 42px; line-height: 40px; padding: 0 24px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer;">
+                        ⚡ <?php esc_attr_e('Adicionar e Conectar no Mercado Livre', 'ts-ml-integration'); ?>
+                    </button>
+                </form>
+            </div>
         </div>
 
-        <h3><?php esc_html_e('➕ Adicionar Nova Conta', 'ts-ml-integration'); ?></h3>
-        <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>">
-            <?php wp_nonce_field('ts_ml_add_account'); ?>
-            <input type="hidden" name="action" value="add_account" />
-            <table class="form-table">
-                <tr>
-                    <th><label for="account_name"><?php esc_html_e('Nome da Conta', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <input type="text" name="account_name" id="account_name" class="regular-text" required
-                            value="<?php echo isset($_POST['account_name']) ? esc_attr($_POST['account_name']) : ''; ?>" />
-                        <p class="description">
-                            <?php esc_html_e('Ex: Conta Principal, Loja Online, etc.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="country"><?php esc_html_e('País', 'ts-ml-integration'); ?></label></th>
-                    <td>
-                        <select name="country" id="country">
-                            <option value="BR" <?php selected(isset($_POST['country']) ? $_POST['country'] : 'BR', 'BR'); ?>>Brasil</option>
-                            <option value="AR" <?php selected(isset($_POST['country']) ? $_POST['country'] : '', 'AR'); ?>>Argentina</option>
-                            <option value="MX" <?php selected(isset($_POST['country']) ? $_POST['country'] : '', 'MX'); ?>>México</option>
-                            <option value="CL" <?php selected(isset($_POST['country']) ? $_POST['country'] : '', 'CL'); ?>>Chile</option>
-                            <option value="CO" <?php selected(isset($_POST['country']) ? $_POST['country'] : '', 'CO'); ?>>Colômbia</option>
-                        </select>
-                    </td>
-                </tr>
-            </table>
-            <p class="submit">
-                <input type="submit" name="add_account" class="button button-primary"
-                    value="<?php esc_attr_e('Adicionar Conta', 'ts-ml-integration'); ?>" />
-            </p>
-        </form>
-        <?php endif; ?>
+        <!-- SEÇÃO 2: REGRAS DE SINCRONIZAÇÃO E QUALIDADE -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+            <div style="margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                <h2 style="margin: 0; font-size: 18px; color: #0f172a; font-weight: 700;"><?php esc_html_e('⚙️ Regras de Sincronização & Qualidade de Anúncios', 'ts-ml-integration'); ?></h2>
+                <p style="margin: 3px 0 0 0; color: #64748b; font-size: 13px;"><?php esc_html_e('Configure como seus produtos, preços e estoques são enviados para o Mercado Livre.', 'ts-ml-integration'); ?></p>
+            </div>
 
-        <hr style="margin: 40px 0;">
+            <form method="post" action="">
+                <?php wp_nonce_field('ts_ml_save_settings'); ?>
 
-        <!-- PASSO 3: Configurações Avançadas (GLOBAIS) -->
-        <h2><?php esc_html_e('⚙️ Passo 3: Configurações Avançadas', 'ts-ml-integration'); ?></h2>
-        <div class="notice notice-info">
-            <p><strong><?php esc_html_e('ℹ️ Importante:', 'ts-ml-integration'); ?></strong>
-                <?php esc_html_e('Estas configurações são GLOBAIS e se aplicam a TODAS as contas do Mercado Livre configuradas no plugin.', 'ts-ml-integration'); ?>
-            </p>
+                <table class="form-table" style="margin-top: 0;">
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Sincronização Automática', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="auto_sync" value="1" <?php checked(get_option('ts_ml_auto_sync'), 'yes'); ?> />
+                                <strong><?php esc_html_e('Ativar sincronização automática de produtos', 'ts-ml-integration'); ?></strong>
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="auto_create_on_ml" value="1" <?php checked(get_option('ts_ml_auto_create_on_ml'), 'yes'); ?> />
+                                <?php esc_html_e('Publicar no Mercado Livre automaticamente ao criar novo produto no WooCommerce', 'ts-ml-integration'); ?>
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="auto_sync_stock" value="1" <?php checked(get_option('ts_ml_auto_sync_stock'), 'yes'); ?> />
+                                <?php esc_html_e('Sincronizar estoque automaticamente', 'ts-ml-integration'); ?>
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="auto_sync_prices" value="1" <?php checked(get_option('ts_ml_auto_sync_prices'), 'yes'); ?> />
+                                <?php esc_html_e('Sincronizar preços automaticamente', 'ts-ml-integration'); ?>
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="auto_sync_orders" value="1" <?php checked(get_option('ts_ml_auto_sync_orders'), 'yes'); ?> />
+                                <?php esc_html_e('Importar pedidos do Mercado Livre automaticamente', 'ts-ml-integration'); ?>
+                            </label>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Filtros de Qualidade', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <label style="display: block; margin-bottom: 10px;">
+                                <input type="checkbox" name="sync_only_with_photos" value="1" <?php checked(get_option('ts_ml_sync_only_with_photos'), 'yes'); ?> />
+                                🖼️ <strong><?php esc_html_e('Sincronizar apenas produtos com foto', 'ts-ml-integration'); ?></strong>
+                            </label>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="sync_only_ready" value="1" <?php checked(get_option('ts_ml_sync_only_ready'), 'yes'); ?> />
+                                ✅ <strong><?php esc_html_e('Sincronizar apenas produtos 100% prontos para o Mercado Livre', 'ts-ml-integration'); ?></strong>
+                            </label>
+                            <p class="description" style="margin-top: 5px;">
+                                <?php esc_html_e('Evita o envio de produtos sem fotos, sem preço, sem estoque ou com categorias não mapeadas.', 'ts-ml-integration'); ?>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Mudanças de Status', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <label style="display: block; margin-bottom: 8px;">
+                                <input type="checkbox" name="sync_status_changes" value="1" <?php checked(get_option('ts_ml_sync_status_changes'), 'yes'); ?> />
+                                <?php esc_html_e('Pausar anúncio no ML ao alterar produto para Rascunho no WooCommerce', 'ts-ml-integration'); ?>
+                            </label>
+                            <label style="display: block;">
+                                <input type="checkbox" name="sync_deletions" value="1" <?php checked(get_option('ts_ml_sync_deletions'), 'yes'); ?> />
+                                <?php esc_html_e('Finalizar anúncio no ML ao mover produto para a Lixeira no WooCommerce', 'ts-ml-integration'); ?>
+                            </label>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Ajustes de Preço no ML', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                                <div>
+                                    <label for="price_adjustment_percent" style="font-weight: 600; display: block; font-size: 12px; margin-bottom: 4px;"><?php esc_html_e('Ajuste Percentual (%)', 'ts-ml-integration'); ?></label>
+                                    <input type="number" step="0.01" name="price_adjustment_percent" id="price_adjustment_percent" value="<?php echo esc_attr(get_option('ts_ml_price_adjustment_percent', '0')); ?>" class="small-text" />
+                                    <span class="description"><?php esc_html_e('Ex: 10 para +10%', 'ts-ml-integration'); ?></span>
+                                </div>
+                                <div>
+                                    <label for="price_adjustment_fixed" style="font-weight: 600; display: block; font-size: 12px; margin-bottom: 4px;"><?php esc_html_e('Ajuste Fixo (R$)', 'ts-ml-integration'); ?></label>
+                                    <input type="number" step="0.01" name="price_adjustment_fixed" id="price_adjustment_fixed" value="<?php echo esc_attr(get_option('ts_ml_price_adjustment_fixed', '0')); ?>" class="small-text" />
+                                    <span class="description"><?php esc_html_e('Ex: 5.00 para +R$5', 'ts-ml-integration'); ?></span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Frequência de Cron', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <select name="sync_frequency">
+                                <option value="hourly" <?php selected(get_option('ts_ml_sync_frequency'), 'hourly'); ?>><?php esc_html_e('A cada hora (Recomendado)', 'ts-ml-integration'); ?></option>
+                                <option value="twicedaily" <?php selected(get_option('ts_ml_sync_frequency'), 'twicedaily'); ?>><?php esc_html_e('Duas vezes por dia', 'ts-ml-integration'); ?></option>
+                                <option value="daily" <?php selected(get_option('ts_ml_sync_frequency'), 'daily'); ?>><?php esc_html_e('Uma vez por dia', 'ts-ml-integration'); ?></option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+
+                <h3 style="margin: 25px 0 15px 0; font-size: 16px; font-weight: 700; color: #0f172a; border-top: 1px solid #f1f5f9; padding-top: 20px;"><?php esc_html_e('🤖 Inteligência Artificial (ChatGPT / Conextbot AI)', 'ts-ml-integration'); ?></h3>
+
+                <table class="form-table" style="margin-top: 0;">
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Respostas Automáticas', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_enabled" value="1" <?php checked(get_option('ts_ml_ai_enabled'), 'yes'); ?> />
+                                <strong><?php esc_html_e('Ativar respostas automáticas com IA para perguntas do Mercado Livre', 'ts-ml-integration'); ?></strong>
+                            </label>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><label for="ai_model"><?php esc_html_e('Modelo de IA', 'ts-ml-integration'); ?></label></th>
+                        <td>
+                            <select name="ai_model" id="ai_model">
+                                <option value="gpt-3.5-turbo" <?php selected(get_option('ts_ml_ai_model', 'gpt-3.5-turbo'), 'gpt-3.5-turbo'); ?>>GPT-3.5 Turbo (Rápido)</option>
+                                <option value="gpt-4o" <?php selected(get_option('ts_ml_ai_model'), 'gpt-4o'); ?>>GPT-4o (Avançado)</option>
+                                <option value="gpt-4-turbo" <?php selected(get_option('ts_ml_ai_model'), 'gpt-4-turbo'); ?>>GPT-4 Turbo</option>
+                            </select>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><label for="ai_system_prompt"><?php esc_html_e('Prompt do Sistema', 'ts-ml-integration'); ?></label></th>
+                        <td>
+                            <textarea name="ai_system_prompt" id="ai_system_prompt" rows="4" class="large-text code"><?php echo esc_textarea(get_option('ts_ml_ai_system_prompt', sprintf('Você é um assistente virtual da loja %s. Responda de forma educada, curta e prestativa para ajudar o cliente a comprar.', esc_html(get_bloginfo('name'))))); ?></textarea>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row" style="font-weight: 600;"><?php esc_html_e('Modo Debug', 'ts-ml-integration'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="debug_mode" value="1" <?php checked(get_option('ts_ml_debug_mode'), 'yes'); ?> />
+                                <?php esc_html_e('Ativar logs detalhados de diagnóstico', 'ts-ml-integration'); ?>
+                            </label>
+                        </td>
+                    </tr>
+                </table>
+
+                <p class="submit">
+                    <input type="submit" name="save_settings" class="button button-primary button-large" style="background: #2563eb; border-color: #2563eb; font-weight: 600; padding: 4px 25px;" value="<?php esc_attr_e('Salvar Configurações', 'ts-ml-integration'); ?>" />
+                </p>
+            </form>
         </div>
-        <p><?php esc_html_e('Configure as opções de sincronização automática e outras funcionalidades do plugin.', 'ts-ml-integration'); ?>
-        </p>
 
-        <form method="post" action="">
-            <?php wp_nonce_field('ts_ml_save_settings'); ?>
+        <!-- MODO DESENVOLVEDOR AVANÇADO (SANFONA EXPANSÍVEL - PARA DEPLOY SEM SAAS) -->
+        <details style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 20px; margin-bottom: 30px;">
+            <summary style="font-weight: 600; color: #64748b; cursor: pointer; user-select: none;">
+                ⚙️ <?php esc_html_e('Modo Avançado / Desenvolvedor (Credenciais Manuais de API sem SaaS)', 'ts-ml-integration'); ?>
+            </summary>
+            
+            <div style="margin-top: 15px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
+                <p class="description" style="margin-bottom: 15px;">
+                    <?php esc_html_e('Utilize esta seção apenas se estiver executando este plugin de forma independente, sem conexão ao Conextbot SaaS.', 'ts-ml-integration'); ?>
+                </p>
 
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização Automática', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_sync" value="1" <?php checked(get_option('ts_ml_auto_sync'), 'yes'); ?> />
-                            <?php esc_html_e('Ativar sincronização automática de produtos', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Sincroniza produtos automaticamente via cron jobs.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>">
+                    <?php wp_nonce_field('ts_ml_save_api_credentials'); ?>
+                    <table class="form-table" style="margin-top: 0;">
+                        <tr>
+                            <th scope="row"><label for="app_id_br"><?php esc_html_e('App ID (Brasil)', 'ts-ml-integration'); ?></label></th>
+                            <td>
+                                <input type="text" name="app_id_br" id="app_id_br" value="<?php echo esc_attr(get_option('ts_ml_app_id_BR')); ?>" class="regular-text" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="app_secret_br"><?php esc_html_e('Secret Key (Brasil)', 'ts-ml-integration'); ?></label></th>
+                            <td>
+                                <input type="password" name="app_secret_br" id="app_secret_br" value="" class="regular-text" placeholder="Secret Key mantido oculta" />
+                            </td>
+                        </tr>
+                    </table>
 
-                <tr>
-                    <th scope="row"><?php esc_html_e('Criação Automática', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_create_on_ml" value="1" <?php checked(get_option('ts_ml_auto_create_on_ml'), 'yes'); ?> />
-                            <?php esc_html_e('Criar anúncio no ML ao criar produto no WooCommerce', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Ao publicar um novo produto no site, ele será automaticamente enviado para o Mercado Livre.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
+                    <p class="submit" style="padding: 0; margin-top: 10px;">
+                        <input type="submit" name="save_api_credentials" class="button button-secondary" value="<?php esc_attr_e('Salvar Credenciais Manuais', 'ts-ml-integration'); ?>" />
+                    </p>
+                </form>
 
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização de Estoque', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_sync_stock" value="1" <?php checked(get_option('ts_ml_auto_sync_stock'), 'yes'); ?> />
-                            <?php esc_html_e('Sincronizar estoque automaticamente', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Atualiza o estoque no Mercado Livre quando alterado no WooCommerce.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização de Preços', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_sync_prices" value="1" <?php checked(get_option('ts_ml_auto_sync_prices'), 'yes'); ?> />
-                            <?php esc_html_e('Sincronizar preços automaticamente', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Atualiza os preços no Mercado Livre quando alterados no WooCommerce.', 'ts-ml-integration'); ?>
-                        </p>
-
-                        <br>
-
-                        <label for="price_adjustment_percent">
-                            <strong><?php esc_html_e('Ajuste Percentual (%):', 'ts-ml-integration'); ?></strong>
-                        </label>
-                        <input type="number" step="0.01" name="price_adjustment_percent" id="price_adjustment_percent"
-                            value="<?php echo esc_attr(get_option('ts_ml_price_adjustment_percent', '0')); ?>"
-                            class="small-text" />
-                        <span
-                            class="description"><?php esc_html_e('Ex: 10 para aumentar 10%, -5 para descontar 5%.', 'ts-ml-integration'); ?></span>
-
-                        <br><br>
-
-                        <label for="price_adjustment_fixed">
-                            <strong><?php esc_html_e('Ajuste Fixo (R$):', 'ts-ml-integration'); ?></strong>
-                        </label>
-                        <input type="number" step="0.01" name="price_adjustment_fixed" id="price_adjustment_fixed"
-                            value="<?php echo esc_attr(get_option('ts_ml_price_adjustment_fixed', '0')); ?>"
-                            class="small-text" />
-                        <span
-                            class="description"><?php esc_html_e('Valor fixo adicionado APÓS o percentual. Ex: 5.00', 'ts-ml-integration'); ?></span>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização de Pedidos', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_sync_orders" value="1" <?php checked(get_option('ts_ml_auto_sync_orders'), 'yes'); ?> />
-                            <?php esc_html_e('Sincronizar pedidos automaticamente', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Importa pedidos do Mercado Livre automaticamente.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização de Exclusão', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="sync_deletions" value="1" <?php checked(get_option('ts_ml_sync_deletions'), 'yes'); ?> />
-                            <?php esc_html_e('Finalizar anúncio no ML ao excluir produto no WooCommerce', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Quando um produto for para a lixeira ou for excluído permanentemente, o anúncio vinculado no Mercado Livre será FINALIZADO (Closed).', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Sincronização de Visibilidade', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="sync_status_changes" value="1" <?php checked(get_option('ts_ml_sync_status_changes'), 'yes'); ?> />
-                            <?php esc_html_e('Pausar anúncio no ML ao mudar produto para Rascunho', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Quando um produto for alterado para Rascunho ou Privado, o anúncio no Mercado Livre será PAUSADO. Ao publicar novamente, ele voltará a ficar ATIVO.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Frequência de Sincronização', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <select name="sync_frequency">
-                            <option value="hourly" <?php selected(get_option('ts_ml_sync_frequency'), 'hourly'); ?>>
-                                <?php esc_html_e('A cada hora', 'ts-ml-integration'); ?>
-                            </option>
-                            <option value="twicedaily" <?php selected(get_option('ts_ml_sync_frequency'), 'twicedaily'); ?>><?php esc_html_e('Duas vezes por dia', 'ts-ml-integration'); ?></option>
-                            <option value="daily" <?php selected(get_option('ts_ml_sync_frequency'), 'daily'); ?>>
-                                <?php esc_html_e('Uma vez por dia', 'ts-ml-integration'); ?>
-                            </option>
-                        </select>
-                        <p class="description">
-                            <?php esc_html_e('Frequência das sincronizações automáticas via cron.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Integração com ChatGPT', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="ai_enabled" value="1" <?php checked(get_option('ts_ml_ai_enabled'), 'yes'); ?> />
-                            <?php esc_html_e('Ativar respostas automáticas com IA', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Use ChatGPT para gerar respostas automáticas às mensagens do Mercado Livre.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="ai_api_key"><?php esc_html_e('Chave API OpenAI', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <input type="password" name="ai_api_key" id="ai_api_key"
-                            value="<?php echo esc_attr(get_option('ts_ml_ai_api_key')); ?>" class="regular-text" />
-                        <p class="description">
-                            <?php esc_html_e('Chave API do OpenAI para usar ChatGPT. Obtenha em', 'ts-ml-integration'); ?>
-                            <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="ai_model"><?php esc_html_e('Modelo IA', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <select name="ai_model" id="ai_model">
-                            <option value="gpt-3.5-turbo" <?php selected(get_option('ts_ml_ai_model', 'gpt-3.5-turbo'), 'gpt-3.5-turbo'); ?>>GPT-3.5 Turbo (Mais rápido/barato)</option>
-                            <option value="gpt-4o" <?php selected(get_option('ts_ml_ai_model'), 'gpt-4o'); ?>>GPT-4o
-                                (Mais inteligente)</option>
-                            <option value="gpt-4-turbo" <?php selected(get_option('ts_ml_ai_model'), 'gpt-4-turbo'); ?>>
-                                GPT-4 Turbo</option>
-                        </select>
-                        <p class="description">
-                            <?php esc_html_e('Escolha o modelo de IA a ser utilizado.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label
-                            for="ai_system_prompt"><?php esc_html_e('Prompt do Sistema', 'ts-ml-integration'); ?></label>
-                    </th>
-                    <td>
-                        <textarea name="ai_system_prompt" id="ai_system_prompt" rows="5"
-                            class="large-text code"><?php echo esc_textarea(get_option('ts_ml_ai_system_prompt', sprintf('Você é um assistente virtual da loja %s. Responda de forma educada, curta e prestativa. O foco é ajudar o cliente a comprar.', esc_html(get_bloginfo('name'))))); ?></textarea>
-                        <p class="description">
-                            <?php esc_html_e('Instruções iniciais para a IA saber como se comportar.', 'ts-ml-integration'); ?>
-                        </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row"><?php esc_html_e('Modo Debug', 'ts-ml-integration'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="debug_mode" value="1" <?php checked(get_option('ts_ml_debug_mode'), 'yes'); ?> />
-                            <?php esc_html_e('Ativar modo debug', 'ts-ml-integration'); ?>
-                        </label>
-                        <p class="description">
-                            <?php esc_html_e('Ativa logs detalhados para depuração. Os logs são salvos em', 'ts-ml-integration'); ?>
-                            <code><?php echo esc_html(wp_upload_dir()['basedir'] . '/ts-ml-logs/'); ?></code>
-                        </p>
-                    </td>
-                </tr>
-            </table>
-
-            <p class="submit">
-                <input type="submit" name="save_settings" class="button button-primary"
-                    value="<?php esc_attr_e('Salvar Configurações', 'ts-ml-integration'); ?>" />
-            </p>
-        </form>
-    </div>
-</div>
+                <div style="margin-top: 20px; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <h5 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 700;"><?php esc_html_e('📋 URLs para Mercado Livre Developers (Modo Manual):', 'ts-ml-integration'); ?></h5>
+                    <p style="margin: 4px 0; font-size: 12px;"><strong>OAuth Redirect:</strong> <code><?php echo esc_html(admin_url('admin.php?page=ts-ml-settings&action=oauth_callback')); ?></code></p>
+                    <p style="margin: 4px 0; font-size: 12px;"><strong>Webhook:</strong> <code><?php echo esc_html(home_url('/wp-json/ts-ml/v1/webhook')); ?></code></p>
+                </div>
+            </div>
+        </details>
+    </div>

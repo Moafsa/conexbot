@@ -83,9 +83,125 @@ if (isset($_GET['search'])) {
     $args['s'] = sanitize_text_field($_GET['search']);
 }
 
+$filter_photo = isset($_GET['filter_photo']) ? sanitize_text_field($_GET['filter_photo']) : '';
+$filter_ready = isset($_GET['filter_ready']) ? sanitize_text_field($_GET['filter_ready']) : '';
+
+if ($filter_photo !== '' || $filter_ready !== '') {
+    global $wpdb;
+    
+    $sql = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
+    
+    if ($filter_photo === 'yes') {
+        $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
+    } elseif ($filter_photo === 'no') {
+        $sql .= " AND ID NOT IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
+    }
+    
+    if ($filter_ready === 'yes') {
+        $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
+        $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_price' AND CAST(meta_value AS DECIMAL(10,2)) > 0)";
+        $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_stock_status' AND meta_value = 'instock')";
+        $sql .= " AND (post_content != '' OR post_excerpt != '')";
+        
+        $mappings = get_option('ts_ml_category_mappings', array());
+        $mapped_wc_cat_ids = array();
+        foreach ($mappings as $wc_cat_id => $ml_cat_id) {
+            if (!empty($ml_cat_id) && $ml_cat_id !== 'MLB1000') {
+                $mapped_wc_cat_ids[] = intval($wc_cat_id);
+            }
+        }
+        
+        if (!empty($mapped_wc_cat_ids)) {
+            $mapped_cats_str = implode(',', $mapped_wc_cat_ids);
+            $sql .= " AND ID IN (
+                SELECT object_id FROM {$wpdb->term_relationships} 
+                WHERE term_taxonomy_id IN (
+                    SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} 
+                    WHERE taxonomy = 'product_cat' AND term_id IN ($mapped_cats_str)
+                )
+            )";
+        } else {
+            $sql .= " AND 1=0";
+        }
+    } elseif ($filter_ready === 'no') {
+        $mappings = get_option('ts_ml_category_mappings', array());
+        $mapped_wc_cat_ids = array();
+        foreach ($mappings as $wc_cat_id => $ml_cat_id) {
+            if (!empty($ml_cat_id) && $ml_cat_id !== 'MLB1000') {
+                $mapped_wc_cat_ids[] = intval($wc_cat_id);
+            }
+        }
+        
+        $ready_subquery = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
+        $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
+        $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_price' AND CAST(meta_value AS DECIMAL(10,2)) > 0)";
+        $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_stock_status' AND meta_value = 'instock')";
+        $ready_subquery .= " AND (post_content != '' OR post_excerpt != '')";
+        
+        if (!empty($mapped_wc_cat_ids)) {
+            $mapped_cats_str = implode(',', $mapped_wc_cat_ids);
+            $ready_subquery .= " AND ID IN (
+                SELECT object_id FROM {$wpdb->term_relationships} 
+                WHERE term_taxonomy_id IN (
+                    SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} 
+                    WHERE taxonomy = 'product_cat' AND term_id IN ($mapped_cats_str)
+                )
+            )";
+        } else {
+            $ready_subquery .= " AND 1=0";
+        }
+        
+        $sql .= " AND ID NOT IN ($ready_subquery)";
+    }
+    
+    $filtered_ids = $wpdb->get_col($sql);
+    if (!empty($filtered_ids)) {
+        $args['post__in'] = $filtered_ids;
+    } else {
+        $args['post__in'] = array(0);
+    }
+}
+
 $products_query = new WP_Query($args);
 $table_products = $wpdb->prefix . 'ts_ml_products';
 ?>
+
+<style>
+.ts-ml-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+}
+.ts-ml-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ts-ml-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 20px;
+}
+.ts-ml-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px; width: 14px;
+  left: 3px; bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+input:checked + .ts-ml-slider {
+  background-color: #10b981;
+}
+input:checked + .ts-ml-slider:before {
+  transform: translateX(18px);
+}
+</style>
 
 <div class="wrap">
     <h1><?php esc_html_e('Produtos - Mercado Livre', 'ts-ml-integration'); ?></h1>
@@ -140,13 +256,26 @@ $table_products = $wpdb->prefix . 'ts_ml_products';
             </div>
             
             <!-- Search Form -->
-            <form method="get" action="" style="margin: 20px 0;">
+            <form method="get" action="" style="margin: 20px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <input type="hidden" name="page" value="ts-ml-products" />
                 <input type="hidden" name="account_id" value="<?php echo esc_attr($selected_account); ?>" />
                 <input type="search" name="search" value="<?php echo isset($_GET['search']) ? esc_attr($_GET['search']) : ''; ?>" placeholder="<?php esc_attr_e('Buscar produtos...', 'ts-ml-integration'); ?>" />
-                <input type="submit" class="button" value="<?php esc_attr_e('Buscar', 'ts-ml-integration'); ?>" />
-                <?php if (isset($_GET['search'])) { ?>
-                    <a href="?page=ts-ml-products&account_id=<?php echo esc_attr($selected_account); ?>" class="button"><?php esc_html_e('Limpar', 'ts-ml-integration'); ?></a>
+                
+                <select name="filter_photo">
+                    <option value=""><?php esc_html_e('Todas as fotos', 'ts-ml-integration'); ?></option>
+                    <option value="yes" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'yes'); ?>><?php esc_html_e('Com foto', 'ts-ml-integration'); ?></option>
+                    <option value="no" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'no'); ?>><?php esc_html_e('Sem foto', 'ts-ml-integration'); ?></option>
+                </select>
+
+                <select name="filter_ready">
+                    <option value=""><?php esc_html_e('Todos os status de prontidão', 'ts-ml-integration'); ?></option>
+                    <option value="yes" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'yes'); ?>><?php esc_html_e('100% Prontos para ML', 'ts-ml-integration'); ?></option>
+                    <option value="no" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'no'); ?>><?php esc_html_e('Incompletos para ML', 'ts-ml-integration'); ?></option>
+                </select>
+
+                <input type="submit" class="button" value="<?php esc_attr_e('Filtrar', 'ts-ml-integration'); ?>" />
+                <?php if (isset($_GET['search']) || !empty($_GET['filter_photo']) || !empty($_GET['filter_ready'])) { ?>
+                    <a href="?page=ts-ml-products&account_id=<?php echo esc_attr($selected_account); ?>" class="button"><?php esc_html_e('Limpar Filtros', 'ts-ml-integration'); ?></a>
                 <?php } ?>
             </form>
             
@@ -176,6 +305,7 @@ $table_products = $wpdb->prefix . 'ts_ml_products';
                             <th><?php esc_html_e('Preço', 'ts-ml-integration'); ?></th>
                             <th><?php esc_html_e('Estoque', 'ts-ml-integration'); ?></th>
                             <th><?php esc_html_e('Status ML', 'ts-ml-integration'); ?></th>
+                            <th><?php esc_html_e('Sincronização Ativa', 'ts-ml-integration'); ?></th>
                             <th><?php esc_html_e('Última Sincronização', 'ts-ml-integration'); ?></th>
                             <th><?php esc_html_e('Ações', 'ts-ml-integration'); ?></th>
                         </tr>
@@ -244,6 +374,18 @@ $table_products = $wpdb->prefix . 'ts_ml_products';
                                     </td>
                                     <td>
                                         <?php 
+                                        $sync_enabled = get_post_meta(get_the_ID(), '_ts_ml_sync_enabled', true);
+                                        if (empty($sync_enabled)) {
+                                            $sync_enabled = 'yes';
+                                        }
+                                        ?>
+                                        <label class="ts-ml-switch" title="<?php esc_attr_e('Ativar/desativar sincronização deste produto', 'ts-ml-integration'); ?>">
+                                            <input type="checkbox" class="ts-ml-sync-toggle" data-id="<?php echo esc_attr(get_the_ID()); ?>" <?php checked($sync_enabled, 'yes'); ?>>
+                                            <span class="ts-ml-slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <?php 
                                         if ($sync_data && $sync_data->last_sync_at) {
                                             echo esc_html(human_time_diff(strtotime($sync_data->last_sync_at), current_time('timestamp'))) . ' ' . esc_html__('atrás', 'ts-ml-integration');
                                         } else {
@@ -264,7 +406,7 @@ $table_products = $wpdb->prefix . 'ts_ml_products';
                             <?php } ?>
                         <?php } else { ?>
                             <tr>
-                                <td colspan="7"><?php esc_html_e('Nenhum produto encontrado.', 'ts-ml-integration'); ?></td>
+                                <td colspan="8"><?php esc_html_e('Nenhum produto encontrado.', 'ts-ml-integration'); ?></td>
                             </tr>
                         <?php } ?>
                     </tbody>
@@ -296,6 +438,37 @@ $table_products = $wpdb->prefix . 'ts_ml_products';
 jQuery(document).ready(function($) {
     $('#cb-select-all').on('change', function() {
         $('input[name="product_ids[]"]').prop('checked', this.checked);
+    });
+
+    $('.ts-ml-sync-toggle').on('change', function() {
+        const checkbox = $(this);
+        const productId = checkbox.data('id');
+        const enabled = checkbox.is(':checked') ? 'yes' : 'no';
+        
+        checkbox.prop('disabled', true);
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'ts_ml_toggle_product_sync',
+                product_id: productId,
+                enabled: enabled,
+                nonce: '<?php echo wp_create_nonce("ts_ml_products_nonce"); ?>'
+            },
+            success: function(response) {
+                checkbox.prop('disabled', false);
+                if (!response.success) {
+                    alert(response.data || 'Erro ao alterar o status de sincronização.');
+                    checkbox.prop('checked', !checkbox.is(':checked'));
+                }
+            },
+            error: function() {
+                checkbox.prop('disabled', false);
+                alert('Erro de conexão ao alterar o status.');
+                checkbox.prop('checked', !checkbox.is(':checked'));
+            }
+        });
     });
 });
 </script>

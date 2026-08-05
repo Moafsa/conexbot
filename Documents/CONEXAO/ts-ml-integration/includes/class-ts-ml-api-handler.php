@@ -115,12 +115,20 @@ class TS_ML_API_Handler
      * @param string $country Country code
      * @return string|WP_Error
      */
+    /**
+     * Get OAuth authorization URL
+     *
+     * @param int $account_id Account ID
+     * @param string $country Country code
+     * @return string|WP_Error
+     */
     public function get_oauth_url($account_id, $country = 'BR')
     {
         $app_id = get_option('ts_ml_app_id_' . $country);
 
+        // Fallback to Master App ID if not explicitly set
         if (empty($app_id)) {
-            return new WP_Error('no_app_id', __('App ID não configurado para este país. Configure as credenciais da API primeiro.', 'ts-ml-integration'));
+            $app_id = '2383288292680789';
         }
 
         // Use a clean redirect URI - ML is very strict, it must match EXACTLY
@@ -153,14 +161,44 @@ class TS_ML_API_Handler
     public function exchange_code_for_token($code, $account_id, $country = 'BR')
     {
         $app_id = get_option('ts_ml_app_id_' . $country);
+        if (empty($app_id)) {
+            $app_id = '2383288292680789';
+        }
+
         $app_secret = get_option('ts_ml_app_secret_' . $country);
+        $use_saas = get_option('ts_ml_use_saas') === 'yes';
+        $saas_url = get_option('ts_ml_saas_url');
 
         // Use clean redirect URI (must match the one used in authorization)
         $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
-
-        // Force HTTPS if not localhost
         $redirect_uri = $this->force_https_if_needed($redirect_uri);
 
+        // If using SaaS mode and local app_secret is not set, exchange token via SaaS proxy
+        if ($use_saas && empty($app_secret) && !empty($saas_url)) {
+            $url = rtrim($saas_url, '/') . '/api/v1/ml/exchange';
+            $response = wp_remote_post($url, array(
+                'headers' => array('Content-Type' => 'application/json'),
+                'body' => json_encode(array(
+                    'code' => $code,
+                    'redirect_uri' => $redirect_uri,
+                    'country' => $country,
+                    'bot_id' => get_option('ts_ml_bot_id')
+                )),
+                'timeout' => 30,
+            ));
+
+            if (!is_wp_error($response)) {
+                $status_code = wp_remote_retrieve_response_code($response);
+                $body = wp_remote_retrieve_body($response);
+                $data = json_decode($body, true);
+
+                if ($status_code < 400 && !isset($data['error']) && isset($data['access_token'])) {
+                    return $data;
+                }
+            }
+        }
+
+        // Direct exchange with Mercado Livre API
         $url = $this->api_base_url . '/oauth/token';
 
         $data = array(
@@ -492,19 +530,26 @@ class TS_ML_API_Handler
      * @param int $account_id Account ID
      * @return string|WP_Error
      */
-    public function get_valid_token($account_id)
+    public function get_valid_token($account_id = 0)
     {
-
         global $wpdb;
         $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
 
-        $account = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table_accounts WHERE id = %d",
-            $account_id
-        ));
+        if (empty($account_id)) {
+            $account = $wpdb->get_row("SELECT * FROM $table_accounts ORDER BY id ASC LIMIT 1");
+        } else {
+            $account = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $table_accounts WHERE id = %d",
+                $account_id
+            ));
+        }
 
         if (!$account) {
-            return new WP_Error('account_not_found', __('Conta não encontrada.', 'ts-ml-integration'));
+            return new WP_Error('account_not_found', __('Nenhuma conta encontrada.', 'ts-ml-integration'));
+        }
+
+        if (empty($account->access_token)) {
+            return new WP_Error('no_access_token', __('Conta sem token configurado.', 'ts-ml-integration'));
         }
 
         // Check if token is expired
@@ -528,7 +573,7 @@ class TS_ML_API_Handler
                     'token_expires_at' => $expires_at,
                     'updated_at' => current_time('mysql'),
                 ),
-                array('id' => $account_id),
+                array('id' => $account->id),
                 array('%s', '%s', '%s', '%s'),
                 array('%d')
             );

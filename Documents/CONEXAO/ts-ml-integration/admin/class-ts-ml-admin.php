@@ -53,9 +53,10 @@ class TS_ML_Admin
         add_action('admin_init', array($this, 'handle_saas_callback'));
         add_action('admin_notices', array($this, 'display_saas_admin_notices'));
 
-        // AJAX Handlers for Import
+        // AJAX Handlers for Import & Toggle
         add_action('wp_ajax_ts_ml_fetch_items', array($this, 'ajax_fetch_items'));
         add_action('wp_ajax_ts_ml_import_single_item', array($this, 'ajax_import_single_item'));
+        add_action('wp_ajax_ts_ml_toggle_product_sync', array($this, 'ajax_toggle_product_sync'));
     }
 
     /**
@@ -534,4 +535,28 @@ class TS_ML_Admin
             <?php
         }
     }
+
+    /**
+     * AJAX Toggle Product Sync Status
+     */
+    public function ajax_toggle_product_sync()
+    {
+        check_ajax_referer('ts_ml_products_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Permissão negada.', 'ts-ml-integration'));
+        }
+
+        $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
+        $enabled = isset($_POST['enabled']) && $_POST['enabled'] === 'yes' ? 'yes' : 'no';
+
+        if (!$product_id) {
+            wp_send_json_error(__('ID de produto inválido.', 'ts-ml-integration'));
+        }
+
+        update_post_meta($product_id, '_ts_ml_sync_enabled', $enabled);
+
+        wp_send_json_success(array('enabled' => $enabled));
+    }
 }
+

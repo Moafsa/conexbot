@@ -3,7 +3,7 @@
 Plugin Name: Conext Writer
 Plugin URI: https://app.conext.click
 Description: Multi-Agent AI Writer with OpenAI and Gemini fallbacks for automated content generation and SEO optimization.
-Version: 1.0.119
+Version: 1.0.120
 Author: Conext
 Text Domain: conext-writer
 */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define Plugin Constants
-define('CONEXT_WRITER_VERSION', '1.0.119');
+define('CONEXT_WRITER_VERSION', '1.0.120');
 define('CONEXT_WRITER_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CONEXT_WRITER_PLUGIN_URL', plugin_dir_url(__FILE__));
 

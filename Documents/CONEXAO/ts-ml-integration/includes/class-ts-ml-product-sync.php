@@ -163,6 +163,35 @@ class TS_ML_Product_Sync
             );
         }
 
+        // 1. Check if sync is disabled individually for this product
+        $sync_enabled = get_post_meta($product_id, '_ts_ml_sync_enabled', true);
+        if ($sync_enabled === 'no') {
+            TS_ML_Logger::info('Sincronização ignorada: desativada para este produto nas configurações individuais', array('product_id' => $product_id));
+            $this->update_sync_status($product_id, $account_id, 'error', __('Sincronização desativada individualmente.', 'ts-ml-integration'));
+            return false;
+        }
+
+        // Only enforce quality/niche checks when exporting to ML
+        if ($direction === 'woo_to_ml' || $direction === 'bidirectional') {
+            // 2. Check if product has photo (if option enabled)
+            if (get_option('ts_ml_sync_only_with_photos') === 'yes') {
+                if (!$this->has_photo($product)) {
+                    TS_ML_Logger::info('Sincronização ignorada: produto sem foto', array('product_id' => $product_id));
+                    $this->update_sync_status($product_id, $account_id, 'error', __('Sincronização ignorada: produto sem foto.', 'ts-ml-integration'));
+                    return false;
+                }
+            }
+
+            // 3. Check if product is 100% ready (if option enabled)
+            if (get_option('ts_ml_sync_only_ready') === 'yes') {
+                if (!$this->is_product_ready($product)) {
+                    TS_ML_Logger::info('Sincronização ignorada: produto não está 100% pronto para o ML', array('product_id' => $product_id));
+                    $this->update_sync_status($product_id, $account_id, 'error', __('Sincronização ignorada: produto incompleto/não mapeado para o ML.', 'ts-ml-integration'));
+                    return false;
+                }
+            }
+        }
+
         if ($direction === 'woo_to_ml' || $direction === 'bidirectional') {
             return $this->export_product_to_ml($product, $account_id);
         }
@@ -1260,4 +1289,77 @@ class TS_ML_Product_Sync
 
         return $this->update_product_status($product_id, $account_id, $ml_status);
     }
+
+    /**
+     * Check if product has a photo
+     *
+     * @param WC_Product $product
+     * @return bool
+     */
+    public function has_photo($product)
+    {
+        return !empty($product->get_image_id());
+    }
+
+    /**
+     * Check if a product is 100% ready for Mercado Livre
+     *
+     * @param WC_Product $product
+     * @return bool
+     */
+    public function is_product_ready($product)
+    {
+        if (!$product) {
+            return false;
+        }
+
+        // 1. Has name/title
+        if (empty($product->get_name())) {
+            return false;
+        }
+
+        // 2. Has price > 0
+        if (floatval($product->get_price()) <= 0) {
+            return false;
+        }
+
+        // 3. Has stock (in stock, and if managing stock, quantity > 0)
+        if (!$product->is_in_stock()) {
+            return false;
+        }
+        if ($product->managing_stock() && $product->get_stock_quantity() <= 0) {
+            return false;
+        }
+
+        // 4. Has description (content or short description)
+        $description = $product->get_description() ?: $product->get_short_description();
+        if (empty(trim(wp_strip_all_tags($description)))) {
+            return false;
+        }
+
+        // 5. Has at least one image
+        if (!$this->has_photo($product)) {
+            return false;
+        }
+
+        // 6. Has mapped category
+        $categories = $product->get_category_ids();
+        if (empty($categories)) {
+            return false;
+        }
+        $mappings = get_option('ts_ml_category_mappings', array());
+        $has_mapped_cat = false;
+        foreach ($categories as $cat_id) {
+            if (isset($mappings[$cat_id]) && !empty($mappings[$cat_id]) && $mappings[$cat_id] !== 'MLB1000') {
+                $has_mapped_cat = true;
+                break;
+            }
+        }
+        if (!$has_mapped_cat) {
+            return false;
+        }
+
+        return true;
+    }
 }
+
