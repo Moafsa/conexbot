@@ -11,7 +11,7 @@ export class CartService {
             include: { items: { include: { addons: true, product: true } } },
         });
 
-        if (cart && (Date.now() - new Date(cart.updatedAt).getTime() > 30 * 60 * 1000)) {
+        if (cart && (Date.now() - new Date(cart.updatedAt).getTime() > 4 * 60 * 60 * 1000)) { // 4h TTL
             await prisma.cart.update({
                 where: { id: cart.id },
                 data: { status: 'ABANDONED' }

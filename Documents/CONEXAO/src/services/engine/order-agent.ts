@@ -57,6 +57,21 @@ async function clearMultiPlan(botId: string, phone: string): Promise<void> {
     await getRedis().del(MULTI_PLAN_KEY(botId, phone)).catch(() => {});
 }
 
+// ── Awaiting Quantity State (tracks when bot asked "quantos botíjões?") ──────────
+const AWAITING_QTY_KEY = (botId: string, phone: string) => `awaiting_qty:${botId}:${phone}`;
+
+async function setAwaitingQty(botId: string, phone: string, productId: string): Promise<void> {
+    await getRedis().setex(AWAITING_QTY_KEY(botId, phone), 600, productId); // 10min TTL
+}
+
+async function getAwaitingQty(botId: string, phone: string): Promise<string | null> {
+    return getRedis().get(AWAITING_QTY_KEY(botId, phone)).catch(() => null);
+}
+
+async function clearAwaitingQty(botId: string, phone: string): Promise<void> {
+    await getRedis().del(AWAITING_QTY_KEY(botId, phone)).catch(() => {});
+}
+
 // ─── Tool Definitions ─────────────────────────────────────────────────────────
 
 const ORDER_AGENT_TOOLS = [
@@ -178,6 +193,7 @@ export interface OrderAgentContext {
         totalAmount: number;
         items: Array<{ productId: string; quantity: number; unitPrice: number }>;
     }) => Promise<{ orderId: string; orderNumber?: string }>;
+    history?: Array<{ role: string; content: string; tool_calls?: any; tool_call_id?: string }>;
 }
 
 export interface OrderAgentResult {
@@ -424,6 +440,75 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         }
     }
 
+    // ── REDIS STATE: Check if bot was waiting for a quantity answer ──────────────
+    // When the previous turn asked "Quantos botijões você precisa?", a Redis key
+    // was set. Any number in the next message = the quantity. 100% deterministic.
+    if (cartIsEmpty && !multiPlan && !isNewMultiDelivery) {
+        const awaitingProductId = await getAwaitingQty(ctx.botId, ctx.contactPhone);
+        const numMatch = ctx.userMessage.match(/(\d+|um|uma|dois|duas|tr[eê]s|tres|quatro|cinco|seis|sete|oito|nove|dez)/i);
+
+        if (awaitingProductId && numMatch) {
+            const rawQty = numMatch[1].toLowerCase();
+            const detectedQty = NUM_WORDS[rawQty] ?? parseInt(rawQty, 10);
+            const defProduct = ctx.catalog.find(p => p.id === awaitingProductId && p.active)
+                || ctx.catalog.find(p => p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') || p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas')))
+                || ctx.catalog.find(p => p.active);
+
+            if (defProduct && detectedQty > 0 && detectedQty <= 100) {
+                await clearAwaitingQty(ctx.botId, ctx.contactPhone);
+                await CartService.addItem(ctx.botId, ctx.contactPhone, defProduct.id, detectedQty);
+                const updatedCart = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
+                return {
+                    reply: `✅ Anotado! *${detectedQty}x ${defProduct.name}* adicionado.\n\nPara qual endereço vou entregar? 📍`,
+                    orderConfirmed: false,
+                    cartSummary: updatedCart
+                };
+            }
+        }
+
+        // Belt-and-suspenders: if message is ONLY a number (strips invisible chars too)
+        const numOnlyMatch = ctx.userMessage
+            .replace(/[\u200b\u200c\u200d\ufeff\r\n\t]/g, '')
+            .trim()
+            .match(/^(\d+|um|uma|dois|duas|tr[eê]s|tres|quatro|cinco|seis|sete|oito|nove|dez)$/i);
+        if (numOnlyMatch) {
+            const rawQty = numOnlyMatch[1].toLowerCase();
+            const detectedQty = NUM_WORDS[rawQty] ?? parseInt(rawQty, 10);
+            const defProduct = ctx.catalog.find(p =>
+                p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') ||
+                p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas'))
+            ) || ctx.catalog.find(p => p.active);
+
+            if (defProduct && detectedQty > 0 && detectedQty <= 100) {
+                await clearAwaitingQty(ctx.botId, ctx.contactPhone);
+                await CartService.addItem(ctx.botId, ctx.contactPhone, defProduct.id, detectedQty);
+                const updatedCart = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
+                return {
+                    reply: `✅ Anotado! *${detectedQty}x ${defProduct.name}* adicionado.\n\nPara qual endereço vou entregar? 📍`,
+                    orderConfirmed: false,
+                    cartSummary: updatedCart
+                };
+            }
+        }
+    }
+
+    // ── REDIS STATE: Set awaiting quantity state if product is mentioned without quantity 
+    if (cartIsEmpty && !multiPlan && !isNewMultiDelivery) {
+        const productMentioned = /\b(g[aá]s|bot[il][aã]o?|botij[oõ][aã]o?s?|p\s*13|kg)\b/i.test(ctx.userMessage);
+        const numberInMsg = ctx.userMessage.match(/(\d+|um|uma|dois|duas|tr[eê]s|tres|quatro|cinco|seis|sete|oito|nove|dez)/i);
+        
+        if (productMentioned && !numberInMsg) {
+            const defProduct = ctx.catalog.find(p =>
+                p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') ||
+                p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas'))
+            ) || ctx.catalog.find(p => p.active) || ctx.catalog[0];
+
+            if (defProduct) {
+                await setAwaitingQty(ctx.botId, ctx.contactPhone, defProduct.id);
+            }
+        }
+    }
+
     // ── Handle Address Update for Pending Multi-Delivery Entry ────────────────
     // If there's a multi-plan with pending address AND the user's message looks like a street
     if (multiPlan) {
@@ -487,111 +572,93 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         ? `\nBAIRROS ATENDIDOS: ${coveredNeighborhoodsList.join(', ')}`
         : '';
 
-    // ── Multi-Delivery Context Block ──────────────────────────────────────────
-    let multiDeliveryBlock = '';
-    if (multiPlan) {
-        const unitPrice = Number(
-            ctx.catalog.find(p => p.id === multiPlan!.productId)?.salePrice ??
-            ctx.catalog.find(p => p.id === multiPlan!.productId)?.price ?? 139
-        );
-        const totalVal = multiPlan.totalQty * unitPrice;
+    // ── Function to build the system prompt dynamically ──────────────────────
+    const buildSystemPrompt = async () => {
+        const currentCart = await CartService.getCartSummary(ctx.botId, ctx.contactPhone);
+        const currentCartIsEmpty = !currentCart.hasItems;
+        const currentMultiPlan = await loadMultiPlan(ctx.botId, ctx.contactPhone);
 
-        const lines = multiPlan.deliveries.map(d => {
-            const sub = (d.qty * unitPrice).toFixed(2);
-            if (d.needsAddress || !d.address) {
-                return `  - ${d.qty}x P13 → ${d.label} ❌ aguardando rua e número`;
-            }
-            return `  - ${d.qty}x P13 → ${d.address} ✅ (R$ ${sub})`;
-        });
+        // ── Multi-Delivery Context Block ──────────────────────────────────────────
+        let multiDeliveryBlock = '';
+        if (currentMultiPlan) {
+            const unitPrice = Number(
+                ctx.catalog.find(p => p.id === currentMultiPlan!.productId)?.salePrice ??
+                ctx.catalog.find(p => p.id === currentMultiPlan!.productId)?.price ?? 139
+            );
+            const totalVal = currentMultiPlan.totalQty * unitPrice;
 
-        const hasPending = multiPlan.deliveries.some(d => d.needsAddress || !d.address);
-        const allReady = !hasPending;
+            const lines = currentMultiPlan.deliveries.map(d => {
+                const sub = (d.qty * unitPrice).toFixed(2);
+                if (d.needsAddress || !d.address) {
+                    return `  - ${d.qty}x P13 → ${d.label} ❌ aguardando rua e número`;
+                }
+                return `  - ${d.qty}x P13 → ${d.address} ✅ (R$ ${sub})`;
+            });
 
-        multiDeliveryBlock = `\nPLANO DE MULTI-ENTREGA ATIVO:
+            const hasPending = currentMultiPlan.deliveries.some(d => d.needsAddress || !d.address);
+
+            multiDeliveryBlock = `\nPLANO DE MULTI-ENTREGA ATIVO:
 ${lines.join('\n')}
 Total geral: R$ ${totalVal.toFixed(2)}
 ${hasPending
     ? `AGUARDANDO: Solicite a rua e número para as entregas marcadas com ❌.`
-    : cartSummary.paymentMethod
-        ? `PRONTO: Todos os endereços confirmados e pagamento definido (${cartSummary.paymentMethod}). Aguardando confirmação do cliente.`
+    : currentCart.paymentMethod
+        ? `PRONTO: Todos os endereços confirmados e pagamento definido (${currentCart.paymentMethod}). Aguardando confirmação do cliente.`
         : `AGUARDANDO: Todos os endereços confirmados. Pergunte a forma de pagamento (dinheiro, Pix ou cartão).`
 }`;
-    }
+        }
 
-    // ── Single Address Neighborhood Hint ─────────────────────────────────────
-    // Only when cart has items but no address yet (not multi-delivery)
-    let singleAddrHint = '';
-    if (!multiPlan && !cartIsEmpty && !cartSummary.deliveryAddress) {
-        const cleanMsg = userMsgLower.replace(/^(no|na|em|o|a|para|pra)\s+/i, '').trim();
-        if (cleanMsg.length >= 3 && !/\b(dinheiro|pix|cartao|cartão)\b/i.test(cleanMsg)) {
-            const foundSaved = findSavedAddress(cleanMsg, ctx.savedAddresses);
-            if (foundSaved) {
-                singleAddrHint = `\nENDEREÇO IDENTIFICADO: O cliente mencionou "${cleanMsg}", que corresponde ao endereço salvo: "${foundSaved.address}". Chame definir_endereco com rua_numero="${foundSaved.address}" imediatamente, sem pedir confirmação.`;
-            } else if (coveredNeighborhoodsList.length > 0) {
-                const isCovered = coveredNeighborhoodsList.some(n => fuzzyMatch(cleanMsg, n));
-                if (isCovered) {
-                    singleAddrHint = `\nBAIRRO ATENDIDO: "${cleanMsg}" é um bairro coberto. Pergunte a rua e o número nesse bairro.`;
-                } else if (cleanMsg.length >= 4 && !/\d/.test(cleanMsg)) {
-                    singleAddrHint = `\nBAIRRO FORA DA COBERTURA: "${cleanMsg}" não está na lista de bairros atendidos. Informe o cliente educadamente.`;
+        // ── Single Address Neighborhood Hint ─────────────────────────────────────
+        let singleAddrHint = '';
+        if (!currentMultiPlan && !currentCartIsEmpty && !currentCart.deliveryAddress) {
+            const cleanMsg = userMsgLower.replace(/^(no|na|em|o|a|para|pra)\s+/i, '').trim();
+            if (cleanMsg.length >= 3 && !/\b(dinheiro|pix|cartao|cartão)\b/i.test(cleanMsg)) {
+                const foundSaved = findSavedAddress(cleanMsg, ctx.savedAddresses);
+                if (foundSaved) {
+                    singleAddrHint = `\nENDEREÇO IDENTIFICADO: O cliente mencionou "${cleanMsg}", que corresponde ao endereço salvo: "${foundSaved.address}". Chame definir_endereco com rua_numero="${foundSaved.address}" imediatamente, sem pedir confirmação.`;
+                } else if (coveredNeighborhoodsList.length > 0) {
+                    const isCovered = coveredNeighborhoodsList.some(n => fuzzyMatch(cleanMsg, n));
+                    if (isCovered) {
+                        singleAddrHint = `\nBAIRRO ATENDIDO: "${cleanMsg}" é um bairro coberto. Pergunte a rua e o número nesse bairro.`;
+                    } else if (cleanMsg.length >= 4 && !/\d/.test(cleanMsg)) {
+                        singleAddrHint = `\nBAIRRO FORA DA COBERTURA: "${cleanMsg}" não está na lista de bairros atendidos. Informe o cliente educadamente.`;
+                    }
                 }
             }
         }
-    }
 
-    // ── Determine Current State + Next Step ───────────────────────────────────
-    let stateDesc: string;
-    let nextStep: string;
+        // ── Determine Current State + Next Step ───────────────────────────────────
+        let stateDesc: string;
+        let nextStep: string;
 
-    if (multiPlan) {
-        const hasPending = multiPlan.deliveries.some(d => d.needsAddress || !d.address);
-        if (hasPending) {
-            const pending = multiPlan.deliveries.find(d => d.needsAddress || !d.address);
-            stateDesc = `Multi-entrega em andamento. Aguardando endereço para: "${pending?.label}".`;
-            nextStep = `Pergunte a rua e o número para "${pending?.label}". Não continue sem isso.`;
-        } else if (!cartSummary.paymentMethod) {
-            stateDesc = `Multi-entrega com todos os endereços confirmados. Aguardando forma de pagamento.`;
-            nextStep = `Pergunte a forma de pagamento (dinheiro, Pix ou cartão).`;
-        } else {
-            stateDesc = `Multi-entrega completa: endereços e pagamento confirmados.`;
-            nextStep = `Apresente o resumo completo (ver PLANO DE MULTI-ENTREGA) e pergunte se o cliente confirma.`;
-        }
-    } else if (cartIsEmpty) {
-        stateDesc = `Carrinho vazio. Aguardando pedido.`;
-
-        // ── Deterministic detection: NUMBER + PRODUCT in message ──────────
-        // Catches: "6 gas", "pedi 6 gas", "quero 3 botíjões", "preciso de 4 p13"
-        // Does NOT catch: "gas" alone, "botíjão" alone (those trigger ask-for-qty)
-        const productMentioned = /\b(g[aá]s|bot[il][aã]o?|botij[oõ][aã]o?s?|p\s*13|kg)\b/i.test(ctx.userMessage);
-        const numberInMsg = ctx.userMessage.match(/(\d+|um|uma|dois|duas|tr[eê]s|tres|quatro|cinco|seis|sete|oito|nove|dez)/i);
-
-        let cartQtyHint = '';
-        if (productMentioned && numberInMsg) {
-            const rawQty = numberInMsg[1].toLowerCase();
-            const detectedQty = NUM_WORDS[rawQty] ?? parseInt(rawQty, 10);
-            const defProduct = ctx.catalog.find(p =>
-                p.active && (p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13') ||
-                p.name.toLowerCase().includes('gás') || p.name.toLowerCase().includes('gas'))
-            ) || ctx.catalog.find(p => p.active);
-
-            if (defProduct && detectedQty > 0 && detectedQty <= 100) {
-                cartQtyHint = `\n\nPEDIDO DETECTADO PELO SISTEMA: O cliente quer ${detectedQty}x ${defProduct.name} (ID: ${defProduct.id}). Chame adicionar_item com produto_id="${defProduct.id}" e quantidade=${detectedQty} imediatamente. Não pergunte a quantidade de novo.`;
+        if (currentMultiPlan) {
+            const hasPending = currentMultiPlan.deliveries.some(d => d.needsAddress || !d.address);
+            if (hasPending) {
+                const pending = currentMultiPlan.deliveries.find(d => d.needsAddress || !d.address);
+                stateDesc = `Multi-entrega em andamento. Aguardando endereço para: "${pending?.label}".`;
+                nextStep = `Pergunte a rua e o número para "${pending?.label}". Não continue sem isso.`;
+            } else if (!currentCart.paymentMethod) {
+                stateDesc = `Multi-entrega com todos os endereços confirmados. Aguardando forma de pagamento.`;
+                nextStep = `Pergunte a forma de pagamento (dinheiro, Pix ou cartão).`;
+            } else {
+                stateDesc = `Multi-entrega completa: endereços e pagamento confirmados.`;
+                nextStep = `Apresente o resumo completo (ver PLANO DE MULTI-ENTREGA) e pergunte se o cliente confirma.`;
             }
+        } else if (currentCartIsEmpty) {
+            stateDesc = `Carrinho vazio. Aguardando pedido do cliente.`;
+            nextStep = `Se o cliente mencionar apenas o produto SEM quantidade (ex: "gas", "botijão", "p13" isolados), pergunte "Quantos botijões você precisa?" antes de adicionar ao carrinho. Se a mensagem contém número + produto, adicione ao carrinho imediatamente.`;
+        } else if (!currentCart.deliveryAddress) {
+            stateDesc = `Carrinho com itens. Aguardando endereço de entrega.`;
+            nextStep = `Pergunte para qual endereço será a entrega. Se o cliente mencionar um bairro com endereço salvo, use o endereço salvo diretamente sem pedir rua e número.${singleAddrHint}`;
+        } else if (!currentCart.paymentMethod) {
+            stateDesc = `Carrinho com itens e endereço confirmado. Aguardando forma de pagamento.`;
+            nextStep = `Pergunte a forma de pagamento: dinheiro, Pix ou cartão.`;
+        } else {
+            stateDesc = `Carrinho completo: itens, endereço e pagamento definidos.`;
+            nextStep = `Apresente o resumo do pedido e pergunte se o cliente confirma ("sim" ou "pode").`;
         }
 
-        nextStep = `Se o cliente mencionar apenas o produto SEM quantidade (ex: "gas", "botijão", "p13" isolados), pergunte "Quantos botijões você precisa?" antes de adicionar ao carrinho. Se a mensagem contém número + produto, adicione ao carrinho imediatamente.${cartQtyHint}`;
-    } else if (!cartSummary.deliveryAddress) {
-        stateDesc = `Carrinho com itens. Aguardando endereço de entrega.`;
-        nextStep = `Pergunte para qual endereço será a entrega. Se o cliente mencionar um bairro com endereço salvo, use o endereço salvo diretamente sem pedir rua e número.${singleAddrHint}`;
-    } else if (!cartSummary.paymentMethod) {
-        stateDesc = `Carrinho com itens e endereço confirmado. Aguardando forma de pagamento.`;
-        nextStep = `Pergunte a forma de pagamento: dinheiro, Pix ou cartão.`;
-    } else {
-        stateDesc = `Carrinho completo: itens, endereço e pagamento definidos.`;
-        nextStep = `Apresente o resumo do pedido e pergunte se o cliente confirma ("sim" ou "pode").`;
-    }
-
-    // ── System Prompt ─────────────────────────────────────────────────────────
-    const systemPrompt = `Você é um atendente simpático e eficiente de uma distribuidora de gás. Seu objetivo é registrar pedidos de forma natural, humanizada e sem erros.
+        return `Você é um atendente simpático e eficiente de uma distribuidora de gás. Seu objetivo é registrar pedidos de forma natural, humanizada e sem erros.
 
 CLIENTE: ${ctx.contactName || 'Cliente'}
 ÚLTIMO PEDIDO: ${lastOrderContext}
@@ -606,8 +673,7 @@ ESTADO ATUAL: ${stateDesc}
 PRÓXIMO PASSO: ${nextStep}
 
 CARRINHO:
-${cartSummary.summary}
-${multiDeliveryBlock}
+${currentCart.summary}
 
 REGRAS DE NEGÓCIO:
 1. QUANTIDADE: Se o cliente mencionar apenas o produto sem quantidade (ex: "gás", "botijão", "p13"), SEMPRE pergunte quantos botijões ele precisa antes de chamar adicionar_item. Nunca assuma quantidade.
@@ -618,11 +684,29 @@ REGRAS DE NEGÓCIO:
 6. MULTI-ENTREGA: Se houver um PLANO DE MULTI-ENTREGA ATIVO acima, use os dados do plano. Quando fechar, chame fechar_pedido — o sistema cria pedidos separados automaticamente para cada endereço.
 7. STATUS: Se o cliente perguntar sobre o status do pedido, informe com base no ÚLTIMO PEDIDO.
 8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas. Responda APENAS ao que foi solicitado no estado atual.`;
+    };
 
-    const messages: any[] = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: ctx.userMessage }
-    ];
+    const initialPrompt = await buildSystemPrompt();
+
+    const messages: any[] = [];
+    messages.push({ role: 'system', content: initialPrompt });
+
+    if (ctx.history && ctx.history.length > 0) {
+        // Mapeia o histórico do banco para o formato de mensagens da OpenAI
+        const mappedHistory = ctx.history.map((h: any) => ({
+            role: h.role === 'system' ? 'system' : h.role === 'assistant' ? 'assistant' : 'user',
+            content: h.content,
+            ...(h.tool_calls ? { tool_calls: h.tool_calls } : {}),
+            ...(h.tool_call_id ? { tool_call_id: h.tool_call_id } : {})
+        }));
+        messages.push(...mappedHistory);
+    }
+
+    // Adiciona a mensagem atual do usuário apenas se ela já não for a última mensagem do histórico
+    const lastHistoryMsg = ctx.history?.[ctx.history.length - 1];
+    if (!lastHistoryMsg || lastHistoryMsg.content !== ctx.userMessage || lastHistoryMsg.role !== 'user') {
+        messages.push({ role: 'user', content: ctx.userMessage });
+    }
 
     let reply = '';
     let orderConfirmed = false;
@@ -733,7 +817,11 @@ REGRAS DE NEGÓCIO:
 
             // ── Tool: fechar_pedido ─────────────────────────────────────────
             } else if (name === 'fechar_pedido') {
-                const isConfirmed = /^(sim|pode|pode sim|pode fechar|pode enviar|confirma|confirmar|confirmado|ok|certeza|manda|mandar|sem troco|pode mandar|isso|correto|esta certo|está certo|vai|pode ir|claro|perfeito)$/i.test(userMsgLower.trim());
+                // Remove trailing punctuation and whitespace before checking
+                const cleanMsg = userMsgLower.trim().replace(/[!.,;:?]+$/, '').trim();
+                // Exact-word match OR contains a confirmation keyword in the message
+                const CONFIRM_WORDS = /\b(sim|pode|confirmo|confirmado|confirma|confirmar|ok|certeza|manda|mandar|isso|correto|claro|perfeito|fechado|bora|vai|ta bom|tá bom|ta ótimo|tá ótimo|tudo certo|pode fechar|pode enviar|pode mandar|pode ir|pode sim|sem troco|está certo|esta certo|quero sim|quero|aceito|aceitar|fechar|prosseguir|vamos|vamo|boa|beleza|show|top)\b/i;
+                const isConfirmed = CONFIRM_WORDS.test(cleanMsg);
                 if (!isConfirmed) {
                     result = '❌ Aguardando confirmação explícita do cliente. Apresente o resumo e aguarde "sim" ou "pode".';
                     toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
@@ -868,6 +956,10 @@ REGRAS DE NEGÓCIO:
         messages.push({ role: 'assistant', content: content || null, tool_calls: toolCalls });
         messages.push(...toolResults);
 
+        // Update the systemPrompt with the new state from the database before the next iteration
+        const updatedPrompt = await buildSystemPrompt();
+        messages[0] = { role: 'system', content: updatedPrompt };
+
         if (orderConfirmed) break;
     }
 
@@ -910,8 +1002,6 @@ export async function createOrderFromCartData(
             latitude: orderData.latitude,
             longitude: orderData.longitude,
             totalAmount: orderData.totalAmount,
-            paymentMethod: orderData.paymentMethod,
-            changeAmount: orderData.changeAmount,
             status: 'PENDING',
             items: {
                 create: orderData.items.map(item => ({

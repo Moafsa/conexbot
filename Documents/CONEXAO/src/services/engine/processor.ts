@@ -1001,6 +1001,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         bot: activeBot,
                         mapboxToken: mapboxToken || undefined,
                         botAddress: bot.address || undefined,
+                        history: history as any,
                         onOrderCreated: async (orderData) => {
                             const created = await createOrderFromCartData(bot.id, existingContact.id, orderData);
 
