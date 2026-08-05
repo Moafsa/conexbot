@@ -22,6 +22,7 @@ import { getNicheTemplate } from '@/lib/niche-templates';
 import { UzapiService } from '@/services/engine/uzapi';
 import { PhoneUtils } from '@/lib/phone-utils';
 import { ChatwootService } from '@/services/engine/chatwoot';
+import { enqueueAudit } from '@/lib/queue';
 
 export async function POST(req: Request) {
     let requestPhone = '';
@@ -322,6 +323,15 @@ export async function POST(req: Request) {
             }
         }
 
+        // 6. Disparar automaticamente o Raio-X do cliente recém-criado. É assíncrono
+        // (fila BullMQ) e não deve bloquear nem falhar o onboarding se a fila estiver indisponível.
+        let auditJobId: string | null = null;
+        try {
+            auditJobId = await enqueueAudit({ clientId, agencyId: agency.id });
+        } catch (auditError: any) {
+            console.error('[Onboarding API] Falha ao enfileirar Raio-X automático:', auditError.message);
+        }
+
         return NextResponse.json({
             success: true,
             clientId,
@@ -331,6 +341,7 @@ export async function POST(req: Request) {
             whatsappSent,
             chatwootProvisioned: !!chatwootCreds,
             chatwootAccountId: chatwootCreds?.chatwootAccountId ?? null,
+            auditJobId,
             template: {
                 niche: template.niche,
                 label: template.label,

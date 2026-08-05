@@ -35,18 +35,24 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Entregador não encontrado' }, { status: 404 });
         }
 
-        // Generate PWA magic login token
-        const crypto = require('crypto');
-        const token = crypto.randomBytes(16).toString('hex');
-        const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days token validity
+        // Reutiliza o token permanente do entregador se ele já existir e não estiver expirado
+        let token = driver.loginToken;
+        const now = new Date();
+        const isExpired = driver.loginTokenExpires ? new Date(driver.loginTokenExpires) < now : true;
 
-        await prisma.contact.update({
-            where: { id: driverId },
-            data: {
-                loginToken: token,
-                loginTokenExpires: tokenExpires
-            }
-        });
+        if (!token || isExpired) {
+            const crypto = require('crypto');
+            token = crypto.randomBytes(16).toString('hex');
+            const tokenExpires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 365 dias (permanente)
+
+            await prisma.contact.update({
+                where: { id: driverId },
+                data: {
+                    loginToken: token,
+                    loginTokenExpires: tokenExpires
+                }
+            });
+        }
 
         // Generate PWA Link
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://app.conext.click');

@@ -164,7 +164,7 @@ DETECTE AUTOMATICAMENTE quando o cliente fornece informações:
 
 🚨 DIRETRIZES DE RETORNO DO CLIENTE (MANDATÓRIO) 🚨
 1. Se o cliente já tem um nome no Perfil do Cliente (ex: "${bot.contactInfo?.name || ''}"), trate-o pelo nome e NUNCA pergunte seu nome novamente.
-2. Se o cliente já possui um endereço cadastrado no Perfil do Cliente (ex: "${bot.contactInfo?.address || ''}"), NÃO pergunte o endereço de entrega ou bairro novamente! Em vez disso, confirme amigavelmente: "Gostaria de entregar no mesmo endereço do seu último pedido (${bot.contactInfo?.address || ''})?" ou use o endereço existente para finalizar.
+2. Se o cliente já possui um endereço cadastrado no Perfil do Cliente (ex: "${bot.contactInfo?.address || ''}"), NUNCA confirme o pedido diretamente com o endereço antigo sem antes PERGUNTAR E CONFIRMAR com o cliente: "Deseja entregar no mesmo endereço do seu último pedido (${bot.contactInfo?.address || ''})?" Aguarde a confirmação. Se o cliente disser que NÃO é nesse endereço, peça o novo endereço completo (rua, número e bairro).
 
 EXEMPLO REAL DE ERRO (NÃO FAÇA ISSO!):
 ❌ Cliente: "moafsa@gmail.com"
@@ -207,12 +207,16 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
     }
 
     // Business info
+    const now = new Date();
+    const brtDateStr = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
+
     const businessLines = [
         `- Empresa: ${bot.name}`,
         `- Tipo: ${bot.businessType}`,
+        `- Data e Hora Atual: ${brtDateStr}`,
     ];
     if (bot.address) businessLines.push(`- Endereço: ${bot.address}`);
-    if (bot.hours) businessLines.push(`- Horário: ${bot.hours}`);
+    if (bot.hours) businessLines.push(`- Horário de Funcionamento: ${bot.hours}`);
     businessLines.push(`- Pagamentos: ${paymentList}`);
     if (bot.websiteUrl) businessLines.push(`- Site/Link: ${bot.websiteUrl}`);
     
@@ -228,26 +232,34 @@ REGRA FINAL: Sempre avance para o PRÓXIMO PASSO. Nunca volte atrás. Nunca insi
         } else if (bot.deliveryFeeType === 'DISTANCE' || bot.deliveryFeeType === 'NEIGHBORHOOD' || bot.deliveryFeeType === 'BY_NEIGHBORHOOD') {
             let rulesStr = '';
             if (Array.isArray(bot.deliveryFeeRules) && bot.deliveryFeeRules.length > 0) {
-                rulesStr = bot.deliveryFeeRules.map((r: any) => 
-                    `- ${r.neighborhood || r.bairro || 'Geral'} (${r.city || r.cidade || ''}): R$ ${r.fee ?? r.value ?? 0}`
-                ).join(', ');
+                rulesStr = bot.deliveryFeeRules.map((r: any) => {
+                    const neigh = (r.neighborhood || r.bairro || 'Geral').trim();
+                    const city = (r.city || r.cidade || '').trim();
+                    const feeVal = r.fee ?? r.value ?? 0;
+                    return `  • ${neigh.toUpperCase()}${city ? ` (${city})` : ''}: R$ ${feeVal}`;
+                }).join('\n');
             }
-            businessLines.push(`- Taxa de Entrega: Calculada por bairro. Regiões atendidas e valores: ${rulesStr || 'Nenhuma configurada.'}`);
-            businessLines.push(`- DIRETRIZ CRÍTICA DE ENTREGAS: Se o cliente solicitar entrega para um bairro ou cidade que NÃO está listado acima, você DEVE informá-lo educadamente que não realizamos entregas para essa região.`);
+            businessLines.push(`- Taxa de Entrega: Calculada por bairro.\n📌 REGIÕES ATENDIDAS E TAXAS:\n${rulesStr || 'Nenhuma configurada.'}`);
+            businessLines.push(`- DIRETRIZ CRÍTICA DE VERIFICAÇÃO DE BAIRROS:\n  1. Verifique a lista de "REGIÕES ATENDIDAS" acima com atenção (a comparação deve ser insensível a maiúsculas, minúsculas e acentos).\n  2. Se o bairro solicitado pelo cliente ESTIVER na lista de regiões atendidas acima, você DEVE CONFIRMAR que realizamos entregas para essa região!\n  3. NUNCA diga que não realizamos entregas para um bairro que ESTÁ presente na lista de regiões atendidas acima.\n  4. Se o cliente solicitar entrega para um bairro/cidade que REALMENTE NÃO está listado acima, informe-o educadamente que não realizamos entregas nessa região.`);
         }
     }
+
+    sections.push(`═══ 🛑 REGRAS OBRIGATÓRIAS PARA CONFIRMAR PEDIDOS (MANDATÓRIO) ═══
+1. 📍 ENDEREÇO COMPLETO É OBRIGATÓRIO: Você JAMAIS deve chamar a função "confirmar_pedido" se você tiver apenas a cidade ou apenas o bairro (ex: "Bento Gonçalves" ou "Progresso"). Você DEVE pedir a RUA e o NÚMERO (ou ponto de referência específico).
+   - Exemplo: Se o cliente disse apenas "Bairro Progresso", pergunte: "Perfeito! Qual é a rua e o número no bairro Progresso para a entrega?"
+2. 💳 FORMA DE PAGAMENTO É OBRIGATÓRIA: Confirme a forma de pagamento (Dinheiro, Pix ou Cartão) e se necessita de troco antes de chamar a função.
+3. 🚫 NÃO CHAME A FERRAMENTA EM RESPOSTAS PÓS-PEDIDO OU DÚVIDAS: Se o pedido JÁ FOI CONFIRMADO anteriormente na conversa e o cliente enviar mensagens simples como "ok", "obrigado", "tá bom", "valeu" ou fizer perguntas, NUNCA chame a função "confirmar_pedido" novamente!
+4. 💬 DIÁLOGO NATURAL PÓS-CONFIRMAÇÃO: Quando o pedido já estiver confirmado e o cliente disser apenas "ok" ou "obrigado", responda de forma curta, natural e educada (ex: "Por nada! Qualquer coisa é só chamar. 😊" ou "De nada! Bom dia pra você!"). JAMAIS repita o texto padrão robótico de "Pedido confirmado com sucesso! O entregador já está a caminho"!`);
 
     sections.push(`═══ INFORMAÇÕES DO NEGÓCIO ═══\n\n${businessLines.join('\n')}`);
 
     // Business Hours Guidelines
-    sections.push(`═══ ⏰ DIRETRIZES DE HORÁRIO DE FUNCIONAMENTO E AGENDAMENTO ═══
+    sections.push(`═══ ⏰ DIRETRIZES DE HORÁRIO DE FUNCIONAMENTO E FORA DE EXPEDIENTE ═══
 1. 🕐 REFERÊNCIA DE HORÁRIO: O horário oficial de funcionamento da empresa é: "${bot.hours || 'Segunda a Sexta das 08h às 18h'}".
 2. 🌙 ATENDIMENTO FORA DO HORÁRIO (ESTABELECIMENTO FECHADO):
-   - Se o cliente solicitar atendimento ou produtos fora do horário de expediente, informe educadamente o horário de funcionamento e quando o estabelecimento reabrirá.
-   - 🚨 NUNCA PERDA A VENDA/ATENDIMENTO: Mesmo fechado, anote e registre o pedido/agendamento para ser entregue ou processado logo na abertura do próximo dia útil.
-   - Exemplo: "Olá! No momento estamos fechados (nosso expediente é ${bot.hours || 'das 08h às 18h'}). Porém, posso deixar seu pedido anotado e garantido para entrega logo no primeiro horário de amanhã! Vamos confirmar?"
-3. ⏳ ATENDIMENTO PRÓXIMO AO FECHAMENTO:
-   - Se o cliente chamar próximo do horário de encerramento, seja transparente e cordial: informe que estamos nos últimos minutos de atendimento e confirme se o pedido/agendamento pode ser atendido hoje ou agendado para o próximo período.`);
+   - Se o cliente solicitar atendimento ou produtos fora do horário de expediente (consulte a Data e Hora Atual acima), informe educadamente que o estabelecimento está fechado no momento e quando reabrirá.
+   - 🚨 RIGOR ABSOLUTO NA CONFERÊNCIA: Fora do horário de expediente, você DEVE EXECUTAR TODAS AS MESMAS VALIDAÇÕES NORMALMENTE (verificar se o bairro é atendido, exigir rua e número completo, e forma de pagamento).
+   - 📦 ANOTAR PEDIDO PARA ABERTURA: Registre o pedido usando "confirmar_pedido", mas avisando ao cliente: "No momento estamos fechados, mas seu pedido foi anotado e garantido para entrega logo na abertura do próximo expediente!"`);
 
     // Contact profile (injected from CRM)
     if (bot.contactInfo) {

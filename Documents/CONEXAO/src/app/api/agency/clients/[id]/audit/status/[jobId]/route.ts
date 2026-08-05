@@ -34,7 +34,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                 scores: audit.scores,
                 overallScore: audit.overallScore,
                 report: audit.report,
-                missions: audit.missions
+                missions: audit.missions,
+                proposalDraft: audit.proposalDraft
             });
         }
 

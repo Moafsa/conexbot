@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     ArrowLeft, Sparkles, AlertTriangle, ShieldCheck, Zap,
-    TrendingUp, FileText, Printer, Award, CheckCircle2, ChevronRight, Loader2, RefreshCw
+    TrendingUp, FileText, Printer, Award, CheckCircle2, ChevronRight, Loader2, RefreshCw, FileSignature
 } from "lucide-react";
 
 export default function ClientAuditPage() {
@@ -19,6 +19,7 @@ export default function ClientAuditPage() {
     const [auditing, setAuditing] = useState(false);
     const [auditStep, setAuditStep] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const [generatingProposal, setGeneratingProposal] = useState(false);
 
     // Mensagens dinâmicas de processamento da auditoria
     const AUDIT_STEPS = [
@@ -34,6 +35,41 @@ export default function ClientAuditPage() {
     useEffect(() => {
         refreshData();
     }, [clientId]);
+
+    // Se chegamos aqui logo após o onboarding (?jobId=...), o Raio-X já foi disparado
+    // automaticamente no servidor — só precisamos continuar o polling dele, não disparar de novo.
+    useEffect(() => {
+        const jobId = new URLSearchParams(window.location.search).get("jobId");
+        if (jobId) {
+            setAuditing(true);
+            setAuditStep(0);
+            pollAuditStatus(jobId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clientId]);
+
+    const handleGenerateProposal = async () => {
+        if (!audit) return;
+        setGeneratingProposal(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/agency/clients/${clientId}/proposal`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ auditId: audit.id || audit.auditId })
+            });
+            const data = await res.json();
+            if (res.ok && data.id) {
+                router.push(`/dashboard/agency/clients/${clientId}/proposal/${data.id}`);
+            } else {
+                setError(data.error || "Erro ao gerar a proposta comercial.");
+                setGeneratingProposal(false);
+            }
+        } catch (e) {
+            setError("Erro ao se conectar ao servidor.");
+            setGeneratingProposal(false);
+        }
+    };
 
     // Loop de mensagens do loading do Raio-X
     useEffect(() => {
@@ -125,10 +161,12 @@ export default function ClientAuditPage() {
                 if (data.status === 'COMPLETED') {
                     clearInterval(interval);
                     setAudit({
+                        id: data.auditId,
                         scores: data.scores,
                         overallScore: data.overallScore,
                         report: data.report,
                         missions: data.missions,
+                        proposalDraft: data.proposalDraft,
                         createdAt: new Date().toISOString()
                     });
                     setAuditing(false);
@@ -393,10 +431,18 @@ export default function ClientAuditPage() {
                     </button>
                     <button
                         onClick={handlePrint}
-                        className="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-xl shadow-emerald-500/20"
+                        className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-bold transition-all text-sm flex items-center gap-2"
                     >
                         <Printer size={16} />
                         Exportar Relatório (PDF)
+                    </button>
+                    <button
+                        onClick={handleGenerateProposal}
+                        disabled={generatingProposal}
+                        className="px-5 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-60 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-xl shadow-purple-500/20"
+                    >
+                        {generatingProposal ? <Loader2 size={16} className="animate-spin" /> : <FileSignature size={16} />}
+                        Gerar Proposta Comercial
                     </button>
                 </div>
             </div>

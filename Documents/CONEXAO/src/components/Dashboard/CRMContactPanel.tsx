@@ -58,7 +58,7 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
 
         const messagesInterval = setInterval(() => {
             fetchContactData({ silent: true });
-        }, 3000);
+        }, 2000);
 
         const typingInterval = setInterval(async () => {
             try {
@@ -88,13 +88,16 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                 const data = await res.json();
                 setContact(data);
                 setOrders(data.orders || []);
-                if (data.conversations?.[0]) {
-                    const newMessages = data.conversations[0].messages || [];
-                    // Evita re-render/flicker desnecessário quando nada mudou no polling silencioso
-                    setMessages(prev => (
-                        opts.silent && prev.length === newMessages.length ? prev : newMessages
-                    ));
-                }
+                const newMessages = data.conversations?.[0]?.messages || [];
+                setMessages(prev => {
+                    if (!opts.silent || prev.length === 0) return newMessages;
+                    const lastPrevId = prev[prev.length - 1]?.id;
+                    const lastNewId = newMessages[newMessages.length - 1]?.id;
+                    if (lastPrevId !== lastNewId || prev.length !== newMessages.length) {
+                        return newMessages;
+                    }
+                    return prev;
+                });
             }
 
             if (!opts.silent) {
@@ -474,10 +477,10 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-sm font-black text-indigo-600">R$ {order.totalAmount?.toFixed(2) || '0.00'}</p>
-                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${order.status === 'RECEIVED' || order.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
+                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' || order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
                                                     order.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
                                                     }`}>
-                                                    {order.status}
+                                                    {order.status === 'DELIVERED' ? 'ENTREGUE & PAGO' : order.status}
                                                 </span>
                                             </div>
                                         </div>
@@ -494,13 +497,13 @@ export default function CRMContactPanel({ contactId, botId, clientId, onClose, o
 
                                         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                             <div className="flex items-center gap-1.5">
-                                                {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' ? <CheckCircle2 size={12} className="text-green-500" /> : <Clock size={12} className="text-amber-500" />}
+                                                {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' || order.status === 'DELIVERED' ? <CheckCircle2 size={12} className="text-green-500" /> : <Clock size={12} className="text-amber-500" />}
                                                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                                                    {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' ? 'Pagamento Confirmado' : 'Aguardando Compensação'}
+                                                    {order.status === 'RECEIVED' || order.status === 'CONFIRMED' || order.status === 'PAID' || order.status === 'DELIVERED' ? 'Pagamento Confirmado' : 'Aguardando Compensação'}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                {(order.status !== 'RECEIVED' && order.status !== 'CONFIRMED' && order.status !== 'PAID') && (
+                                                {(order.status !== 'RECEIVED' && order.status !== 'CONFIRMED' && order.status !== 'PAID' && order.status !== 'DELIVERED') && (
                                                     <button
                                                         onClick={() => handleOrderAction(order.id, 'PAY')}
                                                         className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition cursor-pointer border border-emerald-200"

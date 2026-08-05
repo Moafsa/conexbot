@@ -11,18 +11,22 @@ export async function GET(req: Request) {
         const tenantId = await getEffectiveTenantId(clientId);
         if (!tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const [metaCampaigns, metaInsights, metaBalance, googleCampaigns] = await Promise.all([
+        const [metaCampaigns, metaInsights, metaBalance, googleCampaigns, metaDaily, googleDaily] = await Promise.all([
             MetaAdsService.listCampaigns(tenantId),
             MetaAdsService.getInsights(tenantId),
             MetaAdsService.getAccountBalance(tenantId).catch(() => null),
-            GoogleAdsService.getCampaignInsights(tenantId).catch(() => null)
+            GoogleAdsService.getCampaignInsights(tenantId).catch(() => null),
+            MetaAdsService.getDailyInsights(tenantId).catch(() => []),
+            GoogleAdsService.getDailyInsights(tenantId).catch(() => [])
         ]);
 
-        return NextResponse.json({ 
-            campaigns: metaCampaigns, 
+        return NextResponse.json({
+            campaigns: metaCampaigns,
             insights: metaInsights,
             metaBalance,
-            googleAds: googleCampaigns 
+            googleAds: googleCampaigns,
+            metaDaily,
+            googleDaily
         });
     } catch (error: any) {
         return NextResponse.json({ error: "Erro ao buscar dados de anúncios" }, { status: 500 });

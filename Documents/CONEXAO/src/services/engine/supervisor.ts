@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { safeChatCompletion } from '@/lib/ai-provider';
+import { logToFile } from './logger';
 
 export const SupervisorService = {
     /**
@@ -67,8 +68,9 @@ export const SupervisorService = {
 
         SUA TAREFA:
         1. DECIDIR O PRÓXIMO ESTÁGIO: Baseado na conversa, o cliente deve avançar no funil?
-           🚨 ATENÇÃO (RECOMPRA/RETORNO): Se o cliente já concluiu um pedido anterior (estágio Entregue ou Saiu para Entrega) e agora está iniciando um NOVO contato ou querendo fazer um novo pedido (ex: dizendo "quero gás", "quero 1 gas", "quero fazer um pedido", "oi", etc.), você DEVE obrigatoriamente retorná-lo para o estágio inicial de negociação correspondente (como "Escolhendo Pedido"), permitindo que o bot faça uma nova venda do início!
-           🚨 REGRA DE CONFIRMAÇÃO (MANDATÓRIO): Se a última mensagem do assistente na conversa foi uma pergunta para confirmar detalhes finais, endereço ou forma de pagamento (ex: "Você vai pagar em dinheiro, certo?" ou "Posso confirmar o pedido?") e a resposta atual do usuário for afirmativa (ex: "sim", "isso", "pode", "ok", "confirmado"), você DEVE obrigatoriamente classificar como estágio "Pedido Confirmado", mesmo que a conversa pareça repetitiva no histórico devido a testes.
+            🚨 ATENÇÃO (RECOMPRA/RETORNO): Se o cliente já concluiu um pedido anterior (estágio Entregue ou Saiu para Entrega) e agora está iniciando um NOVO contato ou querendo fazer um novo pedido (ex: dizendo "quero gás", "quero 1 gas", "quero fazer um pedido", "oi", etc.), você DEVE obrigatoriamente retorná-lo para o estágio inicial de negociação correspondente (como "Escolhendo Pedido"), permitindo que o bot faça uma nova venda do início!
+            🚨 REGRA DE MULTI-ENTREGAS / MÚLTIPLOS ENDEREÇOS (CRÍTICO): Se o cliente solicitou entregas divididas em mais de 1 local ou endereço (ex: "1 no Centro e 2 no Botafogo"), você DEVE verificar no histórico se os endereços completos de TODOS os locais solicitados foram devidamente coletados. Se ainda faltar o endereço de qualquer um dos locais, MANTENHA o estágio em "Escolhendo Pedido" e oriente o robô na "strategy" a solicitar o endereço do local que falta. NUNCA autorize a transição para "Pedido Confirmado" enquanto houver endereço pendente!
+            🚨 REGRA DE CONFIRMAÇÃO (MANDATÓRIO): Se a última mensagem do assistente na conversa foi uma pergunta para confirmar detalhes finais, endereço ou forma de pagamento (ex: "Você vai pagar em dinheiro, certo?" ou "Posso confirmar o pedido?") e a resposta atual do usuário for afirmativa (ex: "sim", "isso", "pode", "ok", "confirmado"), você DEVE obrigatoriamente classificar como estágio "Pedido Confirmado", desde que todos os endereços solicitados tenham sido fornecidos.
         2. LEAD SCORE (0-100): Avalie o quão perto o cliente está de fechar.
         3. SENTIMENTO: POSITIVE, NEUTRAL ou NEGATIVE.
         4. INSIGHT: Uma frase curta para o dono do bot.
@@ -162,8 +164,139 @@ export const SupervisorService = {
         }
         // Fechamento e Confirmação de Pedidos
         if (name === 'DECISION' || name === 'DECISÃO' || name === 'FECHAMENTO' || name === 'GANHO' || name === 'CUSTOMER' || name === 'PEDIDO CONFIRMADO' || name === 'PEDIDO_CONFIRMADO' || name === 'ORDER_CONFIRMED' || name === 'CONFIRMADO') {
-            return "FOCO: FECHAMENTO. O cliente confirmou o pedido. Você DEVE obrigatoriamente chamar a ferramenta \"confirmar_pedido\" para registrar o pedido no banco de dados e enviá-lo para os entregadores. Certifique-se de passar todos os parâmetros necessários (endereco_completo, forma_pagamento, bairro_entrega e itens_descricao se for pedido verbal sem carrinho). NÃO apenas responda em formato texto sem acionar a ferramenta.";
+            return "FOCO: ATENDIMENTO PÓS-PEDIDO CONFIRMADO. O pedido do cliente já foi registrado. NUNCA chame a ferramenta 'confirmar_pedido' novamente. Se o cliente enviar apenas mensagens como 'ok', 'obrigado' ou 'tá bom', responda de forma curta, natural e amigável (ex: 'Por nada! Qualquer coisa é só chamar. 😊'). NÃO repita a mensagem padrão de confirmação de pedido.";
         }
         return `FOCO: Atendimento prestativo adequado ao estágio ${stageName}.`;
+    },
+
+    /**
+     * Valida pré-execução de qualquer ferramenta (Gatekeeper do Supervisor).
+     * O Supervisor analisa se todos os requisitos da ferramenta foram preenchidos antes de permitir sua execução.
+     */
+    async validateToolExecution(
+        toolName: string,
+        toolArgs: any,
+        history: { role: string; content: string }[],
+        bot: any
+    ): Promise<{ approved: boolean; reason?: string }> {
+        // 1. Validação de Confirmação de Pedido (confirmar_pedido)
+        if (toolName === 'confirmar_pedido') {
+            const historyText = history.map(h => `${h.role}: ${h.content}`).join('\n');
+            const addrGiven = toolArgs.endereco_completo || '';
+
+            // Encontra o início do pedido atual no histórico (ignorando pedidos antigos do histórico)
+            let currentOrderStartIndex = 0;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const text = (history[i].content || '').toLowerCase();
+                if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão'))) {
+                    currentOrderStartIndex = i;
+                    break;
+                }
+            }
+            const currentHistory = history.slice(currentOrderStartIndex);
+            const currentHistoryText = currentHistory.map(h => `${h.role}: ${h.content}`).join('\n');
+
+            // Checa se o cliente pediu múltiplos endereços/locais no pedido atual
+            const userMessagesInCurrentOrder = currentHistory.filter(h => h.role === 'user');
+            const userText = userMessagesInCurrentOrder.map(h => h.content || '').join('\n');
+            const rawLocMatches = userText.match(/(?:no|na|em|para o|para a)\s+([a-záàâãéèêíóòôõúç\s]{3,20})/gi) || [];
+            const requestedLocations: string[] = [];
+            for (const match of rawLocMatches) {
+                let loc = match.replace(/^(no|na|em|para o|para a)\s+/i, '').replace(/\s+(e|ou)$/i, '').trim();
+                if (loc.length >= 3 && !/^(gás|botijão|botijões|pedido|dinheiro|pix|cartão|troco|painel|frota|entregador|atendente|sistema)$/i.test(loc)) {
+                    if (!requestedLocations.includes(loc.toLowerCase())) {
+                        requestedLocations.push(loc.toLowerCase());
+                    }
+                }
+            }
+
+            const sessionAddrWithNumbers = history.filter(h => 
+                h.role === 'user' && 
+                /\d+/.test(h.content) && 
+                (/rua|avenida|r\.|av\.|bairro|km|estrada|alameda/i.test(h.content) || h.content.trim().length > 8) &&
+                !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(h.content.trim())
+            );
+
+            const hasMultiKeyword = userText.match(/(outro no|locais diferentes|dividido|endereços diferentes)/i);
+            const targetLocCount = Math.max(requestedLocations.length, hasMultiKeyword ? 2 : 1);
+
+            if (targetLocCount > 1 && sessionAddrWithNumbers.length < targetLocCount && !addrGiven.includes(';') && !addrGiven.includes('\n')) {
+                const missingLoc = requestedLocations.find(loc => !sessionAddrWithNumbers.some(a => a.content.toLowerCase().includes(loc.toLowerCase())));
+                const targetLocName = missingLoc ? missingLoc.toUpperCase() : 'SEGUNDO LOCAL';
+                return {
+                    approved: false,
+                    reason: `FALTA O ENDEREÇO DA ENTREGA DO ${targetLocName}! O cliente solicitou entregas em locais diferentes, mas forneceu apenas 1 endereço até agora. Peça ao cliente o nome da rua e número para a entrega do ${targetLocName} antes de confirmar o pedido.`
+                };
+            }
+
+            // Checa se o endereço fornecido tem rua e número (não é apenas bairro ou cidade)
+            const cleanAddr = addrGiven.trim();
+            const hasNumber = /\d+/.test(cleanAddr);
+            if (!hasNumber && cleanAddr.length < 25) {
+                return {
+                    approved: false,
+                    reason: `O endereço ("${cleanAddr}") está incompleto ou sem número. Peça o nome da rua e o número (or ponto de referência) ao cliente.`
+                };
+            }
+
+            // 1.1 Validação do Endereço no Mapbox pelo Supervisor (Confere se o endereço existe na área de atendimento)
+            const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+            const mapboxToken = config?.mapboxToken;
+
+            if (mapboxToken && cleanAddr) {
+                try {
+                    const rawAddr = cleanAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                    const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                    const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                    const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+
+                    const proximityParam = '&proximity=-51.517,-29.170';
+                    const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR${proximityParam}&limit=1`;
+                    
+                    const geocodeRes = await fetch(geocodeUrl);
+                    if (geocodeRes.ok) {
+                        const geocodeData = await geocodeRes.json();
+                        const feature = geocodeData.features?.[0];
+                        
+                        if (!feature || (feature.relevance && feature.relevance < 0.45)) {
+                            return {
+                                approved: false,
+                                reason: `O endereço "${rawAddr}" NÃO FOI ENCONTRADO no sistema de mapas (Mapbox). Peça ao cliente a confirmação exata da rua, número e bairro ou um ponto de referência.`
+                            };
+                        }
+
+                        // Enriquece o endereço com a localização oficial verificada pelo Mapbox (Rua, Número, Bairro Oficial, Cidade, CEP)
+                        if (feature.place_name) {
+                            toolArgs.endereco_completo = feature.place_name;
+                            logToFile(`[Supervisor Gatekeeper] Endereço verificado e atualizado com Mapbox: "${feature.place_name}"`);
+                        }
+                    }
+                } catch (err: any) {
+                    console.error('[Supervisor Gatekeeper] Mapbox address verification error:', err);
+                }
+            }
+        }
+
+        // 2. Validação de Geração de Fatura (gerar_fatura)
+        if (toolName === 'gerar_fatura') {
+            if (!toolArgs.cliente_nome || !toolArgs.cliente_email || !toolArgs.cliente_cpf) {
+                return {
+                    approved: false,
+                    reason: `Faltam dados obrigatórios para gerar fatura (Nome, E-mail ou CPF). Peça os dados faltantes ao cliente.`
+                };
+            }
+        }
+
+        // 3. Validação de Despacho de Serviço (despachar_servico)
+        if (toolName === 'despachar_servico') {
+            if (!toolArgs.detalhes_servico || toolArgs.detalhes_servico.length < 10) {
+                return {
+                    approved: false,
+                    reason: `Os detalhes do serviço a ser despachado estão incompletos. Especifique os itens e o endereço completo.`
+                };
+            }
+        }
+
+        return { approved: true };
     }
 };

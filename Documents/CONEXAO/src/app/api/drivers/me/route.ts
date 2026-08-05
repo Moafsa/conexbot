@@ -92,10 +92,42 @@ export async function POST(req: Request) {
         }
 
         if (action === 'complete') {
+            const { paymentMethod, paymentMethods } = body;
+            let payLabel = 'A COMBINAR';
+
+            if (Array.isArray(paymentMethods) && paymentMethods.length > 0) {
+                payLabel = paymentMethods.join(' + ');
+            } else if (paymentMethod) {
+                payLabel = paymentMethod;
+            }
+
             await prisma.order.update({
                 where: { id: orderId },
-                data: { status: 'DELIVERED' }
+                data: {
+                    status: 'DELIVERED',
+                    updatedAt: new Date()
+                }
             });
+
+            if (order.contactId) {
+                // Find 'ENTREGUE' stage for the bot
+                const deliveredStage = await prisma.crmStage.findFirst({
+                    where: {
+                        botId: order.botId,
+                        name: { contains: 'ENTREGUE', mode: 'insensitive' }
+                    }
+                });
+
+                const prevNotes = order.contact?.notes || '';
+                const newNote = `${prevNotes}\n[ENTREGA CONCLUÍDA - PAGAMENTO: ${payLabel}]`.trim();
+                await prisma.contact.update({
+                    where: { id: order.contactId },
+                    data: {
+                        notes: newNote,
+                        ...(deliveredStage ? { stageId: deliveredStage.id, funnelStage: deliveredStage.name } : {})
+                    }
+                });
+            }
 
             const newActiveJobs = Math.max(0, (driver.activeJobs || 1) - 1);
             await prisma.contact.update({
@@ -103,7 +135,38 @@ export async function POST(req: Request) {
                 data: { activeJobs: newActiveJobs }
             });
 
-            return NextResponse.json({ success: true, message: 'Order marked as completed' });
+            return NextResponse.json({ success: true, message: 'Entrega marcada como concluída com sucesso' });
+        }
+
+        if (action === 'cancel') {
+            const { cancelReason, cancelNote } = body;
+            const reasonLabel = cancelReason || 'NÃO ESPECIFICADO';
+            const noteText = cancelNote ? ` (${cancelNote})` : '';
+
+            await prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    status: 'CANCELLED',
+                    updatedAt: new Date()
+                }
+            });
+
+            if (order.contactId) {
+                const prevNotes = order.contact?.notes || '';
+                const newNote = `${prevNotes}\n[ENTREGA DEVOLVIDA/CANCELADA - MOTIVO: ${reasonLabel}${noteText}]`.trim();
+                await prisma.contact.update({
+                    where: { id: order.contactId },
+                    data: { notes: newNote }
+                });
+            }
+
+            const newActiveJobs = Math.max(0, (driver.activeJobs || 1) - 1);
+            await prisma.contact.update({
+                where: { id: driver.id },
+                data: { activeJobs: newActiveJobs }
+            });
+
+            return NextResponse.json({ success: true, message: 'Entrega cancelada/devolvida com sucesso' });
         }
 
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

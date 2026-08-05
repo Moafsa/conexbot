@@ -425,8 +425,8 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 }
             };
 
-            let clientLat = customer.latitude;
-            let clientLng = customer.longitude;
+            let clientLat = order.latitude || customer.latitude;
+            let clientLng = order.longitude || customer.longitude;
 
             if (clientLng && clientLat) {
                 renderMarker(clientLng, clientLat);
@@ -434,7 +434,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 const [lng, lat] = geocodedOrdersRef.current[orderId];
                 renderMarker(lng, lat);
             } else {
-                const cleanAddr = cleanAddress(customer.needs || customer.notes || '');
+                const cleanAddr = cleanAddress(order.address || customer.needs || customer.notes || '');
                 if (cleanAddr && mapboxToken) {
                     fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`)
                         .then(r => r.json())
@@ -715,7 +715,15 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     try {
                         await navigator.clipboard.writeText(data.pwaUrl);
                     } catch (e) {}
-                    toast.error(`${data.error} O link do app foi copiado para sua área de transferência para envio manual.`, { id: 'send-app', duration: 6000 });
+
+                    const driver = drivers.find(d => d.id === driverId);
+                    const cleanPhone = driver?.phone ? driver.phone.replace(/\D/g, '') : '';
+                    if (cleanPhone) {
+                        const msg = `Olá, *${driverName}*!\n\nAqui está o seu link de acesso ao aplicativo do entregador (PWA):\n\n📱 *Link de Acesso:*\n${data.pwaUrl}\n\n_Abra o link no navegador do celular, ative a geolocalização e adicione à tela inicial!_`;
+                        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }
+
+                    toast.error(`${data.error} Abrindo WhatsApp para envio direto...`, { id: 'send-app', duration: 7000 });
                     return;
                 }
                 throw new Error(data.error || 'Erro ao enviar link do aplicativo.');

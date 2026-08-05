@@ -58,18 +58,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // 3. Generate token for driver PWA
-        const token = crypto.randomBytes(16).toString('hex');
-        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+        // 3. Reutiliza o token permanente do entregador (válido por 365 dias)
+        // Isso impede a troca de token a cada novo pedido e evita deslogar o entregador da PWA.
+        let token = driver.loginToken;
+        const now = new Date();
+        const isExpired = driver.loginTokenExpires ? new Date(driver.loginTokenExpires) < now : true;
 
-        await prisma.contact.update({
-            where: { id: driver.id },
-            data: {
-                loginToken: token,
-                loginTokenExpires: tokenExpires,
-                activeJobs: { increment: 1 }
-            }
-        });
+        if (!token || isExpired) {
+            token = crypto.randomBytes(16).toString('hex');
+            const tokenExpires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 365 dias (permanente)
+
+            await prisma.contact.update({
+                where: { id: driver.id },
+                data: {
+                    loginToken: token,
+                    loginTokenExpires: tokenExpires,
+                    activeJobs: { increment: 1 }
+                }
+            });
+        } else {
+            await prisma.contact.update({
+                where: { id: driver.id },
+                data: {
+                    activeJobs: { increment: 1 }
+                }
+            });
+        }
 
         // 4. Link order to driver
         await prisma.order.update({
@@ -83,18 +97,20 @@ export async function POST(req: Request) {
         // 5. Send message via WhatsApp
         const botSession = order.bot?.sessionName || '';
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const customerName = order.contact?.name || 'Cliente Sem Nome';
-        const customerPhone = order.contact?.phone || '';
-        const rawAddress = order.contact?.notes || order.contact?.needs || 'Endereço não especificado';
-        const deliveryAddress = cleanAddress(rawAddress);
-        const orderItemsStr = order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ');
+        const customerName = order.contact?.name || 'Cliente';
+        const customerPhone = order.contact?.phone ? order.contact.phone.replace(/\D/g, '') : 'Não informado';
+        const rawAddress = order.address || order.contact?.notes || order.contact?.needs || 'Endereço a confirmar';
+        const deliveryAddress = cleanAddress(rawAddress) || order.address || 'Endereço a confirmar';
+        const orderItemsStr = (order.items && order.items.length > 0)
+            ? order.items.map(i => `${i.product.name} x${i.quantity}`).join(', ')
+            : (order.notes || order.description || '1x Botijão P13');
 
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(deliveryAddress)}`;
         const pwaUrl = `${appUrl}/driver?token=${token}`;
 
         const dispatchMsg = `🚚 *NOVA ENTREGA ATRIBUÍDA (MANUAL)* 🚚\n\n` +
             `*Cliente:* ${customerName}\n` +
-            `*WhatsApp Cliente:* wa.me/${customerPhone.replace(/\D/g, '')}\n` +
+            `*WhatsApp Cliente:* wa.me/${customerPhone}\n` +
             `*Endereço:* ${deliveryAddress}\n` +
             `*Itens:* ${orderItemsStr}\n\n` +
             `📍 *Iniciar Rota no Google Maps:*\n${mapsUrl}\n\n` +
@@ -105,10 +121,10 @@ export async function POST(req: Request) {
             {
                 type: 'body',
                 parameters: [
-                    { type: 'text', text: customerName },
-                    { type: 'text', text: customerPhone.replace(/\D/g, '') },
-                    { type: 'text', text: deliveryAddress },
-                    { type: 'text', text: orderItemsStr },
+                    { type: 'text', text: customerName || 'Cliente' },
+                    { type: 'text', text: customerPhone || 'Não informado' },
+                    { type: 'text', text: deliveryAddress || 'Endereço a confirmar' },
+                    { type: 'text', text: orderItemsStr || '1x Botijão P13' },
                     { type: 'text', text: mapsUrl },
                     { type: 'text', text: pwaUrl }
                 ]
@@ -121,9 +137,7 @@ export async function POST(req: Request) {
             templateComponents
         });
         if (!sentResult.success) {
-            return NextResponse.json({ 
-                error: sentResult.error || `Falha ao enviar notificação para o entregador via WhatsApp.` 
-            }, { status: 500 });
+            console.warn(`[Dispatch Warning] Outbound notification warning to driver ${driver.phone}: ${sentResult.error}`);
         }
 
         // 6. Assign conversation in Chatwoot

@@ -652,12 +652,127 @@ export const MessageProcessor = {
             
             let finalSystemPrompt = baseSystemPrompt + supervisorInstruction;
             
-            // 9.5 REINFORCE SALES RULES AND USER PRIMACY (Absolute recency bias fix)
+            const savedAddress = (existingContact as any).needs || (existingContact as any).notes || 'Nenhum endereço salvo anteriormente';
+            const pastOrdersList = (existingContact as any).orders && (existingContact as any).orders.length > 0 
+                ? (existingContact as any).orders.map((o: any) => `- Pedido #${o.id.substring(0, 6)} em ${new Date(o.createdAt).toLocaleDateString()}: R$ ${o.totalAmount.toFixed(2)} (${o.status})`).join('\n')
+                : 'Sem histórico de pedidos anteriores';
+
+            // Instant Mapbox & Correios Address Verification for all addresses in contact and history
+            let mapboxLookupBlock = '';
+            const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+            const mapboxToken = config?.mapboxToken;
+
+            if (mapboxToken) {
+                const addrCandidates: string[] = [];
+                
+                const savedContactAddr = (existingContact as any).needs || (existingContact as any).notes;
+                if (savedContactAddr && typeof savedContactAddr === 'string' && savedContactAddr.length > 5) {
+                    addrCandidates.push(savedContactAddr.split('\n')[0].replace('Endereço: ', '').trim());
+                }
+
+                for (const h of history) {
+                    if (h.role === 'user' && h.content) {
+                        const text = h.content.trim();
+                        if ((/\d+/.test(text) || /rua|avenida|r\.|av\.|bairro|km|estrada|alameda|centro|botafogo|progresso|humaitá|maria goretti/i.test(text)) && 
+                            !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(text)) {
+                            if (!addrCandidates.includes(text)) {
+                                addrCandidates.push(text);
+                            }
+                        }
+                    }
+                }
+
+                if (addrCandidates.length > 0) {
+                    const mapboxResults: string[] = [];
+                    for (const rawAddr of addrCandidates) {
+                        try {
+                            const cityContext = activeBot?.address ? `, ${activeBot.address}` : ', Bento Gonçalves, RS, Brasil';
+                            const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                            const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                            
+                            const geocodeRes = await fetch(geocodeUrl);
+                            if (geocodeRes.ok) {
+                                const geocodeData = await geocodeRes.json();
+                                const feature = geocodeData.features?.[0];
+                                if (feature) {
+                                    let neighborhood = '';
+                                    if (feature.context) {
+                                        for (const ctx of feature.context) {
+                                            if (ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality') || ctx.id.startsWith('district')) {
+                                                neighborhood = ctx.text;
+                                            }
+                                        }
+                                    }
+
+                                    if (!neighborhood && feature.place_name) {
+                                        const parts = feature.place_name.split(',').map(p => p.trim());
+                                        if (parts.length >= 3) {
+                                            neighborhood = parts[1];
+                                        }
+                                    }
+
+                                    const fullResolved = feature.place_name || searchAddr;
+                                    mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO OFICIAL NO MAPA (MAPBOX): **${neighborhood || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
+                                }
+                            }
+                        } catch (e: any) {
+                            console.error('[Processor Mapbox Lookup] Exception:', e.message);
+                        }
+                    }
+
+                    if (mapboxResults.length > 0) {
+                        mapboxLookupBlock = `\n🗺️ CONSULTA OFICIAL EM TEMPO REAL AO MAPBOX (BANCO DE DADOS DE MAPAS):\n${mapboxResults.join('\n')}\n🚨 REGRA CRÍTICA DE VERIFICAÇÃO E CONFERÊNCIA DE BAIRROS:
+1. O Mapbox é a sua FONTE DA VERDADE. Use SEMPRE os bairros oficiais confirmados pelo Mapbox acima.
+2. SE O CLIENTE SOLICITOU ENTREGAS EM DOIS BAIRROS (ex: Centro e Maria Goretti):
+   - Verifique se HÁ UM ENDEREÇO DE RUA COM NÚMERO PARA CADA BAIRRO SOLICITADO.
+   - Se o cliente disse "3 no Centro", mas NÃO PASSOU a rua e número do Centro, VOCÊ É ESTRITAMENTE OBRIGADO a perguntar: "Anotado os botijões para o Maria Goretti! Agora qual é o nome da rua e número para a entrega no Centro?"
+3. NUNCA pergunte a forma de pagamento nem tente confirmar o pedido sem antes ter a rua e número de TODOS os bairros solicitados!`;
+                    }
+                }
+            }
+
+            const contactSavedAddresses = await prisma.contactAddress.findMany({
+                where: { contactId: existingContact.id },
+                orderBy: { createdAt: 'desc' }
+            }).catch(() => []);
+            const allSavedAddressesText = contactSavedAddresses.length > 0
+                ? contactSavedAddresses.map((sa, idx) => `${idx + 1}. ${sa.label ? `[${sa.label}] ` : ''}${sa.address}`).join(' | ')
+                : (savedAddress || 'Nenhum endereço salvo.');
+
+            // 9.5 REINFORCE CUSTOMER MEMORY, ADDRESS DEDUPLICATION AND NATURAL SALES RULES
             finalSystemPrompt += `\n\n═════════════════════════════════════════════════════════════════════════
-🚨 DIRETRIZ ESTRATÉGICA DE VENDAS:
-1. FOCO TOTAL NA QUALIFICAÇÃO: Em saudações ou no início da conversa, NUNCA empurre preços ou o catálogo. Siga 100% o seu prompt de usuário.
-2. PREÇOS REATIVOS: Fale de preços SOMENTE se o cliente perguntar OU se a sua estratégia (prompt) indicar o momento certo.
-3. FORMATO DE ANCORAGEM: SE e QUANDO falar de preços promocionais, use: "De R$ [Original] por APENAS R$ [Promocional]".
+👤 DADOS DO CLIENTE E MEMÓRIA DE ENDEREÇOS:
+- Nome do Cliente: ${existingContact.name || 'Não informado'}
+- Telefone: ${senderPhone}
+- Endereços Salvos no Perfil do Cliente: ${allSavedAddressesText}
+- Histórico de Pedidos Recentes:
+${pastOrdersList}
+${mapboxLookupBlock}
+
+🚨 REGRAS DE MEMÓRIA E ATENDIMENTO NATURAL:
+1. MEMÓRIA DE ENDEREÇO (NUNCA PERGUNTAR O QUE JÁ FOI INFORMADO):
+   - Se o cliente já informou o endereço (rua, número ou bairro) na conversa atual OU se o endereço já consta em "DADOS DO CLIENTE" acima, REAPROVEITE-O IMEDIATAMENTE.
+   - NUNCA pergunte "qual é o seu endereço" se o cliente já forneceu a localização (ex: "Fortaleza 730" ou "Progresso").
+2. TOM NATURAL E ACOLHEDOR EM RECUSA DE PAGAMENTO:
+   - Se o cliente sugerir um método não suportado (ex: cheque ou parcelado em 2x), NUNCA repita a mesma frase robótica de recusa.
+   - Seja simpático e ofereça opções aceitas com naturalidade: "No momento trabalhamos apenas com Pix, Dinheiro ou Cartão na entrega! Podemos manter no Cartão para o entregador levar a maquininha?"
+3. ENTREGAS EM MÚLTIPLOS ENDEREÇOS (CONFIRMAÇÃO DE BAIRRO E SEQUÊNCIA OBRIGATÓRIA):
+   - Se o cliente pedir botijões para mais de 1 bairro/local e enviar um endereço:
+     - Use o Mapbox para verificar o bairro exato do endereço digitado e solicite o endereço do 2º local!
+     - Exemplo: "Anotado a Rua Amazonas, 1014! Conferi no mapa e este endereço fica no bairro Maria Goretti. Qual é o endereço completo para a outra entrega?"
+   - É ESTRITAMENTE PROIBIDO perguntar a forma de pagamento ou tentar confirmar o pedido antes de ter recebido o endereço completo de TODOS os locais solicitados!
+4. CIDADE E VERIFICAÇÃO DE BAIRRO:
+   - A cidade padrão de atendimento é a cidade cadastrada para a empresa (${bot.address || 'Bento Gonçalves, RS'}).
+   - Se o cliente disser que a entrega é para um bairro (ex: "Centro"), mas o Mapbox confirmar outro bairro (ex: "Maria Goretti"), confirme com educação: "Entendi! Conferi no mapa e o endereço fica na verdade no bairro Maria Goretti. Confirmamos a entrega para lá?"
+5. EXECUÇÃO OBRIGATÓRIA DA FERRAMENTA "confirmar_pedido":
+   - Quando o cliente concordar com o valor, disser "sim", "pode ser", "sem troco" ou "nada":
+     - Você É OBRIGADO a EXECUTAR a função "confirmar_pedido" na MESMA RESPOSTA.
+     - É ESTRITAMENTE PROIBIDO responder "vou registrar o pedido" ou "pedido confirmado" em texto sem invocar a ferramenta "confirmar_pedido"!
+6. NOME DE BAIRRO SEM RUA E NÚMERO:
+   - Se o cliente mencionar locais/bairros diferentes (ex: "3 no Centro e 2 no Maria Goretti"), CADA BAIRRO EXIGE SEU PRÓPRIO ENDEREÇO DE RUA E NÚMERO.
+   - NUNCA atribua o endereço de um bairro para outro bairro!
+   - Se falta a rua e número de algum dos bairros solicitados, peça imediatamente: "Qual é o nome da rua e o número para a entrega no [Nome do Bairro]?"
 
 🚨 PRIORIDADE ABSOLUTA:
 ${bot.systemPrompt ? `Se as instruções acima conflitarem com o seu prompt principal ("${bot.systemPrompt}"), IGNORE estas regras e SIGA RIGOROSAMENTE O SEU PROMPT (Primasia do Usuário).` : "Siga a estratégia acima."}
@@ -850,11 +965,109 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                 });
             }
 
+            // ══════════════════════════════════════════════════════════════
+            // ORDER AGENT INTERCEPT — for GAS_DISTRIBUTOR bots
+            // Usa carrinho persistente no BD ao invés de regex no histórico.
+            // Se o agente confirmar pedido, cria o Order e retorna direto.
+            // ══════════════════════════════════════════════════════════════
+            const isOrderBot = (bot.businessType === 'GAS_DISTRIBUTOR' || (bot.businessType || '').includes('GAS'));
+
+            if (isOrderBot) {
+                try {
+                    const { runOrderAgent, createOrderFromCartData, getContactSavedAddresses } = await import('./order-agent');
+                    const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                    const mapboxToken = config?.mapboxToken || bot.mapboxToken;
+
+                    const savedAddresses = await getContactSavedAddresses(existingContact.id, existingContact);
+
+                    const orderCatalog = bot.products
+                        .filter((p: any) => p.active)
+                        .map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            price: Number(p.price),
+                            salePrice: p.salePrice ? Number(p.salePrice) : null,
+                            active: p.active
+                        }));
+
+                    const agentResult = await runOrderAgent({
+                        botId: bot.id,
+                        contactPhone: senderPhone,
+                        contactId: existingContact.id,
+                        contactName: existingContact.name || undefined,
+                        userMessage: messageText,
+                        catalog: orderCatalog,
+                        savedAddresses,
+                        bot: activeBot,
+                        mapboxToken: mapboxToken || undefined,
+                        botAddress: bot.address || undefined,
+                        history: history as any,
+                        onOrderCreated: async (orderData) => {
+                            const created = await createOrderFromCartData(bot.id, existingContact.id, orderData);
+
+                            // Notify attendant
+                            const itemsText = orderData.items.map(i => {
+                                const prod = bot.products.find((p: any) => p.id === i.productId);
+                                return `${i.quantity}x ${prod?.name || i.productId}`;
+                            }).join(', ');
+
+                            const notifMsg = `📦 *Novo Pedido Confirmado*\n\n*Cliente:* ${existingContact.name || senderPhone}\n*Tel:* ${senderPhone}\n*Endereço:* ${orderData.address}\n*Itens:* ${itemsText}\n*Total:* R$ ${orderData.totalAmount.toFixed(2)}\n*Pagamento:* ${orderData.paymentMethod}${orderData.changeAmount ? `\n*Troco para:* R$ ${orderData.changeAmount}` : ''}`;
+
+                            try {
+                                await prisma.message.create({
+                                    data: { conversationId: conversation.id, role: 'system', content: notifMsg }
+                                });
+                            } catch {}
+
+                            return { orderId: created.orderId };
+                        }
+                    });
+
+                    const { CartService } = await import('./cart.service');
+                    const freshSummary = await CartService.getCartSummary(bot.id, senderPhone);
+                    const finalReply = agentResult.reply || freshSummary.summary || 'Pedido anotado! Diga se deseja confirmar ou alterar o endereço/quantidade.';
+
+                    // Save assistant message to DB
+                    await prisma.message.create({
+                        data: { conversationId: conversation.id, content: finalReply, role: 'assistant' }
+                    });
+
+                    // Send reply to user
+                    await deliverAssistantOutbound({
+                        channel,
+                        bot: activeBot,
+                        remoteId: senderPhone,
+                        cleanResponse: finalReply,
+                        mediaMatches: [],
+                        options
+                    });
+
+                    // Sync response to Chatwoot inbox if connected
+                    if ((channel === 'whatsapp' || channel === 'meta_whatsapp' || channel === 'instagram') && bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                        ChatwootService.syncToConversation(
+                            bot,
+                            (existingContact as any).chatwootContactId,
+                            options.chatwootConversationId,
+                            finalReply,
+                            []
+                        ).catch(() => {});
+                    }
+
+                    logToFile(`[OrderAgent] Handled turn (orderConfirmed=${agentResult.orderConfirmed})`);
+                    return; // ALWAYS RETURN! Never fall through to legacy processor loop!
+                } catch (e: any) {
+                    logToFile(`[OrderAgent] Exception in OrderAgent block: ${e.message}`);
+                    return; // NEVER fall through to legacy loop!
+                }
+            }
+
             // 10. Call AI Provider with Tool Calling support (Loop for recursive tools)
+
             let aiResult: any;
             let toolIteration = 0;
             const maxToolIterations = 5;
             let handoffDone = false;
+            let executedAnyToolInTurn = false;
 
             while (toolIteration < maxToolIterations && !handoffDone) {
                 const messages = buildConversationMessages(finalSystemPrompt, history as any);
@@ -871,14 +1084,11 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                      analysis.nextStage.toUpperCase() === 'CONFIRMADO' ||
                      analysis.nextStage.toUpperCase() === 'ORDER_CONFIRMED');
 
-                // When the stage is Pedido Confirmado and this is the first iteration,
-                // inject a hard override instruction right before the AI call.
-                // Do NOT use tool_choice forced mode — that creates orphaned tool_calls
-                // when the history has errors, breaking subsequent messages.
+                // MANDATORY HARD CONSTRAINT: Always force 'confirmar_pedido' tool execution whenever stage is Pedido Confirmado
                 if (isPedidoConfirmado && toolIteration === 0) {
                     messages.push({
                         role: 'system',
-                        content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o endereço e a forma de pagamento. Você DEVE chamar a função confirmar_pedido IMEDIATAMENTE com os dados coletados na conversa. NÃO escreva texto antes de chamar a função. Esta é uma instrução técnica de sistema e não pode ser ignorada.`
+                        content: `🔴 AÇÃO OBRIGATÓRIA AGORA: O cliente confirmou o pedido. Você DEVE chamar a função 'confirmar_pedido' IMEDIATAMENTE nesta iteração com os dados coletados (endereço, itens, pagamento). É TÉCNICAMENTE PROIBIDO responder texto dizendo que o pedido foi confirmado sem antes executar a função 'confirmar_pedido'.`
                     });
                 }
 
@@ -909,12 +1119,33 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         tool_calls: aiResult.toolCalls 
                     } as any);
 
-                    // 2. Execute each tool
+                    // 2. Execute each tool with Supervisor Gatekeeper Verification
                     for (const toolCall of aiResult.toolCalls) {
+                        executedAnyToolInTurn = true;
                         const { name, arguments: argsString } = toolCall.function;
-                        logToFile(`[Processor] Executing Tool: ${name} with args: ${argsString}`);
+                        logToFile(`[Processor] AI requested Tool Execution: ${name} with args: ${argsString}`);
                         const args = JSON.parse(argsString);
                         
+                        // --- SUPERVISOR GATEKEEPER CHECK ---
+                        const { SupervisorService } = await import('./supervisor');
+                        const gatekeeper = await SupervisorService.validateToolExecution(name, args, history as any, bot);
+
+                        if (!gatekeeper.approved) {
+                            logToFile(`[Processor] SUPERVISOR GATEKEEPER BLOCKED tool [${name}]: ${gatekeeper.reason}`);
+                            const toolResult = `AÇÃO BLOQUEADA PELO SUPERVISOR DE VENDAS!\nMotivo: ${gatekeeper.reason}\nInstrução Técnica: NÃO confirme o pedido nem execute a ação ainda. Peça as informações faltantes de forma educada ao cliente no chat.`;
+                            
+                            await (prisma.message as any).create({
+                                data: {
+                                    conversationId: conversation.id,
+                                    role: 'tool',
+                                    content: toolResult,
+                                    tool_call_id: toolCall.id
+                                }
+                            });
+                            history.push({ role: 'tool', content: toolResult, tool_call_id: toolCall.id } as any);
+                            continue;
+                        }
+
                         let toolResult = "";
                         if (name === 'consultar_horarios') {
                             try {
@@ -1286,7 +1517,32 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 } else {
                                     // No cart — build description from args
                                     const descFromArgs: string = args.itens_descricao || args.items_description || args.produtos || '';
-                                    const totalFromArgs = Number(args.total_pedido || args.total || 0);
+                                    let totalFromArgs = Number(args.total_pedido || args.total || 0);
+
+                                    // Auto-calculate price from product catalog if total is 0
+                                    if (totalFromArgs === 0 && descFromArgs) {
+                                        const activeProducts = (activeBot as any).products || await prisma.product.findMany({
+                                            where: { botId: bot.id, active: true }
+                                        });
+                                        if (activeProducts && activeProducts.length > 0) {
+                                            const descLower = descFromArgs.toLowerCase();
+                                            for (const prod of activeProducts) {
+                                                const pNameLower = prod.name.toLowerCase();
+                                                const price = Number(prod.salePrice || prod.price || 0);
+
+                                                if (descLower.includes(pNameLower) || (pNameLower.includes('gás') && (descLower.includes('gás') || descLower.includes('botijã') || descLower.includes('botijao')))) {
+                                                    let qty = 1;
+                                                    const matchQty = descLower.match(/(\d+)\s*(?:botij|gás|unid|pc|item)/i);
+                                                    if (matchQty) {
+                                                        qty = parseInt(matchQty[1], 10) || 1;
+                                                    }
+                                                    totalFromArgs = price * qty;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     summary = { total: totalFromArgs };
                                     itemsText = descFromArgs || 'Pedido verbal (sem carrinho registrado)';
                                 }
@@ -1311,6 +1567,21 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 }
                                 const finalTotal = summary.total + deliveryFee;
                                 const fullAddr = args.endereco_completo || (existingContact as any).needs || '';
+                                const cleanAddr = fullAddr.trim();
+
+                                // Check if address is incomplete (e.g. lacks street number or is just city/neighborhood)
+                                const hasNumber = /\d+/.test(cleanAddr);
+                                const isJustGenericLoc = /^(bento gonçalves|bento gonçalves,? rs|progresso|bairro progresso|botafogo)$/i.test(cleanAddr) || 
+                                                         (!hasNumber && cleanAddr.split(',').length <= 2 && cleanAddr.length < 25);
+
+                                if (isJustGenericLoc) {
+                                    logToFile(`[confirmar_pedido] Endereço incompleto ("${cleanAddr}"). Solicitando rua e número.`);
+                                    toolResult = `ENDEREÇO INCOMPLETO PARA ENTREGA!
+O endereço fornecido ("${cleanAddr}") contém apenas a cidade/bairro e NÃO tem a rua nem o número da residência.
+NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é o nome da rua e o número (ou ponto de referência) para onde o entregador deve levar o gás.`;
+                                    continue;
+                                }
+
                                 const payMethod = args.forma_pagamento || 'A combinar';
                                 const changeText = args.troco_para ? ` (Troco para R$ ${args.troco_para})` : '';
                                 const contactNotes = `Endereço: ${fullAddr}\nPagamento: ${payMethod}${changeText}`;
@@ -1325,8 +1596,20 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                                 if (mapboxToken && fullAddr) {
                                     try {
-                                        const cleanAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
-                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanAddr)}.json?access_token=${mapboxToken}&limit=1`;
+                                        const rawAddr = fullAddr.split('\n')[0].replace('Endereço: ', '').trim();
+                                        
+                                        // Default proximity anchor for Serra Gaúcha / Distributor region (-51.517, -29.170)
+                                        let proximityParam = '&proximity=-51.517,-29.170';
+                                        if (existingContact.longitude && existingContact.latitude) {
+                                            proximityParam = `&proximity=${existingContact.longitude},${existingContact.latitude}`;
+                                        }
+
+                                        // If street already contains city/state or RS, keep as is; otherwise append regional anchor
+                                        const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre| monte belo|\brs\b)/i.test(rawAddr);
+                                        const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}, Bento Gonçalves, RS, Brasil`;
+
+                                        logToFile(`[confirmar_pedido] Geocoding Mapbox searchAddr: "${searchAddr}" (Proximity: ${proximityParam})`);
+                                        const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR${proximityParam}&limit=1`;
                                         const geocodeRes = await fetch(geocodeUrl);
                                         if (geocodeRes.ok) {
                                             const geocodeData = await geocodeRes.json();
@@ -1334,6 +1617,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                             if (center) {
                                                 longitude = center[0];
                                                 latitude = center[1];
+                                                logToFile(`[confirmar_pedido] Mapbox Geocoded: lat=${latitude}, lng=${longitude}`);
                                             }
                                         }
                                     } catch (e: any) {
@@ -1352,27 +1636,231 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     }
                                 });
 
-                                // Create pending order
-                                const orderData: any = {
-                                    botId: bot.id,
-                                    contactId: existingContact.id,
-                                    totalAmount: finalTotal,
-                                    commissionAmount: 0,
-                                    status: 'PENDING',
-                                };
+                                // Check for an existing PENDING order for this contact
+                                const existingPendingOrder = await prisma.order.findFirst({
+                                    where: {
+                                        contactId: existingContact.id,
+                                        status: 'PENDING'
+                                    },
+                                    orderBy: { createdAt: 'desc' }
+                                });
 
-                                // Only attach cart items if a real cart exists
+                                let order: any;
+                                let isOrderUpdate = false;
+
+                                let itemsToCreate: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
+
+                                const activeProducts = await prisma.product.findMany({
+                                    where: { botId: bot.id, active: true }
+                                });
+
                                 if (hasCart) {
-                                    orderData.items = {
-                                        create: cart!.items.map(item => ({
-                                            productId: item.productId,
-                                            quantity: item.quantity,
-                                            unitPrice: item.unitPrice
-                                        }))
-                                    };
+                                    itemsToCreate = cart!.items.map((item: any) => ({
+                                        productId: item.productId,
+                                        quantity: item.quantity,
+                                        unitPrice: item.unitPrice
+                                    }));
+                                } else {
+                                    // Para pedidos verbais no chat, extrai quantidade e associa ao produto do bot
+                                    const descFromArgs: string = args.itens_descricao || args.items_description || args.produtos || '';
+                                    let parsedQty = 1;
+                                    const matchQty = descFromArgs.match(/(\d+)\s*(?:x|botij|gás|unid|pc|item)/i) || descFromArgs.match(/^(\d+)/);
+                                    if (matchQty) {
+                                        parsedQty = parseInt(matchQty[1], 10) || 1;
+                                    }
+
+                                    if (activeProducts.length > 0) {
+                                        const descLower = descFromArgs.toLowerCase();
+
+                                        let matchedProd = activeProducts.find(p => {
+                                            const pName = p.name.toLowerCase();
+                                            if ((descLower.includes('13') || descLower.includes('p13') || descLower.includes('p-13')) && (pName.includes('13') || pName.includes('p13') || pName.includes('p-13'))) return true;
+                                            if ((descLower.includes('45') || descLower.includes('p45') || descLower.includes('p-45')) && (pName.includes('45') || pName.includes('p45') || pName.includes('p-45'))) return true;
+                                            if ((descLower.includes('20') || descLower.includes('p20') || descLower.includes('p-20')) && (pName.includes('20') || pName.includes('p20') || pName.includes('p-20'))) return true;
+                                            return pName.split(' ').some(word => word.length > 2 && descLower.includes(word));
+                                        });
+
+                                        if (!matchedProd) {
+                                            matchedProd = activeProducts.find(p => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
+                                        }
+
+                                        const prod = matchedProd;
+                                        const price = Number(prod.salePrice || prod.price || 0);
+                                        itemsToCreate = [{
+                                            productId: prod.id,
+                                            quantity: parsedQty,
+                                            unitPrice: price > 0 ? price : (summary.total > 0 ? summary.total / parsedQty : 0)
+                                        }];
+                                    }
                                 }
 
-                                const order = await prisma.order.create({ data: orderData });
+                                // Detect all distinct delivery addresses for multi-address orders in current order turn only
+                                let addressesToCreate: string[] = [];
+
+                                if (args.endereco_completo && (args.endereco_completo.includes(';') || args.endereco_completo.includes('\n'))) {
+                                    addressesToCreate = args.endereco_completo.split(/;|\n/).map((a: string) => a.trim()).filter((a: string) => a.length > 5);
+                                }
+
+                                const textToScan = `${args.itens_descricao || ''} ${args.items_description || ''} ${history.slice(-4).map(h => h.content || '').join(' ')}`;
+                                const streetMatches = textToScan.match(/(?:rua|r\.|avenida|av\.|estrada|alameda)\s+[^,.;\n]+,?\s*\d+/gi) || [];
+                                for (const match of streetMatches) {
+                                    const clean = match.trim();
+                                    if (!addressesToCreate.some(a => a.toLowerCase().includes(clean.toLowerCase()) || clean.toLowerCase().includes(a.toLowerCase()))) {
+                                        addressesToCreate.push(clean);
+                                    }
+                                }
+
+                                if (addressesToCreate.length <= 1) {
+                                    let currentTurnStartIndex = 0;
+                                    for (let i = history.length - 1; i >= 0; i--) {
+                                        const text = (history[i].content || '').toLowerCase();
+                                        if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão') || text.includes('preciso') || text.includes('mais '))) {
+                                            currentTurnStartIndex = i;
+                                            break;
+                                        }
+                                    }
+                                    const currentTurnHistory = history.slice(currentTurnStartIndex);
+
+                                    const currentOrderAddresses: string[] = [];
+                                    for (const h of currentTurnHistory) {
+                                        if (h.role === 'user') {
+                                            const content = (h.content || '').trim();
+                                            if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
+                                                if (!currentOrderAddresses.includes(content)) {
+                                                    currentOrderAddresses.push(content);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    const isMultiDeliveryRequest = currentTurnHistory.some(h => (h.content || '').match(/(outro no|locais diferentes|dividido|centro e|botafogo e|1 no|2 no|3 no|5 no|mais \d+ no)/i));
+                                    if (isMultiDeliveryRequest && currentOrderAddresses.length >= 2) {
+                                        addressesToCreate = currentOrderAddresses;
+                                    } else {
+                                        addressesToCreate = [fullAddr];
+                                    }
+                                }
+
+                                const getStreetKey = (addr: string) => {
+                                    const raw = addr.split(',')[0].replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '');
+                                    return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                };
+
+                                const uniqueAddresses: string[] = [];
+                                for (const addr of addressesToCreate) {
+                                    const key = getStreetKey(addr);
+                                    if (key && !uniqueAddresses.some(u => {
+                                        const uKey = getStreetKey(u);
+                                        return uKey === key || uKey.includes(key) || key.includes(uKey);
+                                    })) {
+                                        uniqueAddresses.push(addr);
+                                    }
+                                }
+                                addressesToCreate = uniqueAddresses.length > 0 ? uniqueAddresses : [fullAddr];
+
+                                // Clear old stale pending orders for this contact so only fresh confirmed orders appear on Fleet dashboard
+                                await prisma.orderItem.deleteMany({
+                                    where: { order: { contactId: existingContact.id, status: 'PENDING' } }
+                                }).catch(() => {});
+                                await prisma.order.deleteMany({
+                                    where: { contactId: existingContact.id, status: 'PENDING' }
+                                }).catch(() => {});
+
+                                // Create pending orders for each delivery address verified by Mapbox
+                                for (const singleAddr of addressesToCreate) {
+                                    let verifiedAddr = singleAddr;
+                                    let orderLat: number | null = latitude;
+                                    let orderLng: number | null = longitude;
+
+                                    if (mapboxToken) {
+                                        try {
+                                            const rawAddr = singleAddr.split('\n')[0]
+                                                .replace('Endereço: ', '')
+                                                .replace(/\s+em\s+/gi, ', ')
+                                                .replace(/\s+no\s+/gi, ', ')
+                                                .replace(/\s+na\s+/gi, ', ')
+                                                .replace(/\s+/g, ' ')
+                                                .trim();
+
+                                            const cityContext = bot?.address ? `, ${bot.address}` : ', Bento Gonçalves, RS, Brasil';
+                                            const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
+                                            const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
+                                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                            
+                                            const geocodeRes = await fetch(geocodeUrl);
+                                            if (geocodeRes.ok) {
+                                                const geocodeData = await geocodeRes.json();
+                                                const feature = geocodeData.features?.[0];
+                                                if (feature) {
+                                                    if (feature.place_name) verifiedAddr = feature.place_name;
+                                                    if (feature.center) {
+                                                        orderLng = feature.center[0];
+                                                        orderLat = feature.center[1];
+                                                    }
+                                                }
+                                            }
+                                        } catch (e: any) {
+                                            console.error('[confirmar_pedido] Geocoding singleAddr exception:', e.message);
+                                        }
+                                    }
+
+                                    let addrQty = 1;
+                                    const streetWithoutNum = singleAddr.split(',')[0]
+                                        .replace(/^(rua|r\.|avenida|av\.|estrada|alameda)\s+/i, '')
+                                        .replace(/\d+/g, '')
+                                        .trim();
+
+                                    if (streetWithoutNum.length > 2) {
+                                        const regexBefore = new RegExp(`(\\d+)\\s*(?:botij|gás|unid|p13)?[^,.\\n]*?(?:na|no|em|para)?\\s*[^,.\\n]*?${streetWithoutNum.replace(/[^a-zA-Z]/g, '\\$&')}`, 'i');
+                                        const regexAfter = new RegExp(`${streetWithoutNum.replace(/[^a-zA-Z]/g, '\\$&')}[^,.\\n]*?(\\d+)\\s*(?:botij|gás|unid|p13)?`, 'i');
+
+                                        const matchBefore = textToScan.match(regexBefore);
+                                        const matchAfter = textToScan.match(regexAfter);
+
+                                        if (matchBefore) {
+                                            addrQty = parseInt(matchBefore[1], 10) || 1;
+                                        } else if (matchAfter) {
+                                            addrQty = parseInt(matchAfter[1], 10) || 1;
+                                        }
+                                    }
+
+                                    if (addrQty > 20) {
+                                        const directQtyMatch = (history.slice(-3).map((h: any) => h.content || '').join(' ')).match(/(\d+)\s*(?:botij|gás)/i);
+                                        if (directQtyMatch) {
+                                            addrQty = parseInt(directQtyMatch[1], 10) || 1;
+                                        } else {
+                                            addrQty = 1;
+                                        }
+                                    }
+
+                                    const p13Product = activeProducts.find((p: any) => p.name.toLowerCase().includes('13') || p.name.toLowerCase().includes('p13')) || activeProducts[0];
+                                    const p13UnitPrice = p13Product ? Number(p13Product.salePrice || p13Product.price || 139) : 139;
+
+                                    const singleOrderItems = p13Product ? [{
+                                        productId: p13Product.id,
+                                        quantity: addrQty,
+                                        unitPrice: p13UnitPrice
+                                    }] : itemsToCreate;
+
+                                    const singleOrderTotal = p13UnitPrice * addrQty;
+
+                                    const orderData: any = {
+                                        botId: activeBot.id,
+                                        contactId: existingContact.id,
+                                        address: verifiedAddr,
+                                        latitude: orderLat,
+                                        longitude: orderLng,
+                                        totalAmount: singleOrderTotal,
+                                        commissionAmount: 0,
+                                        status: 'PENDING',
+                                        items: {
+                                            create: singleOrderItems
+                                        }
+                                    };
+
+                                    order = await prisma.order.create({ data: orderData });
+                                    logToFile(`[confirmar_pedido] Pedido gerado com sucesso com endereço oficial do Mapbox: "${verifiedAddr}" (ID: ${order.id})`);
+                                }
 
                                 // Transition the CRM stage to "PEDIDO CONFIRMADO"
                                 const confirmedStage = await prisma.crmStage.findFirst({
@@ -1398,8 +1886,8 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 }
 
                                 // Build notification message for the support human agent
-                                const title = `📦 Novo Pedido Confirmado`;
-                                const notificationMessage = `*${title}*\n\nUm novo pedido foi confirmado pelo bot.\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
+                                const title = isOrderUpdate ? `📦 Pedido Atualizado (Alterações)` : `📦 Novo Pedido Confirmado`;
+                                const notificationMessage = `*${title}*\n\n${isOrderUpdate ? 'O pedido pendente existente foi atualizado pelo bot com as novas informações fornecidas pelo cliente.' : 'Um novo pedido foi confirmado pelo bot.'}\n\n*Dados do Cliente:*\n- Nome: ${existingContact.name || 'Não informado'}\n- Telefone: ${senderPhone}\n- Endereço: ${fullAddr}\n- Forma de Pagamento: ${payMethod}${changeText}\n- Valor Total: R$ ${finalTotal.toFixed(2)}\n\n*Itens do Pedido:*\n${itemsText}`;
 
                                 const handoffDigits = ((bot as { fallbackContact?: string | null }).fallbackContact || '').replace(/\D/g, '');
                                 const whatsappNotifyTarget = handoffDigits || bot.tenant?.whatsapp || null;
@@ -1429,7 +1917,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     data: {
                                         conversationId: conversation.id,
                                         role: 'system',
-                                        content: `[Notificação de Pedido Confirmado enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
+                                        content: `[Notificação de Pedido ${isOrderUpdate ? 'Atualizado' : 'Confirmado'} enviada ao Atendente]\n${notificationMessage}\n\n${notifyResultLine}`,
                                     },
                                 });
 
@@ -1441,7 +1929,12 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                     });
                                 }
 
-                                toolResult = `PEDIDO CRIADO COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\nO pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!`;
+                                const statusVerb = isOrderUpdate ? 'ATUALIZADO' : 'CRIADO';
+                                const actionMsg = isOrderUpdate 
+                                    ? 'O pedido pendente existente foi atualizado no painel de entregadores com os novos dados. Diga ao cliente que a alteração de endereço/pedido foi feita com sucesso!' 
+                                    : 'O pedido já está visível para os operadores no painel de frota e entregadores. Diga ao cliente que o pedido foi confirmado com sucesso e que o entregador já está a caminho!';
+
+                                toolResult = `PEDIDO ${statusVerb} COM SUCESSO!\nID do Pedido: ${order.id}\nValor Total: R$ ${finalTotal.toFixed(2)}${deliveryMsg}.\nForma de Pagamento: ${payMethod}.\nEndereço de Entrega: ${fullAddr}.\n${actionMsg}`;
                             } catch (e: any) {
                                 console.error('[confirmar_pedido] Exception:', e.message, e.stack);
                                 toolResult = `Erro ao confirmar o pedido: ${e.message}`;
@@ -1647,8 +2140,8 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
             const mediaMatches = Array.from(aiResponse.matchAll(MEDIA_TAG_REGEX));
             let cleanResponse = aiResponse.replace(MEDIA_TAG_REGEX, '').trim();
 
-            // 12. Save Assistant Final Response (only if not a tool call already handled)
-            if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
+            // 12. Save Assistant Final Response to CRM history
+            if (cleanResponse && cleanResponse.trim().length > 0) {
                 await prisma.message.create({
                     data: {
                         conversationId: conversation.id,
@@ -1659,6 +2152,113 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                         aiProvider: typeof aiResult === 'object' ? (aiResult.provider ?? null) : null,
                     },
                 });
+            }
+
+            // SAFETY AUDIT: Ensure order is physically created in DB if AI text claims order is confirmed
+            const isTextClaimingOrderConfirmed = /(pedido confirmado|confirmado com sucesso|entregador já está a caminho|pedido registrado|confirmar o pedido)/i.test(cleanResponse);
+
+            if (isTextClaimingOrderConfirmed) {
+                const recentOrder = await prisma.order.findFirst({
+                    where: {
+                        contactId: existingContact.id,
+                        createdAt: { gte: new Date(Date.now() - 60000) }
+                    }
+                });
+
+                if (!recentOrder) {
+                    logToFile(`[Processor Safety Audit] AI output text claims order is confirmed, but model omitted tool execution and no recent order was created. Triggering direct DB order creation fallback!`);
+
+                    let currentTurnStartIndex = 0;
+                    for (let i = history.length - 1; i >= 0; i--) {
+                        const text = (history[i].content || '').toLowerCase();
+                        if (history[i].role === 'user' && (text.includes('quero') || text.includes('gás') || text.includes('pedido') || text.includes('botijão') || text.includes('preciso') || text.includes('mais '))) {
+                            currentTurnStartIndex = i;
+                            break;
+                        }
+                    }
+                    const currentTurnHistory = history.slice(currentTurnStartIndex);
+
+                    const currentTurnAddresses: string[] = [];
+                    for (const h of currentTurnHistory) {
+                        if (h.role === 'user' && h.content) {
+                            const content = h.content.trim();
+                            if ((/\d+/.test(content) || /rua|avenida|r\.|av\.|bairro|km|estrada/i.test(content)) && !/^(dinheiro|pix|cartão|sim|isso|pode|ok|nao|não|nada)$/i.test(content)) {
+                                if (!currentTurnAddresses.includes(content)) currentTurnAddresses.push(content);
+                            }
+                        }
+                    }
+
+                    const fullAddr = currentTurnAddresses.join('; ') || (existingContact as any).needs || (existingContact as any).notes || 'Bento Gonçalves, RS';
+                    const addressesToCreate = currentTurnAddresses.length > 0 ? currentTurnAddresses : [fullAddr];
+
+                    const activeProducts = await prisma.product.findMany({
+                        where: { botId: bot.id, active: true }
+                    });
+                    const defaultProduct = activeProducts[0];
+                    const unitPrice = defaultProduct ? Number(defaultProduct.salePrice || defaultProduct.price || 139) : 139;
+
+                    for (const singleAddr of addressesToCreate) {
+                        let verifiedAddr = singleAddr;
+                        let orderLat: number | null = null;
+                        let orderLng: number | null = null;
+
+                        if (mapboxToken) {
+                            try {
+                                const searchAddr = singleAddr.includes('Bento') ? singleAddr : `${singleAddr}, Bento Gonçalves, RS, Brasil`;
+                                const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                                const res = await fetch(geocodeUrl);
+                                if (res.ok) {
+                                    const json = await res.json();
+                                    const feature = json.features?.[0];
+                                    if (feature) {
+                                        if (feature.place_name) verifiedAddr = feature.place_name;
+                                        if (feature.center) {
+                                            orderLng = feature.center[0];
+                                            orderLat = feature.center[1];
+                                        }
+                                    }
+                                }
+                            } catch (e: any) {}
+                        }
+
+                        const fallbackOrder = await prisma.order.create({
+                            data: {
+                                botId: activeBot.id,
+                                contactId: existingContact.id,
+                                totalAmount: unitPrice,
+                                commissionAmount: 0,
+                                status: 'PENDING',
+                                ...(defaultProduct ? {
+                                    items: {
+                                        create: [{
+                                            productId: defaultProduct.id,
+                                            quantity: 1,
+                                            unitPrice: unitPrice
+                                        }]
+                                    }
+                                } : {})
+                            }
+                        });
+
+                        logToFile(`[Processor Safety Audit] Created fallback Order ID: ${fallbackOrder.id} for address: "${verifiedAddr}"`);
+                    }
+
+                    const confirmedStage = await prisma.crmStage.findFirst({
+                        where: {
+                            pipeline: { botId: bot.id },
+                            name: { contains: 'CONFIRMADO', mode: 'insensitive' }
+                        }
+                    });
+                    if (confirmedStage) {
+                        await prisma.contact.update({
+                            where: { id: existingContact.id },
+                            data: {
+                                stageId: confirmedStage.id,
+                                funnelStage: confirmedStage.name
+                            }
+                        });
+                    }
+                }
             }
 
             VectorService.addDocument(bot.id, `User: ${messageText}`, { type: 'chat_history', conversationId: conversation.id }).catch(e => logger.error({ err: e }, 'Vector save error'));

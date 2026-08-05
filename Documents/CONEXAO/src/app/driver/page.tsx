@@ -12,7 +12,13 @@ import {
     Loader2,
     RefreshCw,
     UserCheck,
-    Check
+    Check,
+    XCircle,
+    DollarSign,
+    CreditCard,
+    QrCode,
+    FileText,
+    X
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { cleanAddress } from '@/lib/phone-utils';
@@ -27,6 +33,15 @@ function DriverDashboardContent() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
+    // Modals & Action State
+    const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<any | null>(null);
+    const [paymentMethods, setPaymentMethods] = useState<string[]>(['PIX']);
+
+    const [selectedOrderForCancel, setSelectedOrderForCancel] = useState<any | null>(null);
+    const [cancelReason, setCancelReason] = useState<string>('CLIENTE_AUSENTE');
+    const [cancelNote, setCancelNote] = useState<string>('');
+    const [submittingAction, setSubmittingAction] = useState(false);
+
     // GPS Telemetry State
     const [gpsActive, setGpsActive] = useState(false);
     const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -189,9 +204,21 @@ function DriverDashboardContent() {
         }
     };
 
-    // 4. Mark Delivery Completed
-    const completeDelivery = async (orderId: string) => {
-        if (!token) return;
+    const togglePaymentMethod = (methodId: string) => {
+        setPaymentMethods(prev => {
+            if (prev.includes(methodId)) {
+                if (prev.length === 1) return prev;
+                return prev.filter(m => m !== methodId);
+            } else {
+                return [...prev, methodId];
+            }
+        });
+    };
+
+    // 4. Mark Delivery Completed with Selected Payment Tag(s)
+    const handleConfirmDelivery = async () => {
+        if (!token || !selectedOrderForDelivery) return;
+        setSubmittingAction(true);
         
         try {
             const res = await fetch('/api/drivers/me', {
@@ -199,21 +226,70 @@ function DriverDashboardContent() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     token,
-                    orderId,
-                    action: 'complete'
+                    orderId: selectedOrderForDelivery.id,
+                    action: 'complete',
+                    paymentMethods
                 })
             });
 
+            let data: any = {};
+            try {
+                data = await res.json();
+            } catch (e) {
+                data = { error: `Servidor indisponível (${res.status}). Tente novamente em instantes.` };
+            }
+
             if (!res.ok) {
-                const data = await res.json();
                 throw new Error(data.error || 'Erro ao finalizar entrega.');
             }
 
             toast.success('Entrega concluída com sucesso!');
-            // Reload data
+            setSelectedOrderForDelivery(null);
             loadDriverData(token);
         } catch (err: any) {
-            toast.error(err.message);
+            toast.error(err.message || 'Erro de conexão.');
+        } finally {
+            setSubmittingAction(false);
+        }
+    };
+
+    // 5. Mark Delivery Cancelled/Returned with Reason
+    const handleConfirmCancel = async () => {
+        if (!token || !selectedOrderForCancel) return;
+        setSubmittingAction(true);
+        
+        try {
+            const res = await fetch('/api/drivers/me', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token,
+                    orderId: selectedOrderForCancel.id,
+                    action: 'cancel',
+                    cancelReason,
+                    cancelNote
+                })
+            });
+
+            let data: any = {};
+            try {
+                data = await res.json();
+            } catch (e) {
+                data = { error: `Servidor indisponível (${res.status}). Tente novamente em instantes.` };
+            }
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Erro ao cancelar entrega.');
+            }
+
+            toast.success('Entrega devolvida/cancelada com sucesso.');
+            setSelectedOrderForCancel(null);
+            setCancelNote('');
+            loadDriverData(token);
+        } catch (err: any) {
+            toast.error(err.message || 'Erro de conexão.');
+        } finally {
+            setSubmittingAction(false);
         }
     };
 
@@ -379,12 +455,26 @@ function DriverDashboardContent() {
                                             <Navigation className="h-3.5 w-3.5 text-[#c084fc]" /> Rota Maps
                                         </a>
                                         <button 
-                                            onClick={() => completeDelivery(order.id)}
-                                            className="p-3 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_10px_var(--primary-glow)] border-0"
+                                            onClick={() => {
+                                                setSelectedOrderForDelivery(order);
+                                                setPaymentMethods(['PIX']);
+                                            }}
+                                            className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white text-xs font-semibold rounded-2xl flex items-center justify-center gap-1.5 transition shadow-[0_0_12px_rgba(16,185,129,0.3)] border-0"
                                         >
-                                            <Check className="h-3.5 w-3.5 text-white" /> Entregue
+                                            <Check className="h-4 w-4 text-white" /> Entregue
                                         </button>
                                     </div>
+
+                                    <button 
+                                        onClick={() => {
+                                            setSelectedOrderForCancel(order);
+                                            setCancelReason('CLIENTE_AUSENTE');
+                                            setCancelNote('');
+                                        }}
+                                        className="w-full p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-xl flex items-center justify-center gap-1.5 border border-red-500/20 transition"
+                                    >
+                                        <XCircle className="h-3.5 w-3.5" /> Devolver / Cancelar Entrega
+                                    </button>
                                 </div>
                             );
                         })
@@ -392,6 +482,180 @@ function DriverDashboardContent() {
                 </div>
 
             </main>
+
+            {/* MODAL: ENTREGUE - SELEÇÃO DE PAGAMENTO */}
+            {selectedOrderForDelivery && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#0f0b29] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 text-white">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                                    <CheckCircle2 className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-base">Finalizar Entrega</h3>
+                                    <p className="text-xs text-gray-400">Cliente: {selectedOrderForDelivery.contact?.name || 'Cliente'}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedOrderForDelivery(null)}
+                                className="p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                                    Forma(s) de Pagamento:
+                                </label>
+                                <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                    Pode selecionar mais de uma
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {[
+                                    { id: 'PIX', label: 'PIX', icon: QrCode, color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+                                    { id: 'DINHEIRO', label: 'Dinheiro', icon: DollarSign, color: 'border-green-500/40 bg-green-500/10 text-green-300' },
+                                    { id: 'CARTAO', label: 'Cartão', icon: CreditCard, color: 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300' },
+                                    { id: 'ANOTADO', label: 'Anotado (Fiado)', icon: FileText, color: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+                                    { id: 'JA_PAGO', label: 'Já Pago (Online)', icon: CheckCircle2, color: 'border-blue-500/40 bg-blue-500/10 text-blue-300' },
+                                ].map((pm) => {
+                                    const IconComponent = pm.icon;
+                                    const isSelected = paymentMethods.includes(pm.id);
+                                    return (
+                                        <button
+                                            key={pm.id}
+                                            type="button"
+                                            onClick={() => togglePaymentMethod(pm.id)}
+                                            className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-between transition active:scale-95 ${
+                                                isSelected 
+                                                    ? `${pm.color} ring-2 ring-emerald-500 shadow-lg` 
+                                                    : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <IconComponent className="h-4 w-4 shrink-0" />
+                                                <span>{pm.label}</span>
+                                            </div>
+                                            {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedOrderForDelivery(null)}
+                                className="w-1/3 py-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold transition border border-white/10"
+                            >
+                                Voltar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmDelivery}
+                                disabled={submittingAction}
+                                className="w-2/3 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                            >
+                                {submittingAction ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                <span>Confirmar Entrega</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: CANCELAR / DEVOLVER ENTREGA */}
+            {selectedOrderForCancel && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#0f0b29] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 text-white">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-red-500/20 text-red-400">
+                                    <AlertCircle className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-base">Devolver / Cancelar</h3>
+                                    <p className="text-xs text-gray-400">Cliente: {selectedOrderForCancel.contact?.name || 'Cliente'}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setSelectedOrderForCancel(null)}
+                                className="p-1.5 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">
+                                Motivo da devolução:
+                            </label>
+
+                            <div className="space-y-2">
+                                {[
+                                    { id: 'CLIENTE_AUSENTE', label: '🏠 Cliente Ausente / Não Atende' },
+                                    { id: 'ENDERECO_NAO_ENCONTRADO', label: '📍 Endereço Não Encontrado' },
+                                    { id: 'RECUSADO', label: '🚫 Recusado pelo Cliente' },
+                                    { id: 'OUTRO', label: '📝 Outro Motivo' },
+                                ].map((r) => {
+                                    const isSelected = cancelReason === r.id;
+                                    return (
+                                        <button
+                                            key={r.id}
+                                            type="button"
+                                            onClick={() => setCancelReason(r.id)}
+                                            className={`w-full p-3 rounded-2xl border text-xs font-bold text-left transition active:scale-98 ${
+                                                isSelected 
+                                                    ? 'border-red-500/40 bg-red-500/10 text-red-300 ring-2 ring-red-500' 
+                                                    : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            {r.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {cancelReason === 'OUTRO' && (
+                                <div className="mt-3">
+                                    <input
+                                        type="text"
+                                        value={cancelNote}
+                                        onChange={e => setCancelNote(e.target.value)}
+                                        placeholder="Descreva o motivo (opcional)..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500 transition"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedOrderForCancel(null)}
+                                className="w-1/3 py-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold transition border border-white/10"
+                            >
+                                Voltar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmCancel}
+                                disabled={submittingAction}
+                                className="w-2/3 py-3 px-4 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:opacity-90 text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-red-500/20 disabled:opacity-50"
+                            >
+                                {submittingAction ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                                <span>Confirmar Cancelamento</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }
