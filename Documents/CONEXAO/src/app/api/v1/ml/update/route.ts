@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { CONEXT_PLUGINS } from '@/lib/conext-plugins';
 
 export async function POST(req: Request) {
     try {
@@ -22,29 +23,7 @@ export async function POST(req: Request) {
         const clientVersion = body.version || '1.0.0';
         const siteUrl = body.site_url || '';
         
-        const allowedPlugins: Record<string, { folder: string, file: string, name: string, zip: string, desc: string }> = {
-            'ts-ml-integration': {
-                folder: 'ts-ml-integration',
-                file: 'ts-ml-integration.php',
-                name: 'ToySport Mercado Livre Integration',
-                zip: 'ts-ml-integration.zip',
-                desc: 'Integração completa entre WooCommerce e Mercado Livre com sincronização bidirecional, gestão de pedidos, mensagens, envios e muito mais.'
-            },
-            'conexbot-wp': {
-                folder: 'conexbot-wp',
-                file: 'conexbot-wp.php',
-                name: 'Conexbot Automação & CRM (WhatsApp)',
-                zip: 'conexbot-wp.zip',
-                desc: 'Integre perfeitamente a Inteligência Artificial Conexão ao seu WooCommerce. O Bot mapeia seu estoque e interage com clientes via Chat e WhatsApp.'
-            },
-            'conext-writer': {
-                folder: 'conext-writer',
-                file: 'conext-writer.php',
-                name: 'Conext Writer',
-                zip: 'conext-writer.zip',
-                desc: 'Multi-Agent AI Writer com fallbacks de OpenAI e Gemini para geração automatizada de conteúdo e otimização SEO.'
-            }
-        };
+        const allowedPlugins = CONEXT_PLUGINS;
         
         if (!allowedPlugins[plugin]) {
             return NextResponse.json({ error: 'Invalid plugin' }, { status: 400 });
@@ -56,7 +35,11 @@ export async function POST(req: Request) {
         
         if (fs.existsSync(pluginPath)) {
             const content = fs.readFileSync(pluginPath, 'utf8');
-            const match = content.match(/\*\s*Version:\s*([0-9.]+)/i);
+            // Some plugin headers use a docblock with a leading "*" per line, others (ex:
+            // conext-writer.php) use a plain /* ... */ block with no per-line prefix — this
+            // used to silently never match for those, so version_check always fell back to
+            // '1.0.0' and never reported an update as available.
+            const match = content.match(/Version:\s*([0-9.]+)/i);
             if (match && match[1]) {
                 latestVersion = match[1];
             }
