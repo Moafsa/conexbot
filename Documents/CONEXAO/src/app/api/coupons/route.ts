@@ -23,7 +23,10 @@ export async function GET(req: Request) {
 
         const coupons = await prisma.coupon.findMany({
             where: { botId },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            include: {
+                products: { include: { product: { select: { id: true, name: true } } } }
+            }
         });
 
         return NextResponse.json(coupons);
@@ -38,8 +41,8 @@ export async function POST(req: Request) {
         if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { botId, code, type, value, expiresAt, usageLimit } = body;
-        
+        const { botId, code, type, value, expiresAt, usageLimit, productIds } = body;
+
         if (!botId || !code || !value) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
@@ -60,6 +63,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Cupom já existe para este robô' }, { status: 400 });
         }
 
+        // Only allow linking products that actually belong to this bot's catalog
+        const validProductIds = Array.isArray(productIds) && productIds.length > 0
+            ? (await prisma.product.findMany({ where: { id: { in: productIds }, botId }, select: { id: true } })).map(p => p.id)
+            : [];
+
         const coupon = await prisma.coupon.create({
             data: {
                 botId,
@@ -69,6 +77,12 @@ export async function POST(req: Request) {
                 value: parseFloat(value),
                 expiresAt: expiresAt ? new Date(expiresAt) : null,
                 usageLimit: usageLimit ? parseInt(usageLimit) : null,
+                products: validProductIds.length > 0
+                    ? { create: validProductIds.map(productId => ({ productId })) }
+                    : undefined,
+            },
+            include: {
+                products: { include: { product: { select: { id: true, name: true } } } }
             }
         });
 

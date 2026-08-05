@@ -36,6 +36,7 @@ interface CouponInfo {
     code: string;
     value: number;
     type: 'PERCENTAGE' | 'FIXED';
+    productNames?: string[]; // vazio/ausente = vale para todo o catálogo
 }
 
 export interface BotContext {
@@ -360,11 +361,14 @@ ${adLines.join('\n')}
 
     // Coupons (Strategic)
     if (bot.coupons && bot.coupons.length > 0) {
-        const couponLines = bot.coupons.map(c => 
-            `- ${c.code}: ${c.type === 'PERCENTAGE' ? c.value + '%' : 'R$ ' + c.value.toFixed(2)} de desconto`
-        );
+        const couponLines = bot.coupons.map(c => {
+            const scope = c.productNames && c.productNames.length > 0
+                ? ` — válido APENAS para: ${c.productNames.join(', ')}`
+                : ' — válido para qualquer produto do catálogo';
+            return `- ${c.code}: ${c.type === 'PERCENTAGE' ? c.value + '%' : 'R$ ' + c.value.toFixed(2)} de desconto${scope}`;
+        });
         sections.push(`═══ CUPONS E DESCONTOS (ESTRATÉGICO) ═══
-Abaixo estão os códigos de desconto ativos no sistema. 
+Abaixo estão os códigos de desconto ativos no sistema.
 
 ${couponLines.join('\n')}
 
@@ -373,7 +377,8 @@ ${couponLines.join('\n')}
 2. SÓ ofereça um cupom se:
    - O cliente hesitar ou desistir da compra (ex: "está caro", "não posso agora", "vou pensar").
    - O cliente perguntar explicitamente se existe algum desconto ou cupom.
-3. Use o cupom como um "empurrão final" para fechar a venda agora.`);
+3. Use o cupom como um "empurrão final" para fechar a venda agora.
+4. NUNCA ofereça ou aplique um cupom em um produto fora da lista de "válido APENAS para" dele. Se o cliente pedir um cupom para um produto que não está na lista, diga que esse cupom não é válido para aquele item.`);
     }
 
     // Fallback to human

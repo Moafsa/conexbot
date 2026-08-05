@@ -14,10 +14,17 @@ interface Coupon {
     expiresAt?: string | null;
     usageLimit?: number | null;
     usedCount: number;
+    products?: { productId: string; product: { id: string; name: string } }[];
+}
+
+interface ProductOption {
+    id: string;
+    name: string;
 }
 
 export function CouponManager({ botId }: { botId: string }) {
     const [coupons, setCoupons] = useState<Coupon[]>([]);
+    const [products, setProducts] = useState<ProductOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -29,11 +36,13 @@ export function CouponManager({ botId }: { botId: string }) {
         value: "",
         expiresAt: "",
         usageLimit: "",
-        active: true
+        active: true,
+        productIds: [] as string[]
     });
 
     useEffect(() => {
         fetchCoupons();
+        fetchProducts();
     }, [botId]);
 
     async function fetchCoupons() {
@@ -48,6 +57,27 @@ export function CouponManager({ botId }: { botId: string }) {
         } finally {
             setLoading(false);
         }
+    }
+
+    async function fetchProducts() {
+        try {
+            const res = await fetch(`/api/products?botId=${botId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setProducts(Array.isArray(data) ? data.map((p: any) => ({ id: p.id, name: p.name })) : []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch products", error);
+        }
+    }
+
+    function toggleProduct(productId: string) {
+        setFormData(prev => ({
+            ...prev,
+            productIds: prev.productIds.includes(productId)
+                ? prev.productIds.filter(id => id !== productId)
+                : [...prev.productIds, productId]
+        }));
     }
 
     async function handleSubmit(e: React.FormEvent) {
@@ -116,7 +146,8 @@ export function CouponManager({ botId }: { botId: string }) {
             value: coupon.value.toString(),
             expiresAt: coupon.expiresAt ? format(new Date(coupon.expiresAt), "yyyy-MM-dd") : "",
             usageLimit: coupon.usageLimit?.toString() || "",
-            active: coupon.active
+            active: coupon.active,
+            productIds: coupon.products?.map(p => p.productId) || []
         });
         setIsModalOpen(true);
     }
@@ -129,7 +160,8 @@ export function CouponManager({ botId }: { botId: string }) {
             value: "",
             expiresAt: "",
             usageLimit: "",
-            active: true
+            active: true,
+            productIds: []
         });
     }
 
@@ -171,6 +203,7 @@ export function CouponManager({ botId }: { botId: string }) {
                             <tr className="border-b border-gray-200">
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm">Código</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm">Desconto</th>
+                                <th className="py-3 px-4 text-gray-600 font-medium text-sm">Produtos</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm">Validade</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm">Uso</th>
                                 <th className="py-3 px-4 text-gray-600 font-medium text-sm">Status</th>
@@ -185,6 +218,19 @@ export function CouponManager({ botId }: { botId: string }) {
                                     </td>
                                     <td className="py-3 px-4 text-gray-600 text-sm">
                                         {c.type === 'PERCENTAGE' ? `${c.value}%` : `R$ ${c.value.toFixed(2)}`}
+                                    </td>
+                                    <td className="py-3 px-4 text-gray-600 text-sm max-w-[220px]">
+                                        {!c.products || c.products.length === 0 ? (
+                                            <span className="text-gray-400 italic">Todos os produtos</span>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-1">
+                                                {c.products.map(p => (
+                                                    <span key={p.productId} className="bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                                                        {p.product.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="py-3 px-4 text-gray-600 text-sm">
                                         {c.expiresAt ? format(new Date(c.expiresAt), "dd/MM/yy", { locale: ptBR }) : 'Permanente'}
@@ -296,9 +342,35 @@ export function CouponManager({ botId }: { botId: string }) {
                                 </div>
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Produtos válidos para este cupom
+                                </label>
+                                <p className="text-xs text-gray-500 mb-2">
+                                    Não selecione nenhum para o cupom valer no catálogo inteiro.
+                                </p>
+                                {products.length === 0 ? (
+                                    <p className="text-xs text-gray-400 italic">Nenhum produto cadastrado ainda.</p>
+                                ) : (
+                                    <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                        {products.map(p => (
+                                            <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.productIds.includes(p.id)}
+                                                    onChange={() => toggleProduct(p.id)}
+                                                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                                />
+                                                {p.name}
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="flex items-center gap-2 pt-2">
-                                <input 
-                                    type="checkbox" 
+                                <input
+                                    type="checkbox"
                                     id="coupon-active"
                                     checked={formData.active}
                                     onChange={(e) => setFormData({ ...formData, active: e.target.checked })}

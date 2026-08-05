@@ -22,6 +22,22 @@ export async function PUT(req: Request, { params }: { params: any }) {
             return NextResponse.json({ error: 'Coupon not found or unauthorized' }, { status: 404 });
         }
 
+        // productIds, when present, fully replaces the current product link set.
+        // Only products that belong to this coupon's own bot may be linked.
+        let productsUpdate: any = undefined;
+        if (Array.isArray(body.productIds)) {
+            const validProductIds = body.productIds.length > 0
+                ? (await prisma.product.findMany({
+                      where: { id: { in: body.productIds }, botId: coupon.botId },
+                      select: { id: true }
+                  })).map((p: any) => p.id)
+                : [];
+            productsUpdate = {
+                deleteMany: {},
+                ...(validProductIds.length > 0 && { create: validProductIds.map((productId: string) => ({ productId })) })
+            };
+        }
+
         const updated = await prisma.coupon.update({
             where: { id },
             data: {
@@ -31,6 +47,10 @@ export async function PUT(req: Request, { params }: { params: any }) {
                 active: body.active,
                 expiresAt: body.expiresAt ? new Date(body.expiresAt) : (body.expiresAt === null ? null : undefined),
                 usageLimit: body.usageLimit !== undefined ? (body.usageLimit ? parseInt(body.usageLimit) : null) : undefined,
+                products: productsUpdate,
+            },
+            include: {
+                products: { include: { product: { select: { id: true, name: true } } } }
             }
         });
 

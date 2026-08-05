@@ -620,8 +620,19 @@ export const MessageProcessor = {
             // 8.5. Coupons Context
             const activeCoupons = await prisma.coupon.findMany({
                 where: { botId: bot.id, active: true },
-                select: { code: true, value: true, type: true }
+                select: {
+                    code: true,
+                    value: true,
+                    type: true,
+                    products: { select: { product: { select: { name: true } } } }
+                }
             });
+            const couponsForPrompt = activeCoupons.map(c => ({
+                code: c.code,
+                value: c.value,
+                type: c.type,
+                productNames: c.products.map(p => p.product.name)
+            }));
 
             // 9. Prompt Building
             const mediaList = bot.media.map((m: any) => ({ id: m.id, type: m.type, description: m.description }));
@@ -680,7 +691,7 @@ export const MessageProcessor = {
                     assignedRole: activeBot.name,
                     specialistSkill: specialistSkill
                 },
-                coupons: activeCoupons as any
+                coupons: couponsForPrompt as any
             });
 
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
@@ -1338,12 +1349,19 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                         // Apply Coupon if provided
                                         if (args.cupom_desconto) {
                                             const coupon = await prisma.coupon.findUnique({
-                                                where: { botId_code: { botId: bot.id, code: args.cupom_desconto.toUpperCase() } }
+                                                where: { botId_code: { botId: bot.id, code: args.cupom_desconto.toUpperCase() } },
+                                                include: { products: { select: { productId: true } } }
                                             });
+
+                                            const couponRestrictedToOtherProduct = !!coupon
+                                                && coupon.products.length > 0
+                                                && !coupon.products.some(p => p.productId === (matchedProduct as any).id);
 
                                             if (coupon && coupon.active) {
                                                 if (!matchedProduct.allowCoupons) {
                                                     discountDetail = " (Este produto não permite uso de cupons)";
+                                                } else if (couponRestrictedToOtherProduct) {
+                                                    discountDetail = " (Cupom não é válido para este produto)";
                                                 } else {
                                                     // Check expiration
                                                     const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
