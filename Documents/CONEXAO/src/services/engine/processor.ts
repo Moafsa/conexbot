@@ -183,10 +183,16 @@ export const MessageProcessor = {
             // 3. Find or create conversation (capture ad attribution on first touch)
             const adAttr = options.adAttribution;
             const phoneVariations = PhoneUtils.getVariations(senderPhone);
+            // getPhoneVariations() strips non-digit characters, so it only ever matches real
+            // phone numbers. Non-phone identifiers (ex: simulator session ids like "SIM_7atah")
+            // strip down to a handful of stray digits and never match the raw remoteId that was
+            // actually stored — always missing the conversation and re-triggering create() below.
+            // Including the raw senderPhone as a candidate fixes that without affecting phone matching.
+            const remoteIdCandidates = Array.from(new Set([senderPhone, ...phoneVariations]));
             let conversation = await prisma.conversation.findFirst({
                 where: {
                     botId: bot.id,
-                    remoteId: { in: phoneVariations },
+                    remoteId: { in: remoteIdCandidates },
                 },
             });
 
@@ -196,25 +202,40 @@ export const MessageProcessor = {
                     data: { updatedAt: new Date(), remoteId: senderPhone }
                 }).catch(() => {});
             } else {
-                conversation = await prisma.conversation.create({
-                    data: {
-                        botId: bot.id,
-                        remoteId: senderPhone,
-                        channel: channel,
-                        ...(adAttr && {
-                            utmSource:    adAttr.utmSource,
-                            utmMedium:    adAttr.utmMedium,
-                            utmCampaign:  adAttr.utmCampaign,
-                            utmContent:   adAttr.utmContent,
-                            adId:         adAttr.adId,
-                            adName:       adAttr.adName,
-                            campaignId:   adAttr.campaignId,
-                            campaignName: adAttr.campaignName,
-                            entrySource:  adAttr.entrySource,
-                            referrer:     adAttr.referrer,
-                        }),
-                    } as any,
-                });
+                try {
+                    conversation = await prisma.conversation.create({
+                        data: {
+                            botId: bot.id,
+                            remoteId: senderPhone,
+                            channel: channel,
+                            ...(adAttr && {
+                                utmSource:    adAttr.utmSource,
+                                utmMedium:    adAttr.utmMedium,
+                                utmCampaign:  adAttr.utmCampaign,
+                                utmContent:   adAttr.utmContent,
+                                adId:         adAttr.adId,
+                                adName:       adAttr.adName,
+                                campaignId:   adAttr.campaignId,
+                                campaignName: adAttr.campaignName,
+                                entrySource:  adAttr.entrySource,
+                                referrer:     adAttr.referrer,
+                            }),
+                        } as any,
+                    });
+                } catch (createErr: any) {
+                    // Duas mensagens quase simultâneas (ex: usuário mandando "oi" e "ola" em sequência)
+                    // podem passar pelo findFirst acima antes de a primeira ter persistido a criação —
+                    // a segunda esbarra na constraint única (botId, remoteId). Nesse caso a conversa já
+                    // existe, então recuperamos ela em vez de propagar o erro.
+                    if (createErr?.code === 'P2002') {
+                        conversation = await prisma.conversation.findFirst({
+                            where: { botId: bot.id, remoteId: { in: remoteIdCandidates } },
+                        });
+                        if (!conversation) throw createErr;
+                    } else {
+                        throw createErr;
+                    }
+                }
             }
 
             // 3.5. Specialized input processing
@@ -290,7 +311,7 @@ export const MessageProcessor = {
             let existingContact: any = await prisma.contact.findFirst({
                 where: {
                     botId: bot.id,
-                    phone: { in: phoneVariations },
+                    phone: { in: remoteIdCandidates },
                 },
                 include: {
                     orders: { orderBy: { createdAt: 'desc' }, take: 5 }
@@ -303,30 +324,44 @@ export const MessageProcessor = {
                     orderBy: { order: 'asc' }
                 });
 
-                existingContact = await prisma.contact.create({
-                    data: {
-                        phone: senderPhone,
-                        tenantId: bot.tenantId,
-                        botId: bot.id,
-                        funnelStage: firstStage?.name || 'LEAD',
-                        stageId: firstStage?.id,
-                        // Persist ad attribution so the agent sees it on every turn
-                        ...(adAttr && {
-                            utmSource:    adAttr.utmSource,
-                            utmMedium:    adAttr.utmMedium,
-                            utmCampaign:  adAttr.utmCampaign,
-                            utmContent:   adAttr.utmContent,
-                            utmTerm:      adAttr.utmTerm,
-                            adId:         adAttr.adId,
-                            adsetId:      adAttr.adsetId,
-                            adName:       adAttr.adName,
-                            adsetName:    adAttr.adsetName,
-                            campaignId:   adAttr.campaignId,
-                            campaignName: adAttr.campaignName,
-                            entrySource:  adAttr.entrySource,
-                        }),
-                    } as any
-                });
+                try {
+                    existingContact = await prisma.contact.create({
+                        data: {
+                            phone: senderPhone,
+                            tenantId: bot.tenantId,
+                            botId: bot.id,
+                            funnelStage: firstStage?.name || 'LEAD',
+                            stageId: firstStage?.id,
+                            // Persist ad attribution so the agent sees it on every turn
+                            ...(adAttr && {
+                                utmSource:    adAttr.utmSource,
+                                utmMedium:    adAttr.utmMedium,
+                                utmCampaign:  adAttr.utmCampaign,
+                                utmContent:   adAttr.utmContent,
+                                utmTerm:      adAttr.utmTerm,
+                                adId:         adAttr.adId,
+                                adsetId:      adAttr.adsetId,
+                                adName:       adAttr.adName,
+                                adsetName:    adAttr.adsetName,
+                                campaignId:   adAttr.campaignId,
+                                campaignName: adAttr.campaignName,
+                                entrySource:  adAttr.entrySource,
+                            }),
+                        } as any
+                    });
+                } catch (createErr: any) {
+                    // Same class of issue as the Conversation lookup above: a near-simultaneous
+                    // message can create the contact between our findFirst and this create().
+                    if (createErr?.code === 'P2002') {
+                        existingContact = await prisma.contact.findFirst({
+                            where: { botId: bot.id, phone: { in: remoteIdCandidates } },
+                            include: { orders: { orderBy: { createdAt: 'desc' }, take: 5 } }
+                        });
+                        if (!existingContact) throw createErr;
+                    } else {
+                        throw createErr;
+                    }
+                }
 
                 // Server-Side Tracking for GA4
                 GoogleMeasurementService.sendEvent({
@@ -1054,10 +1089,13 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     }
 
                     logToFile(`[OrderAgent] Handled turn (orderConfirmed=${agentResult.orderConfirmed})`);
-                    return; // ALWAYS RETURN! Never fall through to legacy processor loop!
+                    // deliverAssistantOutbound() above already pushed this to WhatsApp/Chatwoot, but callers
+                    // that don't go through a real channel (ex: the dashboard Simulator) rely entirely on this
+                    // return value to display the reply — returning nothing left them with no visible response.
+                    return { text: finalReply, media: [] }; // ALWAYS RETURN! Never fall through to legacy processor loop!
                 } catch (e: any) {
                     logToFile(`[OrderAgent] Exception in OrderAgent block: ${e.message}`);
-                    return; // NEVER fall through to legacy loop!
+                    return { text: 'Erro ao processar seu pedido. Tente novamente em instantes.' }; // NEVER fall through to legacy loop!
                 }
             }
 
