@@ -80,6 +80,134 @@ export const GoogleAdsService = {
     },
 
     /**
+     * Busca gastos/impressões/cliques diários dos últimos 30 dias, para gráficos de desempenho.
+     */
+    async getDailyInsights(tenantId: string) {
+        const globalConfig = await prisma.globalConfig.findFirst();
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { googleAdsCustomerId: true, googleAdsRefreshToken: true }
+        });
+
+        if (!globalConfig?.googleAdsDeveloperToken || !tenant?.googleAdsCustomerId || !tenant?.googleAdsRefreshToken) {
+            return [];
+        }
+
+        try {
+            const accessToken = await this.getAccessToken(tenant.googleAdsRefreshToken);
+            const customerId = tenant.googleAdsCustomerId.replace(/-/g, '');
+
+            const url = `https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`;
+            const query = {
+                query: `
+                    SELECT
+                        segments.date,
+                        metrics.cost_micros,
+                        metrics.impressions,
+                        metrics.clicks
+                    FROM campaign
+                    WHERE segments.date DURING LAST_30_DAYS
+                `
+            };
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'developer-token': globalConfig.googleAdsDeveloperToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(query)
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                console.error("[GoogleAds] getDailyInsights API Error:", data.error);
+                return [];
+            }
+
+            const byDate: Record<string, { spend: number; impressions: number; clicks: number }> = {};
+            for (const row of data.results || []) {
+                const date = row.segments?.date;
+                if (!date) continue;
+                if (!byDate[date]) byDate[date] = { spend: 0, impressions: 0, clicks: 0 };
+                byDate[date].spend += Number(row.metrics?.costMicros || 0) / 1000000;
+                byDate[date].impressions += Number(row.metrics?.impressions || 0);
+                byDate[date].clicks += Number(row.metrics?.clicks || 0);
+            }
+
+            return Object.entries(byDate)
+                .map(([date, v]) => ({ date, ...v }))
+                .sort((a, b) => a.date.localeCompare(b.date));
+        } catch (error) {
+            console.error("[GoogleAds] getDailyInsights fetch error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Busca gasto/impressões/cliques de HOJE por campanha (usado pelo snapshot diário
+     * que alimenta o histórico de ROI, já que a API só cobre uma janela rolante).
+     */
+    async getCampaignSpendToday(tenantId: string) {
+        const globalConfig = await prisma.globalConfig.findFirst();
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { googleAdsCustomerId: true, googleAdsRefreshToken: true }
+        });
+
+        if (!globalConfig?.googleAdsDeveloperToken || !tenant?.googleAdsCustomerId || !tenant?.googleAdsRefreshToken) {
+            return [];
+        }
+
+        try {
+            const accessToken = await this.getAccessToken(tenant.googleAdsRefreshToken);
+            const customerId = tenant.googleAdsCustomerId.replace(/-/g, '');
+
+            const url = `https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`;
+            const query = {
+                query: `
+                    SELECT
+                        campaign.id,
+                        campaign.name,
+                        metrics.cost_micros,
+                        metrics.impressions,
+                        metrics.clicks
+                    FROM campaign
+                    WHERE segments.date DURING TODAY
+                `
+            };
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'developer-token': globalConfig.googleAdsDeveloperToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(query)
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                console.error("[GoogleAds] getCampaignSpendToday API Error:", data.error);
+                return [];
+            }
+
+            return (data.results || []).map((r: any) => ({
+                campaignId: String(r.campaign?.id ?? ''),
+                campaignName: r.campaign?.name as string,
+                spend: Number(r.metrics?.costMicros || 0) / 1000000,
+                impressions: Number(r.metrics?.impressions || 0),
+                clicks: Number(r.metrics?.clicks || 0)
+            })).filter((r: any) => r.campaignId);
+        } catch (error) {
+            console.error("[GoogleAds] getCampaignSpendToday fetch error:", error);
+            return [];
+        }
+    },
+
+    /**
      * Exemplo de método para criar ou gerenciar campanhas, para uso futuro pelo Maestro.
      */
     async createCampaign(tenantId: string, params: { name: string; budgetMicros: number }) {
@@ -139,14 +267,10 @@ export const GoogleAdsService = {
             });
 
             const data = await res.json();
-            
+
             if (data.error) {
                 console.error("[GoogleAds] createCampaign API Error:", JSON.stringify(data.error, null, 2));
-                return { 
-                    success: true, 
-                    message: "Mocked campaign creation (Developer Token might be pending approval).", 
-                    externalId: `mock_gads_${Date.now()}` 
-                };
+                throw new Error(data.error.message || "Falha ao criar campanha no Google Ads");
             }
 
             const campaignResult = data.mutateOperationResponses?.find((r: any) => r.campaignResult);

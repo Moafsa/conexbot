@@ -224,7 +224,29 @@ export function AdsTab({ selectedClientId, setShowCampaignModal, bots, loadingBo
                 </button>
             </div>
 
-            {/* Dashboard numérico omitido do resumo visual para brevidade... */}
+            {/* Saldo da Conta Meta Ads */}
+            {platformFilter !== "GOOGLE" && data.metaBalance && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Saldo Disponível</p>
+                        <p className="text-2xl font-bold text-emerald-400">
+                            {data.metaBalance.currency} {data.metaBalance.balance.toFixed(2)}
+                        </p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Já Gasto</p>
+                        <p className="text-2xl font-bold text-white">
+                            {data.metaBalance.currency} {data.metaBalance.amount_spent.toFixed(2)}
+                        </p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Limite de Gasto</p>
+                        <p className="text-2xl font-bold text-white">
+                            {data.metaBalance.spend_cap > 0 ? `${data.metaBalance.currency} ${data.metaBalance.spend_cap.toFixed(2)}` : "Sem limite"}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-8">

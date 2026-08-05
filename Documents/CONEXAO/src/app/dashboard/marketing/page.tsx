@@ -1,6 +1,8 @@
 "use client";
 import { ContentTab } from './components/ContentTab';
 import { AdsTab } from './components/AdsTab';
+import { PerformanceChart } from './components/PerformanceChart';
+import { AttributionTab } from './components/AttributionTab';
 import { CalendarTab } from './components/CalendarTab';
 import WorkflowTab from './components/WorkflowTab';
 import { OffersTab } from './components/OffersTab';
@@ -82,6 +84,7 @@ function MarketingContent() {
         { id: "content", label: "Criador de Posts", icon: Sparkles },
         { id: "offers", label: "Páginas de Vendas (LPs)", icon: ShoppingBag },
         { id: "ads", label: "Gestor de Anúncios", icon: Target },
+        { id: "attribution", label: "ROI & Atribuição", icon: TrendingUp },
         { id: "settings", label: "Integrações", icon: Settings },
     ];
 
@@ -117,6 +120,8 @@ function MarketingContent() {
                 campaigns: Array.isArray(adsData.campaigns) ? adsData.campaigns : [],
                 insights: adsData.insights || null,
                 googleAds: Array.isArray(adsData.googleAds) ? adsData.googleAds : null,
+                metaDaily: Array.isArray(adsData.metaDaily) ? adsData.metaDaily : [],
+                googleDaily: Array.isArray(adsData.googleDaily) ? adsData.googleDaily : [],
                 postsCount: statsData.postsCount || 0,
                 recentPosts: Array.isArray(postsData) ? postsData : [],
                 recommendations: Array.isArray(recsData.recommendations) ? recsData.recommendations : []
@@ -303,6 +308,8 @@ function MarketingContent() {
                     metaInsights: data.insights,
                     metaCampaigns: data.campaigns,
                     googleAds: data.googleAds,
+                    metaDaily: data.metaDaily || [],
+                    googleDaily: data.googleDaily || [],
                     recentPosts: data.recentPosts || [],
                     recommendations: data.recommendations || [],
                 }} refresh={fetchMarketingData} onEdit={(post: any) => {
@@ -347,6 +354,7 @@ function MarketingContent() {
                 )}
                 {activeTab === "offers" && <OffersTab />}
                 {activeTab === "ads" && <AdsTab selectedClientId={selectedClientId} setShowCampaignModal={setShowCampaignModal} bots={bots} loadingBots={loadingBots} agencyClients={agencyClients} />}
+                {activeTab === "attribution" && <AttributionTab selectedClientId={selectedClientId} />}
                 {activeTab === "settings" && <SettingsTab selectedClientId={selectedClientId} />}
             </div>
 
@@ -814,9 +822,7 @@ function OverviewTab({ stats, refresh, onEdit }: any) {
                             <BarChart3 size={20} className="text-emerald-400" />
                             Desempenho de Campanhas
                         </h3>
-                        <div className="h-[300px] flex items-center justify-center border border-dashed border-white/10 rounded-2xl text-gray-500 italic">
-                            Gráfico de desempenho será exibido aqui após a integração.
-                        </div>
+                        <PerformanceChart metaDaily={stats.metaDaily} googleDaily={stats.googleDaily} />
                     </div>
                 </div>
 

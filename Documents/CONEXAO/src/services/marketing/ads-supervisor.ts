@@ -87,7 +87,7 @@ export const AdsSupervisorService = {
             let googleExternalId = null;
 
             // Tentativa Meta Ads
-            if (bot.tenant?.facebookPageId) {
+            if (bot.tenant?.metaAdsToken && bot.tenant?.metaAdsAccountId) {
                 try {
                     metaExternalId = await MetaAdsService.createCampaign(bot.tenantId, {
                         name: campaignName,

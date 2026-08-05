@@ -65,6 +65,124 @@ export const MetaAdsService = {
     },
 
     /**
+     * Busca gastos/impressões/cliques diários dos últimos 30 dias, para gráficos de desempenho.
+     */
+    async getDailyInsights(tenantId: string) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true, metaAdsAccountId: true }
+        });
+
+        if (!tenant?.metaAdsToken || !tenant?.metaAdsAccountId) return [];
+
+        const accountId = tenant.metaAdsAccountId.startsWith('act_')
+            ? tenant.metaAdsAccountId
+            : `act_${tenant.metaAdsAccountId}`;
+
+        const url = `https://graph.facebook.com/v22.0/${accountId}/insights?fields=spend,impressions,clicks&time_increment=1&date_preset=last_30d&access_token=${tenant.metaAdsToken}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) {
+                console.error("[MetaAds] getDailyInsights Error:", data.error);
+                return [];
+            }
+            return (data.data || []).map((d: any) => ({
+                date: d.date_start,
+                spend: parseFloat(d.spend || 0),
+                impressions: Number(d.impressions || 0),
+                clicks: Number(d.clicks || 0)
+            }));
+        } catch (error) {
+            console.error("[MetaAds] getDailyInsights fetch error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Busca gasto/impressões/cliques dos últimos 30 dias por campanha (para o fallback
+     * de ROI enquanto o histórico persistido de AdSpendSnapshot ainda não cobre o período).
+     */
+    async getCampaignInsightsLast30d(tenantId: string) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true, metaAdsAccountId: true }
+        });
+
+        if (!tenant?.metaAdsToken || !tenant?.metaAdsAccountId) return [];
+
+        const accountId = tenant.metaAdsAccountId.startsWith('act_')
+            ? tenant.metaAdsAccountId
+            : `act_${tenant.metaAdsAccountId}`;
+
+        const url = `https://graph.facebook.com/v22.0/${accountId}/campaigns?fields=id,name,insights.date_preset(last_30d){spend,impressions,clicks}&access_token=${tenant.metaAdsToken}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) {
+                console.error("[MetaAds] getCampaignInsightsLast30d Error:", data.error);
+                return [];
+            }
+            return (data.data || []).map((c: any) => {
+                const insight = c.insights?.data?.[0];
+                return {
+                    campaignId: c.id as string,
+                    campaignName: c.name as string,
+                    spend: parseFloat(insight?.spend || 0),
+                    impressions: Number(insight?.impressions || 0),
+                    clicks: Number(insight?.clicks || 0)
+                };
+            });
+        } catch (error) {
+            console.error("[MetaAds] getCampaignInsightsLast30d fetch error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Busca gasto/impressões/cliques de HOJE por campanha (usado pelo snapshot diário
+     * que alimenta o histórico de ROI, já que a Insights API só cobre uma janela rolante).
+     */
+    async getCampaignSpendToday(tenantId: string) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { metaAdsToken: true, metaAdsAccountId: true }
+        });
+
+        if (!tenant?.metaAdsToken || !tenant?.metaAdsAccountId) return [];
+
+        const accountId = tenant.metaAdsAccountId.startsWith('act_')
+            ? tenant.metaAdsAccountId
+            : `act_${tenant.metaAdsAccountId}`;
+
+        const url = `https://graph.facebook.com/v22.0/${accountId}/campaigns?fields=id,name,insights.date_preset(today){spend,impressions,clicks}&access_token=${tenant.metaAdsToken}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) {
+                console.error("[MetaAds] getCampaignSpendToday Error:", data.error);
+                return [];
+            }
+            return (data.data || []).map((c: any) => {
+                const insight = c.insights?.data?.[0];
+                return {
+                    campaignId: c.id as string,
+                    campaignName: c.name as string,
+                    spend: parseFloat(insight?.spend || 0),
+                    impressions: Number(insight?.impressions || 0),
+                    clicks: Number(insight?.clicks || 0)
+                };
+            });
+        } catch (error) {
+            console.error("[MetaAds] getCampaignSpendToday fetch error:", error);
+            return [];
+        }
+    },
+
+    /**
      * Busca o saldo/status financeiro da conta.
      */
     async getAccountBalance(tenantId: string) {
