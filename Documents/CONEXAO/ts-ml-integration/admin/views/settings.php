@@ -46,6 +46,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'create_tables' && current_use
     }
 }
 
+// Handle SaaS ML Callback (Step 2: Connect Account via Next.js SaaS Router)
+if (isset($_GET['action']) && $_GET['action'] === 'saas_ml_callback' && current_user_can('manage_woocommerce')) {
+    $account_id = isset($_GET['account_id']) ? intval($_GET['account_id']) : 0;
+    $access_token = isset($_GET['access_token']) ? sanitize_text_field($_GET['access_token']) : '';
+    $refresh_token = isset($_GET['refresh_token']) ? sanitize_text_field($_GET['refresh_token']) : '';
+    $expires_in = isset($_GET['expires_in']) ? intval($_GET['expires_in']) : 21600;
+    $account_name = isset($_GET['account_name']) ? sanitize_text_field($_GET['account_name']) : '';
+
+    if ($account_id > 0 && !empty($access_token)) {
+        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+        $expires_at = date('Y-m-d H:i:s', time() + $expires_in);
+
+        $update_data = array(
+            'access_token' => $access_token,
+            'refresh_token' => $refresh_token,
+            'token_expires_at' => $expires_at,
+            'updated_at' => current_time('mysql'),
+        );
+
+        if (!empty($account_name)) {
+            $update_data['account_name'] = $account_name;
+        }
+
+        $wpdb->update(
+            $table_accounts,
+            $update_data,
+            array('id' => $account_id)
+        );
+
+        update_option('ts_ml_use_saas', 'yes');
+        wp_redirect(admin_url('admin.php?page=ts-ml-settings&account_connected=1'));
+        exit;
+    }
+}
+
 // Handle account deletion
 $account_deleted = false;
 if (isset($_GET['delete_account']) && isset($_GET['_wpnonce']) && current_user_can('manage_woocommerce')) {

@@ -124,30 +124,49 @@ class TS_ML_API_Handler
      */
     public function get_oauth_url($account_id, $country = 'BR')
     {
-        $app_id = get_option('ts_ml_app_id_' . $country);
+        $app_secret = get_option('ts_ml_app_secret_' . $country);
 
-        // Fallback to Master App ID if not explicitly set
-        if (empty($app_id)) {
-            $app_id = '2383288292680789';
+        // If local app_secret is set, allow standalone direct OAuth
+        if (!empty($app_secret)) {
+            $app_id = get_option('ts_ml_app_id_' . $country, '2383288292680789');
+            $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
+            $redirect_uri = $this->force_https_if_needed($redirect_uri);
+
+            $params = array(
+                'response_type' => 'code',
+                'client_id' => $app_id,
+                'redirect_uri' => $redirect_uri,
+                'state' => $account_id,
+            );
+
+            $domain = $this->get_oauth_domain($country);
+            return $domain . '/authorization?' . http_build_query($params);
         }
 
-        // Use a clean redirect URI - ML is very strict, it must match EXACTLY
-        $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
+        // DEFAULT SAAS MULTI-TENANT ROUTER FLOW (app.conext.click)
+        $saas_url = get_option('ts_ml_saas_url');
+        $shop_url = home_url();
+        $shop_host = parse_url($shop_url, PHP_URL_HOST);
 
-        // Force HTTPS if not localhost (Mercado Livre requires HTTPS for OAuth in production)
-        $redirect_uri = $this->force_https_if_needed($redirect_uri);
+        if (empty($saas_url) || (!empty($shop_host) && strpos($saas_url, $shop_host) !== false)) {
+            $saas_url = 'https://app.conext.click';
+            update_option('ts_ml_saas_url', $saas_url);
+        }
 
-        $params = array(
-            'response_type' => 'code',
-            'client_id' => $app_id,
-            'redirect_uri' => $redirect_uri,
-            'state' => $account_id, // Pass account_id in state
-        );
+        $bot_id = get_option('ts_ml_bot_id');
+        if (empty($bot_id)) {
+            $bot_id = get_option('ts_ml_license_key', 'system');
+        }
 
-        $domain = $this->get_oauth_domain($country);
-        $oauth_url = $domain . '/authorization?' . http_build_query($params);
+        $redirect_uri = admin_url('admin.php?page=ts-ml-settings');
 
-        return $oauth_url;
+        $connect_ml_url = rtrim($saas_url, '/') . '/dashboard/integrations/wordpress/connect-ml' .
+            '?bot_id=' . urlencode($bot_id) .
+            '&account_id=' . urlencode($account_id) .
+            '&shop_url=' . urlencode($shop_url) .
+            '&redirect_uri=' . urlencode($redirect_uri);
+
+        return $connect_ml_url;
     }
 
     /**
