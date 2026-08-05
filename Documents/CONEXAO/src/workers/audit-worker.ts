@@ -26,6 +26,8 @@ Estruture a resposta nos 5 pilares do Conselho:
 
 Você deve responder rigorosamente no formato de um objeto JSON estruturado contendo pontuações, análises e missões práticas de correção ordenadas por prioridade.
 
+Além do diagnóstico, o Conselho também deve preparar o rascunho de uma PROPOSTA COMERCIAL para a agência enviar a este cliente (campo "proposalDraft"), no mesmo estilo de uma proposta profissional de agência: o que já funciona bem, onde o cliente está perdendo alcance/tempo/dinheiro, o que a agência vai entregar (agrupado por categoria de serviço, ex: "Site institucional", "Automação de WhatsApp", "Consolidação de Instagram", "Google Meu Negócio", "Gestão de tráfego pago"), uma lista dos serviços sugeridos (SEM sugerir preço — a agência define o valor depois), um cronograma realista por etapa, e os próximos passos para o cliente aprovar. NÃO invente números de investimento/preço.
+
 ATENÇÃO: Retorne APENAS o objeto JSON. Não coloque crases de markdown (\`\`\`), não coloque texto antes ou depois. Deve ser um JSON puro e perfeitamente parseável.
 
 Estrutura do JSON de Resposta:
@@ -58,7 +60,43 @@ Estrutura do JSON de Resposta:
       "priority": 1,
       "status": "PENDING"
     }
-  ]
+  ],
+  "proposalDraft": {
+    "diagnosis": {
+      "workingWell": [
+        "Frase curta descrevendo algo que já funciona bem no negócio do cliente."
+      ],
+      "losingReach": [
+        "Frase curta descrevendo onde o cliente está perdendo alcance, tempo ou dinheiro hoje."
+      ]
+    },
+    "deliverables": [
+      {
+        "category": "Nome do pacote de entrega, ex: Site institucional com agendamento",
+        "items": [
+          "Item específico que será entregue dentro dessa categoria."
+        ]
+      }
+    ],
+    "suggestedServices": [
+      {
+        "name": "Nome comercial do serviço sugerido, ex: Gestão de tráfego pago (Meta Ads)",
+        "description": "Uma frase explicando o que esse serviço inclui.",
+        "recurring": true
+      }
+    ],
+    "timeline": [
+      {
+        "stage": "Nome da etapa, ex: Consolidação de Instagram",
+        "days": "5 a 7 dias",
+        "expectedResult": "O que o cliente deve esperar ver de resultado após essa etapa."
+      }
+    ],
+    "nextSteps": [
+      "Aprovação desta proposta.",
+      "Envio dos acessos necessários (WhatsApp Business, Instagram, Meta Business Manager, Google)."
+    ]
+  }
 }
 `;
 
@@ -163,6 +201,7 @@ ${socialChannels || 'Nenhuma rede social/canal configurado no onboarding.'}
         const overallScore = parsedResult.overallScore || Math.round(Object.values(scores).reduce((a: any, b: any) => a + b, 0) / 5);
         const report = parsedResult.report || {};
         const missions = parsedResult.missions || [];
+        const proposalDraft = parsedResult.proposalDraft || null;
 
         const audit = await prisma.clientAudit.create({
             data: {
@@ -172,6 +211,7 @@ ${socialChannels || 'Nenhuma rede social/canal configurado no onboarding.'}
                 scores: scores as any,
                 report: report as any,
                 missions: missions as any,
+                proposalDraft: proposalDraft as any,
                 overallScore: overallScore
             }
         });

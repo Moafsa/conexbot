@@ -395,13 +395,28 @@ export default function NewClientWizardPage() {
                         )}
                     </div>
 
-                    <div className="flex gap-3 justify-center">
-                        <button
-                            onClick={() => router.push(`/dashboard/agency/clients/${String(result.clientId || "")}`)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
-                        >
-                            Ver Cliente
-                        </button>
+                    {result.auditJobId && (
+                        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 mb-6 text-xs text-purple-300 text-left">
+                            🪄 O Raio-X deste cliente já está sendo gerado automaticamente pelo Conselho de Especialistas — em instantes você poderá revisar o diagnóstico e gerar a proposta comercial em PDF.
+                        </div>
+                    )}
+
+                    <div className="flex gap-3 justify-center flex-wrap">
+                        {result.auditJobId ? (
+                            <button
+                                onClick={() => router.push(`/dashboard/agency/clients/${String(result.clientId || "")}/audit?jobId=${String(result.auditJobId)}`)}
+                                className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                Ver Raio-X & Gerar Proposta
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => router.push(`/dashboard/agency/clients/${String(result.clientId || "")}`)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                Ver Cliente
+                            </button>
+                        )}
                         <button
                             onClick={() => router.push("/dashboard/agency/clients")}
                             className="bg-[#1a2235] hover:bg-[#243049] text-gray-300 px-5 py-2 rounded-lg text-sm font-medium transition-colors border border-white/10"

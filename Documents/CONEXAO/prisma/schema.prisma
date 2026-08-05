@@ -80,6 +80,7 @@ model Tenant {
   followupRules           FollowupRule[]
   marketingCampaigns      MarketingCampaign[]
   marketingPosts          MarketingPost[]
+  adSpendSnapshots        AdSpendSnapshot[]
   notifications           Notification[]
   payments                Payment[]
   sessions                Session[]
@@ -93,6 +94,7 @@ model Tenant {
   mlUserId                String?
   clientAudits            ClientAudit[] @relation("ClientAudits")
   clientTasks             ClientTask[] @relation("ClientTasks")
+  clientProposals         ClientProposal[] @relation("ClientProposals")
 }
 
 model ProductMapping {
@@ -146,6 +148,26 @@ model MarketingCampaign {
   createdAt  DateTime @default(now())
   bot        Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// Snapshot diário de gasto/impressões/cliques por campanha, capturado via cron.
+// Existe porque a Meta/Google Ads Insights API só devolve uma janela rolante
+// (ex: last_30d) — sem isso, não há como reportar ROI além dos últimos 30 dias.
+model AdSpendSnapshot {
+  id           String   @id @default(uuid())
+  tenantId     String
+  campaignId   String
+  campaignName String?
+  platform     String // META | GOOGLE
+  date         DateTime // dia (meia-noite) que este snapshot representa
+  spend        Float    @default(0)
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, campaignId, platform, date])
+  @@index([tenantId, date])
 }
 
 model KeywordResearch {
@@ -804,16 +826,42 @@ model AgentTemplate {
 }
 
 model ClientAudit {
+  id            String   @id @default(uuid())
+  clientId      String
+  agencyId      String
+  scores        Json
+  report        Json
+  missions      Json     @default("[]")
+  proposalDraft Json? // sugestão bruta da IA para virar ClientProposal: diagnosis/deliverables/suggestedServices/timeline/nextSteps
+  overallScore  Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  client        Tenant   @relation("ClientAudits", fields: [clientId], references: [id], onDelete: Cascade)
+  proposals     ClientProposal[]
+
+  @@index([clientId])
+  @@index([agencyId])
+}
+
+// Proposta comercial editável pela agência, gerada a partir do rascunho do raio-x
+// e exportável como PDF para enviar ao cliente final.
+model ClientProposal {
   id           String   @id @default(uuid())
   clientId     String
   agencyId     String
-  scores       Json
-  report       Json
-  missions     Json     @default("[]")
-  overallScore Int      @default(0)
+  auditId      String?
+  title        String   @default("Proposta Comercial")
+  diagnosis    Json     @default("[]") // { workingWell: string[], losingReach: string[] }
+  deliverables Json     @default("[]") // [{ category: string, items: string[] }]
+  services     Json     @default("[]") // [{ name, description, setupPrice, monthlyPrice, recurring }]
+  timeline     Json     @default("[]") // [{ stage, days, expectedResult }]
+  nextSteps    Json     @default("[]") // string[]
+  status       String   @default("DRAFT") // DRAFT | FINAL
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  client       Tenant   @relation("ClientAudits", fields: [clientId], references: [id], onDelete: Cascade)
+  client       Tenant       @relation("ClientProposals", fields: [clientId], references: [id], onDelete: Cascade)
+  audit        ClientAudit? @relation(fields: [auditId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
   @@index([agencyId])
