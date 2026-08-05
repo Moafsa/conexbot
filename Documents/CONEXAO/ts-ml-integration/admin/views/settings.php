@@ -36,6 +36,15 @@ if (!function_exists('class_exists') || !class_exists('WooCommerce')) {
 // PROCESS ALL FORM SUBMISSIONS FIRST - BEFORE ANY HTML OUTPUT
 global $wpdb;
 
+// Self-healing cleanup: older versions of this plugin auto-created a fake "Conextbot SaaS"
+// account (access_token/refresh_token = 'saas_managed') when SaaS Mode was turned on, which
+// displayed as "Conectada e Ativa" without ever completing real Mercado Livre OAuth. Remove
+// any leftover fake rows on every page load so already-affected sites self-correct.
+$ts_ml_accounts_table = $wpdb->prefix . 'ts_ml_accounts';
+if ($wpdb->get_var("SHOW TABLES LIKE '$ts_ml_accounts_table'")) {
+    $wpdb->delete($ts_ml_accounts_table, array('access_token' => 'saas_managed'));
+}
+
 // Handle table creation
 if (isset($_GET['action']) && $_GET['action'] === 'create_tables' && current_user_can('manage_woocommerce')) {
     check_admin_referer('create_tables');
@@ -283,30 +292,13 @@ if (isset($_POST['save_settings']) && check_admin_referer('ts_ml_save_settings')
     update_option('ts_ml_license_key', sanitize_text_field($_POST['license_key'] ?? ''));
     update_option('ts_ml_auto_create_on_ml', isset($_POST['auto_create_on_ml']) ? 'yes' : 'no');
 
-    if ($use_saas === 'yes') {
-        global $wpdb;
-        $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
-        if ($table_exists) {
-            $count = $wpdb->get_var("SELECT COUNT(*) FROM $table_accounts");
-            if (intval($count) === 0) {
-                $wpdb->insert(
-                    $table_accounts,
-                    array(
-                        'account_name' => 'Conextbot SaaS',
-                        'country' => 'BR',
-                        'is_active' => 1,
-                        'access_token' => 'saas_managed',
-                        'refresh_token' => 'saas_managed',
-                        'token_expires_at' => date('Y-m-d H:i:s', time() + 365 * 24 * 3600),
-                        'created_at' => current_time('mysql'),
-                        'updated_at' => current_time('mysql'),
-                    ),
-                    array('%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s')
-                );
-            }
-        }
-    }
+    // NOTA: Anteriormente, ligar o "Modo SaaS" criava automaticamente uma conta fake
+    // ("Conextbot SaaS") com access_token/refresh_token = 'saas_managed' e validade de
+    // 1 ano no futuro. Isso fazia a conta aparecer como "Conectada e Ativa" na tela sem
+    // NUNCA ter passado pelo OAuth real do Mercado Livre — get_valid_token() só checa se
+    // o token não está vazio e não expirou localmente, nunca valida contra a API do ML.
+    // Ligar o Modo SaaS não deve, por si só, fingir que uma conta está conectada: cada
+    // conta real ainda precisa passar por "Conectar no Mercado Livre".
 
     $settings_saved = true;
 }
