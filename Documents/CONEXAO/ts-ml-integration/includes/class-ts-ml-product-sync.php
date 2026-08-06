@@ -611,6 +611,14 @@ class TS_ML_Product_Sync
             ),
             'pictures' => $this->get_product_images($product),
             'attributes' => $this->get_product_attributes($product),
+            // Mercado Livre rejects the listing outright ("Mandatory free shipping added")
+            // without a shipping mode. me2 (Mercado Envios) is the standard managed-shipping
+            // mode; free_shipping defaults to false (buyer pays) and can be changed per
+            // listing in the ML seller dashboard afterwards.
+            'shipping' => array(
+                'mode' => 'me2',
+                'free_shipping' => false,
+            ),
         );
 
         if ($product->is_type('variable')) {
@@ -688,21 +696,17 @@ class TS_ML_Product_Sync
     {
         $attributes = array();
 
-        // Add brand if available
-        if ($product->get_meta('_brand')) {
-            $attributes[] = array(
-                'id' => 'BRAND',
-                'value_name' => $product->get_meta('_brand'),
-            );
-        }
+        // Most Mercado Livre categories require BRAND and MODEL. Without them the listing
+        // is rejected outright ("attributes [BRAND, MODEL] are required for category X"), so
+        // these are never skipped — only the SOURCE of the value changes. Mercado Livre's own
+        // convention for unbranded/generic products is the literal value "Genérica"/"Genérico",
+        // which is accepted across virtually every category, so that's the last resort instead
+        // of leaving the attribute out entirely.
+        $brand = $this->find_product_value($product, 'product_brand', array('_brand'), array('marca', 'brand'));
+        $attributes[] = array('id' => 'BRAND', 'value_name' => $brand ?: 'Genérica');
 
-        // Add model if available
-        if ($product->get_meta('_model')) {
-            $attributes[] = array(
-                'id' => 'MODEL',
-                'value_name' => $product->get_meta('_model'),
-            );
-        }
+        $model = $this->find_product_value($product, '', array('_model'), array('modelo', 'model'));
+        $attributes[] = array('id' => 'MODEL', 'value_name' => $model ?: 'Genérico');
 
         // Add GTIN/EAN if available
         $gtin = $product->get_meta('_ean') ?: ($product->get_meta('_gtin') ?: ($product->get_meta('_ts_ml_ean') ?: ''));
@@ -714,6 +718,43 @@ class TS_ML_Product_Sync
         }
 
         return $attributes;
+    }
+
+    /**
+     * Look for a value across the places a store might realistically have it:
+     * a WooCommerce taxonomy (e.g. native product_brand), legacy postmeta keys, or a
+     * per-product custom attribute (matched by name, not just global pa_* taxonomies).
+     *
+     * @param WC_Product $product
+     * @param string $taxonomy Taxonomy slug to check, or '' to skip
+     * @param array $meta_keys Postmeta keys to check, in order
+     * @param array $attribute_names Custom attribute names to check (case-insensitive), in order
+     * @return string
+     */
+    private function find_product_value($product, $taxonomy, $meta_keys, $attribute_names)
+    {
+        if (!empty($taxonomy) && taxonomy_exists($taxonomy)) {
+            $terms = get_the_terms($product->get_id(), $taxonomy);
+            if (!empty($terms) && !is_wp_error($terms)) {
+                return $terms[0]->name;
+            }
+        }
+
+        foreach ($meta_keys as $meta_key) {
+            $value = $product->get_meta($meta_key);
+            if (!empty($value)) {
+                return $value;
+            }
+        }
+
+        foreach ($attribute_names as $attribute_name) {
+            $value = $product->get_attribute($attribute_name);
+            if (!empty($value)) {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     /**
