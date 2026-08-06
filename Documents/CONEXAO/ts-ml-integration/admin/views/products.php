@@ -472,6 +472,10 @@ input:checked + .ts-ml-slider:before {
                                                     'paused' => '⏸️ ' . __('Pausado no ML', 'ts-ml-integration'),
                                                     'closed' => '🚫 ' . __('Finalizado no ML', 'ts-ml-integration'),
                                                     'inactive' => '🚫 ' . __('Inativo no ML (fora de estoque por muito tempo)', 'ts-ml-integration'),
+                                                    // Mercado Livre's own automatic content moderation for newly-created listings —
+                                                    // not an error, just pending their review. Resolves on its own, usually within
+                                                    // minutes to a few hours; nothing to fix here.
+                                                    'under_review' => '🔍 ' . __('Em análise pelo Mercado Livre (aguardando revisão automática)', 'ts-ml-integration'),
                                                 );
                                                 ?>
                                                 <br><small style="color: #92400e; font-size: 11px;">
