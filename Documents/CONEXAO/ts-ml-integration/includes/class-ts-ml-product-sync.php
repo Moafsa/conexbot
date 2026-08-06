@@ -688,6 +688,55 @@ class TS_ML_Product_Sync
     }
 
     /**
+     * Read-only: pull the listing's real current status from Mercado Livre and update our
+     * local record. Local ml_status only ever changes when WE make a call (sync/pause/close/
+     * activate) — it goes stale the moment Mercado Livre's own side changes it on its own
+     * (e.g. finishing automatic content review and going from under_review/paused to active),
+     * with no way to see that without this.
+     *
+     * @param int $product_id WooCommerce product ID
+     * @param int $account_id
+     * @return true|WP_Error
+     */
+    public function refresh_listing_status($product_id, $account_id)
+    {
+        global $wpdb;
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_products WHERE product_id = %d AND account_id = %d",
+            $product_id,
+            $account_id
+        ));
+
+        if (!$existing || empty($existing->ml_item_id)) {
+            return new WP_Error('not_synced', __('Este produto ainda não foi publicado no Mercado Livre.', 'ts-ml-integration'));
+        }
+
+        $api_handler = TS_ML_API_Handler::instance();
+        $access_token = $api_handler->get_valid_token($account_id);
+        if (is_wp_error($access_token)) {
+            return $access_token;
+        }
+
+        $response = $api_handler->api_request('/items/' . $existing->ml_item_id, 'GET', array(), $access_token);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $wpdb->update(
+            $table_products,
+            array(
+                'ml_status' => isset($response['status']) ? $response['status'] : $existing->ml_status,
+                'permalink' => isset($response['permalink']) ? $response['permalink'] : $existing->permalink,
+                'updated_at' => current_time('mysql'),
+            ),
+            array('id' => $existing->id)
+        );
+
+        return true;
+    }
+
+    /**
      * Permanently close a listing on Mercado Livre. This is the actual equivalent of
      * "deleting" an ad — Mercado Livre doesn't allow hard-deleting a listing that has ever
      * been active (for buyer/audit history), 'closed' is the real, always-available option.

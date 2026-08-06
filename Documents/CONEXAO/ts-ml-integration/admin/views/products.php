@@ -44,6 +44,11 @@ if (isset($_POST['bulk_action']) && isset($_POST['product_ids']) && check_admin_
                         $count_success++;
                     }
                     break;
+                case 'refresh_status_on_ml':
+                    if (!is_wp_error(TS_ML_Product_Sync::instance()->refresh_listing_status($product_id, $account_id))) {
+                        $count_success++;
+                    }
+                    break;
                 case 'close_on_ml':
                     if (!is_wp_error(TS_ML_Product_Sync::instance()->close_listing($product_id, $account_id))) {
                         $count_success++;
@@ -78,6 +83,9 @@ if (isset($_GET['ml_status_action']) && isset($_GET['product_id']) && isset($_GE
     } elseif ($status_action === 'activate') {
         $result = $product_sync->activate_listing($product_id, $account_id);
         $success_msg = __('Anúncio reativado no Mercado Livre.', 'ts-ml-integration');
+    } elseif ($status_action === 'refresh') {
+        $result = $product_sync->refresh_listing_status($product_id, $account_id);
+        $success_msg = __('Status atualizado a partir do Mercado Livre.', 'ts-ml-integration');
     } else {
         $result = $product_sync->pause_listing($product_id, $account_id);
         $success_msg = __('Anúncio pausado no Mercado Livre.', 'ts-ml-integration');
@@ -128,8 +136,12 @@ if (isset($_GET['search'])) {
 $filter_photo = isset($_GET['filter_photo']) ? sanitize_text_field($_GET['filter_photo']) : '';
 $filter_ready = isset($_GET['filter_ready']) ? sanitize_text_field($_GET['filter_ready']) : '';
 $filter_flow  = isset($_GET['filter_flow']) ? sanitize_text_field($_GET['filter_flow']) : '';
+// Not exposed as a dropdown (yet) — these are what the Relatórios stat cards link to, so
+// clicking e.g. "Produtos com Erro" actually shows which products that number refers to.
+$filter_sync_status = isset($_GET['filter_sync_status']) ? sanitize_text_field($_GET['filter_sync_status']) : '';
+$filter_ml_status = isset($_GET['filter_ml_status']) ? sanitize_text_field($_GET['filter_ml_status']) : '';
 
-if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '') {
+if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '' || $filter_sync_status !== '' || $filter_ml_status !== '') {
     $sql = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
     
     if ($filter_photo === 'yes') {
@@ -159,7 +171,17 @@ if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '') {
             $sql .= " AND ID IN (SELECT product_id FROM $table_products WHERE account_id = $selected_account AND (sync_direction = 'ml_to_woo' OR sync_direction = 'bidirectional'))";
         }
     }
-    
+
+    if (!empty($filter_sync_status)) {
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        $sql .= $wpdb->prepare(" AND ID IN (SELECT product_id FROM $table_products WHERE sync_status = %s)", $filter_sync_status);
+    }
+
+    if (!empty($filter_ml_status)) {
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        $sql .= $wpdb->prepare(" AND ID IN (SELECT product_id FROM $table_products WHERE ml_status = %s)", $filter_ml_status);
+    }
+
     $filtered_ids = $wpdb->get_col($sql);
     if (!empty($filtered_ids)) {
         $args['post__in'] = $filtered_ids;
@@ -357,6 +379,7 @@ input:checked + .ts-ml-slider:before {
                             <option value="sync_ml_to_woo"><?php esc_html_e('🟡 Importar do Mercado Livre (ML ➔ Loja)', 'ts-ml-integration'); ?></option>
                             <option value="pause_on_ml"><?php esc_html_e('⏸️ Pausar Anúncio no Mercado Livre', 'ts-ml-integration'); ?></option>
                             <option value="activate_on_ml"><?php esc_html_e('▶️ Reativar Anúncio no Mercado Livre', 'ts-ml-integration'); ?></option>
+                            <option value="refresh_status_on_ml"><?php esc_html_e('🔄 Atualizar Status a partir do Mercado Livre', 'ts-ml-integration'); ?></option>
                             <option value="close_on_ml"><?php esc_html_e('🚫 Finalizar Anúncio no Mercado Livre', 'ts-ml-integration'); ?></option>
                             <option value="remove_sync"><?php esc_html_e('🗑️ Remover da Sincronização (apenas local)', 'ts-ml-integration'); ?></option>
                         </select>
@@ -506,6 +529,11 @@ input:checked + .ts-ml-slider:before {
                                             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;">
                                                 🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
                                             </a>
+                                            <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=refresh&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8;" title="<?php esc_attr_e('Consulta o status real no Mercado Livre agora, sem reenviar dados', 'ts-ml-integration'); ?>">
+                                                    🔄 <?php esc_html_e('Atualizar Status', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } ?>
                                             <?php
                                             // Once closed or inactive, Mercado Livre locks every field on the listing — pause/
                                             // reactivate/close all fail against it the same way an update does. Resyncing the
