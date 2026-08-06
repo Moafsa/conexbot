@@ -370,6 +370,25 @@ class TS_ML_API_Handler
 
         if ($status_code >= 400) {
             $error_message = isset($data['message']) ? $data['message'] : 'API Error';
+
+            // The top-level "message" is usually just a generic label like "Validation
+            // error" — the actionable detail (which field, which attribute is missing,
+            // etc.) is in "cause". Without it, every validation failure looks identical
+            // and gives no clue what to actually fix.
+            if (!empty($data['cause']) && is_array($data['cause'])) {
+                $cause_messages = array();
+                foreach ($data['cause'] as $cause) {
+                    if (is_array($cause) && !empty($cause['message'])) {
+                        $cause_messages[] = $cause['message'];
+                    } elseif (is_string($cause)) {
+                        $cause_messages[] = $cause;
+                    }
+                }
+                if (!empty($cause_messages)) {
+                    $error_message .= ': ' . implode('; ', $cause_messages);
+                }
+            }
+
             return new WP_Error('api_error', $error_message, array('status' => $status_code, 'body' => $body));
         }
 
