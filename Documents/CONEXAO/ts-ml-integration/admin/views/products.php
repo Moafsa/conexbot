@@ -467,9 +467,15 @@ input:checked + .ts-ml-slider:before {
                                             <?php if ($sync_data->sync_errors) { ?>
                                                 <br><small style="color: #ef4444; font-size: 11px;"><?php echo esc_html($sync_data->sync_errors); ?></small>
                                             <?php } ?>
-                                            <?php if (!empty($sync_data->ml_status) && $sync_data->ml_status !== 'active') { ?>
+                                            <?php if (!empty($sync_data->ml_status) && $sync_data->ml_status !== 'active') {
+                                                $ml_status_labels = array(
+                                                    'paused' => '⏸️ ' . __('Pausado no ML', 'ts-ml-integration'),
+                                                    'closed' => '🚫 ' . __('Finalizado no ML', 'ts-ml-integration'),
+                                                    'inactive' => '🚫 ' . __('Inativo no ML (fora de estoque por muito tempo)', 'ts-ml-integration'),
+                                                );
+                                                ?>
                                                 <br><small style="color: #92400e; font-size: 11px;">
-                                                    <?php echo $sync_data->ml_status === 'paused' ? '⏸️ ' . esc_html__('Pausado no ML', 'ts-ml-integration') : '🚫 ' . esc_html__('Finalizado no ML', 'ts-ml-integration'); ?>
+                                                    <?php echo isset($ml_status_labels[$sync_data->ml_status]) ? esc_html($ml_status_labels[$sync_data->ml_status]) : esc_html($sync_data->ml_status); ?>
                                                 </small>
                                             <?php } ?>
                                         <?php } else { ?>
@@ -496,21 +502,28 @@ input:checked + .ts-ml-slider:before {
                                             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;">
                                                 🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
                                             </a>
-                                            <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                            <?php
+                                            // Once closed or inactive, Mercado Livre locks every field on the listing — pause/
+                                            // reactivate/close all fail against it the same way an update does. Resyncing the
+                                            // product is the only recovery (publishes a fresh listing), so don't offer actions
+                                            // that would just fail.
+                                            $ml_status_locked = in_array($sync_data->ml_status ?? '', array('closed', 'inactive'), true);
+                                            ?>
+                                            <?php if ($sync_data && !empty($sync_data->ml_item_id) && !$ml_status_locked) { ?>
                                                 <?php if (!empty($sync_data->ml_status) && $sync_data->ml_status === 'paused') { ?>
                                                     <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=activate&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #ecfdf5; border-color: #a7f3d0; color: #047857;">
                                                         ▶️ <?php esc_html_e('Reativar no ML', 'ts-ml-integration'); ?>
                                                     </a>
-                                                <?php } elseif (empty($sync_data->ml_status) || $sync_data->ml_status !== 'closed') { ?>
+                                                <?php } else { ?>
                                                     <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=pause&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fffbeb; border-color: #fde68a; color: #92400e;">
                                                         ⏸️ <?php esc_html_e('Pausar no ML', 'ts-ml-integration'); ?>
                                                     </a>
                                                 <?php } ?>
-                                                <?php if (empty($sync_data->ml_status) || $sync_data->ml_status !== 'closed') { ?>
-                                                    <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=close&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fff1f2; border-color: #fecdd3; color: #9f1239;" onclick="return confirm('<?php echo esc_js(__('Finalizar este anúncio no Mercado Livre? Essa ação não pode ser desfeita facilmente.', 'ts-ml-integration')); ?>');">
-                                                        🚫 <?php esc_html_e('Finalizar no ML', 'ts-ml-integration'); ?>
-                                                    </a>
-                                                <?php } ?>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=close&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fff1f2; border-color: #fecdd3; color: #9f1239;" onclick="return confirm('<?php echo esc_js(__('Finalizar este anúncio no Mercado Livre? Essa ação não pode ser desfeita facilmente.', 'ts-ml-integration')); ?>');">
+                                                    🚫 <?php esc_html_e('Finalizar no ML', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } elseif ($sync_data && !empty($sync_data->ml_item_id) && $ml_status_locked) { ?>
+                                                <small style="color: #64748b; font-size: 11px;"><?php esc_html_e('Reenvie para publicar um novo anúncio', 'ts-ml-integration'); ?></small>
                                             <?php } ?>
                                         </div>
                                     </td>

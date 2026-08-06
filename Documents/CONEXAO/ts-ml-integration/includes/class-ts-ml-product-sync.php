@@ -575,12 +575,15 @@ class TS_ML_Product_Sync
                 $access_token
             );
 
-            // A closed listing rejects every single field ("title is not modifiable;
-            // category_id is not modifiable; ..."). There's no "reopen" — once closed, it's
-            // permanently frozen — so the only way to keep syncing this product is to publish
-            // it as a brand new listing, which also gets a new item ID/permalink.
-            if (is_wp_error($response) && strpos($response->get_error_message(), 'status:closed') !== false) {
-                TS_ML_Logger::info('Anúncio anterior está finalizado (fechado) no ML — criando um novo em seu lugar', array('old_ml_item_id' => $existing->ml_item_id));
+            // A closed OR inactive listing rejects every single field ("title is not
+            // modifiable; category_id is not modifiable; ...") — confirmed both
+            // "status:closed" and "status:inactive" produce this exact same locked-item
+            // pattern (inactive items are common when Mercado Livre auto-deactivates a
+            // listing, e.g. after being out of stock too long). Neither can be "reopened" via
+            // the API — the only way to keep syncing this product is to publish it as a brand
+            // new listing, which also gets a new item ID/permalink.
+            if (is_wp_error($response) && preg_match('/status:(closed|inactive)/', $response->get_error_message())) {
+                TS_ML_Logger::info('Anúncio anterior está travado (fechado/inativo) no ML — criando um novo em seu lugar', array('old_ml_item_id' => $existing->ml_item_id));
                 $is_update = false;
                 $response = $api_handler->api_request(
                     '/items',
