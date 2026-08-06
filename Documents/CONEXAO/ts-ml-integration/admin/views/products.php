@@ -130,6 +130,12 @@ if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '') {
 
 $products_query = new WP_Query($args);
 $table_products = $wpdb->prefix . 'ts_ml_products';
+
+// Self-healing: add the permalink column for sites that synced products before it existed.
+$permalink_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_products LIKE 'permalink'");
+if (empty($permalink_column_exists)) {
+    $wpdb->query("ALTER TABLE $table_products ADD COLUMN permalink varchar(500) AFTER ml_listing_id");
+}
 ?>
 
 <style>
@@ -362,10 +368,18 @@ input:checked + .ts-ml-slider:before {
                                                 <?php echo esc_html(get_the_title()); ?>
                                             </a>
                                         </strong>
-                                        <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                        <?php if ($sync_data && !empty($sync_data->ml_item_id)) {
+                                            // Prefer the real permalink Mercado Livre returned when syncing. For rows
+                                            // synced before that was captured, fall back to ML's official universal
+                                            // redirect (articulo.mercadolibre.com.br/MLB-123 — note the dash, which the
+                                            // raw item ID doesn't have), instead of a guessed URL that 404s.
+                                            $ml_url = !empty($sync_data->permalink)
+                                                ? $sync_data->permalink
+                                                : 'https://articulo.mercadolibre.com.br/' . preg_replace('/^([A-Z]+)(\d+)$/', '$1-$2', $sync_data->ml_item_id);
+                                            ?>
                                             <br>
                                             <small>
-                                                <a href="https://produto.mercadolivre.com.br/<?php echo esc_attr($sync_data->ml_item_id); ?>" target="_blank">
+                                                <a href="<?php echo esc_url($ml_url); ?>" target="_blank">
                                                     🔗 <?php esc_html_e('Ver no Mercado Livre', 'ts-ml-integration'); ?>
                                                 </a>
                                             </small>

@@ -869,6 +869,9 @@ class TS_ML_Product_Sync
         $data = array(
             'ml_item_id' => isset($ml_response['id']) ? $ml_response['id'] : null,
             'ml_listing_id' => isset($ml_response['id']) ? $ml_response['id'] : null,
+            // The real, canonical listing URL Mercado Livre returns — don't hand-construct
+            // one from just the item ID, the actual URL format/subdomain isn't guessable.
+            'permalink' => isset($ml_response['permalink']) ? $ml_response['permalink'] : null,
             'sync_status' => 'synced',
             'last_sync_at' => current_time('mysql'),
             'updated_at' => current_time('mysql'),

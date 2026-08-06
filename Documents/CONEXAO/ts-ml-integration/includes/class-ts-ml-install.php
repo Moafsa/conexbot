@@ -101,6 +101,7 @@ class TS_ML_Install {
             product_id bigint(20) NOT NULL,
             ml_item_id varchar(255),
             ml_listing_id varchar(255),
+            permalink varchar(500),
             sync_direction varchar(20) DEFAULT 'bidirectional',
             last_sync_at datetime,
             sync_status varchar(20) DEFAULT 'pending',
