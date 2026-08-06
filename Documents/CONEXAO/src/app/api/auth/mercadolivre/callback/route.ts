@@ -69,6 +69,13 @@ export async function GET(req: Request) {
                 finalWpUrl.searchParams.set("license_key", tenantId);
                 finalWpUrl.searchParams.set("account_name", nickname);
                 finalWpUrl.searchParams.set("saas_url", `${process.env.NEXT_PUBLIC_APP_URL}`);
+                // This same OAuth round-trip already produced a real Mercado Livre token — hand it
+                // back too, so the "1-click" flow both validates the license AND connects a real
+                // account in a single pass, instead of requiring a second manual step in WordPress.
+                finalWpUrl.searchParams.set("access_token", callbackData.access_token);
+                finalWpUrl.searchParams.set("refresh_token", callbackData.refresh_token);
+                finalWpUrl.searchParams.set("expires_in", String(callbackData.expires_in));
+                finalWpUrl.searchParams.set("ml_user_id", String(callbackData.user_id));
             }
 
             return NextResponse.redirect(finalWpUrl.toString());

@@ -464,6 +464,66 @@ class TS_ML_Admin
             update_option('ts_ml_connected_site_url', site_url());
             delete_option('ts_ml_saas_last_error');
 
+            // The "1-click" button promises to validate the license AND connect a real
+            // Mercado Livre account in one pass. Conextbot's callback now hands back a real
+            // token from this same OAuth round-trip when present — use it to create a genuinely
+            // connected account, instead of the caller having to repeat "Adicionar Nova Conta"
+            // + "Conectar no Mercado Livre" as a separate manual step.
+            $access_token = isset($_GET['access_token']) ? sanitize_text_field($_GET['access_token']) : '';
+            $refresh_token = isset($_GET['refresh_token']) ? sanitize_text_field($_GET['refresh_token']) : '';
+            $expires_in = isset($_GET['expires_in']) ? intval($_GET['expires_in']) : 0;
+            $account_name = isset($_GET['account_name']) ? sanitize_text_field($_GET['account_name']) : 'Mercado Livre';
+
+            if (!empty($access_token) && !empty($refresh_token)) {
+                global $wpdb;
+                $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
+                $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
+
+                if ($table_exists) {
+                    $expires_at = date('Y-m-d H:i:s', time() + ($expires_in > 0 ? $expires_in : 21600));
+
+                    // Dedupe by account_name, same convention "Adicionar Nova Conta" already uses
+                    // below. user_id here follows that same convention too: it stores the WP admin
+                    // who performed the action, not a Mercado Livre id.
+                    $existing = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id FROM $table_accounts WHERE account_name = %s",
+                        $account_name
+                    ));
+
+                    if ($existing) {
+                        $wpdb->update(
+                            $table_accounts,
+                            array(
+                                'access_token' => $access_token,
+                                'refresh_token' => $refresh_token,
+                                'token_expires_at' => $expires_at,
+                                'is_active' => 1,
+                                'updated_at' => current_time('mysql'),
+                            ),
+                            array('id' => $existing->id),
+                            array('%s', '%s', '%s', '%d', '%s'),
+                            array('%d')
+                        );
+                    } else {
+                        $wpdb->insert(
+                            $table_accounts,
+                            array(
+                                'account_name' => $account_name,
+                                'country' => 'BR',
+                                'user_id' => get_current_user_id(),
+                                'is_active' => 1,
+                                'access_token' => $access_token,
+                                'refresh_token' => $refresh_token,
+                                'token_expires_at' => $expires_at,
+                                'created_at' => current_time('mysql'),
+                                'updated_at' => current_time('mysql'),
+                            ),
+                            array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
+                        );
+                    }
+                }
+            }
+
             wp_redirect(admin_url('admin.php?page=ts-ml-settings&settings_saved=1'));
             exit;
         }

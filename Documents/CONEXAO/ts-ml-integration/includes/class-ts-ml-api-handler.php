@@ -125,10 +125,17 @@ class TS_ML_API_Handler
     public function get_oauth_url($account_id, $country = 'BR')
     {
         $app_secret = get_option('ts_ml_app_secret_' . $country);
+        // No fallback here on purpose: the hardcoded default app_id below belongs to Conextbot's
+        // shared SaaS app, which is registered on Mercado Livre with app.conext.click as its
+        // redirect_uri. Using it with THIS store's own domain as redirect_uri always fails with
+        // "não foi possível conectar o aplicativo à sua conta", because Mercado Livre requires an
+        // exact match between client_id and the redirect_uri registered for that app.
+        $app_id = get_option('ts_ml_app_id_' . $country);
 
-        // If local app_secret is set, allow standalone direct OAuth
-        if (!empty($app_secret)) {
-            $app_id = get_option('ts_ml_app_id_' . $country, '2383288292680789');
+        // Direct OAuth only makes sense when the store owner registered THEIR OWN Mercado Livre
+        // app (with this site's own admin URL as its redirect_uri). If only the secret is set but
+        // not a matching app_id, fall through to the SaaS proxy flow instead of guessing.
+        if (!empty($app_secret) && !empty($app_id)) {
             $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
             $redirect_uri = $this->force_https_if_needed($redirect_uri);
 
@@ -179,10 +186,11 @@ class TS_ML_API_Handler
      */
     public function exchange_code_for_token($code, $account_id, $country = 'BR')
     {
+        // Same reasoning as get_oauth_url(): never silently substitute Conextbot's shared
+        // SaaS app_id here. It's only registered on Mercado Livre for app.conext.click's
+        // redirect_uri, so exchanging a code with it against this site's own redirect_uri
+        // would fail (or worse, succeed against the wrong app).
         $app_id = get_option('ts_ml_app_id_' . $country);
-        if (empty($app_id)) {
-            $app_id = '2383288292680789';
-        }
 
         $app_secret = get_option('ts_ml_app_secret_' . $country);
         $use_saas = get_option('ts_ml_use_saas') === 'yes';

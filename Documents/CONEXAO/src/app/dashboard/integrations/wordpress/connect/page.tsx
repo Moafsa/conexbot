@@ -33,7 +33,7 @@ function WordPressConnectContent() {
                     return;
                 }
 
-                // 2. Register / Get Bot in SaaS database
+                // 2. Register / Get Bot in SaaS database (validates the license / pairs the site)
                 const tenantId = session.user.id;
                 const registerRes = await fetch("/api/v1/wp/register-store", {
                     method: "POST",
@@ -47,14 +47,23 @@ function WordPressConnectContent() {
                 }
 
                 setStatus("redirecting");
-                
-                // Redirect back to WooCommerce immediately with Bot ID and License Key
-                const finalWpUrl = new URL(wpRedirectUri);
-                finalWpUrl.searchParams.set("bot_id", registerData.botId);
-                finalWpUrl.searchParams.set("license_key", tenantId);
-                finalWpUrl.searchParams.set("saas_url", window.location.origin);
-                
-                window.location.href = finalWpUrl.toString();
+
+                // 3. Continue straight into the real Mercado Livre OAuth screen — this button
+                // promises to both validate the license AND authenticate Mercado Livre in one
+                // click, so licensing alone isn't enough here. account_id=0 tells the callback
+                // this is a fresh "step 1" connection (not linking an existing WP account row),
+                // and it reuses Conextbot's own centrally-configured ML app (GlobalConfig.mlClientId),
+                // never the store's own domain/app.
+                const oauthUrlRes = await fetch(
+                    `/api/auth/mercadolivre/url-plugin?shop_url=${encodeURIComponent(shopUrl)}&redirect_uri=${encodeURIComponent(wpRedirectUri)}&account_id=0`
+                );
+                const oauthUrlData = await oauthUrlRes.json();
+
+                if (!oauthUrlRes.ok || !oauthUrlData.url) {
+                    throw new Error(oauthUrlData.error || "Loja vinculada, mas falhou ao iniciar a autenticação com o Mercado Livre.");
+                }
+
+                window.location.href = oauthUrlData.url;
             } catch (err: any) {
                 setStatus("error");
                 setErrorMessage(err.message || "Erro desconhecido ao iniciar conexão com o SaaS.");
@@ -78,8 +87,8 @@ function WordPressConnectContent() {
                 {status === "redirecting" && (
                     <div className="space-y-4 my-6">
                         <RefreshCw className="animate-spin w-12 h-12 text-green-500 mx-auto" />
-                        <h2 className="text-xl font-bold text-green-400">Vinculando Loja...</h2>
-                        <p className="text-gray-400 text-sm">Retornando para o seu painel do WooCommerce.</p>
+                        <h2 className="text-xl font-bold text-green-400">Loja Vinculada!</h2>
+                        <p className="text-gray-400 text-sm">Redirecionando para você autorizar sua conta do Mercado Livre.</p>
                     </div>
                 )}
 
