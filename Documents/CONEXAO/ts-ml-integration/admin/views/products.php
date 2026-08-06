@@ -34,9 +34,19 @@ if (isset($_POST['bulk_action']) && isset($_POST['product_ids']) && check_admin_
                     $wpdb->delete($table_products, array('product_id' => $product_id, 'account_id' => $account_id), array('%d', '%d'));
                     $count_success++;
                     break;
+                case 'pause_on_ml':
+                    if (!is_wp_error(TS_ML_Product_Sync::instance()->pause_listing($product_id, $account_id))) {
+                        $count_success++;
+                    }
+                    break;
+                case 'close_on_ml':
+                    if (!is_wp_error(TS_ML_Product_Sync::instance()->close_listing($product_id, $account_id))) {
+                        $count_success++;
+                    }
+                    break;
             }
         }
-        echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('Sincronização processada com sucesso para %d produto(s)!', 'ts-ml-integration'), $count_success) . '</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('Ação processada com sucesso para %d produto(s)!', 'ts-ml-integration'), $count_success) . '</p></div>';
     }
 }
 
@@ -45,9 +55,29 @@ if (isset($_GET['sync_product']) && isset($_GET['account_id']) && check_admin_re
     $product_id = intval($_GET['sync_product']);
     $account_id = intval($_GET['account_id']);
     $direction = isset($_GET['direction']) ? sanitize_text_field($_GET['direction']) : 'woo_to_ml';
-    
+
     TS_ML_Product_Sync::instance()->sync_product($product_id, $account_id, $direction);
     echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Produto enviado para a fila de sincronização!', 'ts-ml-integration') . '</p></div>';
+}
+
+// Handle single product pause/close on Mercado Livre
+if (isset($_GET['ml_status_action']) && isset($_GET['product_id']) && isset($_GET['account_id']) && check_admin_referer('ml_status_action_' . $_GET['product_id'])) {
+    $product_id = intval($_GET['product_id']);
+    $account_id = intval($_GET['account_id']);
+    $status_action = sanitize_text_field($_GET['ml_status_action']);
+
+    $result = $status_action === 'close'
+        ? TS_ML_Product_Sync::instance()->close_listing($product_id, $account_id)
+        : TS_ML_Product_Sync::instance()->pause_listing($product_id, $account_id);
+
+    if (is_wp_error($result)) {
+        echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($result->get_error_message()) . '</p></div>';
+    } else {
+        $success_msg = $status_action === 'close'
+            ? __('Anúncio finalizado no Mercado Livre.', 'ts-ml-integration')
+            : __('Anúncio pausado no Mercado Livre.', 'ts-ml-integration');
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($success_msg) . '</p></div>';
+    }
 }
 
 // Get accounts
@@ -131,10 +161,14 @@ if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '') {
 $products_query = new WP_Query($args);
 $table_products = $wpdb->prefix . 'ts_ml_products';
 
-// Self-healing: add the permalink column for sites that synced products before it existed.
+// Self-healing: add columns for sites whose ts_ml_products table predates them.
 $permalink_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_products LIKE 'permalink'");
 if (empty($permalink_column_exists)) {
     $wpdb->query("ALTER TABLE $table_products ADD COLUMN permalink varchar(500) AFTER ml_listing_id");
+}
+$ml_status_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_products LIKE 'ml_status'");
+if (empty($ml_status_column_exists)) {
+    $wpdb->query("ALTER TABLE $table_products ADD COLUMN ml_status varchar(20) AFTER permalink");
 }
 ?>
 
@@ -311,7 +345,9 @@ input:checked + .ts-ml-slider:before {
                             <option value=""><?php esc_html_e('Ações em massa...', 'ts-ml-integration'); ?></option>
                             <option value="sync_woo_to_ml"><?php esc_html_e('🛒 Enviar para o Mercado Livre (Loja ➔ ML)', 'ts-ml-integration'); ?></option>
                             <option value="sync_ml_to_woo"><?php esc_html_e('🟡 Importar do Mercado Livre (ML ➔ Loja)', 'ts-ml-integration'); ?></option>
-                            <option value="remove_sync"><?php esc_html_e('🗑️ Remover da Sincronização', 'ts-ml-integration'); ?></option>
+                            <option value="pause_on_ml"><?php esc_html_e('⏸️ Pausar Anúncio no Mercado Livre', 'ts-ml-integration'); ?></option>
+                            <option value="close_on_ml"><?php esc_html_e('🚫 Finalizar Anúncio no Mercado Livre', 'ts-ml-integration'); ?></option>
+                            <option value="remove_sync"><?php esc_html_e('🗑️ Remover da Sincronização (apenas local)', 'ts-ml-integration'); ?></option>
                         </select>
                         <input type="submit" class="button action" value="<?php esc_attr_e('Aplicar Ação', 'ts-ml-integration'); ?>" />
                     </div>
@@ -420,6 +456,11 @@ input:checked + .ts-ml-slider:before {
                                             <?php if ($sync_data->sync_errors) { ?>
                                                 <br><small style="color: #ef4444; font-size: 11px;"><?php echo esc_html($sync_data->sync_errors); ?></small>
                                             <?php } ?>
+                                            <?php if (!empty($sync_data->ml_status) && $sync_data->ml_status !== 'active') { ?>
+                                                <br><small style="color: #92400e; font-size: 11px;">
+                                                    <?php echo $sync_data->ml_status === 'paused' ? '⏸️ ' . esc_html__('Pausado no ML', 'ts-ml-integration') : '🚫 ' . esc_html__('Finalizado no ML', 'ts-ml-integration'); ?>
+                                                </small>
+                                            <?php } ?>
                                         <?php } else { ?>
                                             <span class="status-not-synced" style="color: #64748b; font-size: 12px;"><?php esc_html_e('Não sincronizado', 'ts-ml-integration'); ?></span>
                                         <?php } ?>
@@ -444,6 +485,14 @@ input:checked + .ts-ml-slider:before {
                                             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;">
                                                 🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
                                             </a>
+                                            <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=pause&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fffbeb; border-color: #fde68a; color: #92400e;">
+                                                    ⏸️ <?php esc_html_e('Pausar no ML', 'ts-ml-integration'); ?>
+                                                </a>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=close&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fff1f2; border-color: #fecdd3; color: #9f1239;" onclick="return confirm('<?php echo esc_js(__('Finalizar este anúncio no Mercado Livre? Essa ação não pode ser desfeita facilmente.', 'ts-ml-integration')); ?>');">
+                                                    🚫 <?php esc_html_e('Finalizar no ML', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } ?>
                                         </div>
                                     </td>
                                 </tr>

@@ -614,6 +614,89 @@ class TS_ML_Product_Sync
     }
 
     /**
+     * Pause a published listing on Mercado Livre (hides it from search/buyers; can be
+     * reactivated later by setting status back to 'active').
+     *
+     * @param int $product_id WooCommerce product ID
+     * @param int $account_id
+     * @return true|WP_Error
+     */
+    public function pause_listing($product_id, $account_id)
+    {
+        return $this->set_listing_status($product_id, $account_id, 'paused');
+    }
+
+    /**
+     * Permanently close a listing on Mercado Livre. This is the actual equivalent of
+     * "deleting" an ad — Mercado Livre doesn't allow hard-deleting a listing that has ever
+     * been active (for buyer/audit history), 'closed' is the real, always-available option.
+     *
+     * @param int $product_id WooCommerce product ID
+     * @param int $account_id
+     * @return true|WP_Error
+     */
+    public function close_listing($product_id, $account_id)
+    {
+        return $this->set_listing_status($product_id, $account_id, 'closed');
+    }
+
+    /**
+     * @param int $product_id
+     * @param int $account_id
+     * @param string $status 'active'|'paused'|'closed'
+     * @return true|WP_Error
+     */
+    private function set_listing_status($product_id, $account_id, $status)
+    {
+        global $wpdb;
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_products WHERE product_id = %d AND account_id = %d",
+            $product_id,
+            $account_id
+        ));
+
+        if (!$existing || empty($existing->ml_item_id)) {
+            return new WP_Error('not_synced', __('Este produto ainda não foi publicado no Mercado Livre.', 'ts-ml-integration'));
+        }
+
+        $api_handler = TS_ML_API_Handler::instance();
+        $access_token = $api_handler->get_valid_token($account_id);
+
+        if (is_wp_error($access_token)) {
+            return $access_token;
+        }
+
+        $response = $api_handler->api_request(
+            '/items/' . $existing->ml_item_id,
+            'PUT',
+            array('status' => $status),
+            $access_token
+        );
+
+        if (is_wp_error($response)) {
+            TS_ML_Logger::error('Erro ao alterar status do anúncio no ML', array(
+                'ml_item_id' => $existing->ml_item_id,
+                'status' => $status,
+                'error' => $response->get_error_message(),
+            ));
+            return $response;
+        }
+
+        TS_ML_Logger::info('Status do anúncio alterado no ML', array('ml_item_id' => $existing->ml_item_id, 'status' => $status));
+
+        $wpdb->update(
+            $table_products,
+            array('ml_status' => $status, 'updated_at' => current_time('mysql')),
+            array('id' => $existing->id),
+            array('%s', '%s'),
+            array('%d')
+        );
+
+        return true;
+    }
+
+    /**
      * Prepare product for Mercado Livre
      *
      * @param WC_Product $product Product object
