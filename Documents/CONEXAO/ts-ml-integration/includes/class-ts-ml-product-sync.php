@@ -840,9 +840,13 @@ class TS_ML_Product_Sync
     {
         // wp_strip_all_tags() removes tags without inserting anything in their place, so
         // "</p><p>" or "<br>" between blocks collapses straight into "...texto!Próximo
-        // bloco..." with no separator at all. Turn block boundaries into real line breaks
-        // *before* stripping, so paragraphs/list items/headings stay readable.
+        // bloco..." with no separator at all — including "</th><td>" inside a table row,
+        // which is why a spec table came out as "ModeloF1-Spray com Rodas 360°" instead of
+        // "Modelo: F1-Spray com Rodas 360°". Turn block boundaries into real line breaks
+        // (and cell boundaries into ": ") *before* stripping, so paragraphs/list items/
+        // headings/tables stay readable.
         $html = preg_replace('/<(br|\/p|\/div|\/h[1-6]|\/li|\/tr)\s*\/?>/i', "\n", $html);
+        $html = preg_replace('/<\/t[hd]>\s*<t[hd][^>]*>/i', ': ', $html);
         $html = preg_replace('/<li[^>]*>/i', '• ', $html);
 
         $text = wp_strip_all_tags($html);
@@ -952,9 +956,19 @@ class TS_ML_Product_Sync
         // which is accepted across virtually every category, so that's the last resort instead
         // of leaving the attribute out entirely.
         $brand = $this->find_product_value($product, 'product_brand', array('_brand'), array('marca', 'brand'));
-        $attributes[] = array('id' => 'BRAND', 'value_name' => $brand ?: 'Genérica');
-
         $model = $this->find_product_value($product, '', array('_model'), array('modelo', 'model'));
+
+        // Still nothing structured? Try pulling it from the product's own description text —
+        // sellers often write "Modelo: X" / "Marca: Y" in the description without ever
+        // filling a dedicated field. Constrained to values literally present in that text
+        // (see extract_brand_model_from_description), so this never invents data.
+        if ((empty($brand) || empty($model)) && get_option('ts_ml_ai_api_key')) {
+            $extracted = $this->extract_brand_model_from_description($product);
+            $brand = $brand ?: $extracted['brand'];
+            $model = $model ?: $extracted['model'];
+        }
+
+        $attributes[] = array('id' => 'BRAND', 'value_name' => $brand ?: 'Genérica');
         $attributes[] = array('id' => 'MODEL', 'value_name' => $model ?: 'Genérico');
 
         // Add GTIN/EAN if available
@@ -1004,6 +1018,59 @@ class TS_ML_Product_Sync
         }
 
         return '';
+    }
+
+    /**
+     * Ask AI to pull brand/model out of the product's own description — but ONLY values
+     * literally written there, never inferred or guessed, since a wrong-but-plausible brand
+     * is worse than the honest "Genérica" fallback.
+     *
+     * @param WC_Product $product
+     * @return array{brand: string, model: string}
+     */
+    private function extract_brand_model_from_description($product)
+    {
+        $empty = array('brand' => '', 'model' => '');
+
+        $api_key = get_option('ts_ml_ai_api_key');
+        if (empty($api_key)) {
+            return $empty;
+        }
+
+        $description = $this->to_plain_text($product->get_description() ?: $product->get_short_description());
+        if ($description === '') {
+            return $empty;
+        }
+
+        $model_name = get_option('ts_ml_ai_model', 'gpt-4o-mini');
+        $system_prompt = 'Você extrai marca e modelo de um produto a partir da descrição dele. ' .
+            'Responda APENAS um JSON no formato {"brand": "...", "model": "..."} , sem texto adicional. ' .
+            'Use string vazia em qualquer campo que não esteja EXPLICITAMENTE escrito na descrição — nunca invente, deduza ou adivinhe um valor que não apareça literalmente no texto.';
+
+        $messages = array(
+            array('role' => 'system', 'content' => $system_prompt),
+            array('role' => 'user', 'content' => $description),
+        );
+
+        $ai = TS_ML_AI_Integration::instance();
+        $response = $ai->call_openai_api($messages, $model_name, $api_key);
+
+        if (is_wp_error($response)) {
+            return $empty;
+        }
+
+        $result = isset($response['choices'][0]['message']['content']) ? trim($response['choices'][0]['message']['content']) : '';
+        $result = preg_replace('/^```(?:json)?|```$/m', '', $result);
+        $decoded = json_decode(trim($result), true);
+
+        if (!is_array($decoded)) {
+            return $empty;
+        }
+
+        return array(
+            'brand' => isset($decoded['brand']) ? sanitize_text_field($decoded['brand']) : '',
+            'model' => isset($decoded['model']) ? sanitize_text_field($decoded['model']) : '',
+        );
     }
 
     /**
