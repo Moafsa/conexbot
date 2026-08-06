@@ -3,7 +3,7 @@
  * Plugin Name: Conextbot Mercado Livre Integration
  * Plugin URI: https://app.conext.click
  * Description: Integração completa e automatizada entre WooCommerce e Mercado Livre. Sincronize estoque, preços, produtos, pedidos, mensagens e envios em tempo real via Conextbot.
- * Version: 1.0.137
+ * Version: 1.0.138
  * Author: Conext
  * Author URI: https://app.conext.click
  * Text Domain: ts-ml-integration
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants immediately (needed for activation hook)
 if (!defined('TS_ML_VERSION')) {
-    define('TS_ML_VERSION', '1.0.137');
+    define('TS_ML_VERSION', '1.0.138');
     define('TS_ML_PLUGIN_FILE', __FILE__);
     define('TS_ML_UPDATE_API_URL', 'https://app.conext.click/api/v1/ml/update');
 

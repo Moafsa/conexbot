@@ -129,11 +129,21 @@ class TS_ML_Category_Mapper
      */
     public function auto_map_via_ai($wc_category_id, $wc_category_name)
     {
+        // Mercado Livre's own predictor is purpose-built for exactly this task (real text
+        // → real category) and only ever returns categories that actually exist and are
+        // relevant. Try it first. AI is a fallback for names it can't confidently match —
+        // and even then, an AI answer is only trusted after verifying the ID exists, since
+        // a plausible-looking MLBxxxxx can still be a hallucinated, unrelated category (e.g.
+        // it once mapped "BEBÊ" to MLB1000, which is real but is "Eletrônicos, Áudio e Vídeo").
+        $predicted = $this->auto_map_via_ml_predictor($wc_category_id, $wc_category_name);
+        if ($predicted) {
+            return $predicted;
+        }
+
         $api_key = get_option('ts_ml_ai_api_key');
 
         if (empty($api_key)) {
-            // Fallback to official ML category predictor
-            return $this->auto_map_via_ml_predictor($wc_category_id, $wc_category_name);
+            return false;
         }
 
         $model = get_option('ts_ml_ai_model', 'gpt-4o-mini');
@@ -156,8 +166,7 @@ class TS_ML_Category_Mapper
         $response = $ai->call_openai_api($messages, $model, $api_key);
 
         if (is_wp_error($response)) {
-            // Log error and fallback to predictor
-            return $this->auto_map_via_ml_predictor($wc_category_id, $wc_category_name);
+            return false; // Predictor (tried above) already couldn't match this one either.
         }
 
         $result = isset($response['choices'][0]['message']['content']) 
@@ -177,8 +186,9 @@ class TS_ML_Category_Mapper
             }
         }
 
-        // Fallback if AI output is invalid or the ID doesn't actually exist
-        return $this->auto_map_via_ml_predictor($wc_category_id, $wc_category_name);
+        // AI output was invalid or the ID doesn't actually exist, and the predictor (tried
+        // above) already couldn't match this one either.
+        return false;
     }
 
     /**
@@ -207,7 +217,10 @@ class TS_ML_Category_Mapper
      */
     public function auto_map_via_ml_predictor($wc_category_id, $wc_category_name)
     {
-        $url = 'https://api.mercadolibre.com/sites/MLB/category_predictor/predict?title=' . urlencode($wc_category_name);
+        // Mercado Livre discontinued /category_predictor/predict (now returns 404 for every
+        // query). /domain_discovery/search is its replacement and returns the same kind of
+        // result: the best-matching real category for a free-text title.
+        $url = 'https://api.mercadolibre.com/sites/MLB/domain_discovery/search?limit=1&q=' . urlencode($wc_category_name);
         $response = wp_remote_get($url, array('timeout' => 15));
 
         if (is_wp_error($response)) {
@@ -217,8 +230,8 @@ class TS_ML_Category_Mapper
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
-        if (isset($data['id'])) {
-            $ml_category_id = sanitize_text_field($data['id']);
+        if (isset($data[0]['category_id'])) {
+            $ml_category_id = sanitize_text_field($data[0]['category_id']);
             $this->save_mapping($wc_category_id, $ml_category_id);
             return $ml_category_id;
         }
