@@ -571,6 +571,21 @@ class TS_ML_Product_Sync
                 $ml_product_data,
                 $access_token
             );
+
+            // A closed listing rejects every single field ("title is not modifiable;
+            // category_id is not modifiable; ..."). There's no "reopen" — once closed, it's
+            // permanently frozen — so the only way to keep syncing this product is to publish
+            // it as a brand new listing, which also gets a new item ID/permalink.
+            if (is_wp_error($response) && strpos($response->get_error_message(), 'status:closed') !== false) {
+                TS_ML_Logger::info('Anúncio anterior está finalizado (fechado) no ML — criando um novo em seu lugar', array('old_ml_item_id' => $existing->ml_item_id));
+                $is_update = false;
+                $response = $api_handler->api_request(
+                    '/items',
+                    'POST',
+                    $ml_product_data,
+                    $access_token
+                );
+            }
         } else {
             // Create new listing
             TS_ML_Logger::info('Criando nova publicação');
@@ -986,6 +1001,10 @@ class TS_ML_Product_Sync
             // The real, canonical listing URL Mercado Livre returns — don't hand-construct
             // one from just the item ID, the actual URL format/subdomain isn't guessable.
             'permalink' => isset($ml_response['permalink']) ? $ml_response['permalink'] : null,
+            // Reset from whatever the real ML response says — critical when a closed listing
+            // just got replaced by a brand new one, so the UI stops showing "Finalizado no ML"
+            // for a product that's actually active again under a new item ID.
+            'ml_status' => isset($ml_response['status']) ? $ml_response['status'] : 'active',
             'sync_status' => 'synced',
             'last_sync_at' => current_time('mysql'),
             'updated_at' => current_time('mysql'),
