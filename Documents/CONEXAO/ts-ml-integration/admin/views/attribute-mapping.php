@@ -23,6 +23,22 @@ if (isset($_POST['save_attribute_mapping']) && check_admin_referer('ts_ml_save_a
     echo '<div class="notice notice-success is-dismissible"><p>Mapeamento salvo com sucesso!</p></div>';
 }
 
+// Auto Mapping — only ever picks from the real attribute list Mercado Livre returns for the
+// categories already mapped in "Mapear Categorias" (never invents an attribute ID).
+if (isset($_POST['auto_map_attributes']) && check_admin_referer('ts_ml_save_attribute_mapping')) {
+    $result = TS_ML_Attribute_Mapper::instance()->auto_map_all();
+
+    if ($result['total_candidates'] === 0) {
+        echo '<div class="notice notice-warning is-dismissible"><p>' .
+            esc_html__('Não há categorias mapeadas em "Mapear Categorias" ainda — mapeie ao menos uma categoria primeiro, pois os atributos válidos do Mercado Livre dependem da categoria.', 'ts-ml-integration') .
+            '</p></div>';
+    } else {
+        echo '<div class="notice notice-success is-dismissible"><p>' .
+            sprintf(esc_html__('%d atributos mapeados automaticamente. %d não encontraram correspondência e precisam ser preenchidos manualmente.', 'ts-ml-integration'), $result['mapped'], $result['skipped']) .
+            '</p></div>';
+    }
+}
+
 // Get Saved Mapping
 $saved_mapping = get_option('ts_ml_attribute_mapping', array());
 
@@ -40,6 +56,9 @@ $attribute_taxonomies = wc_get_attribute_taxonomies();
             mapeie os atributos globais do WooCommerce para os IDs de atributos do Mercado Livre.
             <br>Exemplos de IDs do ML: <code>COLOR</code> (Cor), <code>SIZE</code> (Tamanho), <code>BRAND</code>
             (Marca), <code>MODEL</code> (Modelo), <code>VOLTAGE</code> (Voltagem).
+        </p>
+        <p>
+            <?php esc_html_e('O botão "Mapear Automaticamente" busca os atributos reais das categorias já mapeadas em "Mapear Categorias" e associa cada atributo do WooCommerce a um deles — nunca inventa um ID que não existe no Mercado Livre.', 'ts-ml-integration'); ?>
         </p>
     </div>
 
@@ -97,6 +116,9 @@ $attribute_taxonomies = wc_get_attribute_taxonomies();
         <p class="submit">
             <input type="submit" name="save_attribute_mapping" class="button button-primary"
                 value="Salvar Mapeamento" />
+            &nbsp;
+            <input type="submit" name="auto_map_attributes" class="button button-secondary"
+                value="<?php esc_attr_e('Mapear Automaticamente (não-mapeados)', 'ts-ml-integration'); ?>" />
         </p>
     </form>
 </div>

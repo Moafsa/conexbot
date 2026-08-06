@@ -167,12 +167,35 @@ class TS_ML_Category_Mapper
         // Match MLBXXXXX format
         if (preg_match('/(MLB\d+)/i', $result, $matches)) {
             $ml_category_id = strtoupper($matches[1]);
-            $this->save_mapping($wc_category_id, $ml_category_id);
-            return $ml_category_id;
+
+            // LLMs don't reliably know real Mercado Livre category IDs — a well-formatted
+            // MLBxxxxx string can still be a hallucinated ID that doesn't exist. Verify it
+            // against the real category endpoint before trusting it.
+            if ($this->category_exists($ml_category_id)) {
+                $this->save_mapping($wc_category_id, $ml_category_id);
+                return $ml_category_id;
+            }
         }
 
-        // Fallback if AI output is invalid
+        // Fallback if AI output is invalid or the ID doesn't actually exist
         return $this->auto_map_via_ml_predictor($wc_category_id, $wc_category_name);
+    }
+
+    /**
+     * Verify a Mercado Livre category ID actually exists
+     *
+     * @param string $ml_category_id
+     * @return bool
+     */
+    private function category_exists($ml_category_id)
+    {
+        $response = wp_remote_get('https://api.mercadolibre.com/categories/' . rawurlencode($ml_category_id), array('timeout' => 10));
+
+        if (is_wp_error($response)) {
+            return false;
+        }
+
+        return wp_remote_retrieve_response_code($response) === 200;
     }
 
     /**

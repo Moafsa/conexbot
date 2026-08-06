@@ -399,6 +399,19 @@ class TS_ML_API_Handler
     }
 
     /**
+     * Get the real, valid attribute list for a Mercado Livre category.
+     * Public catalog endpoint — the token is optional but passed through if available.
+     *
+     * @param string $ml_category_id e.g. MLB1055
+     * @param string $access_token   Optional
+     * @return array|WP_Error List of {id, name, ...} attribute definitions
+     */
+    public function get_category_attributes($ml_category_id, $access_token = '')
+    {
+        return $this->api_request('/categories/' . $ml_category_id . '/attributes', 'GET', array(), $access_token);
+    }
+
+    /**
      * Handle OAuth callback
      */
     public function handle_oauth_callback()
