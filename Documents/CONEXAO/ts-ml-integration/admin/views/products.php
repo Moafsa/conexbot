@@ -15,20 +15,28 @@ if (isset($_POST['bulk_action']) && isset($_POST['product_ids']) && check_admin_
     $product_ids = array_map('intval', $_POST['product_ids']);
     $account_id = isset($_POST['account_id']) ? intval($_POST['account_id']) : 0;
     
-    if ($account_id > 0) {
+    if ($account_id > 0 && !empty($product_ids)) {
+        $count_success = 0;
         foreach ($product_ids as $product_id) {
             switch ($action) {
+                case 'sync_woo_to_ml':
                 case 'sync_to_ml':
                     TS_ML_Product_Sync::instance()->sync_product($product_id, $account_id, 'woo_to_ml');
+                    $count_success++;
+                    break;
+                case 'sync_ml_to_woo':
+                    TS_ML_Product_Sync::instance()->sync_product($product_id, $account_id, 'ml_to_woo');
+                    $count_success++;
                     break;
                 case 'remove_sync':
                     global $wpdb;
                     $table_products = $wpdb->prefix . 'ts_ml_products';
                     $wpdb->delete($table_products, array('product_id' => $product_id, 'account_id' => $account_id), array('%d', '%d'));
+                    $count_success++;
                     break;
             }
         }
-        echo '<div class="notice notice-success"><p>' . esc_html__('Ação executada com sucesso!', 'ts-ml-integration') . '</p></div>';
+        echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(esc_html__('Sincronização processada com sucesso para %d produto(s)!', 'ts-ml-integration'), $count_success) . '</p></div>';
     }
 }
 
@@ -36,37 +44,31 @@ if (isset($_POST['bulk_action']) && isset($_POST['product_ids']) && check_admin_
 if (isset($_GET['sync_product']) && isset($_GET['account_id']) && check_admin_referer('sync_product_' . $_GET['sync_product'])) {
     $product_id = intval($_GET['sync_product']);
     $account_id = intval($_GET['account_id']);
-    TS_ML_Product_Sync::instance()->sync_product($product_id, $account_id, 'woo_to_ml');
-    echo '<div class="notice notice-success"><p>' . esc_html__('Produto sincronizado!', 'ts-ml-integration') . '</p></div>';
+    $direction = isset($_GET['direction']) ? sanitize_text_field($_GET['direction']) : 'woo_to_ml';
+    
+    TS_ML_Product_Sync::instance()->sync_product($product_id, $account_id, $direction);
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Produto enviado para a fila de sincronização!', 'ts-ml-integration') . '</p></div>';
 }
 
 // Get accounts
 global $wpdb;
 $table_accounts = $wpdb->prefix . 'ts_ml_accounts';
-
-// Check if table exists first
 $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_accounts'");
 $accounts = array();
 
 if ($table_exists) {
-    // Get ALL accounts (not just active ones) - user can have accounts being configured
     $all_accounts = $wpdb->get_results("SELECT * FROM $table_accounts ORDER BY created_at DESC");
-    
-    // Filter active accounts for display
     $accounts = array_filter($all_accounts, function($account) {
         return !empty($account->is_active) && $account->is_active == 1;
     });
-    
-    // If no active accounts but we have accounts, show them anyway (they might be in setup)
     if (empty($accounts) && !empty($all_accounts)) {
         $accounts = $all_accounts;
     }
 }
 
-// Get selected account
-$selected_account = isset($_GET['account_id']) ? intval($_GET['account_id']) : (!empty($accounts) ? $accounts[0]->id : 0);
+$selected_account = isset($_GET['account_id']) ? intval($_GET['account_id']) : (!empty($accounts) ? reset($accounts)->id : 0);
 
-// Get products
+// Get products query
 $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
 $per_page = 20;
 $offset = ($paged - 1) * $per_page;
@@ -85,10 +87,9 @@ if (isset($_GET['search'])) {
 
 $filter_photo = isset($_GET['filter_photo']) ? sanitize_text_field($_GET['filter_photo']) : '';
 $filter_ready = isset($_GET['filter_ready']) ? sanitize_text_field($_GET['filter_ready']) : '';
+$filter_flow  = isset($_GET['filter_flow']) ? sanitize_text_field($_GET['filter_flow']) : '';
 
-if ($filter_photo !== '' || $filter_ready !== '') {
-    global $wpdb;
-    
+if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '') {
     $sql = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
     
     if ($filter_photo === 'yes') {
@@ -102,56 +103,21 @@ if ($filter_photo !== '' || $filter_ready !== '') {
         $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_price' AND CAST(meta_value AS DECIMAL(10,2)) > 0)";
         $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_stock_status' AND meta_value = 'instock')";
         $sql .= " AND (post_content != '' OR post_excerpt != '')";
-        
-        $mappings = get_option('ts_ml_category_mappings', array());
-        $mapped_wc_cat_ids = array();
-        foreach ($mappings as $wc_cat_id => $ml_cat_id) {
-            if (!empty($ml_cat_id) && $ml_cat_id !== 'MLB1000') {
-                $mapped_wc_cat_ids[] = intval($wc_cat_id);
-            }
-        }
-        
-        if (!empty($mapped_wc_cat_ids)) {
-            $mapped_cats_str = implode(',', $mapped_wc_cat_ids);
-            $sql .= " AND ID IN (
-                SELECT object_id FROM {$wpdb->term_relationships} 
-                WHERE term_taxonomy_id IN (
-                    SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} 
-                    WHERE taxonomy = 'product_cat' AND term_id IN ($mapped_cats_str)
-                )
-            )";
-        } else {
-            $sql .= " AND 1=0";
-        }
     } elseif ($filter_ready === 'no') {
-        $mappings = get_option('ts_ml_category_mappings', array());
-        $mapped_wc_cat_ids = array();
-        foreach ($mappings as $wc_cat_id => $ml_cat_id) {
-            if (!empty($ml_cat_id) && $ml_cat_id !== 'MLB1000') {
-                $mapped_wc_cat_ids[] = intval($wc_cat_id);
-            }
-        }
-        
         $ready_subquery = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
         $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
         $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_price' AND CAST(meta_value AS DECIMAL(10,2)) > 0)";
         $ready_subquery .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_stock_status' AND meta_value = 'instock')";
-        $ready_subquery .= " AND (post_content != '' OR post_excerpt != '')";
-        
-        if (!empty($mapped_wc_cat_ids)) {
-            $mapped_cats_str = implode(',', $mapped_wc_cat_ids);
-            $ready_subquery .= " AND ID IN (
-                SELECT object_id FROM {$wpdb->term_relationships} 
-                WHERE term_taxonomy_id IN (
-                    SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} 
-                    WHERE taxonomy = 'product_cat' AND term_id IN ($mapped_cats_str)
-                )
-            )";
-        } else {
-            $ready_subquery .= " AND 1=0";
-        }
-        
         $sql .= " AND ID NOT IN ($ready_subquery)";
+    }
+
+    if (!empty($filter_flow) && $selected_account > 0) {
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        if ($filter_flow === 'woo_to_ml') {
+            $sql .= " AND ID IN (SELECT product_id FROM $table_products WHERE account_id = $selected_account AND (sync_direction = 'woo_to_ml' OR sync_direction = 'bidirectional'))";
+        } elseif ($filter_flow === 'ml_to_woo') {
+            $sql .= " AND ID IN (SELECT product_id FROM $table_products WHERE account_id = $selected_account AND (sync_direction = 'ml_to_woo' OR sync_direction = 'bidirectional'))";
+        }
     }
     
     $filtered_ids = $wpdb->get_col($sql);
@@ -201,97 +167,147 @@ input:checked + .ts-ml-slider {
 input:checked + .ts-ml-slider:before {
   transform: translateX(18px);
 }
+.ts-ml-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ts-ml-badge-woo-to-ml {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.ts-ml-badge-ml-to-woo {
+  background: #fcf4ff;
+  color: #86198f;
+  border: 1px solid #f5d0fe;
+}
+.ts-ml-badge-has-photo {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.ts-ml-badge-no-photo {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+/* Modal Staging Queue */
+.ts-ml-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+}
+.ts-ml-modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 850px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
 </style>
 
 <div class="wrap">
-    <h1><?php esc_html_e('Produtos - Mercado Livre', 'ts-ml-integration'); ?></h1>
+    <h1 style="display: flex; align-items: center; gap: 10px;">
+        🛍️ <?php esc_html_e('Produtos - Mercado Livre', 'ts-ml-integration'); ?>
+    </h1>
     
     <div class="ts-ml-products-page">
-        <?php 
-        // Debug information (only show if debug mode is enabled)
-        if (get_option('ts_ml_debug_mode') === 'yes') {
-            echo '<div class="notice notice-info">';
-            echo '<p><strong>Debug Info:</strong></p>';
-            echo '<ul>';
-            echo '<li>Tabela existe: ' . ($table_exists ? 'Sim' : 'Não') . '</li>';
-            if ($table_exists) {
-                $all_accounts_debug = $wpdb->get_results("SELECT id, account_name, is_active, country FROM $table_accounts");
-                echo '<li>Total de contas na tabela: ' . count($all_accounts_debug) . '</li>';
-                if (!empty($all_accounts_debug)) {
-                    echo '<li>Contas encontradas:<ul>';
-                    foreach ($all_accounts_debug as $acc) {
-                        echo '<li>ID: ' . esc_html($acc->id) . ', Nome: ' . esc_html($acc->account_name) . ', Ativa: ' . ($acc->is_active ? 'Sim' : 'Não') . ', País: ' . esc_html($acc->country) . '</li>';
-                    }
-                    echo '</ul></li>';
-                }
-            }
-            echo '<li>Contas filtradas (ativas): ' . count($accounts) . '</li>';
-            echo '</ul>';
-            echo '</div>';
-        }
-        
-        if (empty($accounts)) { ?>
-            <div class="notice notice-warning">
-                <p><?php esc_html_e('Nenhuma conta do Mercado Livre configurada. Configure uma conta em', 'ts-ml-integration'); ?> 
-                   <a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>"><?php esc_html_e('Configurações', 'ts-ml-integration'); ?></a>
+        <?php if (empty($accounts)) { ?>
+            <div class="notice notice-warning" style="margin-top: 20px;">
+                <p><?php esc_html_e('Nenhuma conta do Mercado Livre configurada.', 'ts-ml-integration'); ?> 
+                   <a href="<?php echo esc_url(admin_url('admin.php?page=ts-ml-settings')); ?>"><?php esc_html_e('Configurar Conta Agora', 'ts-ml-integration'); ?></a>
                 </p>
-                <?php if (!$table_exists) { ?>
-                    <p><strong><?php esc_html_e('⚠️ A tabela de contas não existe!', 'ts-ml-integration'); ?></strong> 
-                       <?php esc_html_e('Por favor, vá em Configurações e clique em "Criar Tabelas Agora".', 'ts-ml-integration'); ?>
-                    </p>
-                <?php } ?>
             </div>
         <?php } else { ?>
             
-            <!-- Account Selector -->
-            <div class="ts-ml-account-selector" style="margin: 20px 0;">
-                <label for="account_filter"><strong><?php esc_html_e('Conta:', 'ts-ml-integration'); ?></strong></label>
-                <select id="account_filter" onchange="window.location.href='?page=ts-ml-products&account_id='+this.value">
-                    <?php foreach ($accounts as $account) { ?>
-                        <option value="<?php echo esc_attr($account->id); ?>" <?php selected($selected_account, $account->id); ?>>
-                            <?php echo esc_html($account->account_name . ' (' . $account->country . ')'); ?>
-                        </option>
-                    <?php } ?>
-                </select>
+            <!-- Barra Superior de Controle & Conta -->
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px 20px; margin: 20px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <label for="account_filter" style="font-weight: 700; color: #334155; font-size: 14px;">🏢 <?php esc_html_e('Conta Ativa:', 'ts-ml-integration'); ?></label>
+                    <select id="account_filter" style="height: 38px; font-weight: 600; border-radius: 6px; padding: 0 12px;" onchange="window.location.href='?page=ts-ml-products&account_id='+this.value">
+                        <?php foreach ($accounts as $account) { ?>
+                            <option value="<?php echo esc_attr($account->id); ?>" <?php selected($selected_account, $account->id); ?>>
+                                <?php echo esc_html($account->account_name . ' (' . $account->country . ')'); ?>
+                            </option>
+                        <?php } ?>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" id="btn-open-sync-queue" class="button button-primary button-large" style="background: #2563eb; border-color: #2563eb; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 18px; height: 38px;">
+                        📋 <?php esc_html_e('Ver Fila & Prévia de Sincronização', 'ts-ml-integration'); ?>
+                    </button>
+                </div>
             </div>
-            
-            <!-- Search Form -->
-            <form method="get" action="" style="margin: 20px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+
+            <!-- Filtros de Busca, Fotos e Fluxo -->
+            <form method="get" action="" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <input type="hidden" name="page" value="ts-ml-products" />
                 <input type="hidden" name="account_id" value="<?php echo esc_attr($selected_account); ?>" />
-                <input type="search" name="search" value="<?php echo isset($_GET['search']) ? esc_attr($_GET['search']) : ''; ?>" placeholder="<?php esc_attr_e('Buscar produtos...', 'ts-ml-integration'); ?>" />
                 
-                <select name="filter_photo">
-                    <option value=""><?php esc_html_e('Todas as fotos', 'ts-ml-integration'); ?></option>
-                    <option value="yes" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'yes'); ?>><?php esc_html_e('Com foto', 'ts-ml-integration'); ?></option>
-                    <option value="no" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'no'); ?>><?php esc_html_e('Sem foto', 'ts-ml-integration'); ?></option>
-                </select>
+                <div style="flex: 1; min-width: 220px;">
+                    <input type="search" name="search" value="<?php echo isset($_GET['search']) ? esc_attr($_GET['search']) : ''; ?>" style="width: 100%; height: 38px;" placeholder="<?php esc_attr_e('🔍 Buscar produto por nome...', 'ts-ml-integration'); ?>" />
+                </div>
+                
+                <div>
+                    <select name="filter_photo" style="height: 38px;">
+                        <option value=""><?php esc_html_e('🖼️ Filtro de Foto: Todos', 'ts-ml-integration'); ?></option>
+                        <option value="yes" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'yes'); ?>><?php esc_html_e('🖼️ Somente Com Foto', 'ts-ml-integration'); ?></option>
+                        <option value="no" <?php selected(isset($_GET['filter_photo']) && $_GET['filter_photo'] === 'no'); ?>><?php esc_html_e('⚠️ Somente Sem Foto', 'ts-ml-integration'); ?></option>
+                    </select>
+                </div>
 
-                <select name="filter_ready">
-                    <option value=""><?php esc_html_e('Todos os status de prontidão', 'ts-ml-integration'); ?></option>
-                    <option value="yes" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'yes'); ?>><?php esc_html_e('100% Prontos para ML', 'ts-ml-integration'); ?></option>
-                    <option value="no" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'no'); ?>><?php esc_html_e('Incompletos para ML', 'ts-ml-integration'); ?></option>
-                </select>
+                <div>
+                    <select name="filter_flow" style="height: 38px;">
+                        <option value=""><?php esc_html_e('⇄ Fluxo: Todos', 'ts-ml-integration'); ?></option>
+                        <option value="woo_to_ml" <?php selected(isset($_GET['filter_flow']) && $_GET['filter_flow'] === 'woo_to_ml'); ?>><?php esc_html_e('🛒 Loja ➔ 🟡 ML (Enviar)', 'ts-ml-integration'); ?></option>
+                        <option value="ml_to_woo" <?php selected(isset($_GET['filter_flow']) && $_GET['filter_flow'] === 'ml_to_woo'); ?>><?php esc_html_e('🟡 ML ➔ 🛒 Loja (Importar)', 'ts-ml-integration'); ?></option>
+                    </select>
+                </div>
 
-                <input type="submit" class="button" value="<?php esc_attr_e('Filtrar', 'ts-ml-integration'); ?>" />
-                <?php if (isset($_GET['search']) || !empty($_GET['filter_photo']) || !empty($_GET['filter_ready'])) { ?>
-                    <a href="?page=ts-ml-products&account_id=<?php echo esc_attr($selected_account); ?>" class="button"><?php esc_html_e('Limpar Filtros', 'ts-ml-integration'); ?></a>
+                <div>
+                    <select name="filter_ready" style="height: 38px;">
+                        <option value=""><?php esc_html_e('✅ Prontidão: Todos', 'ts-ml-integration'); ?></option>
+                        <option value="yes" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'yes'); ?>><?php esc_html_e('✅ 100% Prontos para ML', 'ts-ml-integration'); ?></option>
+                        <option value="no" <?php selected(isset($_GET['filter_ready']) && $_GET['filter_ready'] === 'no'); ?>><?php esc_html_e('⚠️ Incompletos para ML', 'ts-ml-integration'); ?></option>
+                    </select>
+                </div>
+
+                <input type="submit" class="button button-secondary" style="height: 38px; font-weight: 600;" value="<?php esc_attr_e('Filtrar', 'ts-ml-integration'); ?>" />
+                
+                <?php if (isset($_GET['search']) || !empty($_GET['filter_photo']) || !empty($_GET['filter_ready']) || !empty($_GET['filter_flow'])) { ?>
+                    <a href="?page=ts-ml-products&account_id=<?php echo esc_attr($selected_account); ?>" class="button" style="height: 38px; line-height: 36px;"><?php esc_html_e('Limpar Filtros', 'ts-ml-integration'); ?></a>
                 <?php } ?>
             </form>
             
-            <!-- Bulk Actions Form -->
+            <!-- Tabela Principal com Ações em Massa -->
             <form method="post" action="" id="bulk-products-form">
                 <?php wp_nonce_field('ts_ml_bulk_products'); ?>
                 <input type="hidden" name="account_id" value="<?php echo esc_attr($selected_account); ?>" />
                 
-                <div class="tablenav top">
-                    <div class="alignleft actions bulkactions">
-                        <select name="bulk_action">
-                            <option value=""><?php esc_html_e('Ações em massa', 'ts-ml-integration'); ?></option>
-                            <option value="sync_to_ml"><?php esc_html_e('Sincronizar para Mercado Livre', 'ts-ml-integration'); ?></option>
-                            <option value="remove_sync"><?php esc_html_e('Remover sincronização', 'ts-ml-integration'); ?></option>
+                <div class="tablenav top" style="margin-bottom: 10px;">
+                    <div class="alignleft actions bulkactions" style="display: flex; gap: 8px; align-items: center;">
+                        <select name="bulk_action" id="bulk-action-selector" style="height: 32px;">
+                            <option value=""><?php esc_html_e('Ações em massa...', 'ts-ml-integration'); ?></option>
+                            <option value="sync_woo_to_ml"><?php esc_html_e('🛒 Enviar para o Mercado Livre (Loja ➔ ML)', 'ts-ml-integration'); ?></option>
+                            <option value="sync_ml_to_woo"><?php esc_html_e('🟡 Importar do Mercado Livre (ML ➔ Loja)', 'ts-ml-integration'); ?></option>
+                            <option value="remove_sync"><?php esc_html_e('🗑️ Remover da Sincronização', 'ts-ml-integration'); ?></option>
                         </select>
-                        <input type="submit" class="button action" value="<?php esc_attr_e('Aplicar', 'ts-ml-integration'); ?>" />
+                        <input type="submit" class="button action" value="<?php esc_attr_e('Aplicar Ação', 'ts-ml-integration'); ?>" />
                     </div>
                 </div>
                 
@@ -301,33 +317,46 @@ input:checked + .ts-ml-slider:before {
                             <td class="manage-column column-cb check-column">
                                 <input type="checkbox" id="cb-select-all" />
                             </td>
+                            <th style="width: 70px;"><?php esc_html_e('Foto', 'ts-ml-integration'); ?></th>
                             <th><?php esc_html_e('Produto', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Preço', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Estoque', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Status ML', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Sincronização Ativa', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Última Sincronização', 'ts-ml-integration'); ?></th>
-                            <th><?php esc_html_e('Ações', 'ts-ml-integration'); ?></th>
+                            <th style="width: 100px;"><?php esc_html_e('Preço', 'ts-ml-integration'); ?></th>
+                            <th style="width: 90px;"><?php esc_html_e('Estoque', 'ts-ml-integration'); ?></th>
+                            <th style="width: 130px;"><?php esc_html_e('Fluxo / Direção', 'ts-ml-integration'); ?></th>
+                            <th style="width: 120px;"><?php esc_html_e('Status ML', 'ts-ml-integration'); ?></th>
+                            <th style="width: 90px;"><?php esc_html_e('Sincronizar', 'ts-ml-integration'); ?></th>
+                            <th style="width: 140px;"><?php esc_html_e('Ações Rápidas', 'ts-ml-integration'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if ($products_query->have_posts()) { ?>
                             <?php while ($products_query->have_posts()) { 
                                 $products_query->the_post();
-                                $product = wc_get_product(get_the_ID());
+                                $product_id = get_the_ID();
+                                $product = wc_get_product($product_id);
+                                $has_photo = $product->get_image_id() > 0;
+                                
                                 $sync_data = $wpdb->get_row($wpdb->prepare(
                                     "SELECT * FROM $table_products WHERE product_id = %d AND account_id = %d",
-                                    get_the_ID(),
+                                    $product_id,
                                     $selected_account
                                 ));
+
+                                $direction = $sync_data ? $sync_data->sync_direction : 'woo_to_ml';
                                 ?>
-                                <tr>
+                                <tr data-id="<?php echo esc_attr($product_id); ?>" data-name="<?php echo esc_attr(get_the_title()); ?>" data-photo="<?php echo $has_photo ? 'yes' : 'no'; ?>">
                                     <th scope="row" class="check-column">
-                                        <input type="checkbox" name="product_ids[]" value="<?php echo esc_attr(get_the_ID()); ?>" />
+                                        <input type="checkbox" name="product_ids[]" value="<?php echo esc_attr($product_id); ?>" class="product-cb" />
                                     </th>
                                     <td>
+                                        <?php if ($has_photo) { ?>
+                                            <span class="ts-ml-badge ts-ml-badge-has-photo">🖼️ Sim</span>
+                                        <?php } else { ?>
+                                            <span class="ts-ml-badge ts-ml-badge-no-photo">⚠️ Não</span>
+                                        <?php } ?>
+                                    </td>
+                                    <td>
                                         <strong>
-                                            <a href="<?php echo esc_url(admin_url('post.php?post=' . get_the_ID() . '&action=edit')); ?>">
+                                            <a href="<?php echo esc_url(admin_url('post.php?post=' . $product_id . '&action=edit')); ?>">
                                                 <?php echo esc_html(get_the_title()); ?>
                                             </a>
                                         </strong>
@@ -335,7 +364,7 @@ input:checked + .ts-ml-slider:before {
                                             <br>
                                             <small>
                                                 <a href="https://produto.mercadolivre.com.br/<?php echo esc_attr($sync_data->ml_item_id); ?>" target="_blank">
-                                                    <?php esc_html_e('Ver no ML', 'ts-ml-integration'); ?>
+                                                    🔗 <?php esc_html_e('Ver no Mercado Livre', 'ts-ml-integration'); ?>
                                                 </a>
                                             </small>
                                         <?php } ?>
@@ -353,6 +382,13 @@ input:checked + .ts-ml-slider:before {
                                         ?>
                                     </td>
                                     <td>
+                                        <?php if ($direction === 'ml_to_woo') { ?>
+                                            <span class="ts-ml-badge ts-ml-badge-ml-to-woo">🟡 ML ➔ 🛒 Loja</span>
+                                        <?php } else { ?>
+                                            <span class="ts-ml-badge ts-ml-badge-woo-to-ml">🛒 Loja ➔ 🟡 ML</span>
+                                        <?php } ?>
+                                    </td>
+                                    <td>
                                         <?php if ($sync_data) { ?>
                                             <span class="status-<?php echo esc_attr($sync_data->sync_status); ?>">
                                                 <?php 
@@ -366,47 +402,39 @@ input:checked + .ts-ml-slider:before {
                                                 ?>
                                             </span>
                                             <?php if ($sync_data->sync_errors) { ?>
-                                                <br><small style="color: red;"><?php echo esc_html($sync_data->sync_errors); ?></small>
+                                                <br><small style="color: #ef4444; font-size: 11px;"><?php echo esc_html($sync_data->sync_errors); ?></small>
                                             <?php } ?>
                                         <?php } else { ?>
-                                            <span class="status-not-synced"><?php esc_html_e('Não sincronizado', 'ts-ml-integration'); ?></span>
+                                            <span class="status-not-synced" style="color: #64748b; font-size: 12px;"><?php esc_html_e('Não sincronizado', 'ts-ml-integration'); ?></span>
                                         <?php } ?>
                                     </td>
                                     <td>
                                         <?php 
-                                        $sync_enabled = get_post_meta(get_the_ID(), '_ts_ml_sync_enabled', true);
+                                        $sync_enabled = get_post_meta($product_id, '_ts_ml_sync_enabled', true);
                                         if (empty($sync_enabled)) {
                                             $sync_enabled = 'yes';
                                         }
                                         ?>
                                         <label class="ts-ml-switch" title="<?php esc_attr_e('Ativar/desativar sincronização deste produto', 'ts-ml-integration'); ?>">
-                                            <input type="checkbox" class="ts-ml-sync-toggle" data-id="<?php echo esc_attr(get_the_ID()); ?>" <?php checked($sync_enabled, 'yes'); ?>>
+                                            <input type="checkbox" class="ts-ml-sync-toggle" data-id="<?php echo esc_attr($product_id); ?>" <?php checked($sync_enabled, 'yes'); ?>>
                                             <span class="ts-ml-slider"></span>
                                         </label>
                                     </td>
                                     <td>
-                                        <?php 
-                                        if ($sync_data && $sync_data->last_sync_at) {
-                                            echo esc_html(human_time_diff(strtotime($sync_data->last_sync_at), current_time('timestamp'))) . ' ' . esc_html__('atrás', 'ts-ml-integration');
-                                        } else {
-                                            echo esc_html__('Nunca', 'ts-ml-integration');
-                                        }
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <?php if (!$sync_data || $sync_data->sync_status !== 'syncing') { ?>
-                                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . get_the_ID() . '&account_id=' . $selected_account), 'sync_product_' . get_the_ID())); ?>" class="button button-small">
-                                                <?php esc_html_e('Sincronizar', 'ts-ml-integration'); ?>
+                                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=woo_to_ml'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px;">
+                                                🛒 <?php esc_html_e('Enviar p/ ML', 'ts-ml-integration'); ?>
                                             </a>
-                                        <?php } else { ?>
-                                            <span class="button button-small disabled"><?php esc_html_e('Sincronizando...', 'ts-ml-integration'); ?></span>
-                                        <?php } ?>
+                                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;">
+                                                🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php } ?>
                         <?php } else { ?>
                             <tr>
-                                <td colspan="8"><?php esc_html_e('Nenhum produto encontrado.', 'ts-ml-integration'); ?></td>
+                                <td colspan="9"><?php esc_html_e('Nenhum produto encontrado com os filtros selecionados.', 'ts-ml-integration'); ?></td>
                             </tr>
                         <?php } ?>
                     </tbody>
@@ -431,6 +459,66 @@ input:checked + .ts-ml-slider:before {
                 ?>
             </form>
         <?php } ?>
+    </div>
+</div>
+
+<!-- MODAL DA FILA & PRÉVIA DE SINCRONIZAÇÃO -->
+<div id="ts-ml-queue-modal" class="ts-ml-modal-overlay">
+    <div class="ts-ml-modal-content">
+        <div style="background: #0f172a; color: #ffffff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px; color: #ffffff; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                📋 <?php esc_html_e('Fila & Prévia de Sincronização de Produtos', 'ts-ml-integration'); ?>
+            </h3>
+            <button type="button" id="btn-close-queue-modal" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">&times;</button>
+        </div>
+
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <!-- Métricas da Fila -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 15px; border-radius: 8px;">
+                    <span style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; display: block;"><?php esc_html_e('Total na Prévia', 'ts-ml-integration'); ?></span>
+                    <strong id="modal-total-count" style="font-size: 22px; color: #0f172a;">0</strong>
+                </div>
+                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; padding: 12px 15px; border-radius: 8px;">
+                    <span style="font-size: 11px; text-transform: uppercase; color: #047857; font-weight: 700; display: block;"><?php esc_html_e('Com Foto', 'ts-ml-integration'); ?></span>
+                    <strong id="modal-photo-count" style="font-size: 22px; color: #065f46;">0</strong>
+                </div>
+                <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 12px 15px; border-radius: 8px;">
+                    <span style="font-size: 11px; text-transform: uppercase; color: #be123c; font-weight: 700; display: block;"><?php esc_html_e('Sem Foto', 'ts-ml-integration'); ?></span>
+                    <strong id="modal-nophoto-count" style="font-size: 22px; color: #9f1239;">0</strong>
+                </div>
+            </div>
+
+            <!-- Escolha do Fluxo da Fila -->
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <label style="font-weight: 700; font-size: 13px; color: #1e293b;"><?php esc_html_e('Escolha a Direção da Sincronização para a Fila:', 'ts-ml-integration'); ?></label>
+                <select id="modal-sync-direction-selector" style="height: 38px; font-weight: 700; border-radius: 6px; padding: 0 10px;">
+                    <option value="sync_woo_to_ml">🛒 Loja ➔ 🟡 Mercado Livre (Enviar / Atualizar no ML)</option>
+                    <option value="sync_ml_to_woo">🟡 Mercado Livre ➔ 🛒 Loja (Importar / Atualizar no WP)</option>
+                </select>
+            </div>
+
+            <!-- Tabela Prévia da Fila -->
+            <table class="wp-list-table widefat fixed striped" style="margin: 0;">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Produto', 'ts-ml-integration'); ?></th>
+                        <th style="width: 100px;"><?php esc_html_e('Foto', 'ts-ml-integration'); ?></th>
+                        <th style="width: 180px;"><?php esc_html_e('Fluxo Selecionado', 'ts-ml-integration'); ?></th>
+                    </tr>
+                </thead>
+                <tbody id="modal-queue-tbody">
+                    <!-- Dinâmico via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 15px 24px; display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" id="btn-cancel-queue-modal" class="button" style="height: 38px; padding: 0 18px;"><?php esc_html_e('Cancelar', 'ts-ml-integration'); ?></button>
+            <button type="button" id="btn-confirm-execute-sync" class="button button-primary button-large" style="background: #10b981; border-color: #10b981; height: 38px; padding: 0 25px; font-weight: 700;">
+                🚀 <?php esc_html_e('Confirmar e Sincronizar Fila Agora', 'ts-ml-integration'); ?>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -469,6 +557,84 @@ jQuery(document).ready(function($) {
                 checkbox.prop('checked', !checkbox.is(':checked'));
             }
         });
+    });
+
+    // MODAL FILA DE SINCRONIZAÇÃO
+    const modal = $('#ts-ml-queue-modal');
+    
+    $('#btn-open-sync-queue').on('click', function() {
+        populateModalQueue();
+        modal.css('display', 'flex');
+    });
+
+    $('#btn-close-queue-modal, #btn-cancel-queue-modal').on('click', function() {
+        modal.hide();
+    });
+
+    function populateModalQueue() {
+        const checkedBoxes = $('input[name="product_ids[]"]:checked');
+        const rowsToProcess = checkedBoxes.length > 0 ? checkedBoxes.closest('tr') : $('tbody tr[data-id]');
+        
+        let totalCount = 0;
+        let photoCount = 0;
+        let noPhotoCount = 0;
+        let tbodyHtml = '';
+
+        const selectedFlow = $('#modal-sync-direction-selector').val();
+        const flowLabel = selectedFlow === 'sync_woo_to_ml' ? '🛒 Loja ➔ 🟡 ML' : '🟡 ML ➔ 🛒 Loja';
+
+        rowsToProcess.each(function() {
+            const tr = $(this);
+            const id = tr.data('id');
+            const name = tr.data('name');
+            const photo = tr.data('photo');
+
+            if (!id) return;
+
+            totalCount++;
+            if (photo === 'yes') {
+                photoCount++;
+            } else {
+                noPhotoCount++;
+            }
+
+            const photoBadge = photo === 'yes' 
+                ? '<span class="ts-ml-badge ts-ml-badge-has-photo">🖼️ Sim</span>' 
+                : '<span class="ts-ml-badge ts-ml-badge-no-photo">⚠️ Sem Foto</span>';
+
+            tbodyHtml += `
+                <tr>
+                    <td><strong>${name}</strong></td>
+                    <td>${photoBadge}</td>
+                    <td><span class="ts-ml-badge ts-ml-badge-woo-to-ml">${flowLabel}</span></td>
+                </tr>
+            `;
+        });
+
+        if (totalCount === 0) {
+            tbodyHtml = '<tr><td colspan="3">Nenhum produto selecionado ou disponível para a fila.</td></tr>';
+        }
+
+        $('#modal-total-count').text(totalCount);
+        $('#modal-photo-count').text(photoCount);
+        $('#modal-nophoto-count').text(noPhotoCount);
+        $('#modal-queue-tbody').html(tbodyHtml);
+    }
+
+    $('#modal-sync-direction-selector').on('change', function() {
+        populateModalQueue();
+    });
+
+    $('#btn-confirm-execute-sync').on('click', function() {
+        const selectedAction = $('#modal-sync-direction-selector').val();
+        $('#bulk-action-selector').val(selectedAction);
+        
+        // If no checkboxes are explicitly checked, check all items currently listed
+        if ($('input[name="product_ids[]"]:checked').length === 0) {
+            $('.product-cb').prop('checked', true);
+        }
+
+        $('#bulk-products-form').submit();
     });
 });
 </script>
