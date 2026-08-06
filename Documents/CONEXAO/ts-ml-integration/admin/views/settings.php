@@ -277,7 +277,14 @@ if (isset($_POST['save_settings']) && check_admin_referer('ts_ml_save_settings')
     update_option('ts_ml_sync_only_with_photos', isset($_POST['sync_only_with_photos']) ? 'yes' : 'no');
     update_option('ts_ml_sync_only_ready', isset($_POST['sync_only_ready']) ? 'yes' : 'no');
     update_option('ts_ml_ai_enabled', isset($_POST['ai_enabled']) ? 'yes' : 'no');
-    update_option('ts_ml_ai_api_key', sanitize_text_field($_POST['ai_api_key'] ?? ''));
+    // Only overwrite the key if the user actually typed a new one — the field is left
+    // blank on page load (secrets aren't echoed back), so a blank submit must NOT wipe
+    // out an already-configured key.
+    if (!empty($_POST['ai_api_key'])) {
+        update_option('ts_ml_ai_api_key', sanitize_text_field($_POST['ai_api_key']));
+    } elseif (isset($_POST['ai_api_key_clear'])) {
+        update_option('ts_ml_ai_api_key', '');
+    }
     update_option('ts_ml_ai_model', sanitize_text_field($_POST['ai_model'] ?? 'gpt-3.5-turbo'));
     update_option('ts_ml_ai_system_prompt', sanitize_textarea_field($_POST['ai_system_prompt'] ?? ''));
     update_option('ts_ml_debug_mode', isset($_POST['debug_mode']) ? 'yes' : 'no');
@@ -724,6 +731,22 @@ if (!isset($settings_saved)) {
                                 <input type="checkbox" name="ai_enabled" value="1" <?php checked(get_option('ts_ml_ai_enabled'), 'yes'); ?> />
                                 <strong><?php esc_html_e('Ativar respostas automáticas com IA para perguntas do Mercado Livre', 'ts-ml-integration'); ?></strong>
                             </label>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row"><label for="ai_api_key"><?php esc_html_e('Chave da API (OpenAI)', 'ts-ml-integration'); ?></label></th>
+                        <td>
+                            <?php $has_ai_key = !empty(get_option('ts_ml_ai_api_key')); ?>
+                            <input type="password" name="ai_api_key" id="ai_api_key" class="regular-text" autocomplete="off"
+                                placeholder="<?php echo $has_ai_key ? esc_attr__('•••••••••••••••••••• (chave já configurada)', 'ts-ml-integration') : 'sk-...'; ?>" />
+                            <?php if ($has_ai_key) : ?>
+                                <label style="margin-left: 10px; font-weight: normal;">
+                                    <input type="checkbox" name="ai_api_key_clear" value="1" />
+                                    <?php esc_html_e('Remover chave configurada', 'ts-ml-integration'); ?>
+                                </label>
+                            <?php endif; ?>
+                            <p class="description"><?php esc_html_e('Necessária para mapeamento automático de categorias/atributos via IA e respostas automáticas. Deixe em branco para manter a chave atual.', 'ts-ml-integration'); ?></p>
                         </td>
                     </tr>
 

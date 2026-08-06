@@ -334,7 +334,9 @@ input:checked + .ts-ml-slider:before {
                                 $product_id = get_the_ID();
                                 $product = wc_get_product($product_id);
                                 $has_photo = $product->get_image_id() > 0;
-                                
+                                $thumb_url = $has_photo ? wp_get_attachment_image_url($product->get_image_id(), 'thumbnail') : '';
+                                $stock_qty = $product->managing_stock() ? $product->get_stock_quantity() : null;
+
                                 $sync_data = $wpdb->get_row($wpdb->prepare(
                                     "SELECT * FROM $table_products WHERE product_id = %d AND account_id = %d",
                                     $product_id,
@@ -343,15 +345,15 @@ input:checked + .ts-ml-slider:before {
 
                                 $direction = $sync_data ? $sync_data->sync_direction : 'woo_to_ml';
                                 ?>
-                                <tr data-id="<?php echo esc_attr($product_id); ?>" data-name="<?php echo esc_attr(get_the_title()); ?>" data-photo="<?php echo $has_photo ? 'yes' : 'no'; ?>">
+                                <tr data-id="<?php echo esc_attr($product_id); ?>" data-name="<?php echo esc_attr(get_the_title()); ?>" data-photo="<?php echo $has_photo ? 'yes' : 'no'; ?>" data-thumb="<?php echo esc_url($thumb_url); ?>" data-stock="<?php echo esc_attr($stock_qty === null ? '' : $stock_qty); ?>">
                                     <th scope="row" class="check-column">
                                         <input type="checkbox" name="product_ids[]" value="<?php echo esc_attr($product_id); ?>" class="product-cb" />
                                     </th>
                                     <td>
                                         <?php if ($has_photo) { ?>
-                                            <span class="ts-ml-badge ts-ml-badge-has-photo">🖼️ Sim</span>
+                                            <img src="<?php echo esc_url($thumb_url); ?>" alt="" width="40" height="40" style="border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; display: block;" />
                                         <?php } else { ?>
-                                            <span class="ts-ml-badge ts-ml-badge-no-photo">⚠️ Não</span>
+                                            <span class="ts-ml-badge ts-ml-badge-no-photo">⚠️ Sem foto</span>
                                         <?php } ?>
                                     </td>
                                     <td>
@@ -502,8 +504,9 @@ input:checked + .ts-ml-slider:before {
             <table class="wp-list-table widefat fixed striped" style="margin: 0;">
                 <thead>
                     <tr>
+                        <th style="width: 60px;"><?php esc_html_e('Foto', 'ts-ml-integration'); ?></th>
                         <th><?php esc_html_e('Produto', 'ts-ml-integration'); ?></th>
-                        <th style="width: 100px;"><?php esc_html_e('Foto', 'ts-ml-integration'); ?></th>
+                        <th style="width: 90px;"><?php esc_html_e('Estoque', 'ts-ml-integration'); ?></th>
                         <th style="width: 180px;"><?php esc_html_e('Fluxo Selecionado', 'ts-ml-integration'); ?></th>
                     </tr>
                 </thead>
@@ -588,6 +591,8 @@ jQuery(document).ready(function($) {
             const id = tr.data('id');
             const name = tr.data('name');
             const photo = tr.data('photo');
+            const thumb = tr.data('thumb');
+            const stock = tr.data('stock');
 
             if (!id) return;
 
@@ -598,21 +603,24 @@ jQuery(document).ready(function($) {
                 noPhotoCount++;
             }
 
-            const photoBadge = photo === 'yes' 
-                ? '<span class="ts-ml-badge ts-ml-badge-has-photo">🖼️ Sim</span>' 
-                : '<span class="ts-ml-badge ts-ml-badge-no-photo">⚠️ Sem Foto</span>';
+            const photoCell = photo === 'yes' && thumb
+                ? `<img src="${thumb}" alt="" width="36" height="36" style="border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; display: block;" />`
+                : '<span class="ts-ml-badge ts-ml-badge-no-photo">⚠️</span>';
+
+            const stockCell = (stock === '' || stock === undefined) ? '—' : stock;
 
             tbodyHtml += `
                 <tr>
+                    <td>${photoCell}</td>
                     <td><strong>${name}</strong></td>
-                    <td>${photoBadge}</td>
+                    <td>${stockCell}</td>
                     <td><span class="ts-ml-badge ts-ml-badge-woo-to-ml">${flowLabel}</span></td>
                 </tr>
             `;
         });
 
         if (totalCount === 0) {
-            tbodyHtml = '<tr><td colspan="3">Nenhum produto selecionado ou disponível para a fila.</td></tr>';
+            tbodyHtml = '<tr><td colspan="4">Nenhum produto selecionado ou disponível para a fila.</td></tr>';
         }
 
         $('#modal-total-count').text(totalCount);
