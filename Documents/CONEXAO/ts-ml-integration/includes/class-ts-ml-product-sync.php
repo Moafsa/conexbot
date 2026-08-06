@@ -772,7 +772,10 @@ class TS_ML_Product_Sync
             'listing_type_id' => 'gold_special',
             'condition' => 'new',
             'description' => array(
-                'plain_text' => $product->get_description() ?: $product->get_short_description(),
+                // Mercado Livre rejects this outright if it isn't genuinely plain text —
+                // WooCommerce descriptions are HTML (<p>, <strong>, etc.), so it has to be
+                // stripped and decoded first, not sent as-is.
+                'plain_text' => $this->to_plain_text($product->get_description() ?: $product->get_short_description()),
             ),
             'pictures' => $this->get_product_images($product),
             'attributes' => $this->get_product_attributes($product),
@@ -824,6 +827,21 @@ class TS_ML_Product_Sync
 
         TS_ML_Logger::warning('Nenhuma categoria mapeada. Usando fallback genérico (MLB1000)', array('product_id' => $product->get_id()));
         return 'MLB1000'; // Fallback if no mapping found
+    }
+
+    /**
+     * Strip a WooCommerce (HTML) description down to genuine plain text — Mercado Livre's
+     * description endpoint rejects anything containing markup.
+     *
+     * @param string $html
+     * @return string
+     */
+    private function to_plain_text($html)
+    {
+        $text = wp_strip_all_tags($html);
+        $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+        return trim($text);
     }
 
     /**
