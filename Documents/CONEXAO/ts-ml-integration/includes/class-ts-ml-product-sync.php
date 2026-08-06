@@ -838,8 +838,16 @@ class TS_ML_Product_Sync
      */
     private function to_plain_text($html)
     {
+        // wp_strip_all_tags() removes tags without inserting anything in their place, so
+        // "</p><p>" or "<br>" between blocks collapses straight into "...texto!Próximo
+        // bloco..." with no separator at all. Turn block boundaries into real line breaks
+        // *before* stripping, so paragraphs/list items/headings stay readable.
+        $html = preg_replace('/<(br|\/p|\/div|\/h[1-6]|\/li|\/tr)\s*\/?>/i', "\n", $html);
+        $html = preg_replace('/<li[^>]*>/i', '• ', $html);
+
         $text = wp_strip_all_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        $text = preg_replace('/[ \t]+/', ' ', $text);
         $text = preg_replace('/\n{3,}/', "\n\n", $text);
         return trim($text);
     }
