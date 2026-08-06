@@ -57,6 +57,10 @@ class TS_ML_Admin
         add_action('wp_ajax_ts_ml_fetch_items', array($this, 'ajax_fetch_items'));
         add_action('wp_ajax_ts_ml_import_single_item', array($this, 'ajax_import_single_item'));
         add_action('wp_ajax_ts_ml_toggle_product_sync', array($this, 'ajax_toggle_product_sync'));
+
+        // AJAX Handlers for Q&A (Messages)
+        add_action('wp_ajax_ts_ml_fetch_questions', array($this, 'ajax_fetch_questions'));
+        add_action('wp_ajax_ts_ml_send_answer', array($this, 'ajax_send_answer'));
     }
 
     /**
@@ -617,6 +621,123 @@ class TS_ML_Admin
         update_post_meta($product_id, '_ts_ml_sync_enabled', $enabled);
 
         wp_send_json_success(array('enabled' => $enabled));
+    }
+
+    /**
+     * AJAX: fetch Q&A questions for an account, enriched with item title/permalink
+     */
+    public function ajax_fetch_questions()
+    {
+        check_ajax_referer('ts_ml_qa_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Permissão negada.', 'ts-ml-integration'));
+        }
+
+        $account_id = isset($_POST['account_id']) ? intval($_POST['account_id']) : 0;
+        $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : 'UNANSWERED';
+
+        if (empty($account_id)) {
+            wp_send_json_error(__('Conta não especificada.', 'ts-ml-integration'));
+        }
+
+        $api_handler = TS_ML_API_Handler::instance();
+        $access_token = $api_handler->get_valid_token($account_id);
+
+        if (is_wp_error($access_token)) {
+            wp_send_json_error($access_token->get_error_message());
+        }
+
+        $user_info = $api_handler->get_user_info($access_token);
+        if (is_wp_error($user_info)) {
+            wp_send_json_error(__('Erro ao obter informações do usuário:', 'ts-ml-integration') . ' ' . $user_info->get_error_message());
+        }
+
+        $questions_data = $api_handler->api_request('/questions/search', 'GET', array(
+            'seller_id' => $user_info['id'],
+            'status' => $status,
+        ), $access_token);
+
+        if (is_wp_error($questions_data)) {
+            wp_send_json_error($questions_data->get_error_message());
+        }
+
+        $questions = $questions_data['questions'] ?? array();
+
+        if (empty($questions)) {
+            wp_send_json_success(array());
+        }
+
+        // Enrich with item title/permalink via multiget, same pattern as ajax_fetch_items
+        $item_ids = array_unique(array_map(function ($q) {
+            return $q['item_id'];
+        }, $questions));
+
+        $items_by_id = array();
+        $items_data = $api_handler->api_request('/items', 'GET', array('ids' => implode(',', $item_ids)), $access_token);
+        if (!is_wp_error($items_data)) {
+            foreach ($items_data as $item_resp) {
+                if (isset($item_resp['body']['id'])) {
+                    $items_by_id[$item_resp['body']['id']] = $item_resp['body'];
+                }
+            }
+        }
+
+        $formatted = array_map(function ($q) use ($items_by_id) {
+            $item = $items_by_id[$q['item_id']] ?? array();
+            return array(
+                'id' => $q['id'],
+                'text' => $q['text'],
+                'status' => $q['status'],
+                'date_created' => $q['date_created'],
+                'answer' => $q['answer'] ?? null,
+                'item' => array(
+                    'id' => $q['item_id'],
+                    'title' => $item['title'] ?? $q['item_id'],
+                    'permalink' => $item['permalink'] ?? '#',
+                ),
+            );
+        }, $questions);
+
+        wp_send_json_success($formatted);
+    }
+
+    /**
+     * AJAX: send an answer to a Mercado Livre question
+     */
+    public function ajax_send_answer()
+    {
+        check_ajax_referer('ts_ml_qa_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Permissão negada.', 'ts-ml-integration'));
+        }
+
+        $account_id = isset($_POST['account_id']) ? intval($_POST['account_id']) : 0;
+        $question_id = isset($_POST['question_id']) ? intval($_POST['question_id']) : 0;
+        $text = isset($_POST['text']) ? sanitize_textarea_field($_POST['text']) : '';
+
+        if (empty($account_id) || empty($question_id) || $text === '') {
+            wp_send_json_error(__('Dados incompletos para responder a pergunta.', 'ts-ml-integration'));
+        }
+
+        $api_handler = TS_ML_API_Handler::instance();
+        $access_token = $api_handler->get_valid_token($account_id);
+
+        if (is_wp_error($access_token)) {
+            wp_send_json_error($access_token->get_error_message());
+        }
+
+        $result = $api_handler->api_request('/answers', 'POST', array(
+            'question_id' => $question_id,
+            'text' => $text,
+        ), $access_token);
+
+        if (is_wp_error($result)) {
+            wp_send_json_error($result->get_error_message());
+        }
+
+        wp_send_json_success($result);
     }
 }
 
