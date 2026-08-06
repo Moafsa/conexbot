@@ -813,14 +813,9 @@ class TS_ML_Product_Sync
     private function get_ml_category($product)
     {
         $categories = $product->get_category_ids();
-
-        if (empty($categories)) {
-            return 'MLB1000'; // Default fallback
-        }
-
         $mapper = TS_ML_Category_Mapper::instance();
 
-        // Try to find a mapping for any of the product categories
+        // Try to find a mapping for any of the product's WooCommerce categories
         foreach ($categories as $cat_id) {
             $ml_cat_id = $mapper->get_ml_category($cat_id);
             if ($ml_cat_id) {
@@ -828,8 +823,42 @@ class TS_ML_Product_Sync
             }
         }
 
-        TS_ML_Logger::warning('Nenhuma categoria mapeada. Usando fallback genérico (MLB1000)', array('product_id' => $product->get_id()));
-        return 'MLB1000'; // Fallback if no mapping found
+        // Nothing mapped — ask Mercado Livre's own category finder for this exact product's
+        // title, the same reliable lookup Category Mapping uses. This always returns a real,
+        // sellable "leaf" category; a hardcoded fallback like MLB1000 doesn't — confirmed live
+        // ("Is not allowed to post in category MLB1000. Make sure you're posting in a leaf
+        // category"), since MLB1000 is a broad parent category (Eletrônicos, Áudio e Vídeo),
+        // not something Mercado Livre accepts posting directly into.
+        $predicted = $this->predict_category_from_title($product->get_name());
+        if ($predicted) {
+            TS_ML_Logger::info('Nenhuma categoria mapeada — categoria detectada pelo título do produto', array(
+                'product_id' => $product->get_id(),
+                'ml_category_id' => $predicted,
+            ));
+            return $predicted;
+        }
+
+        TS_ML_Logger::warning('Nenhuma categoria mapeada e a busca automática não encontrou nada. Usando fallback genérico (MLB1000), que pode falhar por não ser uma categoria-folha.', array('product_id' => $product->get_id()));
+        return 'MLB1000'; // Last-resort fallback only if even the live lookup fails
+    }
+
+    /**
+     * @param string $title
+     * @return string|false Real ML category ID, or false if nothing matched
+     */
+    private function predict_category_from_title($title)
+    {
+        $response = wp_remote_get(
+            'https://api.mercadolibre.com/sites/MLB/domain_discovery/search?limit=1&q=' . urlencode($title),
+            array('timeout' => 10)
+        );
+
+        if (is_wp_error($response)) {
+            return false;
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($data[0]['category_id']) ? sanitize_text_field($data[0]['category_id']) : false;
     }
 
     /**
