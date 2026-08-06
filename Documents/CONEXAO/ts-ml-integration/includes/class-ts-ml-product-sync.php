@@ -538,6 +538,14 @@ class TS_ML_Product_Sync
         // Prepare product data for ML
         $ml_product_data = $this->prepare_product_for_ml($product);
 
+        // Mercado Livre's /items endpoint doesn't reliably persist an inline "description" —
+        // for an already-active item it rejects the whole request outright ("description is
+        // not modifiable"), and even on creation it isn't guaranteed to stick. The only
+        // reliable path is the dedicated /items/{id}/description endpoint, called separately
+        // below once the item itself exists.
+        $description_text = isset($ml_product_data['description']['plain_text']) ? $ml_product_data['description']['plain_text'] : '';
+        unset($ml_product_data['description']);
+
         TS_ML_Logger::debug('Dados do produto preparados', array('data' => $ml_product_data));
 
         // Check if product already exists in ML
@@ -549,39 +557,20 @@ class TS_ML_Product_Sync
             $account_id
         ));
 
-        if ($existing && !empty($existing->ml_item_id)) {
-            // Update existing listing. Mercado Livre rejects the whole request
-            // ("listing_type_id is not modifiable; description is not modifiable") if these
-            // are included on an already-active item: listing_type_id can't change after
-            // publish without a dedicated upgrade/downgrade flow, and description has to go
-            // through its own endpoint, not the main item payload.
-            TS_ML_Logger::info('Atualizando publicação existente', array('ml_item_id' => $existing->ml_item_id));
+        $is_update = $existing && !empty($existing->ml_item_id);
 
-            $update_data = $ml_product_data;
-            $description_text = isset($update_data['description']['plain_text']) ? $update_data['description']['plain_text'] : '';
-            unset($update_data['listing_type_id'], $update_data['description']);
+        if ($is_update) {
+            // listing_type_id can't change after publish without a dedicated upgrade/
+            // downgrade flow — sending it on an update is rejected outright.
+            TS_ML_Logger::info('Atualizando publicação existente', array('ml_item_id' => $existing->ml_item_id));
+            unset($ml_product_data['listing_type_id']);
 
             $response = $api_handler->api_request(
                 '/items/' . $existing->ml_item_id,
                 'PUT',
-                $update_data,
+                $ml_product_data,
                 $access_token
             );
-
-            if (!is_wp_error($response) && $description_text !== '') {
-                $description_response = $api_handler->api_request(
-                    '/items/' . $existing->ml_item_id . '/description',
-                    'PUT',
-                    array('plain_text' => $description_text),
-                    $access_token
-                );
-                if (is_wp_error($description_response)) {
-                    TS_ML_Logger::warning('Item atualizado, mas a descrição falhou', array(
-                        'ml_item_id' => $existing->ml_item_id,
-                        'error' => $description_response->get_error_message(),
-                    ));
-                }
-            }
         } else {
             // Create new listing
             TS_ML_Logger::info('Criando nova publicação');
@@ -598,6 +587,24 @@ class TS_ML_Product_Sync
             TS_ML_Logger::error('Erro na API do Mercado Livre', array('error' => $error_message));
             $this->update_sync_status($product->get_id(), $account_id, 'error', $error_message);
             return false;
+        }
+
+        // Set the description via its own endpoint now that the item definitely exists.
+        // POST creates it (a brand new item has none yet); PUT updates an existing one.
+        $ml_item_id = $is_update ? $existing->ml_item_id : (isset($response['id']) ? $response['id'] : '');
+        if ($description_text !== '' && !empty($ml_item_id)) {
+            $description_response = $api_handler->api_request(
+                '/items/' . $ml_item_id . '/description',
+                $is_update ? 'PUT' : 'POST',
+                array('plain_text' => $description_text),
+                $access_token
+            );
+            if (is_wp_error($description_response)) {
+                TS_ML_Logger::warning('Item sincronizado, mas a descrição falhou', array(
+                    'ml_item_id' => $ml_item_id,
+                    'error' => $description_response->get_error_message(),
+                ));
+            }
         }
 
         // Update sync record
