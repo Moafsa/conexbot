@@ -192,7 +192,12 @@ class TS_ML_Category_Mapper
     }
 
     /**
-     * Verify a Mercado Livre category ID actually exists
+     * Verify a Mercado Livre category ID actually exists AND is a "leaf" category — a
+     * category with sub-categories (or explicitly marked listing_allowed=false) exists but
+     * rejects every listing posted directly into it ("Is not allowed to post in category X.
+     * Make sure you're posting in a leaf category"), confirmed live for both the AI-mapped
+     * and product-sync fallback paths. A mapping to a non-leaf category is just as broken as
+     * one to a category that doesn't exist at all, so both are rejected the same way here.
      *
      * @param string $ml_category_id
      * @return bool
@@ -201,11 +206,20 @@ class TS_ML_Category_Mapper
     {
         $response = wp_remote_get('https://api.mercadolibre.com/categories/' . rawurlencode($ml_category_id), array('timeout' => 10));
 
-        if (is_wp_error($response)) {
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
             return false;
         }
 
-        return wp_remote_retrieve_response_code($response) === 200;
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($data)) {
+            return false;
+        }
+
+        if (isset($data['settings']['listing_allowed'])) {
+            return (bool) $data['settings']['listing_allowed'];
+        }
+
+        return empty($data['children_categories']);
     }
 
     /**
@@ -230,10 +244,16 @@ class TS_ML_Category_Mapper
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
+        // domain_discovery/search is meant to return only leaf (postable) categories, but
+        // confirmed live that a broad single-word WC category name ("Bebês") can still get
+        // back a parent category (MLB1384, 15 sub-categories, listing_allowed=false) — same
+        // failure mode as an unverified AI answer. Verify before saving either way.
         if (isset($data[0]['category_id'])) {
             $ml_category_id = sanitize_text_field($data[0]['category_id']);
-            $this->save_mapping($wc_category_id, $ml_category_id);
-            return $ml_category_id;
+            if ($this->category_exists($ml_category_id)) {
+                $this->save_mapping($wc_category_id, $ml_category_id);
+                return $ml_category_id;
+            }
         }
 
         return false;

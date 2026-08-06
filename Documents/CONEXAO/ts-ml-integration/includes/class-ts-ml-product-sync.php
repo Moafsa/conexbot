@@ -864,11 +864,21 @@ class TS_ML_Product_Sync
         $categories = $product->get_category_ids();
         $mapper = TS_ML_Category_Mapper::instance();
 
-        // Try to find a mapping for any of the product's WooCommerce categories
+        // Try to find a mapping for any of the product's WooCommerce categories — but a saved
+        // mapping isn't automatically trustworthy: it can point at a non-leaf parent category.
+        // Confirmed live: "Bebês" was mapped to MLB1384, which has 15 sub-categories and
+        // listing_allowed=false, rejecting every post attempt ("Is not allowed to post in
+        // category MLB1384 ... Make sure you're posting in a leaf category") the exact same
+        // way the old MLB1000 fallback did. Only trust a mapping if it's actually postable.
         foreach ($categories as $cat_id) {
             $ml_cat_id = $mapper->get_ml_category($cat_id);
-            if ($ml_cat_id) {
+            if ($ml_cat_id && $this->is_leaf_category($ml_cat_id)) {
                 return $ml_cat_id;
+            } elseif ($ml_cat_id) {
+                TS_ML_Logger::warning('Categoria mapeada não é uma categoria-folha (Mercado Livre não aceita anúncios diretamente nela) — ignorando o mapeamento e buscando pelo título do produto', array(
+                    'product_id' => $product->get_id(),
+                    'ml_category_id' => $ml_cat_id,
+                ));
             }
         }
 
@@ -889,6 +899,34 @@ class TS_ML_Product_Sync
 
         TS_ML_Logger::warning('Nenhuma categoria mapeada e a busca automática não encontrou nada. Usando fallback genérico (MLB1000), que pode falhar por não ser uma categoria-folha.', array('product_id' => $product->get_id()));
         return 'MLB1000'; // Last-resort fallback only if even the live lookup fails
+    }
+
+    /**
+     * A category with sub-categories (or explicitly marked listing_allowed=false) rejects
+     * every single post/update attempt outright — Mercado Livre only accepts listings
+     * directly in "leaf" categories.
+     *
+     * @param string $ml_category_id
+     * @return bool
+     */
+    private function is_leaf_category($ml_category_id)
+    {
+        $response = wp_remote_get('https://api.mercadolibre.com/categories/' . rawurlencode($ml_category_id), array('timeout' => 10));
+
+        if (is_wp_error($response)) {
+            return true; // Network hiccup — don't block a sync that might otherwise be fine; let Mercado Livre's own validation catch it if this guess was wrong.
+        }
+
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($data)) {
+            return true;
+        }
+
+        if (isset($data['settings']['listing_allowed'])) {
+            return (bool) $data['settings']['listing_allowed'];
+        }
+
+        return empty($data['children_categories']);
     }
 
     /**
