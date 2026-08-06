@@ -530,10 +530,19 @@ input:checked + .ts-ml-slider:before {
                                     </td>
                                     <td>
                                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=woo_to_ml'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px;">
-                                                🛒 <?php esc_html_e('Enviar p/ ML', 'ts-ml-integration'); ?>
-                                            </a>
-                                            <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                            <?php
+                                            // Respect the row's own declared Fluxo/Direção (the badge in the previous column) —
+                                            // showing "Importar do ML" on a row explicitly marked "Loja ➔ ML" contradicted what
+                                            // the row itself said, which is exactly what looked wrong.
+                                            $show_send_button = $direction !== 'ml_to_woo';
+                                            $show_import_button = $direction !== 'woo_to_ml' && $sync_data && !empty($sync_data->ml_item_id);
+                                            ?>
+                                            <?php if ($show_send_button) { ?>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=woo_to_ml'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px;">
+                                                    🛒 <?php esc_html_e('Enviar p/ ML', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } ?>
+                                            <?php if ($show_import_button) { ?>
                                                 <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;" title="<?php esc_attr_e('Puxa os dados atuais do anúncio já vinculado no Mercado Livre', 'ts-ml-integration'); ?>">
                                                     🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
                                                 </a>
