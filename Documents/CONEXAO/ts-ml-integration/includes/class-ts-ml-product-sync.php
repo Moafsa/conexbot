@@ -197,14 +197,18 @@ class TS_ML_Product_Sync
         }
 
         if ($direction === 'ml_to_woo' || $direction === 'bidirectional') {
-            // Get ML Item ID if not provided (for existing syncs)
-            if (empty($ml_item_id) && $existing && !empty($existing->ml_item_id)) {
-                $ml_item_id = $existing->ml_item_id;
-            }
+            $ml_item_id = $existing ? $existing->ml_item_id : null;
 
             if (!empty($ml_item_id)) {
                 return $this->import_product_from_ml($ml_item_id, $account_id);
             }
+
+            // "Importar do ML" only makes sense for a product that already has a known ML
+            // listing to pull FROM — for a product that's never been synced, there's no item
+            // ID to import, and this used to silently no-op and report success anyway.
+            TS_ML_Logger::warning('Importar do ML ignorado: produto ainda não tem um anúncio conhecido no Mercado Livre para importar', array('product_id' => $product_id));
+            $this->update_sync_status($product_id, $account_id, 'error', __('Nada para importar: este produto ainda não tem um anúncio vinculado no Mercado Livre.', 'ts-ml-integration'));
+            return false;
         }
 
         return true;
@@ -815,7 +819,10 @@ class TS_ML_Product_Sync
     private function prepare_product_for_ml($product)
     {
         $data = array(
-            'title' => $product->get_name(),
+            // Mercado Livre rejects any title over 60 characters ("Category MLBxxxxx does
+            // not support titles greater than 60 characters long"). Confirmed live with a
+            // 68-char product name. Truncate at a word boundary rather than mid-word.
+            'title' => $this->truncate_title($product->get_name(), 60),
             'category_id' => $this->get_ml_category($product),
             'price' => $this->calculate_price(floatval($product->get_price())),
             'currency_id' => 'BRL',
@@ -946,6 +953,26 @@ class TS_ML_Product_Sync
 
         $data = json_decode(wp_remote_retrieve_body($response), true);
         return isset($data[0]['category_id']) ? sanitize_text_field($data[0]['category_id']) : false;
+    }
+
+    /**
+     * Truncate a title to Mercado Livre's max length, breaking at the last whole word that
+     * fits rather than cutting mid-word.
+     *
+     * @param string $title
+     * @param int $max_length
+     * @return string
+     */
+    private function truncate_title($title, $max_length)
+    {
+        if (mb_strlen($title) <= $max_length) {
+            return $title;
+        }
+
+        $truncated = mb_substr($title, 0, $max_length);
+        $last_space = mb_strrpos($truncated, ' ');
+
+        return $last_space !== false ? mb_substr($truncated, 0, $last_space) : $truncated;
     }
 
     /**

@@ -326,6 +326,13 @@ input:checked + .ts-ml-slider:before {
                 </div>
             </div>
 
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px;">
+                <span style="font-size: 16px; line-height: 1;">ℹ️</span>
+                <p style="margin: 0; font-size: 12px; color: #1e3a8a; line-height: 1.5;">
+                    <?php esc_html_e('Depois de enviar um produto, o Mercado Livre pode levar alguns minutos (às vezes até algumas horas) para processar a foto e concluir a revisão automática do anúncio — é normal ele aparecer "Pausado" ou "Em análise" logo após o envio. Use o botão "Atualizar Status" no produto para conferir quando o processamento terminar, sem precisar reenviar nada.', 'ts-ml-integration'); ?>
+                </p>
+            </div>
+
             <!-- Filtros de Busca, Fotos e Fluxo -->
             <form method="get" action="" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <input type="hidden" name="page" value="ts-ml-products" />
@@ -526,9 +533,11 @@ input:checked + .ts-ml-slider:before {
                                             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=woo_to_ml'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px;">
                                                 🛒 <?php esc_html_e('Enviar p/ ML', 'ts-ml-integration'); ?>
                                             </a>
-                                            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;">
-                                                🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
-                                            </a>
+                                            <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&sync_product=' . $product_id . '&account_id=' . $selected_account . '&direction=ml_to_woo'), 'sync_product_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #fcf4ff; border-color: #e9d5ff; color: #7e22ce;" title="<?php esc_attr_e('Puxa os dados atuais do anúncio já vinculado no Mercado Livre', 'ts-ml-integration'); ?>">
+                                                    🟡 <?php esc_html_e('Importar do ML', 'ts-ml-integration'); ?>
+                                                </a>
+                                            <?php } ?>
                                             <?php if ($sync_data && !empty($sync_data->ml_item_id)) { ?>
                                                 <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=ts-ml-products&ml_status_action=refresh&product_id=' . $product_id . '&account_id=' . $selected_account), 'ml_status_action_' . $product_id)); ?>" class="button button-small" style="font-size: 11px; background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8;" title="<?php esc_attr_e('Consulta o status real no Mercado Livre agora, sem reenviar dados', 'ts-ml-integration'); ?>">
                                                     🔄 <?php esc_html_e('Atualizar Status', 'ts-ml-integration'); ?>
