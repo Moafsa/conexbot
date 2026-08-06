@@ -608,25 +608,44 @@ class TS_ML_Product_Sync
         }
 
         // Set the description via its own endpoint now that the item definitely exists.
-        // POST creates it (a brand new item has none yet); PUT updates an existing one.
+        // Mercado Livre's contract is POST to create a description (an item that doesn't
+        // have one yet) and PUT to edit an existing one — but whether the item ALREADY has a
+        // description isn't reliably the same thing as whether this sync is an "update" in
+        // our own local records (e.g. a prior sync could have set the item's fields fine but
+        // failed to set the description). So: always try POST first; if Mercado Livre says
+        // one already exists, retry with PUT instead of guessing upfront.
         $ml_item_id = $is_update ? $existing->ml_item_id : (isset($response['id']) ? $response['id'] : '');
+        $description_warning = '';
         if ($description_text !== '' && !empty($ml_item_id)) {
             $description_response = $api_handler->api_request(
                 '/items/' . $ml_item_id . '/description',
-                $is_update ? 'PUT' : 'POST',
+                'POST',
                 array('plain_text' => $description_text),
                 $access_token
             );
+
             if (is_wp_error($description_response)) {
+                $description_response = $api_handler->api_request(
+                    '/items/' . $ml_item_id . '/description',
+                    'PUT',
+                    array('plain_text' => $description_text),
+                    $access_token
+                );
+            }
+
+            if (is_wp_error($description_response)) {
+                $description_warning = $description_response->get_error_message();
                 TS_ML_Logger::warning('Item sincronizado, mas a descrição falhou', array(
                     'ml_item_id' => $ml_item_id,
-                    'error' => $description_response->get_error_message(),
+                    'error' => $description_warning,
                 ));
             }
         }
 
-        // Update sync record
-        $this->update_sync_record($product->get_id(), $account_id, $response);
+        // Update sync record. Product itself synced fine even if the description call above
+        // failed — surface that as a visible (non-blocking) warning instead of only logging
+        // it, so "description isn't showing up" has an actual answer in the product list.
+        $this->update_sync_record($product->get_id(), $account_id, $response, $description_warning ? __('Produto sincronizado, mas a descrição falhou: ', 'ts-ml-integration') . $description_warning : '');
 
         // Update variations data if variable
         if ($product->is_type('variable') && isset($response['variations'])) {
@@ -1059,7 +1078,7 @@ class TS_ML_Product_Sync
      * @param int $account_id Account ID
      * @param array $ml_response ML API response
      */
-    private function update_sync_record($product_id, $account_id, $ml_response)
+    private function update_sync_record($product_id, $account_id, $ml_response, $warning = '')
     {
         global $wpdb;
         $table_products = $wpdb->prefix . 'ts_ml_products';
@@ -1081,6 +1100,10 @@ class TS_ML_Product_Sync
             // for a product that's actually active again under a new item ID.
             'ml_status' => isset($ml_response['status']) ? $ml_response['status'] : 'active',
             'sync_status' => 'synced',
+            // Not a sync failure (status stays 'synced'), but worth surfacing in the same
+            // visible spot rather than only in the internal log — e.g. the description call
+            // failing separately from the main item update.
+            'sync_errors' => $warning,
             'last_sync_at' => current_time('mysql'),
             'updated_at' => current_time('mysql'),
         );
