@@ -652,6 +652,20 @@ class TS_ML_Product_Sync
     }
 
     /**
+     * Reactivate a paused listing on Mercado Livre. Not valid for a 'closed' listing —
+     * Mercado Livre rejects reopening a closed one, syncing the product again publishes a
+     * fresh listing instead (handled in export_product_to_ml()).
+     *
+     * @param int $product_id WooCommerce product ID
+     * @param int $account_id
+     * @return true|WP_Error
+     */
+    public function activate_listing($product_id, $account_id)
+    {
+        return $this->set_listing_status($product_id, $account_id, 'active');
+    }
+
+    /**
      * Permanently close a listing on Mercado Livre. This is the actual equivalent of
      * "deleting" an ad — Mercado Livre doesn't allow hard-deleting a listing that has ever
      * been active (for buyer/audit history), 'closed' is the real, always-available option.
@@ -809,13 +823,71 @@ class TS_ML_Product_Sync
         }
 
         foreach ($attachment_ids as $attachment_id) {
-            $image_url = wp_get_attachment_image_url($attachment_id, 'full');
+            $image_url = $this->get_ml_compatible_image_url($attachment_id);
             if ($image_url) {
                 $images[] = array('source' => $image_url);
             }
         }
 
         return $images;
+    }
+
+    /**
+     * Mercado Livre's picture ingestion doesn't reliably accept WebP — an attachment in
+     * that format (common with EWWW Image Optimizer and similar, or with images sourced/
+     * scraped as .webp to begin with) can get registered but never actually load, leaving
+     * the listing with a broken photo and no valid picture (which can also cause Mercado
+     * Livre to leave the item paused). Convert to a cached JPEG on the fly when that's the
+     * case; every other format passes through unchanged.
+     *
+     * @param int $attachment_id
+     * @return string|false
+     */
+    private function get_ml_compatible_image_url($attachment_id)
+    {
+        $image_url = wp_get_attachment_image_url($attachment_id, 'full');
+        if (!$image_url) {
+            return false;
+        }
+
+        if (get_post_mime_type($attachment_id) !== 'image/webp') {
+            return $image_url;
+        }
+
+        $upload_dir = wp_upload_dir();
+        $cache_dir = $upload_dir['basedir'] . '/ts-ml-jpeg-cache';
+        $cache_file = $cache_dir . '/' . $attachment_id . '.jpg';
+        $cache_url = $upload_dir['baseurl'] . '/ts-ml-jpeg-cache/' . $attachment_id . '.jpg';
+
+        if (file_exists($cache_file)) {
+            return $cache_url;
+        }
+
+        $source_file = get_attached_file($attachment_id);
+        if (!$source_file || !file_exists($source_file)) {
+            return $image_url; // Fall back to the (likely broken for ML) webp URL rather than nothing.
+        }
+
+        $editor = wp_get_image_editor($source_file);
+        if (is_wp_error($editor)) {
+            TS_ML_Logger::warning('Não foi possível carregar editor de imagem para conversão WebP→JPEG', array('attachment_id' => $attachment_id));
+            return $image_url;
+        }
+
+        if (!file_exists($cache_dir)) {
+            wp_mkdir_p($cache_dir);
+        }
+
+        $saved = $editor->save($cache_file, 'image/jpeg');
+        if (is_wp_error($saved)) {
+            TS_ML_Logger::warning('Falha ao converter imagem WebP para JPEG', array(
+                'attachment_id' => $attachment_id,
+                'error' => $saved->get_error_message(),
+            ));
+            return $image_url;
+        }
+
+        return $cache_url;
     }
 
     /**
