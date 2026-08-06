@@ -561,14 +561,17 @@ class TS_ML_Product_Sync
 
         if ($is_update) {
             // listing_type_id can't change after publish without a dedicated upgrade/
-            // downgrade flow — sending it on an update is rejected outright.
+            // downgrade flow — sending it on an update is rejected outright. Use a copy for
+            // the update payload: $ml_product_data itself must keep listing_type_id intact,
+            // since it's required if this falls through to creating a brand new listing below.
             TS_ML_Logger::info('Atualizando publicação existente', array('ml_item_id' => $existing->ml_item_id));
-            unset($ml_product_data['listing_type_id']);
+            $update_payload = $ml_product_data;
+            unset($update_payload['listing_type_id']);
 
             $response = $api_handler->api_request(
                 '/items/' . $existing->ml_item_id,
                 'PUT',
-                $ml_product_data,
+                $update_payload,
                 $access_token
             );
 
