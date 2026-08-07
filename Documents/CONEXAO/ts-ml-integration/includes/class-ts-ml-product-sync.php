@@ -1294,16 +1294,39 @@ class TS_ML_Product_Sync
             $valid_values = array_slice($valid_values, 0, 40); // keep the prompt bounded
         }
 
+        // Attributes measured in a physical unit (power, weight, voltage...) need a number
+        // PLUS one of Mercado Livre's own accepted units — confirmed live: without unit
+        // guidance the AI grabbed a nearby number from the description that used the wrong
+        // unit entirely (e.g. answered "25 km/h" — a max-speed spec — for "Potência"/POWER,
+        // which only accepts W/kW/BTU/etc.), and Mercado Livre rejected it outright.
+        $is_number_unit = ($attr_definition['value_type'] ?? '') === 'number_unit';
+        $allowed_units = array();
+        if ($is_number_unit && !empty($attr_definition['allowed_units']) && is_array($attr_definition['allowed_units'])) {
+            foreach ($attr_definition['allowed_units'] as $u) {
+                if (!empty($u['id'])) {
+                    $allowed_units[$u['id']] = $u['name'] ?? $u['id'];
+                }
+            }
+        }
+
         // Some attributes only turn out to be mandatory when Mercado Livre actually validates
         // the listing (channel-specific requirements the generic /attributes endpoint doesn't
         // flag) — for those, this method gets called a second time with $force_guess = true, so
         // the AI must commit to its best guess instead of bailing out, since there is no "leave
         // it blank" option left: the sync will keep failing until something valid is sent.
-        $confidence_instruction = $force_guess
+        // EXCEPTION: number_unit attributes never get force-guessed — inventing a wattage,
+        // weight or voltage that isn't actually in the product's own data would put a false
+        // spec on a public listing, which is worse than leaving the sync blocked on it.
+        $confidence_instruction = ($force_guess && !$is_number_unit)
             ? 'Este campo é obrigatório para publicar o anúncio — escolha a opção mais provável com base no senso comum para este tipo de produto, mesmo que não tenha certeza absoluta. Nunca deixe de responder.'
             : 'Se não conseguir determinar com confiança, responda: 0.';
 
-        if (!empty($valid_values)) {
+        if ($is_number_unit && !empty($allowed_units)) {
+            $system_prompt = "Você extrai a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
+                'O valor DEVE ser um número seguido de uma destas unidades: ' . implode(', ', array_values($allowed_units)) . '. ' .
+                'Cuidado para não confundir com outras medidas do produto (velocidade em km/h, peso em kg, autonomia em km, capacidade em kg, etc.) — só responda se o título/descrição realmente citar um valor nessa unidade específica. ' .
+                'Responda APENAS "número unidade" (ex: "300 W"), nada mais. Se não houver um valor real nessa unidade, responda: NENHUM.';
+        } elseif (!empty($valid_values)) {
             $options_list = array();
             foreach ($valid_values as $i => $v) {
                 $options_list[] = ($i + 1) . '. ' . $v;
@@ -1332,6 +1355,25 @@ class TS_ML_Product_Sync
         $result = trim($response['choices'][0]['message']['content'] ?? '');
 
         if ($result === '') {
+            return '';
+        }
+
+        if ($is_number_unit && !empty($allowed_units)) {
+            if (stripos($result, 'NENHUM') !== false) {
+                return '';
+            }
+            // Only accept "number + one of the exact allowed units" — anything else (wrong
+            // unit, no unit, extra words) gets rejected rather than sent and risking the same
+            // validation error again.
+            if (preg_match('/^(\d+(?:[.,]\d+)?)\s*([a-zA-Z\/%]+)$/u', trim($result), $m)) {
+                $number = str_replace(',', '.', $m[1]);
+                $unit_given = $m[2];
+                foreach ($allowed_units as $unit_id => $unit_name) {
+                    if (strcasecmp($unit_given, $unit_id) === 0 || strcasecmp($unit_given, $unit_name) === 0) {
+                        return $number . ' ' . $unit_id;
+                    }
+                }
+            }
             return '';
         }
 
@@ -1726,8 +1768,15 @@ class TS_ML_Product_Sync
     /**
      * Report a sync error to the Conextbot SaaS so every connected store's plugin errors are
      * visible from one central place (app.conext.click/admin/ml-errors), instead of needing
-     * someone to check each WordPress site individually. Fire-and-forget: never blocks or
-     * fails the actual sync if the SaaS is unreachable.
+     * someone to check each WordPress site individually.
+     *
+     * Deliberately BLOCKING (short timeout): a true fire-and-forget (`blocking => false`)
+     * request only queues the socket write and returns immediately — on many shared-hosting
+     * PHP-FPM setups the process gets torn down right after the page finishes rendering,
+     * before that queued request ever actually leaves the server, so the report silently never
+     * arrives. This only runs on the already-failed path, so a couple of extra seconds here
+     * doesn't cost anything on the happy path. Its own failure is swallowed either way — never
+     * blocks or fails the actual sync if the SaaS is unreachable.
      */
     private function notify_saas_of_error($product_id, $account_id, $error_message)
     {
@@ -1758,13 +1807,17 @@ class TS_ML_Product_Sync
             'plugin_version' => defined('TS_ML_VERSION') ? TS_ML_VERSION : '',
         );
 
-        wp_remote_post($saas_url . '/api/v1/wp/ml-error-report', array(
+        $result = wp_remote_post($saas_url . '/api/v1/wp/ml-error-report', array(
             'method' => 'POST',
             'headers' => array('Content-Type' => 'application/json'),
             'body' => json_encode($body),
-            'blocking' => false,
-            'timeout' => 3,
+            'blocking' => true,
+            'timeout' => 5,
         ));
+
+        if (is_wp_error($result)) {
+            TS_ML_Logger::warning('Falha ao reportar erro de sync para o Conextbot', array('error' => $result->get_error_message()));
+        }
     }
 
     /**
