@@ -818,12 +818,14 @@ class TS_ML_Product_Sync
      */
     private function prepare_product_for_ml($product)
     {
+        $category_id = $this->get_ml_category($product);
+
         $data = array(
             // Mercado Livre rejects any title over 60 characters ("Category MLBxxxxx does
             // not support titles greater than 60 characters long"). Confirmed live with a
             // 68-char product name. Truncate at a word boundary rather than mid-word.
             'title' => $this->truncate_title($product->get_name(), 60),
-            'category_id' => $this->get_ml_category($product),
+            'category_id' => $category_id,
             'price' => $this->calculate_price(floatval($product->get_price())),
             'currency_id' => 'BRL',
             'available_quantity' => $product->get_stock_quantity() ?: 1,
@@ -837,7 +839,7 @@ class TS_ML_Product_Sync
                 'plain_text' => $this->to_plain_text($product->get_description() ?: $product->get_short_description()),
             ),
             'pictures' => $this->get_product_images($product),
-            'attributes' => $this->get_product_attributes($product),
+            'attributes' => $this->get_product_attributes($product, $category_id),
             // Mercado Livre rejects the listing outright ("Mandatory free shipping added")
             // without a shipping mode. me2 (Mercado Envios) is the standard managed-shipping
             // mode; free_shipping defaults to false (buyer pays) and can be changed per
@@ -1089,9 +1091,11 @@ class TS_ML_Product_Sync
      * Get product attributes
      *
      * @param WC_Product $product Product object
+     * @param string $category_id ML category the product will be posted into — needed to
+     *                            know which attributes are actually required for it.
      * @return array
      */
-    private function get_product_attributes($product)
+    private function get_product_attributes($product, $category_id = '')
     {
         $attributes = array();
 
@@ -1126,7 +1130,148 @@ class TS_ML_Product_Sync
             );
         }
 
+        // Beyond BRAND/MODEL/GTIN, categories can require their own specific attributes
+        // (confirmed live: "Bicicletas Elétricas" needs POWER_SUPPLY_TYPE and
+        // REQUIRES_ASSEMBLY too, on top of the usual ones). Fill in whatever's still missing
+        // by asking AI to infer it from the product's own title/description — constrained to
+        // Mercado Livre's real valid options for that exact attribute, so it can only pick a
+        // value that actually exists, never invent one.
+        if (!empty($category_id) && get_option('ts_ml_ai_api_key')) {
+            $this->fill_required_attributes_via_ai($product, $category_id, $attributes);
+        }
+
         return $attributes;
+    }
+
+    /**
+     * Mutates $attributes in place, adding a value for every attribute Mercado Livre marks
+     * required for $category_id that isn't already covered.
+     *
+     * @param WC_Product $product
+     * @param string $category_id
+     * @param array $attributes Already-collected attributes (by reference)
+     */
+    private function fill_required_attributes_via_ai($product, $category_id, array &$attributes)
+    {
+        $api_handler = TS_ML_API_Handler::instance();
+        $category_attributes = $api_handler->get_category_attributes($category_id);
+
+        if (is_wp_error($category_attributes) || !is_array($category_attributes)) {
+            return;
+        }
+
+        $already_covered = wp_list_pluck($attributes, 'id');
+        $context = $this->truncate_title($product->get_name(), 200) . "\n" . $this->to_plain_text($product->get_description() ?: $product->get_short_description());
+        $newly_inferred = array();
+
+        foreach ($category_attributes as $attr) {
+            $is_required = !empty($attr['tags']['required']);
+            if (!$is_required || empty($attr['id']) || in_array($attr['id'], $already_covered, true)) {
+                continue;
+            }
+
+            $value = $this->infer_attribute_value_via_ai($attr, $context);
+            if ($value !== '') {
+                $attributes[] = array('id' => $attr['id'], 'value_name' => $value);
+                $already_covered[] = $attr['id'];
+                $newly_inferred[$attr['name'] ?? $attr['id']] = $value;
+                TS_ML_Logger::info('Atributo obrigatório preenchido via IA', array(
+                    'product_id' => $product->get_id(),
+                    'attribute_id' => $attr['id'],
+                    'value' => $value,
+                ));
+            }
+        }
+
+        // Persist on the WooCommerce product too (not just the Mercado Livre payload) so it
+        // shows on the site and doesn't need to be re-inferred on the next sync.
+        if (!empty($newly_inferred)) {
+            $this->save_inferred_attributes_to_product($product, $newly_inferred);
+        }
+    }
+
+    /**
+     * @param WC_Product $product
+     * @param array $values [attribute label => value]
+     */
+    private function save_inferred_attributes_to_product($product, array $values)
+    {
+        $wc_attributes = $product->get_attributes();
+
+        foreach ($values as $label => $value) {
+            $wc_attribute = new WC_Product_Attribute();
+            $wc_attribute->set_name($label);
+            $wc_attribute->set_options(array($value));
+            $wc_attribute->set_visible(true);
+            $wc_attributes[sanitize_title($label)] = $wc_attribute;
+        }
+
+        $product->set_attributes($wc_attributes);
+        $product->save();
+    }
+
+    /**
+     * @param array $attr_definition One entry from GET /categories/{id}/attributes
+     * @param string $product_context Title + description to infer from
+     * @return string Chosen value, or '' if the AI couldn't determine one confidently
+     */
+    private function infer_attribute_value_via_ai($attr_definition, $product_context)
+    {
+        $api_key = get_option('ts_ml_ai_api_key');
+        $model = get_option('ts_ml_ai_model', 'gpt-4o-mini');
+        $attr_name = $attr_definition['name'] ?? $attr_definition['id'];
+
+        // Enumerated attributes (a fixed catalog of allowed values, e.g. "Elétrica"/"A pilha"/
+        // "Manual" for power supply type) MUST get back one of those exact names — anything
+        // else Mercado Livre rejects. Free-text attributes get no such constraint.
+        $valid_values = array();
+        if (!empty($attr_definition['values']) && is_array($attr_definition['values'])) {
+            foreach ($attr_definition['values'] as $v) {
+                if (!empty($v['name'])) {
+                    $valid_values[] = $v['name'];
+                }
+            }
+        }
+
+        if (!empty($valid_values)) {
+            $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
+                "Escolha o valor mais adequado APENAS dentre esta lista: " . implode(', ', $valid_values) . ". " .
+                'Responda exatamente um desses valores, sem mais nada. Se não conseguir determinar com confiança, responda: NENHUM.';
+        } else {
+            $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
+                'Responda apenas o valor (curto, direto), sem explicações. Se não conseguir determinar com confiança, responda: NENHUM.';
+        }
+
+        $messages = array(
+            array('role' => 'system', 'content' => $system_prompt),
+            array('role' => 'user', 'content' => $product_context),
+        );
+
+        $ai = TS_ML_AI_Integration::instance();
+        $response = $ai->call_openai_api($messages, $model, $api_key);
+
+        if (is_wp_error($response)) {
+            return '';
+        }
+
+        $result = trim($response['choices'][0]['message']['content'] ?? '');
+
+        if ($result === '' || stripos($result, 'NENHUM') !== false) {
+            return '';
+        }
+
+        // For enumerated attributes, only accept the answer if it's literally one of the
+        // real options — never trust free text here even if the AI ignored the instruction.
+        if (!empty($valid_values)) {
+            foreach ($valid_values as $valid) {
+                if (mb_strtolower($valid) === mb_strtolower($result)) {
+                    return $valid;
+                }
+            }
+            return '';
+        }
+
+        return $result;
     }
 
     /**

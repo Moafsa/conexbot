@@ -141,9 +141,12 @@ $filter_flow  = isset($_GET['filter_flow']) ? sanitize_text_field($_GET['filter_
 $filter_sync_status = isset($_GET['filter_sync_status']) ? sanitize_text_field($_GET['filter_sync_status']) : '';
 $filter_ml_status = isset($_GET['filter_ml_status']) ? sanitize_text_field($_GET['filter_ml_status']) : '';
 
-if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '' || $filter_sync_status !== '' || $filter_ml_status !== '') {
+// Always build the ID list ourselves now (not just when a filter is active) so we can
+// control the default ORDER BY: products with a photo first, and products already synced to
+// Mercado Livre next — WP_Query's default (post date) doesn't let you prioritize either.
+{
     $sql = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_status = 'publish'";
-    
+
     if ($filter_photo === 'yes') {
         $sql .= " AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')";
     } elseif ($filter_photo === 'no') {
@@ -182,9 +185,16 @@ if ($filter_photo !== '' || $filter_ready !== '' || $filter_flow !== '' || $filt
         $sql .= $wpdb->prepare(" AND ID IN (SELECT product_id FROM $table_products WHERE ml_status = %s)", $filter_ml_status);
     }
 
+    $table_products_order = $wpdb->prefix . 'ts_ml_products';
+    $sql .= " ORDER BY
+        (ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_thumbnail_id' AND meta_value > 0 AND meta_value != '')) DESC,
+        (ID IN (SELECT product_id FROM $table_products_order WHERE sync_status = 'synced'" . ($selected_account > 0 ? " AND account_id = $selected_account" : '') . ")) DESC,
+        ID DESC";
+
     $filtered_ids = $wpdb->get_col($sql);
     if (!empty($filtered_ids)) {
         $args['post__in'] = $filtered_ids;
+        $args['orderby'] = 'post__in';
     } else {
         $args['post__in'] = array(0);
     }
