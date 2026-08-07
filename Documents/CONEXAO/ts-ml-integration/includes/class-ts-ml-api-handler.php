@@ -124,31 +124,15 @@ class TS_ML_API_Handler
      */
     public function get_oauth_url($account_id, $country = 'BR')
     {
-        $app_secret = get_option('ts_ml_app_secret_' . $country);
-        // No fallback here on purpose: the hardcoded default app_id below belongs to Conextbot's
-        // shared SaaS app, which is registered on Mercado Livre with app.conext.click as its
-        // redirect_uri. Using it with THIS store's own domain as redirect_uri always fails with
-        // "não foi possível conectar o aplicativo à sua conta", because Mercado Livre requires an
-        // exact match between client_id and the redirect_uri registered for that app.
-        $app_id = get_option('ts_ml_app_id_' . $country);
-
-        // Direct OAuth only makes sense when the store owner registered THEIR OWN Mercado Livre
-        // app (with this site's own admin URL as its redirect_uri). If only the secret is set but
-        // not a matching app_id, fall through to the SaaS proxy flow instead of guessing.
-        if (!empty($app_secret) && !empty($app_id)) {
-            $redirect_uri = admin_url('admin.php?page=ts-ml-settings&action=oauth_callback');
-            $redirect_uri = $this->force_https_if_needed($redirect_uri);
-
-            $params = array(
-                'response_type' => 'code',
-                'client_id' => $app_id,
-                'redirect_uri' => $redirect_uri,
-                'state' => $account_id,
-            );
-
-            $domain = $this->get_oauth_domain($country);
-            return $domain . '/authorization?' . http_build_query($params);
-        }
+        // A "direct OAuth with the store's own Mercado Livre app" branch used to live here,
+        // gated on ts_ml_app_id_{country}/ts_ml_app_secret_{country}. It's been removed: it
+        // depends on the redirect_uri registered on Mercado Livre's own Developer Console for
+        // that app exactly matching this site's admin URL, which was never confirmed correct
+        // for any real store and reliably produced "não foi possível conectar o aplicativo à
+        // sua conta" with no way for us to inspect or fix the Developer Console side. Every
+        // account — new or reconnecting — now goes through the same SaaS multi-tenant proxy
+        // (app.conext.click) as the main "Conectar Loja ao Conextbot SaaS" button, which is
+        // the one flow actually confirmed working.
 
         // DEFAULT SAAS MULTI-TENANT ROUTER FLOW (app.conext.click)
         $saas_url = get_option('ts_ml_saas_url');
