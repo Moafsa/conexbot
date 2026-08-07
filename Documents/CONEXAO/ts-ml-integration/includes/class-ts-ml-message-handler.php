@@ -193,6 +193,7 @@ class TS_ML_Message_Handler
         }
 
         // Use AI if enabled
+        $replied_via = !empty($reply_text) ? 'manual' : 'ai';
         if (get_option('ts_ml_ai_enabled') === 'yes') {
             $ai_integration = TS_ML_AI_Integration::instance();
             $reply_text = $ai_integration->generate_reply($message->message_text, $reply_text);
@@ -215,11 +216,16 @@ class TS_ML_Message_Handler
             return false;
         }
 
-        // Update message status
+        // Update message status. reply_text/replied_via weren't stored before — the reply
+        // went straight to Mercado Livre with no local record of what was actually said,
+        // making it impossible to audit what the AI (running unattended on an hourly cron)
+        // had been telling customers.
         $wpdb->update(
             $table_messages,
             array(
                 'status' => 'replied',
+                'reply_text' => $reply_text,
+                'replied_via' => $replied_via,
                 'replied_at' => current_time('mysql'),
             ),
             array('id' => $message_id)

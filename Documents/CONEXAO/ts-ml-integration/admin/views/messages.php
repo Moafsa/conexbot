@@ -101,7 +101,11 @@ $current_account_id = isset($_GET['account_id']) ? intval($_GET['account_id']) :
 
 <script type="text/javascript">
 jQuery(document).ready(function($) {
-    
+
+    function escapeHtml(text) {
+        return $('<div>').text(text || '').html().replace(/"/g, '&quot;');
+    }
+
     function loadQuestions() {
         let accountId = $('#filter-by-account').val();
         let status = $('#filter-status').val();
@@ -153,6 +157,7 @@ jQuery(document).ready(function($) {
                     <div class="ts-ml-reply-area" id="reply-box-${q.id}">
                         <textarea class="large-text" rows="3" placeholder="Escreva sua resposta..."></textarea>
                         <br><br>
+                        <button type="button" class="button suggest-ai-reply" data-id="${q.id}" data-question="${escapeHtml(q.text)}">🤖 Sugerir com IA</button>
                         <button type="button" class="button button-primary send-reply" data-id="${q.id}">Enviar Resposta</button>
                     </div>
                 `;
@@ -180,6 +185,41 @@ jQuery(document).ready(function($) {
 
         $('#ts-ml-qa-list').html(html);
     }
+
+    // Suggest a reply via AI — fills the textarea for review, doesn't send anything.
+    // Public pre-sale questions are visible to every potential buyer, so unlike the
+    // private post-sale messages (which auto-reply unattended), this stays a suggestion
+    // the seller reviews/edits before clicking "Enviar Resposta".
+    $(document).on('click', '.suggest-ai-reply', function() {
+        let btn = $(this);
+        let qId = btn.data('id');
+        let questionText = btn.data('question');
+        let container = $('#reply-box-' + qId);
+
+        btn.prop('disabled', true).text('Gerando...');
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'ts_ml_suggest_question_answer',
+                question_text: questionText,
+                nonce: '<?php echo wp_create_nonce('ts_ml_qa_nonce'); ?>'
+            },
+            success: function(response) {
+                btn.prop('disabled', false).text('🤖 Sugerir com IA');
+                if (response.success) {
+                    container.find('textarea').val(response.data);
+                } else {
+                    alert('Erro: ' + response.data);
+                }
+            },
+            error: function() {
+                btn.prop('disabled', false).text('🤖 Sugerir com IA');
+                alert('Erro de conexão.');
+            }
+        });
+    });
 
     // Send Reply
     $(document).on('click', '.send-reply', function() {

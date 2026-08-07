@@ -148,6 +148,8 @@ class TS_ML_Install {
             message_text text,
             message_type varchar(50),
             status varchar(20) DEFAULT 'unread',
+            reply_text text,
+            replied_via varchar(10),
             replied_at datetime,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

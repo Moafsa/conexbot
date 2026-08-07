@@ -61,6 +61,7 @@ class TS_ML_Admin
         // AJAX Handlers for Q&A (Messages)
         add_action('wp_ajax_ts_ml_fetch_questions', array($this, 'ajax_fetch_questions'));
         add_action('wp_ajax_ts_ml_send_answer', array($this, 'ajax_send_answer'));
+        add_action('wp_ajax_ts_ml_suggest_question_answer', array($this, 'ajax_suggest_question_answer'));
     }
 
     /**
@@ -125,11 +126,23 @@ class TS_ML_Admin
 
         add_submenu_page(
             'ts-ml-settings',
-            __('Mensagens', 'ts-ml-integration'),
-            __('Mensagens', 'ts-ml-integration'),
+            // This is the public pre-sale Q&A (/questions/search) — renamed from the old
+            // generic "Mensagens" label, which was easy to confuse with the *separate*
+            // private post-sale messages system below (different API, has AI auto-reply).
+            __('Perguntas (Pré-venda)', 'ts-ml-integration'),
+            __('Perguntas (Pré-venda)', 'ts-ml-integration'),
             'manage_woocommerce',
             'ts-ml-messages',
             array($this, 'render_messages_page')
+        );
+
+        add_submenu_page(
+            'ts-ml-settings',
+            __('Mensagens Privadas', 'ts-ml-integration'),
+            __('Mensagens Privadas', 'ts-ml-integration'),
+            'manage_woocommerce',
+            'ts-ml-private-messages',
+            array($this, 'render_private_messages_page')
         );
 
         add_submenu_page(
@@ -235,6 +248,14 @@ class TS_ML_Admin
     public function render_messages_page()
     {
         include TS_ML_PLUGIN_DIR . 'admin/views/messages.php';
+    }
+
+    /**
+     * Render private (post-sale) messages page
+     */
+    public function render_private_messages_page()
+    {
+        include TS_ML_PLUGIN_DIR . 'admin/views/private-messages.php';
     }
 
     /**
@@ -738,6 +759,32 @@ class TS_ML_Admin
         }
 
         wp_send_json_success($result);
+    }
+
+    /**
+     * AJAX: suggest an AI-generated reply to a public pre-sale question — returns text for
+     * the seller to review/edit, does not send anything itself.
+     */
+    public function ajax_suggest_question_answer()
+    {
+        check_ajax_referer('ts_ml_qa_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('Permissão negada.', 'ts-ml-integration'));
+        }
+
+        $question_text = isset($_POST['question_text']) ? sanitize_textarea_field($_POST['question_text']) : '';
+
+        if ($question_text === '') {
+            wp_send_json_error(__('Pergunta vazia.', 'ts-ml-integration'));
+        }
+
+        if (empty(get_option('ts_ml_ai_api_key'))) {
+            wp_send_json_error(__('Nenhuma chave de IA configurada em Configurações.', 'ts-ml-integration'));
+        }
+
+        $suggestion = TS_ML_AI_Integration::instance()->generate_reply($question_text);
+        wp_send_json_success($suggestion);
     }
 }
 
