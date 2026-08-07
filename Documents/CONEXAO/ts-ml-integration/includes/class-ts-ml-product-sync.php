@@ -832,6 +832,14 @@ class TS_ML_Product_Sync
             'buying_mode' => 'buy_it_now',
             'listing_type_id' => 'gold_special',
             'condition' => 'new',
+            // Without this, Mercado Livre can auto-match the listing to an existing "catalog"
+            // product (multiple sellers competing on one shared page) based on title
+            // similarity — confirmed live: a bike titled "BIKE ELETRICA V8" got rejected for
+            // a "Com acelerador independente" requirement that doesn't even appear in the
+            // category's own attribute list (only reachable through the catalog match, which
+            // has its own separate, more specific requirements). Explicitly opting out keeps
+            // it a normal standalone listing instead.
+            'catalog_listing' => false,
             'description' => array(
                 // Mercado Livre rejects this outright if it isn't genuinely plain text —
                 // WooCommerce descriptions are HTML (<p>, <strong>, etc.), so it has to be
