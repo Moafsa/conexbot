@@ -586,8 +586,30 @@ class TS_ML_Product_Sync
             // listing, e.g. after being out of stock too long). Neither can be "reopened" via
             // the API — the only way to keep syncing this product is to publish it as a brand
             // new listing, which also gets a new item ID/permalink.
+            $needs_fresh_listing = false;
             if (is_wp_error($response) && preg_match('/status:(closed|inactive)/', $response->get_error_message())) {
                 TS_ML_Logger::info('Anúncio anterior está travado (fechado/inativo) no ML — criando um novo em seu lugar', array('old_ml_item_id' => $existing->ml_item_id));
+                $needs_fresh_listing = true;
+            } elseif (is_wp_error($response) && preg_match('/obrigat[óo]rio e não foi adicionado/ui', $response->get_error_message())) {
+                // This item got auto-matched to a Mercado Livre catalog product before
+                // catalog_listing:false existed — that flag only applies at creation time, so
+                // an item already bound to a catalog product keeps demanding the catalog's own
+                // extra required attributes (e.g. POWER_SUPPLY_TYPE) no matter what we PUT,
+                // even ones our category's own schema never asked for. The only way to detach
+                // it is to close this listing and publish a fresh one with catalog_listing:false
+                // from the start, so it never gets auto-matched again.
+                TS_ML_Logger::info('Anúncio existente está preso a um produto de catálogo do ML — fechando e criando um novo sem vínculo de catálogo', array('old_ml_item_id' => $existing->ml_item_id));
+                $close_result = $this->set_listing_status($product->get_id(), $account_id, 'closed');
+                if (is_wp_error($close_result)) {
+                    TS_ML_Logger::warning('Não foi possível fechar o anúncio antigo antes de recriar (pode ficar duplicado no ML)', array(
+                        'ml_item_id' => $existing->ml_item_id,
+                        'error' => $close_result->get_error_message(),
+                    ));
+                }
+                $needs_fresh_listing = true;
+            }
+
+            if ($needs_fresh_listing) {
                 $is_update = false;
                 $response = $api_handler->api_request(
                     '/items',
