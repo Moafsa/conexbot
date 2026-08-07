@@ -1221,9 +1221,14 @@ class TS_ML_Product_Sync
         $model = get_option('ts_ml_ai_model', 'gpt-4o-mini');
         $attr_name = $attr_definition['name'] ?? $attr_definition['id'];
 
-        // Enumerated attributes (a fixed catalog of allowed values, e.g. "Elétrica"/"A pilha"/
-        // "Manual" for power supply type) MUST get back one of those exact names — anything
-        // else Mercado Livre rejects. Free-text attributes get no such constraint.
+        // Enumerated attributes (a fixed catalog of allowed values, e.g. "Bateria"/"Energía
+        // solar"/"Bateria/Energia solar" for power supply type) MUST get back one of those
+        // exact catalog names — anything else Mercado Livre rejects. Asking the AI to
+        // reproduce the exact string verbatim is fragile (confirmed live: it answered
+        // something reasonable but not byte-identical to the catalog string, e.g. a synonym
+        // or different capitalization, and got silently dropped). Numbered-choice is far more
+        // reliable: the AI only ever has to output a digit, which is then indexed directly
+        // into the real list — no text-matching involved at all.
         $valid_values = array();
         if (!empty($attr_definition['values']) && is_array($attr_definition['values'])) {
             foreach ($attr_definition['values'] as $v) {
@@ -1231,12 +1236,17 @@ class TS_ML_Product_Sync
                     $valid_values[] = $v['name'];
                 }
             }
+            $valid_values = array_slice($valid_values, 0, 40); // keep the prompt bounded
         }
 
         if (!empty($valid_values)) {
+            $options_list = array();
+            foreach ($valid_values as $i => $v) {
+                $options_list[] = ($i + 1) . '. ' . $v;
+            }
             $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
-                "Escolha o valor mais adequado APENAS dentre esta lista: " . implode(', ', $valid_values) . ". " .
-                'Responda exatamente um desses valores, sem mais nada. Se não conseguir determinar com confiança, responda: NENHUM.';
+                "Escolha a opção mais adequada dentre esta lista:\n" . implode("\n", $options_list) . "\n" .
+                'Responda APENAS o número da opção escolhida (ex: "2"), nada mais. Se não conseguir determinar com confiança, responda: 0.';
         } else {
             $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
                 'Responda apenas o valor (curto, direto), sem explicações. Se não conseguir determinar com confiança, responda: NENHUM.';
@@ -1256,22 +1266,17 @@ class TS_ML_Product_Sync
 
         $result = trim($response['choices'][0]['message']['content'] ?? '');
 
-        if ($result === '' || stripos($result, 'NENHUM') !== false) {
+        if ($result === '') {
             return '';
         }
 
-        // For enumerated attributes, only accept the answer if it's literally one of the
-        // real options — never trust free text here even if the AI ignored the instruction.
         if (!empty($valid_values)) {
-            foreach ($valid_values as $valid) {
-                if (mb_strtolower($valid) === mb_strtolower($result)) {
-                    return $valid;
-                }
-            }
-            return '';
+            preg_match('/\d+/', $result, $matches);
+            $choice = isset($matches[0]) ? intval($matches[0]) : 0;
+            return isset($valid_values[$choice - 1]) ? $valid_values[$choice - 1] : '';
         }
 
-        return $result;
+        return stripos($result, 'NENHUM') !== false ? '' : $result;
     }
 
     /**
