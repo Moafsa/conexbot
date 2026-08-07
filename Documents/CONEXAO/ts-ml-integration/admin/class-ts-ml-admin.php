@@ -774,6 +774,7 @@ class TS_ML_Admin
         }
 
         $question_text = isset($_POST['question_text']) ? sanitize_textarea_field($_POST['question_text']) : '';
+        $ml_item_id = isset($_POST['ml_item_id']) ? sanitize_text_field($_POST['ml_item_id']) : '';
 
         if ($question_text === '') {
             wp_send_json_error(__('Pergunta vazia.', 'ts-ml-integration'));
@@ -783,7 +784,19 @@ class TS_ML_Admin
             wp_send_json_error(__('Nenhuma chave de IA configurada em Configurações.', 'ts-ml-integration'));
         }
 
-        $suggestion = TS_ML_AI_Integration::instance()->generate_reply($question_text);
+        // Ground the suggestion in the real product (price/stock/description/attributes)
+        // instead of answering blind — resolve the ML item back to the local WC product.
+        $product_id = 0;
+        if (!empty($ml_item_id)) {
+            global $wpdb;
+            $table_products = $wpdb->prefix . 'ts_ml_products';
+            $product_id = intval($wpdb->get_var($wpdb->prepare(
+                "SELECT product_id FROM $table_products WHERE ml_item_id = %s LIMIT 1",
+                $ml_item_id
+            )));
+        }
+
+        $suggestion = TS_ML_AI_Integration::instance()->generate_reply($question_text, '', $product_id);
         wp_send_json_success($suggestion);
     }
 }

@@ -157,7 +157,7 @@ jQuery(document).ready(function($) {
                     <div class="ts-ml-reply-area" id="reply-box-${q.id}">
                         <textarea class="large-text" rows="3" placeholder="Escreva sua resposta..."></textarea>
                         <br><br>
-                        <button type="button" class="button suggest-ai-reply" data-id="${q.id}" data-question="${escapeHtml(q.text)}">🤖 Sugerir com IA</button>
+                        <button type="button" class="button suggest-ai-reply" data-id="${q.id}" data-question="${escapeHtml(q.text)}" data-ml-item-id="${escapeHtml(q.item.id)}">🤖 Sugerir com IA</button>
                         <button type="button" class="button button-primary send-reply" data-id="${q.id}">Enviar Resposta</button>
                     </div>
                 `;
@@ -194,6 +194,7 @@ jQuery(document).ready(function($) {
         let btn = $(this);
         let qId = btn.data('id');
         let questionText = btn.data('question');
+        let mlItemId = btn.data('ml-item-id');
         let container = $('#reply-box-' + qId);
 
         btn.prop('disabled', true).text('Gerando...');
@@ -204,6 +205,7 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'ts_ml_suggest_question_answer',
                 question_text: questionText,
+                ml_item_id: mlItemId,
                 nonce: '<?php echo wp_create_nonce('ts_ml_qa_nonce'); ?>'
             },
             success: function(response) {

@@ -196,7 +196,7 @@ class TS_ML_Message_Handler
         $replied_via = !empty($reply_text) ? 'manual' : 'ai';
         if (get_option('ts_ml_ai_enabled') === 'yes') {
             $ai_integration = TS_ML_AI_Integration::instance();
-            $reply_text = $ai_integration->generate_reply($message->message_text, $reply_text);
+            $reply_text = $ai_integration->generate_reply($message->message_text, $reply_text, intval($message->product_id));
         }
 
         // Send reply via ML API
