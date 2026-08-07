@@ -114,6 +114,25 @@ model ProductMapping {
   @@index([mlItemId])
 }
 
+// Centralized error inbox: the WordPress ML plugin reports sync failures here (across every
+// connected store) so they can be reviewed and fixed from one place instead of checking each
+// site individually.
+model MlErrorReport {
+  id            String   @id @default(uuid())
+  tenantId      String
+  siteUrl       String?
+  wooProductId  String?
+  productName   String?
+  mlItemId      String?
+  errorMessage  String
+  pluginVersion String?
+  resolved      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([resolved])
+}
+
 model MarketingPost {
   id              String    @id @default(uuid())
   title           String?

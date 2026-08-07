@@ -15,7 +15,8 @@ import {
     LogOut,
     Shield,
     Handshake,
-    ShoppingBag
+    ShoppingBag,
+    AlertTriangle
 } from "lucide-react";
 
 export default function AdminSidebar() {
@@ -29,6 +30,7 @@ export default function AdminSidebar() {
         { name: "Pagamentos", href: "/admin/payments", icon: CreditCard },
         { name: "Gestão de Agências", href: "/admin/agencies", icon: Handshake },
         { name: "Marketplace", href: "/admin/marketplace", icon: ShoppingBag },
+        { name: "Erros do Plugin ML", href: "/admin/ml-errors", icon: AlertTriangle },
         { name: "Meu Perfil", href: "/admin/profile", icon: UserCircle },
         { name: "Configurações", href: "/admin/settings", icon: Settings },
     ];

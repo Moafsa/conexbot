@@ -629,6 +629,31 @@ class TS_ML_Product_Sync
             );
         }
 
+        // Ground-truth second chance: some attributes are only mandatory for a specific
+        // channel and never show up as required in the generic category schema (confirmed
+        // live: WITH_INDEPENDENT_ACCELERATOR), so fill_required_attributes_via_ai() above
+        // never even attempts them. Mercado Livre's own validation error is the only place
+        // that requirement is visible — so on exactly this failure, fill whatever it says is
+        // missing and retry the same request once before giving up.
+        if (is_wp_error($response) && preg_match('/obrigat[óo]rio e não foi adicionado|are required for category/ui', $response->get_error_message())) {
+            $category_id_for_retry = isset($ml_product_data['category_id']) ? $ml_product_data['category_id'] : '';
+            if (!empty($category_id_for_retry)) {
+                $retry_payload = $is_update ? $update_payload : $ml_product_data;
+                $filled = $this->fill_missing_attributes_from_error($product, $category_id_for_retry, $retry_payload, $response->get_error_message());
+                if ($filled) {
+                    TS_ML_Logger::info('Reenviando após preencher atributo(s) exigido(s) pela validação do ML', array('product_id' => $product->get_id()));
+                    if ($is_update) {
+                        $update_payload = $retry_payload;
+                        $ml_product_data['attributes'] = $retry_payload['attributes'];
+                        $response = $api_handler->api_request('/items/' . $existing->ml_item_id, 'PUT', $update_payload, $access_token);
+                    } else {
+                        $ml_product_data = $retry_payload;
+                        $response = $api_handler->api_request('/items', 'POST', $ml_product_data, $access_token);
+                    }
+                }
+            }
+        }
+
         if (is_wp_error($response)) {
             $error_message = $response->get_error_message();
             TS_ML_Logger::error('Erro na API do Mercado Livre', array('error' => $error_message));
@@ -1245,7 +1270,7 @@ class TS_ML_Product_Sync
      * @param string $product_context Title + description to infer from
      * @return string Chosen value, or '' if the AI couldn't determine one confidently
      */
-    private function infer_attribute_value_via_ai($attr_definition, $product_context)
+    private function infer_attribute_value_via_ai($attr_definition, $product_context, $force_guess = false)
     {
         $api_key = get_option('ts_ml_ai_api_key');
         $model = get_option('ts_ml_ai_model', 'gpt-4o-mini');
@@ -1269,6 +1294,15 @@ class TS_ML_Product_Sync
             $valid_values = array_slice($valid_values, 0, 40); // keep the prompt bounded
         }
 
+        // Some attributes only turn out to be mandatory when Mercado Livre actually validates
+        // the listing (channel-specific requirements the generic /attributes endpoint doesn't
+        // flag) — for those, this method gets called a second time with $force_guess = true, so
+        // the AI must commit to its best guess instead of bailing out, since there is no "leave
+        // it blank" option left: the sync will keep failing until something valid is sent.
+        $confidence_instruction = $force_guess
+            ? 'Este campo é obrigatório para publicar o anúncio — escolha a opção mais provável com base no senso comum para este tipo de produto, mesmo que não tenha certeza absoluta. Nunca deixe de responder.'
+            : 'Se não conseguir determinar com confiança, responda: 0.';
+
         if (!empty($valid_values)) {
             $options_list = array();
             foreach ($valid_values as $i => $v) {
@@ -1276,10 +1310,11 @@ class TS_ML_Product_Sync
             }
             $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
                 "Escolha a opção mais adequada dentre esta lista:\n" . implode("\n", $options_list) . "\n" .
-                'Responda APENAS o número da opção escolhida (ex: "2"), nada mais. Se não conseguir determinar com confiança, responda: 0.';
+                'Responda APENAS o número da opção escolhida (ex: "2"), nada mais. ' . $confidence_instruction;
         } else {
             $system_prompt = "Você identifica a característica \"{$attr_name}\" de um produto a partir do título/descrição dele. " .
-                'Responda apenas o valor (curto, direto), sem explicações. Se não conseguir determinar com confiança, responda: NENHUM.';
+                'Responda apenas o valor (curto, direto), sem explicações. ' .
+                ($force_guess ? $confidence_instruction : 'Se não conseguir determinar com confiança, responda: NENHUM.');
         }
 
         $messages = array(
@@ -1307,6 +1342,100 @@ class TS_ML_Product_Sync
         }
 
         return stripos($result, 'NENHUM') !== false ? '' : $result;
+    }
+
+    /**
+     * The generic /categories/{id}/attributes endpoint only flags an attribute as
+     * tags.required when it's required for EVERY channel — some attributes (seen live:
+     * WITH_INDEPENDENT_ACCELERATOR) are only mandatory for the "marketplace" channel
+     * specifically, which that endpoint doesn't expose. The one place that requirement is
+     * ever visible is Mercado Livre's own validation error when we actually try to publish.
+     * So: after a real failure, re-check which of the category's attributes are named or
+     * id'd in that error text and aren't already in our payload — that's ground truth for
+     * "actually required", regardless of what the generic schema claimed upfront.
+     *
+     * @param string $error_message
+     * @param array $category_attributes
+     * @param array $already_have_ids
+     * @return array Matching attribute definitions
+     */
+    private function get_missing_attributes_from_error($error_message, array $category_attributes, array $already_have_ids)
+    {
+        $missing = array();
+        foreach ($category_attributes as $attr) {
+            if (empty($attr['id']) || in_array($attr['id'], $already_have_ids, true)) {
+                continue;
+            }
+            $id_mentioned = strpos($error_message, $attr['id']) !== false;
+            $name_mentioned = !empty($attr['name']) && stripos($error_message, $attr['name']) !== false;
+            if ($id_mentioned || $name_mentioned) {
+                $missing[] = $attr;
+            }
+        }
+        return $missing;
+    }
+
+    /**
+     * Second-chance fill: called only after Mercado Livre has already rejected a sync for
+     * missing required attributes. Unlike fill_required_attributes_via_ai() (which only
+     * considers attributes the generic schema marks required), this trusts the real error
+     * as ground truth and forces the AI to commit to a best guess rather than skipping —
+     * there's no "leave it blank" option left, the sync will just keep failing otherwise.
+     *
+     * @param WC_Product $product
+     * @param string $category_id
+     * @param array $ml_product_data Passed by reference; 'attributes' gets the new entries appended
+     * @param string $error_message The real validation error from Mercado Livre
+     * @return bool True if at least one attribute was filled (worth retrying the request)
+     */
+    private function fill_missing_attributes_from_error($product, $category_id, array &$ml_product_data, $error_message)
+    {
+        $api_handler = TS_ML_API_Handler::instance();
+        $category_attributes = $api_handler->get_category_attributes($category_id);
+
+        if (is_wp_error($category_attributes) || !is_array($category_attributes)) {
+            return false;
+        }
+
+        $attributes = isset($ml_product_data['attributes']) && is_array($ml_product_data['attributes']) ? $ml_product_data['attributes'] : array();
+        $already_covered = wp_list_pluck($attributes, 'id');
+
+        $missing_defs = $this->get_missing_attributes_from_error($error_message, $category_attributes, $already_covered);
+        if (empty($missing_defs)) {
+            return false;
+        }
+
+        $context = $this->truncate_title($product->get_name(), 200) . "\n" . $this->to_plain_text($product->get_description() ?: $product->get_short_description());
+        $newly_inferred = array();
+        $filled_any = false;
+
+        foreach ($missing_defs as $attr) {
+            $value = $this->infer_attribute_value_via_ai($attr, $context, true);
+            if ($value === '' && !empty($attr['values'][0]['name'])) {
+                // The AI still didn't answer even when forced — fall back to the catalog's
+                // first listed option so the item can actually publish instead of looping
+                // on the same missing-attribute error forever.
+                $value = $attr['values'][0]['name'];
+            }
+            if ($value !== '') {
+                $attributes[] = array('id' => $attr['id'], 'value_name' => $value);
+                $already_covered[] = $attr['id'];
+                $newly_inferred[$attr['name'] ?? $attr['id']] = $value;
+                $filled_any = true;
+                TS_ML_Logger::info('Atributo exigido pelo ML na validação (fora do schema genérico) preenchido via IA', array(
+                    'product_id' => $product->get_id(),
+                    'attribute_id' => $attr['id'],
+                    'value' => $value,
+                ));
+            }
+        }
+
+        if ($filled_any) {
+            $ml_product_data['attributes'] = $attributes;
+            $this->save_inferred_attributes_to_product($product, $newly_inferred);
+        }
+
+        return $filled_any;
     }
 
     /**
@@ -1588,6 +1717,54 @@ class TS_ML_Product_Sync
         );
 
         $wpdb->update($table_products, $data, $where);
+
+        if ($status === 'error' && !empty($error_message)) {
+            $this->notify_saas_of_error($product_id, $account_id, $error_message);
+        }
+    }
+
+    /**
+     * Report a sync error to the Conextbot SaaS so every connected store's plugin errors are
+     * visible from one central place (app.conext.click/admin/ml-errors), instead of needing
+     * someone to check each WordPress site individually. Fire-and-forget: never blocks or
+     * fails the actual sync if the SaaS is unreachable.
+     */
+    private function notify_saas_of_error($product_id, $account_id, $error_message)
+    {
+        $saas_url = get_option('ts_ml_saas_url');
+        $bot_id = get_option('ts_ml_bot_id');
+
+        if (empty($saas_url) || empty($bot_id)) {
+            return;
+        }
+
+        global $wpdb;
+        $table_products = $wpdb->prefix . 'ts_ml_products';
+        $ml_item_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT ml_item_id FROM $table_products WHERE product_id = %d AND account_id = %d",
+            $product_id,
+            $account_id
+        ));
+
+        $product = wc_get_product($product_id);
+
+        $body = array(
+            'bot_id' => $bot_id,
+            'site_url' => home_url(),
+            'woo_product_id' => $product_id,
+            'product_name' => $product ? $product->get_name() : '',
+            'ml_item_id' => $ml_item_id ?: null,
+            'error_message' => $error_message,
+            'plugin_version' => defined('TS_ML_VERSION') ? TS_ML_VERSION : '',
+        );
+
+        wp_remote_post($saas_url . '/api/v1/wp/ml-error-report', array(
+            'method' => 'POST',
+            'headers' => array('Content-Type' => 'application/json'),
+            'body' => json_encode($body),
+            'blocking' => false,
+            'timeout' => 3,
+        ));
     }
 
     /**
