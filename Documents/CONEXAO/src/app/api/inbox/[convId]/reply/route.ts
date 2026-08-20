@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import prisma from '@/lib/prisma';
 
-export async function POST(req: Request, { params }: { params: { convId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ convId: string }> }) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: { convId: string 
     const tenantId = await getEffectiveTenantId(clientId);
     if (!tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { convId } = params;
+    const { convId } = await params;
     const body = await req.json();
     const { text } = body;
     if (!text?.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 });
