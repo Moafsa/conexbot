@@ -109,10 +109,11 @@ export function InboxPage({ clientId }: { clientId?: string }) {
         }
     }, [clientId, selectedBot, search]);
 
+    // Initial load of messages — shows loading spinner, replaces state
     const fetchMessages = useCallback(async (convId: string) => {
         setLoadingMsgs(true);
         try {
-            const res = await fetch(qa(`/api/inbox/${convId}/messages`, ''));
+            const res = await fetch(`/api/inbox/${convId}/messages${clientId ? `?clientId=${clientId}` : ''}`);
             if (!res.ok) return;
             const data = await res.json();
             setMessages(data.messages || []);
@@ -123,6 +124,25 @@ export function InboxPage({ clientId }: { clientId?: string }) {
         }
     }, [clientId]);
 
+    // Silent poll — only appends truly new messages, never replaces array (prevents scroll jump)
+    const pollMessages = useCallback(async (convId: string) => {
+        try {
+            const res = await fetch(`/api/inbox/${convId}/messages${clientId ? `?clientId=${clientId}` : ''}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const incoming: Message[] = data.messages || [];
+            setMessages(prev => {
+                if (incoming.length <= prev.length) return prev;
+                const existingIds = new Set(prev.map(m => m.id));
+                const added = incoming.filter(m => !existingIds.has(m.id));
+                return added.length > 0 ? [...prev, ...added] : prev;
+            });
+            // Update contact/conv info silently
+            if (data.contact) setContact(data.contact);
+            if (data.conversation) setConvInfo(data.conversation);
+        } catch { }
+    }, [clientId]);
+
     useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
     useEffect(() => {
@@ -130,22 +150,27 @@ export function InboxPage({ clientId }: { clientId?: string }) {
         fetchMessages(selectedConv);
     }, [selectedConv, fetchMessages]);
 
+    // Scroll to bottom only when a NEW message is appended (not on initial set)
+    const prevLenRef = useRef(0);
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (messages.length > prevLenRef.current) {
+            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+        prevLenRef.current = messages.length;
+    }, [messages.length]);
 
-    // Auto-refresh conversations
+    // Auto-refresh conversations list
     useEffect(() => {
-        const id = setInterval(fetchConversations, 8000);
+        const id = setInterval(fetchConversations, 15000);
         return () => clearInterval(id);
     }, [fetchConversations]);
 
-    // Auto-refresh messages for selected conv
+    // Silent poll for new messages — uses append-only logic
     useEffect(() => {
         if (!selectedConv) return;
-        const id = setInterval(() => fetchMessages(selectedConv), 5000);
+        const id = setInterval(() => pollMessages(selectedConv), 8000);
         return () => clearInterval(id);
-    }, [selectedConv, fetchMessages]);
+    }, [selectedConv, pollMessages]);
 
     const handleSelectConv = (id: string) => {
         setSelectedConv(id);

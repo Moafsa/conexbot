@@ -251,6 +251,7 @@ export function ContactsPage({ clientId }: { clientId?: string }) {
                             botId={selectedContact.botId}
                             clientId={clientId}
                             onClose={() => setSelectedContact(null)}
+                            onDeleted={() => { setSelectedContact(null); fetchContacts(); }}
                         />
                     </div>
                 </div>
