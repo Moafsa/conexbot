@@ -124,6 +124,34 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
         for (const c of dbContacts) knownPhones.set(c.phone.replace(/\D/g, ''), c.name || c.phone);
         for (const c of chatwootContacts) if (!knownPhones.has(c.phone)) knownPhones.set(c.phone, c.name);
 
+        // Discover contacts from WUZAPI /user/contacts (WhatsApp synced contacts)
+        // This is the primary source when no DB/Chatwoot contacts exist yet
+        try {
+            const uzContactsRes = await fetch(`${UZAPI_URL}/user/contacts`, {
+                headers: { 'Token': sessionToken },
+            });
+            if (uzContactsRes.ok) {
+                const uzData = await uzContactsRes.json();
+                const uzContacts: Record<string, { PushName?: string; FullName?: string; BusinessName?: string }> = uzData.data || {};
+                let added = 0;
+                for (const [jid, info] of Object.entries(uzContacts)) {
+                    // Only individual chats (not groups @g.us, broadcasts @broadcast, LID @lid)
+                    if (!jid.endsWith('@s.whatsapp.net')) continue;
+                    const phone = jid.replace('@s.whatsapp.net', '');
+                    // Skip numbers that look like servers/system (e.g., 0@...)
+                    if (phone === '0' || phone.length < 7) continue;
+                    if (!knownPhones.has(phone)) {
+                        const name = info.FullName || info.PushName || info.BusinessName || phone;
+                        knownPhones.set(phone, name);
+                        added++;
+                    }
+                }
+                log(`${added} contato(s) adicionais descobertos via WUZAPI (${knownPhones.size} total)`);
+            }
+        } catch (e: any) {
+            log(`Aviso: não foi possível listar contatos WUZAPI — ${e.message}`);
+        }
+
         job.steps[1].done = true;
         job.steps[1].count = knownPhones.size;
         job.total = knownPhones.size;
