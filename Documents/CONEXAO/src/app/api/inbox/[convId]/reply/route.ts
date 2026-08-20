@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ convId:
 
     // Send via UZAPI if bot has a session
     const UZAPI_URL = process.env.UZAPI_URL || 'http://localhost:21465';
-    const sessionToken = `bot-${conv.botId}`;
+    const sessionToken = `bot-${conv.botId.split('-')[0]}`;
     const phone = conv.remoteId.replace(/\D/g, '');
     const toJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
 

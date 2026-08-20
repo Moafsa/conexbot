@@ -55,7 +55,7 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
         log(`Bot: ${bot.name}`);
 
         const UZAPI_URL = process.env.UZAPI_URL || 'http://localhost:21465';
-        const sessionToken = `bot-${botId}`;
+        const sessionToken = `bot-${botId.split('-')[0]}`;
 
         // Enable history on this WUZAPI session
         const UZAPI_ADMIN = process.env.UZAPI_SECRET_KEY || 'admin_token_123';
