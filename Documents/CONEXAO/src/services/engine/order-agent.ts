@@ -771,6 +771,7 @@ REGRAS DE NEGÓCIO:
 
                 if (ctx.mapboxToken) {
                     const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
+                    console.log(`[CityCheck] definir_endereco addr="${rawAddr}" geocodedCity="${geo.city}" resolvedAddr="${geo.resolvedAddr}" allowedCities=${JSON.stringify(allowedCitiesList)} mapboxToken=${!!ctx.mapboxToken}`);
                     if (!geo.valid) {
                         result = `❌ Endereço "${rawAddr}" não localizado. Peça ao cliente para verificar a rua e o número.`;
                         toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
@@ -780,14 +781,12 @@ REGRAS DE NEGÓCIO:
                     lat = geo.lat;
                     lng = geo.lng;
 
-                    // Valida a cidade usando o campo "place" do contexto do Mapbox.
-                    // Isso é mais confiável que buscar o nome da cidade na string de endereço,
-                    // pois o place_name pode omitir a cidade ou o LLM pode passar endereço já resolvido.
                     if (allowedCitiesList.length > 0) {
                         const geocodedCity = geo.city;
                         const cityAllowed = geocodedCity
                             ? allowedCitiesList.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()))
                             : allowedCitiesList.some(c => resolvedAddr.toLowerCase().includes(c.toLowerCase()));
+                        console.log(`[CityCheck] geocodedCity="${geocodedCity}" cityAllowed=${cityAllowed}`);
                         if (!cityAllowed) {
                             const citiesStr = allowedCitiesList.join(', ');
                             result = `❌ Desculpe, não realizamos entregas em "${resolvedAddr}". Atendemos apenas em: ${citiesStr}. Por favor, informe um endereço nessas cidades.`;
@@ -1067,23 +1066,30 @@ export async function createOrderFromCartData(
     contactId: string,
     orderData: Awaited<ReturnType<typeof CartService.convertToOrderData>>
 ): Promise<{ orderId: string }> {
-    const order = await prisma.order.create({
-        data: {
-            botId,
-            contactId,
-            address: orderData.address,
-            latitude: orderData.latitude,
-            longitude: orderData.longitude,
-            totalAmount: orderData.totalAmount,
-            status: 'PENDING',
-            items: {
-                create: orderData.items.map(item => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice
-                }))
+    console.log(`[OrderCreate] Creating order botId=${botId} contactId=${contactId} address="${orderData.address}" total=${orderData.totalAmount} items=${JSON.stringify(orderData.items)}`);
+    try {
+        const order = await prisma.order.create({
+            data: {
+                botId,
+                contactId,
+                address: orderData.address,
+                latitude: orderData.latitude,
+                longitude: orderData.longitude,
+                totalAmount: orderData.totalAmount,
+                status: 'PENDING',
+                items: {
+                    create: orderData.items.map(item => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice
+                    }))
+                }
             }
-        }
-    });
-    return { orderId: order.id };
+        });
+        console.log(`[OrderCreate] SUCCESS orderId=${order.id}`);
+        return { orderId: order.id };
+    } catch (err: any) {
+        console.error(`[OrderCreate] FAILED:`, err.message, err);
+        throw err;
+    }
 }
