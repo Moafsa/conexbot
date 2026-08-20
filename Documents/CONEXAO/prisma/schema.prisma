@@ -86,6 +86,7 @@ model Tenant {
   sessions                Session[]
   smtpConfigs             SmtpConfig[]
   subscriptions           Subscription[]
+  apiKeys                 ApiKey[]
   managedBy               Agency?             @relation("AgencyClients", fields: [agencyId], references: [id])
   usageCounter            UsageCounter?
   mlAccessToken           String?
@@ -291,6 +292,7 @@ model Bot {
   vectorStores            VectorStore[]
   digitalOffers           DigitalOffer[]
   smtpConfigs             SmtpConfig[]
+  apiKeys                 ApiKey[]
 }
 
 model BotChannel {
@@ -1094,4 +1096,25 @@ model DigitalOffer {
 
   @@index([botId])
   @@index([publicSlug])
+}
+
+// ── BSP: API Keys para acesso externo ao WhatsApp via ConextBot ──────────────
+model ApiKey {
+  id             String    @id @default(uuid())
+  key            String    @unique
+  name           String
+  botId          String
+  tenantId       String
+  webhookUrl     String?
+  webhookSecret  String?
+  active         Boolean   @default(true)
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  bot            Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([key])
+  @@index([botId])
+  @@index([tenantId])
 }

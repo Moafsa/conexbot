@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { UzapiService } from './uzapi';
+import { sendOutboundMessageToPhone } from './outbound-notifier';
 import { SupervisorService } from './supervisor';
 import { FunnelStage } from '@prisma/client';
 import { PhoneUtils } from '@/lib/phone-utils';
@@ -97,35 +97,48 @@ export const FollowUpService = {
                 shouldTrigger = true;
             }
         } else if (rule.triggerType === 'AFTER_LAST_MESSAGE' || rule.triggerType === 'STALLED') {
-            // Support for MINUTES, HOURS, DAYS
             let targetMinutes = triggerValue;
             if (rule.triggerUnit === 'HOURS') targetMinutes *= 60;
             if (rule.triggerUnit === 'DAYS' || !rule.triggerUnit) targetMinutes *= 1440;
 
-            if (diffMinutes >= targetMinutes) {
-                const conversation = await prisma.conversation.findUnique({
-                    where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
-                    include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } }
-                });
+            const isShortRule = rule.triggerUnit === 'MINUTES' || rule.triggerUnit === 'HOURS';
+            const PHASE1_MAX_MINUTES = 24 * 60; // 24h window for short-term rules
+            const REENGAGEMENT_DAYS = 30;
 
-                const lastMsg = conversation?.messages?.[0];
-                // Trigger if last message was from assistant (typical stalled)
-                // OR if it was from user but it was REALLY long ago (system failure)
-                // OR if NO message history exists (newly imported or DB wiped)
-                if (!lastMsg || lastMsg.role === 'assistant' || diffMinutes > targetMinutes + 120) {
-                    shouldTrigger = true;
+            if (isShortRule) {
+                // Phase 1: stalled recent conversation (15 min to 24h)
+                if (diffMinutes >= targetMinutes && diffMinutes <= PHASE1_MAX_MINUTES) {
+                    const conv2 = await prisma.conversation.findUnique({
+                        where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
+                        include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } }
+                    });
+                    const lastMsg = conv2?.messages?.[0];
+                    // Only trigger if last message is from assistant (bot replied, client didn't)
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        shouldTrigger = true;
+                    }
+                }
+                // Phase 2: 30-day re-engagement (only if phase 1 follow-up was already sent)
+                else if (diffMinutes >= REENGAGEMENT_DAYS * 24 * 60) {
+                    shouldTrigger = true; // will be validated by alreadySent logic below
+                }
+            } else {
+                // DAYS rules: standard logic
+                if (diffMinutes >= targetMinutes) {
+                    const conv2 = await prisma.conversation.findUnique({
+                        where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } },
+                        include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } }
+                    });
+                    const lastMsg = conv2?.messages?.[0];
+                    if (!lastMsg || lastMsg.role === 'assistant' || diffMinutes > targetMinutes + 120) {
+                        shouldTrigger = true;
+                    }
                 }
             }
         }
 
         if (shouldTrigger) {
-            // Adjust cooldown based on rule unit
-            let cooldownMs = 23 * 60 * 60 * 1000; // Default 23h
-            if (rule.triggerUnit === 'MINUTES') cooldownMs = (triggerValue - 0.5) * 60 * 1000;
-            if (rule.triggerUnit === 'HOURS') cooldownMs = (triggerValue - 0.5) * 60 * 60 * 1000;
-
             const conv = await prisma.conversation.findUnique({ where: { botId_remoteId: { botId: bot.id, remoteId: normalizedPhone } } });
-            // Check if we already sent this follow-up AFTER the last user message
             const lastFollowUp = await prisma.message.findFirst({
                 where: {
                     conversationId: conv?.id,
@@ -137,17 +150,26 @@ export const FollowUpService = {
             let alreadySent = false;
             if (lastFollowUp) {
                 const lastUserMsg = await prisma.message.findFirst({
-                    where: {
-                        conversationId: conv?.id,
-                        role: 'user'
-                    },
+                    where: { conversationId: conv?.id, role: 'user' },
                     orderBy: { createdAt: 'desc' }
                 });
 
-                if (!lastUserMsg || lastFollowUp.createdAt > lastUserMsg.createdAt) {
-                    // Block if it was already sent after the last user interaction
-                    alreadySent = true;
+                const followUpAfterLastUser = !lastUserMsg || lastFollowUp.createdAt > lastUserMsg.createdAt;
+
+                if (followUpAfterLastUser) {
+                    const isShortRule = rule.triggerUnit === 'MINUTES' || rule.triggerUnit === 'HOURS';
+                    if (isShortRule && diffMinutes >= 30 * 24 * 60) {
+                        // Phase 2: allow re-engagement if 30+ days since last follow-up
+                        const daysSinceFollowUp = (now.getTime() - lastFollowUp.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+                        alreadySent = daysSinceFollowUp < 30;
+                    } else {
+                        // Phase 1 or DAYS rules: block until user responds
+                        alreadySent = true;
+                    }
                 }
+            } else if ((rule.triggerUnit === 'MINUTES' || rule.triggerUnit === 'HOURS') && diffMinutes >= 30 * 24 * 60) {
+                // Phase 2 but no prior follow-up — skip (phase 1 must happen first)
+                alreadySent = true;
             }
 
             console.log(`[FollowUp] Checking for ${contact.phone}: alreadySent=${alreadySent}, convId=${conv?.id}`);
@@ -180,7 +202,7 @@ export const FollowUpService = {
                 const generatedMessage = await this.generateAiFollowup(actingBot, contact, rule);
 
                 if (generatedMessage) {
-                    await UzapiService.sendMessage(bot.sessionName!, normalizedPhone, generatedMessage);
+                    await sendOutboundMessageToPhone(bot, normalizedPhone, generatedMessage);
 
                     // ENSURE Conversation exists before logging message
                     const conversation = await prisma.conversation.upsert({

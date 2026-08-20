@@ -136,8 +136,9 @@ export async function POST(req: Request) {
             templateLanguage: 'pt_BR',
             templateComponents
         });
-        if (!sentResult.success) {
-            console.warn(`[Dispatch Warning] Outbound notification warning to driver ${driver.phone}: ${sentResult.error}`);
+        const messageError = sentResult.success ? null : sentResult.error;
+        if (messageError) {
+            console.warn(`[Dispatch] Mensagem NÃO enviada para ${driver.phone}: ${messageError}`);
         }
 
         // 6. Assign conversation in Chatwoot
@@ -154,7 +155,11 @@ export async function POST(req: Request) {
             }
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({
+            success: true,
+            messageDelivered: !messageError,
+            messageError: messageError || null,
+        });
     } catch (error: any) {
         console.error('[API Manual Dispatch Error]:', error);
         return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

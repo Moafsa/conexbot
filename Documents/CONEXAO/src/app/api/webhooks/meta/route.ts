@@ -106,6 +106,15 @@ async function handleWhatsApp(body: any) {
                     continue;
                 }
 
+                // Forward raw payload to any registered external webhooks (BSP model)
+                forwardToExternalWebhooks(channel.botId, body).catch(() => {});
+
+                // Log delivery status updates (sent/delivered/read/failed)
+                const statuses = value.statuses || [];
+                for (const s of statuses) {
+                    console.log(`[Meta Webhook] Message status: id=${s.id} status=${s.status} recipient=${s.recipient_id} ts=${s.timestamp}${s.errors ? ' errors=' + JSON.stringify(s.errors) : ''}`);
+                }
+
                 const messages = value.messages || [];
                 for (const msg of messages) {
                     const from = msg.from; // Customer phone
@@ -347,4 +356,31 @@ async function handleInstagram(body: any) {
             }
         }
     }
+}
+
+// ── BSP Webhook Forwarding ────────────────────────────────────────────────────
+async function forwardToExternalWebhooks(botId: string, payload: any) {
+    const apiKeys = await prisma.apiKey.findMany({
+        where: { botId, active: true, webhookUrl: { not: null } },
+        select: { webhookUrl: true, webhookSecret: true }
+    });
+
+    if (apiKeys.length === 0) return;
+
+    const body = JSON.stringify(payload);
+
+    await Promise.allSettled(apiKeys.map(async (k) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (k.webhookSecret) {
+            const { createHmac } = await import('crypto');
+            const sig = createHmac('sha256', k.webhookSecret).update(body).digest('hex');
+            headers['X-Conext-Signature'] = `sha256=${sig}`;
+        }
+        await fetch(k.webhookUrl!, {
+            method: 'POST',
+            headers,
+            body,
+            signal: AbortSignal.timeout(8000)
+        });
+    }));
 }

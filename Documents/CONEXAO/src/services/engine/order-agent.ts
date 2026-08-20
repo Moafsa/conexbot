@@ -98,7 +98,7 @@ const ORDER_AGENT_TOOLS = [
             parameters: {
                 type: 'object',
                 properties: {
-                    rua_numero: { type: 'string', description: 'Rua e número exatos. Ex: "Rua Fortaleza, 380"' },
+                    rua_numero: { type: 'string', description: 'Rua e número do endereço. Se o cliente mencionar uma cidade diferente da padrão de atendimento, inclua a cidade no final. Ex: "Rua Fortaleza, 380" ou "Rua Tal, 123, Flores da Cunha - RS"' },
                     bairro: { type: 'string', description: 'Nome do bairro (opcional, complemento)' }
                 },
                 required: ['rua_numero']
@@ -273,13 +273,11 @@ async function geocodeAddress(
     rawAddr: string,
     mapboxToken: string,
     botAddress?: string
-): Promise<{ resolvedAddr: string; lat: number | null; lng: number | null; valid: boolean }> {
-    const cityCtx = botAddress || 'Bento Gonçalves, RS, Brasil';
-    const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(rawAddr);
-    const searchAddr = hasCity ? rawAddr : `${rawAddr}, ${cityCtx}`;
-
+): Promise<{ resolvedAddr: string; lat: number | null; lng: number | null; valid: boolean; city?: string }> {
+    // Geocode the raw address without appending city context so Mapbox returns the true city.
+    // The proximity parameter biases results toward the bot's region without overriding actual location.
     try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(rawAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
         const res = await fetch(url);
         if (!res.ok) return { resolvedAddr: rawAddr, lat: null, lng: null, valid: true };
 
@@ -297,11 +295,16 @@ async function geocodeAddress(
             resolvedAddr = feature.place_name;
         }
 
+        // Extract city from Mapbox context (type "place") for reliable city-level validation
+        const cityCtxEntry = (feature.context || []).find((c: any) => c.id?.startsWith('place.'));
+        const city: string | undefined = cityCtxEntry?.text;
+
         return {
             resolvedAddr,
             lat: feature.center ? feature.center[1] : null,
             lng: feature.center ? feature.center[0] : null,
-            valid: true
+            valid: true,
+            city
         };
     } catch {
         return { resolvedAddr: rawAddr, lat: null, lng: null, valid: true };
@@ -520,7 +523,7 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
 
             if (hasStreetNumber && !isPaymentMsg && !isConfirmation && userMsgLower.length >= 5) {
                 const cityCtx = ctx.botAddress || 'Bento Gonçalves, RS, Brasil';
-                const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(ctx.userMessage);
+                const hasCity = /\b(rs|sc|sp|mg|pr|rj)\b|-\s*rs\b|(bento|garibaldi|farroupilha|caxias|flores|nova\s+prata|flores\s+da\s+cunha|veranopolis|antônio\s+prado)/i.test(ctx.userMessage);
                 const resolved = hasCity
                     ? ctx.userMessage.trim()
                     : `${ctx.userMessage.trim()}, ${pendingEntry.label}, ${cityCtx}`;
@@ -554,8 +557,9 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
         lastOrderContext = `${lastOrder.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ')} | R$ ${Number(lastOrder.totalAmount).toFixed(2)} | ${statusMap[lastOrder.status] || lastOrder.status} | ${lastOrder.address}`;
     }
 
-    // ── Covered Neighborhoods ─────────────────────────────────────────────────
+    // ── Covered Neighborhoods & Allowed Cities ────────────────────────────────
     let coveredNeighborhoodsList: string[] = [];
+    let allowedCitiesList: string[] = [];
     if (ctx.bot?.deliveryFeeRules) {
         try {
             const rules = typeof ctx.bot.deliveryFeeRules === 'string'
@@ -565,6 +569,9 @@ export async function runOrderAgent(ctx: OrderAgentContext): Promise<OrderAgentR
                 coveredNeighborhoodsList = rules
                     .map((r: any) => r.neighborhood || r.bairro || r.region)
                     .filter(Boolean);
+                allowedCitiesList = [...new Set(
+                    rules.map((r: any) => r.city).filter(Boolean)
+                )] as string[];
             }
         } catch {}
     }
@@ -772,6 +779,22 @@ REGRAS DE NEGÓCIO:
                     resolvedAddr = geo.resolvedAddr;
                     lat = geo.lat;
                     lng = geo.lng;
+
+                    // Valida a cidade usando o campo "place" do contexto do Mapbox.
+                    // Isso é mais confiável que buscar o nome da cidade na string de endereço,
+                    // pois o place_name pode omitir a cidade ou o LLM pode passar endereço já resolvido.
+                    if (allowedCitiesList.length > 0) {
+                        const geocodedCity = geo.city;
+                        const cityAllowed = geocodedCity
+                            ? allowedCitiesList.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()))
+                            : allowedCitiesList.some(c => resolvedAddr.toLowerCase().includes(c.toLowerCase()));
+                        if (!cityAllowed) {
+                            const citiesStr = allowedCitiesList.join(', ');
+                            result = `❌ Desculpe, não realizamos entregas em "${resolvedAddr}". Atendemos apenas em: ${citiesStr}. Por favor, informe um endereço nessas cidades.`;
+                            toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                            continue;
+                        }
+                    }
                 }
 
                 // Ensure neighborhood is in address string
@@ -793,10 +816,28 @@ REGRAS DE NEGÓCIO:
                     );
                     if (entry) {
                         const cityCtx = ctx.botAddress || 'Bento Gonçalves, RS, Brasil';
-                        const hasCity = /(bento|garibaldi|farroupilha|caxias|\brs\b)/i.test(args.rua_numero);
-                        entry.address = hasCity
+                        const hasCity = /\b(rs|sc|sp|mg|pr|rj)\b|-\s*rs\b|(bento|garibaldi|farroupilha|caxias|flores|nova\s+prata|flores\s+da\s+cunha|veranopolis|antônio\s+prado)/i.test(args.rua_numero);
+                        const rawAddrUpd = hasCity
                             ? args.rua_numero
                             : `${args.rua_numero}, ${entry.label}, ${cityCtx}`;
+
+                        if (ctx.mapboxToken && allowedCitiesList.length > 0) {
+                            const geo = await geocodeAddress(args.rua_numero, ctx.mapboxToken, ctx.botAddress);
+                            if (geo.valid) {
+                                const geocodedCity = geo.city;
+                                const cityAllowed = geocodedCity
+                                    ? allowedCitiesList.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()))
+                                    : allowedCitiesList.some(c => geo.resolvedAddr.toLowerCase().includes(c.toLowerCase()));
+                                if (!cityAllowed) {
+                                    const citiesStr = allowedCitiesList.join(', ');
+                                    result = `❌ Desculpe, não realizamos entregas em "${geo.resolvedAddr}". Atendemos apenas em: ${citiesStr}. Por favor, informe um endereço nessas cidades.`;
+                                    toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                                    continue;
+                                }
+                            }
+                        }
+
+                        entry.address = rawAddrUpd;
                         entry.needsAddress = false;
                         await saveMultiPlan(ctx.botId, ctx.contactPhone, freshPlan);
                         multiPlan = freshPlan;
@@ -859,7 +900,21 @@ REGRAS DE NEGÓCIO:
 
                         if (ctx.mapboxToken) {
                             const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
-                            if (geo.valid) { verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng; }
+                            if (geo.valid) {
+                                if (allowedCitiesList.length > 0) {
+                                    const geocodedCity = geo.city;
+                                    const cityAllowed = geocodedCity
+                                        ? allowedCitiesList.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()))
+                                        : allowedCitiesList.some(c => geo.resolvedAddr.toLowerCase().includes(c.toLowerCase()));
+                                    if (!cityAllowed) {
+                                        const citiesStr = allowedCitiesList.join(', ');
+                                        result = `❌ Desculpe, não realizamos entregas em "${geo.resolvedAddr}". Atendemos apenas em: ${citiesStr}.`;
+                                        toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                                        break;
+                                    }
+                                }
+                                verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng;
+                            }
                         }
 
                         const created = await ctx.onOrderCreated({
@@ -876,11 +931,13 @@ REGRAS DE NEGÓCIO:
                         summaryText += `✅ Pedido #${created.orderId.substring(0, 6)}: ${delivery.qty}x ${defProd?.name || 'P13'} → ${verifiedAddr} (R$ ${total.toFixed(2)})\n`;
                     }
 
-                    await CartService.clearCart(ctx.botId, ctx.contactPhone);
-                    await clearMultiPlan(ctx.botId, ctx.contactPhone);
-                    orderConfirmed = true;
-                    orderId = createdOrders.join(', ');
-                    result = summaryText;
+                    if (createdOrders.length > 0) {
+                        await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                        await clearMultiPlan(ctx.botId, ctx.contactPhone);
+                        orderConfirmed = true;
+                        orderId = createdOrders.join(', ');
+                        result = summaryText;
+                    }
 
                 } else if (args.entregas && Array.isArray(args.entregas) && args.entregas.length > 0) {
                     // LLM-provided entregas array (fallback path)
@@ -904,7 +961,21 @@ REGRAS DE NEGÓCIO:
 
                         if (ctx.mapboxToken && rawAddr) {
                             const geo = await geocodeAddress(rawAddr, ctx.mapboxToken, ctx.botAddress);
-                            if (geo.valid) { verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng; }
+                            if (geo.valid) {
+                                if (allowedCitiesList.length > 0) {
+                                    const geocodedCity = geo.city;
+                                    const cityAllowed = geocodedCity
+                                        ? allowedCitiesList.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()))
+                                        : allowedCitiesList.some(c => geo.resolvedAddr.toLowerCase().includes(c.toLowerCase()));
+                                    if (!cityAllowed) {
+                                        const citiesStr = allowedCitiesList.join(', ');
+                                        result = `❌ Desculpe, não realizamos entregas em "${geo.resolvedAddr}". Atendemos apenas em: ${citiesStr}.`;
+                                        toolResults.push({ tool_call_id: tc.id, role: 'tool' as const, content: result });
+                                        break;
+                                    }
+                                }
+                                verifiedAddr = geo.resolvedAddr; lat = geo.lat; lng = geo.lng;
+                            }
                         }
 
                         const created = await ctx.onOrderCreated({
@@ -918,11 +989,13 @@ REGRAS DE NEGÓCIO:
                         summaryText += `✅ Pedido #${created.orderId.substring(0, 6)}: ${qty}x ${prod?.name || 'P13'} → ${verifiedAddr}\n`;
                     }
 
-                    await CartService.clearCart(ctx.botId, ctx.contactPhone);
-                    await clearMultiPlan(ctx.botId, ctx.contactPhone);
-                    orderConfirmed = true;
-                    orderId = createdOrders.join(', ');
-                    result = summaryText;
+                    if (createdOrders.length > 0) {
+                        await CartService.clearCart(ctx.botId, ctx.contactPhone);
+                        await clearMultiPlan(ctx.botId, ctx.contactPhone);
+                        orderConfirmed = true;
+                        orderId = createdOrders.join(', ');
+                        result = summaryText;
+                    }
 
                 } else {
                     // Single-address checkout from Cart

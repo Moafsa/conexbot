@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
+import { MapPin, Navigation, Truck, RefreshCw, Eye, EyeOff, User, Compass, Edit2, Settings, Smartphone, Trash2, Undo2, CheckCircle2, XCircle, Clock, Copy, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { cleanAddress } from '@/lib/phone-utils';
 
@@ -495,12 +495,17 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                 body: JSON.stringify({ orderId, driverId })
             });
 
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
                 throw new Error(data.error || 'Erro ao despachar pedido');
             }
 
-            toast.success('Pedido despachado e motorista notificado!', { id: 'dispatch' });
+            if (data.messageDelivered === false) {
+                toast.success('Pedido despachado! ⚠️ Falha ao notificar o entregador via WhatsApp.', { id: 'dispatch', duration: 6000 });
+                console.warn('[Dispatch] Falha de mensagem:', data.messageError);
+            } else {
+                toast.success('Pedido despachado e motorista notificado!', { id: 'dispatch' });
+            }
             refreshAll();
         } catch (err: any) {
             toast.error(err.message, { id: 'dispatch' });
@@ -996,6 +1001,9 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                 </div>
                                                 <div>
                                                     <h4 className="text-xs font-semibold text-white">{driver.name || 'Sem nome'}</h4>
+                                                    {driver.phone && (
+                                                        <p className="text-[9px] text-cyan-400 font-mono mt-0">{driver.phone}</p>
+                                                    )}
                                                     <p className="text-[9px] text-gray-400 mt-0.5">
                                                         {hasGps ? `${driver.latitude.toFixed(4)}, ${driver.longitude.toFixed(4)}` : 'Sem sinal GPS'}
                                                     </p>
@@ -1077,6 +1085,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                 <div>
                                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Painel do Entregador</h3>
                                     <h4 className="text-base font-bold text-white mt-0.5">{selectedDriver.name}</h4>
+                                    <p className="text-xs text-cyan-400 font-mono mt-0.5">{selectedDriver.phone || '—'}</p>
                                 </div>
                                 <button 
                                     onClick={() => setSelectedDriver(null)}
@@ -1101,6 +1110,34 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                     <Smartphone className="h-3.5 w-3.5" /> Enviar no WhatsApp
                                 </button>
                             </div>
+                            {/* Re-send active delivery details */}
+                            {selectedDriver.assignedOrders?.length > 0 && (
+                                <button
+                                    onClick={async () => {
+                                        const order = selectedDriver.assignedOrders[0];
+                                        toast.loading('Reenviando dados da entrega...', { id: 'resend' });
+                                        try {
+                                            const res = await fetch('/api/drivers/dispatch', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ orderId: order.id, driverId: selectedDriver.id })
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) throw new Error(data.error || 'Erro ao reenviar');
+                                            if (data.messageDelivered === false) {
+                                                toast.error(`Falha ao enviar: ${data.messageError}`, { id: 'resend', duration: 8000 });
+                                            } else {
+                                                toast.success('Dados da entrega reenviados!', { id: 'resend' });
+                                            }
+                                        } catch (e: any) {
+                                            toast.error(e.message, { id: 'resend' });
+                                        }
+                                    }}
+                                    className="w-full p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                >
+                                    <Send className="h-3.5 w-3.5" /> Reenviar Dados da Entrega
+                                </button>
+                            )}
                         
                         {/* Tabs */}
                         <div className="flex border-b border-white/10 mt-3 mb-3">

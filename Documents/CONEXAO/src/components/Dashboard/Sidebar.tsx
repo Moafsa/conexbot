@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList, Truck } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList, Truck, Code2 } from "lucide-react";
 
 export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo, botBusinessType, isOpenOnMobile, onCloseMobile }: {
     branding?: any;
@@ -83,6 +83,7 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
             {
                 category: "CONTA & CONFIGS",
                 items: [
+                    { icon: Code2,           label: "Portal Dev / BSP",      href: "/dashboard/developer" },
                     { icon: CreditCard,      label: "Financeiro",            href: "/dashboard/finance" },
                     { icon: Settings,        label: "Configurações",         href: "/dashboard/settings" },
                 ]
@@ -112,6 +113,7 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
             {
                 category: "CONTA",
                 items: [
+                    { icon: Code2,           label: "Portal Dev / BSP",        href: "/dashboard/developer" },
                     { icon: CreditCard,      label: "Financeiro",              href: "/dashboard/finance" },
                     { icon: Settings,        label: "Configurações",           href: "/dashboard/settings" },
                 ]
@@ -147,8 +149,9 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
         menuCategories.push({
             category: "CONTA",
             items: [
-                { icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" },
-                { icon: Settings,   label: "Configurações", href: "/dashboard/settings" },
+                { icon: Code2,      label: "Portal Dev / BSP", href: "/dashboard/developer" },
+                { icon: CreditCard, label: "Financeiro",       href: "/dashboard/finance" },
+                { icon: Settings,   label: "Configurações",    href: "/dashboard/settings" },
             ]
         });
     } else {
@@ -185,8 +188,9 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
         menuCategories.push({
             category: "CONTA",
             items: [
-                { icon: CreditCard, label: "Financeiro",    href: "/dashboard/finance" },
-                { icon: Settings,   label: "Configurações", href: "/dashboard/settings" },
+                { icon: Code2,      label: "Portal Dev / BSP", href: "/dashboard/developer" },
+                { icon: CreditCard, label: "Financeiro",       href: "/dashboard/finance" },
+                { icon: Settings,   label: "Configurações",    href: "/dashboard/settings" },
             ]
         });
     }

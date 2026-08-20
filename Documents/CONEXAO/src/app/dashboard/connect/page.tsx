@@ -187,10 +187,25 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
         window.location.href = url;
     };
 
+    const handleDisconnectMetaWhatsApp = async () => {
+        if (!confirm('Tem certeza que deseja desconectar este número? Ele voltará a funcionar normalmente no app do WhatsApp após alguns minutos.')) return;
+        try {
+            const url = clientId
+                ? `/api/bots/${botId}/channels?provider=META_WHATSAPP&clientId=${clientId}`
+                : `/api/bots/${botId}/channels?provider=META_WHATSAPP`;
+            await fetch(url, { method: 'DELETE' });
+            setMetaConnectStep('idle');
+            setMetaConnectedInfo(null);
+            setMetaPhoneId('');
+        } catch (e) {
+            console.error("Falha ao desconectar WhatsApp Meta:", e);
+        }
+    };
+
     const handleDisconnectInstagram = async () => {
         try {
-            const url = clientId 
-                ? `/api/bots/${botId}/channels?provider=INSTAGRAM&clientId=${clientId}` 
+            const url = clientId
+                ? `/api/bots/${botId}/channels?provider=INSTAGRAM&clientId=${clientId}`
                 : `/api/bots/${botId}/channels?provider=INSTAGRAM`;
             await fetch(url, { method: 'DELETE' });
             setInstaConnectStep('idle');
@@ -563,12 +578,20 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                         O número já está registrado na Cloud API e o webhook foi assinado automaticamente.
                                         Pode levar até 1-2 minutos para as primeiras mensagens fluírem normalmente.
                                     </p>
-                                    <button
-                                        onClick={() => setMetaConnectStep('idle')}
-                                        className="text-xs text-green-700 underline hover:text-green-900"
-                                    >
-                                        Conectar outro número
-                                    </button>
+                                    <div className="flex flex-col items-center gap-1 pt-1">
+                                        <button
+                                            onClick={() => setMetaConnectStep('idle')}
+                                            className="text-xs text-green-700 underline hover:text-green-900"
+                                        >
+                                            Conectar outro número
+                                        </button>
+                                        <button
+                                            onClick={handleDisconnectMetaWhatsApp}
+                                            className="text-xs text-red-500 underline hover:text-red-700 font-medium"
+                                        >
+                                            Desconectar este número
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
@@ -613,6 +636,25 @@ function ConnectPageContent({ metaAppId, metaConfigId, instagramConfigId }: { me
                                         </ol>
                                         <p className="text-[11px] text-blue-600 pt-1">
                                             Não é necessário copiar tokens nem mexer no painel de desenvolvedor da Meta. Tudo acontece dentro do popup.
+                                        </p>
+                                    </div>
+
+                                    {/* Warning: payment method + templates required */}
+                                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-sm text-amber-900 space-y-2">
+                                        <p className="font-semibold flex items-center gap-2">
+                                            <AlertTriangle size={16} className="text-amber-600" />
+                                            Antes de conectar — leia este aviso
+                                        </p>
+                                        <ul className="list-disc pl-5 space-y-1 text-amber-800 text-[12px]">
+                                            <li>
+                                                <b>Método de pagamento obrigatório:</b> a Meta exige um cartão cadastrado na conta do WhatsApp Business (WABA) para enviar mensagens proativas (templates). Sem ele, a API aceita o envio mas a mensagem <b>não é entregue</b>. Adicione em <b>business.facebook.com → Faturação → Métodos de pagamento</b>.
+                                            </li>
+                                            <li>
+                                                <b>Templates precisam ser criados e aprovados:</b> para enviar notificações ativas (ex: confirmação de pedido, despacho de entregador), é necessário criar e ter os templates aprovados no <b>Gerenciador do WhatsApp → Ferramentas → Modelos de mensagem</b>.
+                                            </li>
+                                        </ul>
+                                        <p className="text-[11px] text-amber-600 pt-1">
+                                            Mensagens recebidas de clientes (inbound) funcionam mesmo sem pagamento. O pagamento só é necessário para mensagens que você envia primeiro (templates).
                                         </p>
                                     </div>
 

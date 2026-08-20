@@ -17,7 +17,8 @@ import {
     ShieldAlert,
     Ticket,
     Pause,
-    Trash2
+    Trash2,
+    Key
 } from "lucide-react";
 import { ProductManager } from "@/components/Dashboard/ProductManager";
 import { MediaManager } from "@/components/Dashboard/MediaManager";
@@ -26,6 +27,7 @@ import { CRMBoard } from "@/components/Dashboard/CRMBoard";
 import { AgendaManager } from "@/components/Dashboard/AgendaManager";
 import { SecuritySettings } from "@/components/Dashboard/SecuritySettings";
 import { CouponManager } from "@/components/Dashboard/CouponManager";
+import { ApiKeyManager } from "@/components/Dashboard/ApiKeyManager";
 
 export default function BotDetailsPage() {
     const params = useParams();
@@ -253,6 +255,12 @@ export default function BotDetailsPage() {
                     icon={<ShieldAlert size={16} />}
                     label="Segurança"
                 />
+                <TabButton
+                    active={activeTab === "api"}
+                    onClick={() => setActiveTab("api")}
+                    icon={<Key size={16} />}
+                    label="API & Webhooks"
+                />
             </div>
 
             {/* Content */}
@@ -345,6 +353,9 @@ export default function BotDetailsPage() {
 
                 {activeTab === "security" && (
                     <SecuritySettings bot={bot} onUpdate={fetchBot} />
+                )}
+                {activeTab === "api" && (
+                    <ApiKeyManager botId={botId} />
                 )}
             </div>
         </div>

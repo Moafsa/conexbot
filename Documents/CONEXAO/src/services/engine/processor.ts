@@ -732,10 +732,9 @@ export const MessageProcessor = {
                     const mapboxResults: string[] = [];
                     for (const rawAddr of addrCandidates) {
                         try {
-                            const cityContext = activeBot?.address ? `, ${activeBot.address}` : ', Bento Gonçalves, RS, Brasil';
-                            const hasCityOrState = /(bento|garibaldi|farroupilha|caxias|carlos barbosa|porto alegre|monte belo|\brs\b)/i.test(rawAddr);
-                            const searchAddr = hasCityOrState ? rawAddr : `${rawAddr}${cityContext}`;
-                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddr)}.json?access_token=${mapboxToken}&country=BR&proximity=-51.517,-29.170&limit=1`;
+                            // For city verification, geocode WITHOUT city context so Mapbox finds the real location.
+                            // Adding the bot's city as context would bias results and defeat the purpose of checking.
+                            const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(rawAddr)}.json?access_token=${mapboxToken}&country=BR&limit=1`;
                             
                             const geocodeRes = await fetch(geocodeUrl);
                             if (geocodeRes.ok) {
@@ -743,10 +742,14 @@ export const MessageProcessor = {
                                 const feature = geocodeData.features?.[0];
                                 if (feature) {
                                     let neighborhood = '';
+                                    let geocodedCity = '';
                                     if (feature.context) {
                                         for (const ctx of feature.context) {
                                             if (ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality') || ctx.id.startsWith('district')) {
                                                 neighborhood = ctx.text;
+                                            }
+                                            if (ctx.id.startsWith('place.')) {
+                                                geocodedCity = ctx.text;
                                             }
                                         }
                                     }
@@ -759,7 +762,19 @@ export const MessageProcessor = {
                                     }
 
                                     const fullResolved = feature.place_name || searchAddr;
-                                    mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO OFICIAL NO MAPA (MAPBOX): **${neighborhood || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
+
+                                    // Check if geocoded city is in the allowed cities list
+                                    const feeRulesRaw = activeBot?.deliveryFeeRules;
+                                    const feeRules = Array.isArray(feeRulesRaw) ? feeRulesRaw : (typeof feeRulesRaw === 'string' ? JSON.parse(feeRulesRaw || '[]') : []);
+                                    const allowedCities: string[] = [...new Set(feeRules.map((r: any) => r.city).filter(Boolean))] as string[];
+                                    const cityOutsideCoverage = allowedCities.length > 0 && geocodedCity &&
+                                        !allowedCities.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()));
+
+                                    if (cityOutsideCoverage) {
+                                        mapboxResults.push(`- ⛔ ENDEREÇO FORA DA ÁREA DE ATENDIMENTO: "${rawAddr}" → O Mapbox identificou que este endereço pertence à cidade de **${geocodedCity}**, que NÃO está na lista de cidades atendidas (${allowedCities.join(', ')}). VOCÊ DEVE RECUSAR A ENTREGA e informar ao cliente que não realizamos entregas em ${geocodedCity}.`);
+                                    } else {
+                                        mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO OFICIAL NO MAPA (MAPBOX): **${neighborhood || geocodedCity || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
+                                    }
                                 }
                             }
                         } catch (e: any) {
@@ -1024,7 +1039,38 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                     const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
                     const mapboxToken = config?.mapboxToken || bot.mapboxToken;
 
-                    const savedAddresses = await getContactSavedAddresses(existingContact.id, existingContact);
+                    const rawSavedAddresses = await getContactSavedAddresses(existingContact.id, existingContact);
+
+                    // Filter saved addresses: remove any that are in cities outside coverage area
+                    let savedAddresses = rawSavedAddresses;
+                    if (mapboxToken) {
+                        const feeRulesRaw = bot.deliveryFeeRules;
+                        const feeRules = Array.isArray(feeRulesRaw) ? feeRulesRaw : (typeof feeRulesRaw === 'string' ? JSON.parse(feeRulesRaw || '[]') : []);
+                        const allowedCities: string[] = [...new Set(feeRules.map((r: any) => r.city).filter(Boolean))] as string[];
+
+                        if (allowedCities.length > 0) {
+                            const checkedAddresses = await Promise.all(rawSavedAddresses.map(async (sa) => {
+                                try {
+                                    const geoRes = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(sa.address)}.json?access_token=${mapboxToken}&country=BR&limit=1`);
+                                    if (!geoRes.ok) return sa;
+                                    const geoData = await geoRes.json();
+                                    const feature = geoData.features?.[0];
+                                    if (!feature) return sa;
+                                    const placeCtx = (feature.context || []).find((c: any) => c.id?.startsWith('place.'));
+                                    const geocodedCity: string = placeCtx?.text || '';
+                                    const cityAllowed = !geocodedCity || allowedCities.some(c =>
+                                        geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase())
+                                    );
+                                    if (!cityAllowed) {
+                                        // Return address marked as outside coverage so the agent won't use it
+                                        return { ...sa, address: `[FORA DA ÁREA - ${geocodedCity}] ${sa.address}`, label: 'Endereço inválido (fora da área de entrega)' };
+                                    }
+                                    return sa;
+                                } catch { return sa; }
+                            }));
+                            savedAddresses = checkedAddresses;
+                        }
+                    }
 
                     const orderCatalog = bot.products
                         .filter((p: any) => p.active)
@@ -2138,7 +2184,27 @@ NÃO diga que o pedido foi confirmado. Pergunte educadamente ao cliente qual é 
 
                                     // 5. Send message to driver WhatsApp via active channel (Meta WhatsApp or WuzAPI)
                                     const { sendOutboundMessageToPhone } = await import('@/services/engine/outbound-notifier');
-                                    await sendOutboundMessageToPhone(bot, finalPhone, dispatchMsg);
+                                    const templateComponents = [
+                                        {
+                                            type: 'body',
+                                            parameters: [
+                                                { type: 'text', text: customerName },
+                                                { type: 'text', text: customerPhone?.replace(/\D/g, '') || 'Não informado' },
+                                                { type: 'text', text: deliveryAddress },
+                                                { type: 'text', text: orderItemsStr },
+                                                { type: 'text', text: mapsUrl },
+                                                { type: 'text', text: pwaUrl }
+                                            ]
+                                        }
+                                    ];
+                                    const dispatchResult = await sendOutboundMessageToPhone(bot, finalPhone, dispatchMsg, {
+                                        templateName: 'nova_entrega_atribuida',
+                                        templateLanguage: 'pt_BR',
+                                        templateComponents
+                                    });
+                                    if (!dispatchResult.success) {
+                                        logToFile(`[Processor dispatch] Warning: ${dispatchResult.error}`);
+                                    }
 
                                     // 6. Assign conversation to driver in Chatwoot
                                     const cwConvId = (conversation as any)?.chatwootConversationId || options.chatwootConversationId;
