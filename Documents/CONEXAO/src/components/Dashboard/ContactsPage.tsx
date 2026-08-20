@@ -241,8 +241,11 @@ export function ContactsPage({ clientId }: { clientId?: string }) {
 
             {/* Contact detail panel — full-screen overlay */}
             {selectedContact && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    onClick={e => { if (e.target === e.currentTarget) setSelectedContact(null); }}
+                >
+                    <div className="h-[90vh] overflow-hidden rounded-2xl shadow-2xl">
                         <CRMContactPanel
                             contactId={selectedContact.id}
                             botId={selectedContact.botId}
