@@ -175,7 +175,7 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
         job.total = knownPhones.size;
         emit(jobId, 'progress', job);
 
-        // ── Step 3: Import messages from WUZAPI ───────────────────────────
+        // ── Step 3: Import messages from WUZAPI (parallel batches) ──────────
         log(`Buscando histórico de mensagens para ${knownPhones.size} contato(s)...`);
         job.steps[2].done = false;
         emit(jobId, 'progress', job);
@@ -184,151 +184,110 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
         let importedMessages = 0;
         let importedChatwoot = 0;
 
-        for (const [phone, name] of knownPhones) {
-            const jid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+        const PARALLEL = 20; // concurrent WUZAPI calls per batch
+        const allEntries = [...knownPhones.entries()];
+        const cwBase = bot.chatwootUrl ? bot.chatwootUrl.replace(/\/$/, '') : null;
+        const cwHeaders = cwBase ? { 'api_access_token': bot.chatwootToken!, 'Content-Type': 'application/json' } : null;
 
-            // Fetch history from WUZAPI
-            let history: any[] = [];
-            try {
-                const histRes = await fetch(`${UZAPI_URL}/chat/history?chat_jid=${encodeURIComponent(jid)}&count=200`, {
-                    headers: { 'Token': sessionToken },
-                });
-                if (histRes.ok) {
-                    const histData = await histRes.json();
-                    history = histData.data || [];
+        for (let batchStart = 0; batchStart < allEntries.length; batchStart += PARALLEL) {
+            const batch = allEntries.slice(batchStart, batchStart + PARALLEL);
+
+            // Fetch all histories in parallel
+            const results = await Promise.all(batch.map(async ([phone, name]) => {
+                const jid = `${phone}@s.whatsapp.net`;
+                let history: any[] = [];
+                try {
+                    const r = await fetch(`${UZAPI_URL}/chat/history?chat_jid=${encodeURIComponent(jid)}&count=200`, {
+                        headers: { 'Token': sessionToken },
+                    });
+                    if (r.ok) { const d = await r.json(); history = d.data || []; }
+                } catch { }
+                return { phone, name, jid, history };
+            }));
+
+            // Process each result (DB writes serial per batch to avoid contention)
+            for (const { phone, name, jid, history } of results) {
+                if (history.length === 0) {
+                    job.imported++;
+                    emit(jobId, 'progress', job);
+                    continue;
                 }
-            } catch (e: any) {
-                job.errors.push(`WUZAPI history ${phone}: ${e.message}`);
-            }
 
-            if (history.length === 0) {
-                job.imported++;
-                emit(jobId, 'progress', job);
-                continue;
-            }
+                const cleanPhone = phone.replace(/\D/g, '');
 
-            // Update contact lastActive since they have history
-            const cleanPhone = phone.replace(/\D/g, '');
-            try {
+                // Update contact lastActive
                 await prisma.contact.update({
                     where: { phone_botId: { phone: cleanPhone, botId } },
                     data: { lastActive: new Date() },
                 }).catch(() => null);
                 importedContacts++;
-            } catch (e: any) {
-                // ignore
-            }
 
-            // Upsert Conversation
-            let convId: string | null = null;
-            try {
-                const conv = await prisma.conversation.upsert({
-                    where: { botId_remoteId: { botId, remoteId: cleanPhone } },
-                    create: { botId, remoteId: cleanPhone, channel: 'whatsapp', status: 'open' },
-                    update: { updatedAt: new Date() },
-                });
-                convId = conv.id;
-            } catch (e: any) {
-                job.errors.push(`Conversation upsert ${phone}: ${e.message}`);
-            }
-
-            if (convId) {
-                // Import messages
-                const existingMsgIds = new Set(
-                    (await prisma.message.findMany({ where: { conversationId: convId }, select: { tool_call_id: true } }))
-                        .map(m => m.tool_call_id).filter(Boolean)
-                );
-
-                for (const item of history) {
-                    const msgId = item.message_id;
-                    if (msgId && existingMsgIds.has(msgId)) continue;
-
-                    const content = item.text_content || '[mídia]';
-                    const fromMe = item.sender_jid?.includes(phone) === false || item.sender_jid?.startsWith('55');
-                    const role = item.sender_jid === jid ? 'user' : 'assistant';
-                    const ts = item.timestamp ? new Date(item.timestamp) : new Date();
-
-                    try {
-                        await prisma.message.create({
-                            data: {
-                                conversationId: convId,
-                                content,
-                                role,
-                                createdAt: ts,
-                                tool_call_id: msgId || undefined,
-                            },
-                        });
-                        importedMessages++;
-                    } catch (e: any) {
-                        // duplicate key — ignore
-                    }
-                }
-            }
-
-            // Push contact + conversation to Chatwoot
-            if (bot.chatwootUrl && bot.chatwootToken && bot.chatwootAccountId && bot.chatwootInboxId) {
+                // Upsert Conversation in local DB
+                let convId: string | null = null;
                 try {
-                    const base = bot.chatwootUrl.replace(/\/$/, '');
-                    const headers = { 'api_access_token': bot.chatwootToken, 'Content-Type': 'application/json' };
-
-                    // Find or create contact in Chatwoot
-                    const searchRes = await fetch(`${base}/api/v1/accounts/${bot.chatwootAccountId}/contacts/search?q=${encodeURIComponent(cleanPhone)}`, { headers });
-                    let cwContactId: number | null = null;
-                    if (searchRes.ok) {
-                        const sData = await searchRes.json();
-                        cwContactId = sData.payload?.[0]?.id || null;
-                    }
-                    if (!cwContactId) {
-                        const createRes = await fetch(`${base}/api/v1/accounts/${bot.chatwootAccountId}/contacts`, {
-                            method: 'POST', headers,
-                            body: JSON.stringify({ name: name || cleanPhone, phone_number: `+${cleanPhone}` }),
-                        });
-                        if (createRes.ok) {
-                            const created = await createRes.json();
-                            cwContactId = created.id;
-                        }
-                    }
-
-                    if (cwContactId && history.length > 0) {
-                        // Create conversation in Chatwoot
-                        const convRes = await fetch(`${base}/api/v1/accounts/${bot.chatwootAccountId}/conversations`, {
-                            method: 'POST', headers,
-                            body: JSON.stringify({
-                                contact_id: cwContactId,
-                                inbox_id: parseInt(bot.chatwootInboxId),
-                            }),
-                        });
-                        if (convRes.ok) {
-                            const cwConv = await convRes.json();
-                            const cwConvId = cwConv.id;
-
-                            // Push messages to Chatwoot (last 50 only to avoid overload)
-                            const toSend = history.slice(-50);
-                            for (const item of toSend) {
-                                const content = item.text_content;
-                                if (!content || content === '[mídia]') continue;
-                                const fromMe = item.sender_jid !== jid;
-                                await fetch(`${base}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${cwConvId}/messages`, {
-                                    method: 'POST', headers,
-                                    body: JSON.stringify({
-                                        content,
-                                        message_type: fromMe ? 'outgoing' : 'incoming',
-                                        private: false,
-                                    }),
-                                }).catch(() => null);
-                            }
-                            importedChatwoot++;
-                        }
-                    }
+                    const conv = await prisma.conversation.upsert({
+                        where: { botId_remoteId: { botId, remoteId: cleanPhone } },
+                        create: { botId, remoteId: cleanPhone, channel: 'whatsapp', status: 'open' },
+                        update: { updatedAt: new Date() },
+                    });
+                    convId = conv.id;
                 } catch (e: any) {
-                    job.errors.push(`Chatwoot ${phone}: ${e.message}`);
+                    job.errors.push(`Conv ${phone}: ${e.message}`);
                 }
-            }
 
-            job.imported++;
-            emit(jobId, 'progress', job);
-            // Small delay to avoid overwhelming services
-            await new Promise(r => setTimeout(r, 50));
+                if (convId) {
+                    const existingIds = new Set(
+                        (await prisma.message.findMany({ where: { conversationId: convId }, select: { tool_call_id: true } }))
+                            .map(m => m.tool_call_id).filter(Boolean)
+                    );
+                    for (const item of history) {
+                        if (item.message_id && existingIds.has(item.message_id)) continue;
+                        const role = item.sender_jid === jid ? 'user' : 'assistant';
+                        const ts = item.timestamp ? new Date(Number(item.timestamp) * (item.timestamp > 1e10 ? 1 : 1000)) : new Date();
+                        await prisma.message.create({
+                            data: { conversationId: convId, content: item.text_content || '[mídia]', role, createdAt: ts, tool_call_id: item.message_id || undefined },
+                        }).catch(() => null);
+                        importedMessages++;
+                    }
+                }
+
+                // Push to Chatwoot CRM
+                if (cwBase && cwHeaders && bot.chatwootAccountId && bot.chatwootInboxId) {
+                    try {
+                        const sr = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/contacts/search?q=${encodeURIComponent(cleanPhone)}`, { headers: cwHeaders });
+                        let cwContactId: number | null = null;
+                        if (sr.ok) { const sd = await sr.json(); cwContactId = sd.payload?.[0]?.id || null; }
+                        if (!cwContactId) {
+                            const cr = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/contacts`, {
+                                method: 'POST', headers: cwHeaders,
+                                body: JSON.stringify({ name: (name && name !== cleanPhone) ? name : cleanPhone, phone_number: `+${cleanPhone}` }),
+                            });
+                            if (cr.ok) { const cd = await cr.json(); cwContactId = cd.id; }
+                        }
+                        if (cwContactId) {
+                            const convR = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/conversations`, {
+                                method: 'POST', headers: cwHeaders,
+                                body: JSON.stringify({ contact_id: cwContactId, inbox_id: parseInt(bot.chatwootInboxId) }),
+                            });
+                            if (convR.ok) {
+                                const cwConv = await convR.json();
+                                const cwConvId = cwConv.id;
+                                for (const item of history.slice(-50)) {
+                                    if (!item.text_content || item.text_content === '[mídia]') continue;
+                                    await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${cwConvId}/messages`, {
+                                        method: 'POST', headers: cwHeaders,
+                                        body: JSON.stringify({ content: item.text_content, message_type: item.sender_jid !== jid ? 'outgoing' : 'incoming', private: false }),
+                                    }).catch(() => null);
+                                }
+                                importedChatwoot++;
+                            }
+                        }
+                    } catch (e: any) { job.errors.push(`Chatwoot ${phone}: ${e.message}`); }
+                }
+
+                job.imported++;
+                emit(jobId, 'progress', job);
+            }
         }
 
         job.steps[2].done = true;
