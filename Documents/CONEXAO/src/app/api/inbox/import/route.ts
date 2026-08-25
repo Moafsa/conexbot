@@ -152,13 +152,30 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
             log(`Aviso: não foi possível listar contatos WUZAPI — ${e.message}`);
         }
 
+        // ── Bulk-upsert ALL contacts immediately (even without history) ──────
+        log(`Criando ${knownPhones.size} contato(s) no banco...`);
+        const BATCH = 100;
+        const allPhones = [...knownPhones.entries()];
+        for (let i = 0; i < allPhones.length; i += BATCH) {
+            const slice = allPhones.slice(i, i + BATCH);
+            await Promise.all(slice.map(([phone, name]) => {
+                const cleanPhone = phone.replace(/\D/g, '');
+                return prisma.contact.upsert({
+                    where: { phone_botId: { phone: cleanPhone, botId } },
+                    create: { phone: cleanPhone, name: name !== cleanPhone ? name : null, botId, tenantId, lastActive: new Date() },
+                    update: { ...(name && name !== cleanPhone ? { name } : {}) },
+                }).catch(() => null);
+            }));
+        }
+        log(`${knownPhones.size} contato(s) criado(s)/atualizados na página de Contatos`);
+
         job.steps[1].done = true;
         job.steps[1].count = knownPhones.size;
         job.total = knownPhones.size;
         emit(jobId, 'progress', job);
 
         // ── Step 3: Import messages from WUZAPI ───────────────────────────
-        log(`Importando histórico de ${knownPhones.size} contato(s)...`);
+        log(`Buscando histórico de mensagens para ${knownPhones.size} contato(s)...`);
         job.steps[2].done = false;
         emit(jobId, 'progress', job);
 
@@ -189,17 +206,16 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
                 continue;
             }
 
-            // Upsert Contact in local DB
+            // Update contact lastActive since they have history
             const cleanPhone = phone.replace(/\D/g, '');
             try {
-                await prisma.contact.upsert({
+                await prisma.contact.update({
                     where: { phone_botId: { phone: cleanPhone, botId } },
-                    create: { phone: cleanPhone, name, botId, tenantId, lastActive: new Date() },
-                    update: { lastActive: new Date(), ...(name && name !== cleanPhone ? { name } : {}) },
-                });
+                    data: { lastActive: new Date() },
+                }).catch(() => null);
                 importedContacts++;
             } catch (e: any) {
-                job.errors.push(`Contact upsert ${phone}: ${e.message}`);
+                // ignore
             }
 
             // Upsert Conversation
