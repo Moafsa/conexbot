@@ -63,7 +63,8 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
         let uzapiUserId: string | null = null;
         if (usersRes?.ok) {
             const usersData = await usersRes.json();
-            const user = (usersData.data || []).find((u: any) => u.name === `bot-${botId}`);
+            const shortId = botId.split('-')[0];
+            const user = (usersData.data || []).find((u: any) => u.name === `bot-${shortId}` || u.token === `bot-${shortId}`);
             if (user) {
                 uzapiUserId = user.id;
                 await fetch(`${UZAPI_URL}/admin/users/${user.id}`, {
