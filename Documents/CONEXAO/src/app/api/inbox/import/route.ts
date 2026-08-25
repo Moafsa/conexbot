@@ -265,13 +265,30 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
                             if (cr.ok) { const cd = await cr.json(); cwContactId = cd.id; }
                         }
                         if (cwContactId) {
-                            const convR = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/conversations`, {
-                                method: 'POST', headers: cwHeaders,
-                                body: JSON.stringify({ contact_id: cwContactId, inbox_id: parseInt(bot.chatwootInboxId) }),
-                            });
-                            if (convR.ok) {
-                                const cwConv = await convR.json();
-                                const cwConvId = cwConv.id;
+                            // Check for existing conversation (avoid duplicates on re-import)
+                            let cwConvId: number | null = null;
+                            const existConvR = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/contacts/${cwContactId}/conversations`, { headers: cwHeaders });
+                            if (existConvR.ok) {
+                                const existData = await existConvR.json();
+                                const inboxId = parseInt(bot.chatwootInboxId);
+                                const existing = (existData.payload || []).find((c: any) => c.inbox_id === inboxId);
+                                if (existing) cwConvId = existing.id;
+                            }
+
+                            if (!cwConvId) {
+                                const convR = await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/conversations`, {
+                                    method: 'POST', headers: cwHeaders,
+                                    body: JSON.stringify({ contact_id: cwContactId, inbox_id: parseInt(bot.chatwootInboxId) }),
+                                });
+                                if (convR.ok) {
+                                    const cwConvCreated = await convR.json();
+                                    cwConvId = cwConvCreated.id;
+                                    importedChatwoot++;
+                                }
+                            }
+
+                            // Push messages to the conversation (new or existing)
+                            if (cwConvId) {
                                 for (const item of history.slice(-50)) {
                                     if (!item.text_content || item.text_content === '[mídia]') continue;
                                     await fetch(`${cwBase}/api/v1/accounts/${bot.chatwootAccountId}/conversations/${cwConvId}/messages`, {
@@ -279,7 +296,6 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
                                         body: JSON.stringify({ content: item.text_content, message_type: item.sender_jid !== jid ? 'outgoing' : 'incoming', private: false }),
                                     }).catch(() => null);
                                 }
-                                importedChatwoot++;
                             }
                         }
                     } catch (e: any) { job.errors.push(`Chatwoot ${phone}: ${e.message}`); }
