@@ -87,6 +87,8 @@ export function InboxPage({ clientId }: { clientId?: string }) {
     const [importLog, setImportLog] = useState<string[]>([]);
     const [importing, setImporting] = useState(false);
     const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const chatEndRef = useRef<HTMLDivElement>(null);
     const replyRef = useRef<HTMLTextAreaElement>(null);
@@ -107,10 +109,30 @@ export function InboxPage({ clientId }: { clientId?: string }) {
             const data = await res.json();
             setBots(data.bots || []);
             setConversations(data.conversations || []);
+            setNextCursor(data.nextCursor || null);
         } catch { } finally {
             setLoadingConvs(false);
         }
     }, [clientId, selectedBot, search]);
+
+    const loadMoreConversations = useCallback(async () => {
+        if (!nextCursor || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const params = new URLSearchParams();
+            if (clientId) params.set('clientId', clientId);
+            if (selectedBot) params.set('botId', selectedBot);
+            if (search) params.set('search', search);
+            params.set('cursor', nextCursor);
+            const res = await fetch(`/api/inbox?${params}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setConversations(prev => [...prev, ...(data.conversations || [])]);
+            setNextCursor(data.nextCursor || null);
+        } catch { } finally {
+            setLoadingMore(false);
+        }
+    }, [nextCursor, loadingMore, clientId, selectedBot, search]);
 
     // Initial load of messages — shows loading spinner, replaces state
     const fetchMessages = useCallback(async (convId: string) => {
@@ -333,6 +355,18 @@ export function InboxPage({ clientId }: { clientId?: string }) {
                                 </button>
                             );
                         })
+                    )}
+                    {nextCursor && (
+                        <div className="p-3 flex justify-center border-t border-gray-100 dark:border-gray-700">
+                            <button
+                                onClick={loadMoreConversations}
+                                disabled={loadingMore}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 transition-colors"
+                            >
+                                {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                {loadingMore ? 'Carregando...' : 'Carregar mais'}
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>

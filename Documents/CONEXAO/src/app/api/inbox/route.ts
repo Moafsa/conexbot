@@ -50,7 +50,7 @@ export async function GET(req: Request) {
         ...(matchingContacts
             ? { OR: matchingContacts.map(c => ({ botId: c.botId!, remoteId: c.phone })) }
             : {}),
-        ...(cursor ? { id: { lt: cursor } } : {}),
+        ...(cursor ? { updatedAt: { lt: new Date(cursor) } } : {}),
     };
 
     const conversations = await prisma.conversation.findMany({
@@ -95,7 +95,7 @@ export async function GET(req: Request) {
         };
     });
 
-    const nextCursor = conversations.length === PAGE ? conversations[conversations.length - 1].id : null;
+    const nextCursor = conversations.length === PAGE ? conversations[conversations.length - 1].updatedAt.toISOString() : null;
 
     return NextResponse.json({ conversations: result, bots: allBots, nextCursor });
 }
