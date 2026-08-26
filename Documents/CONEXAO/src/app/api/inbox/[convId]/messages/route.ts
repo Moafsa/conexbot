@@ -15,9 +15,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ convId: 
     if (!tenantId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { convId } = await params;
-    const cursor = searchParams.get('cursor');
-    const PAGE = 60;
-
     const conv = await prisma.conversation.findUnique({
         where: { id: convId },
         include: { bot: { select: { tenantId: true, id: true, name: true } } },
@@ -26,24 +23,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ convId: 
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const messages = cursor
-        ? await prisma.message.findMany({
-            where: { conversationId: convId, id: { lt: cursor } },
-            orderBy: { createdAt: 'desc' },
-            take: PAGE,
-          }).then(rows => rows.reverse())
-        : await prisma.message.findMany({
-            where: { conversationId: convId },
-            orderBy: { createdAt: 'desc' },
-            take: PAGE,
-          }).then(rows => rows.reverse());
+    const messages = await prisma.message.findMany({
+        where: { conversationId: convId },
+        orderBy: { createdAt: 'asc' },
+    });
 
     const contact = await prisma.contact.findFirst({
         where: { phone: conv.remoteId, botId: conv.botId },
         select: { id: true, name: true, phone: true, email: true, notes: true, tags: true, leadScore: true, funnelStage: true },
     });
 
-    const nextCursor = messages.length === PAGE ? messages[0].id : null;
-
-    return NextResponse.json({ messages, contact, conversation: { id: conv.id, remoteId: conv.remoteId, status: conv.status, botId: conv.botId, botName: conv.bot.name }, nextCursor });
+    return NextResponse.json({ messages, contact, conversation: { id: conv.id, remoteId: conv.remoteId, status: conv.status, botId: conv.botId, botName: conv.bot.name }, nextCursor: null });
 }
