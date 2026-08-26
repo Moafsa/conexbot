@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import prisma from '@/lib/prisma';
+import { getPhoneVariations } from '@/lib/phone-utils';
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
@@ -29,26 +30,49 @@ export async function GET(req: Request) {
 
     const activeBotIds = botId ? [botId] : botIds;
 
-    // Get contacts matching search
-    const contactWhere = search
-        ? {
-            botId: { in: activeBotIds },
-            OR: [
-                { name: { contains: search, mode: 'insensitive' as const } },
-                { phone: { contains: search } },
-            ]
-        }
-        : { botId: { in: activeBotIds } };
+    let searchOrConditions: any[] | null = null;
 
-    const matchingContacts = search
-        ? await prisma.contact.findMany({ where: contactWhere, select: { phone: true, botId: true } })
-        : null;
+    if (search) {
+        // 1. Find contacts by name or phone (all variations)
+        const matchingContacts = await prisma.contact.findMany({
+            where: {
+                botId: { in: activeBotIds },
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { phone: { contains: search } },
+                ]
+            },
+            select: { phone: true, botId: true }
+        });
+
+        // Generate all phone variations so format mismatch doesn't break lookups
+        const contactConditions = matchingContacts.flatMap(c =>
+            getPhoneVariations(c.phone).map(v => ({ botId: c.botId!, remoteId: v }))
+        );
+
+        // 2. Find conversations whose messages contain the search term
+        const matchingMessages = await prisma.message.findMany({
+            where: {
+                content: { contains: search, mode: 'insensitive' },
+                conversation: { botId: { in: activeBotIds } },
+            },
+            select: { conversationId: true },
+            distinct: ['conversationId'],
+            take: 200,
+        });
+        const messageConvIds = matchingMessages.map(m => m.conversationId);
+
+        searchOrConditions = [
+            ...contactConditions,
+            ...(messageConvIds.length > 0 ? [{ id: { in: messageConvIds } }] : []),
+        ];
+    }
 
     const convWhere: any = {
         botId: { in: activeBotIds },
         ...(status !== 'all' ? { status } : {}),
-        ...(matchingContacts
-            ? { OR: matchingContacts.map(c => ({ botId: c.botId!, remoteId: c.phone })) }
+        ...(searchOrConditions !== null
+            ? (searchOrConditions.length > 0 ? { OR: searchOrConditions } : { id: 'no-match' })
             : {}),
         ...(cursor ? { updatedAt: { lt: new Date(cursor) } } : {}),
     };
@@ -67,13 +91,20 @@ export async function GET(req: Request) {
         },
     });
 
-    // Enrich with contact info
-    const phones = [...new Set(conversations.map(c => c.remoteId))];
+    // Enrich with contact info — try both the stored remoteId and all its variations
+    const allPhoneVariants = [...new Set(conversations.flatMap(c => getPhoneVariations(c.remoteId)))];
     const contacts = await prisma.contact.findMany({
-        where: { phone: { in: phones }, botId: { in: activeBotIds } },
+        where: { phone: { in: allPhoneVariants }, botId: { in: activeBotIds } },
         select: { phone: true, name: true, botId: true },
     });
-    const contactMap = new Map(contacts.map(c => [`${c.botId}:${c.phone}`, c]));
+    // Index by every variant so lookup always finds the right contact
+    const contactMap = new Map<string, { name: string }>();
+    for (const ct of contacts) {
+        for (const v of getPhoneVariations(ct.phone)) {
+            const key = `${ct.botId}:${v}`;
+            if (!contactMap.has(key)) contactMap.set(key, ct);
+        }
+    }
 
     const allBots = await prisma.bot.findMany({
         where: { tenantId },
