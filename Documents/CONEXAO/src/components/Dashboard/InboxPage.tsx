@@ -90,6 +90,7 @@ export function InboxPage({ clientId }: { clientId?: string }) {
     const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [total, setTotal] = useState<number>(0);
 
     const chatEndRef = useRef<HTMLDivElement>(null);
     const replyRef = useRef<HTMLTextAreaElement>(null);
@@ -111,6 +112,7 @@ export function InboxPage({ clientId }: { clientId?: string }) {
             setBots(data.bots || []);
             setConversations(data.conversations || []);
             setNextCursor(data.nextCursor || null);
+            setTotal(data.total ?? 0);
         } catch { } finally {
             setLoadingConvs(false);
         }
@@ -274,6 +276,11 @@ export function InboxPage({ clientId }: { clientId?: string }) {
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                             <MessageCircle className="w-5 h-5 text-blue-500" />
                             Caixa de Entrada
+                            {total > 0 && (
+                                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+                                    {total.toLocaleString('pt-BR')}
+                                </span>
+                            )}
                         </h2>
                         <div className="flex gap-2">
                             <button onClick={() => fetchConversations()} className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Atualizar">

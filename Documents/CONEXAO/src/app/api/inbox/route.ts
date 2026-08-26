@@ -118,10 +118,10 @@ export async function GET(req: Request) {
         }
     }
 
-    const allBots = await prisma.bot.findMany({
-        where: { tenantId },
-        select: { id: true, name: true },
-    });
+    const [allBots, totalCount] = await Promise.all([
+        prisma.bot.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+        prisma.conversation.count({ where: { botId: { in: activeBotIds }, ...(status !== 'all' ? { status } : {}) } }),
+    ]);
 
     const result = conversations.map(conv => {
         const contact = contactMap.get(`${conv.botId}:${conv.remoteId}`);
@@ -147,5 +147,5 @@ export async function GET(req: Request) {
 
     const nextCursor = conversations.length === PAGE ? conversations[conversations.length - 1].updatedAt.toISOString() : null;
 
-    return NextResponse.json({ conversations: result, bots: allBots, nextCursor });
+    return NextResponse.json({ conversations: result, bots: allBots, nextCursor, total: totalCount });
 }
