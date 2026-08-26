@@ -75,7 +75,7 @@ const SALE_KEYWORDS = /\b(sim|quero|fecha|confirmo|fechar|vou querer|beleza|fech
 const UNCERTAIN_KEYWORDS = /\b(não sei|não tenho|não encontrei|desconheço)\b/i;
 
 export const MessageProcessor = {
-    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image', mediaPath?: string, whatsappChatJid?: string, chatwootConversationId?: number, adAttribution?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string; adId?: string; adsetId?: string; adName?: string; adsetName?: string; campaignId?: string; campaignName?: string; entrySource?: string; referrer?: string } } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
+    async process(identifier: string, senderPhoneRaw: string, messageText: string, channel: 'whatsapp' | 'simulator' | 'generic' | 'wordpress' | 'meta_whatsapp' | 'instagram' = 'whatsapp', searchBy: 'sessionName' | 'id' = 'sessionName', options: { inputType: 'text' | 'audio' | 'image' | 'video' | 'document', mediaPath?: string, mediaUrl?: string, mimeType?: string, fileName?: string, whatsappChatJid?: string, chatwootConversationId?: number, adAttribution?: { utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string; adId?: string; adsetId?: string; adName?: string; adsetName?: string; campaignId?: string; campaignName?: string; entrySource?: string; referrer?: string } } = { inputType: 'text' }): Promise<{ text: string, media?: any[], audioPath?: string } | null> {
         const senderPhone = (channel === 'whatsapp' || channel === 'meta_whatsapp') ? PhoneUtils.normalize(senderPhoneRaw) : senderPhoneRaw;
         const lockKey = `${channel}:${senderPhone}`;
 
@@ -259,7 +259,10 @@ export const MessageProcessor = {
                     conversationId: conversation.id,
                     content: contentToSave,
                     role: 'user',
-                },
+                    ...(options.mediaUrl ? { mediaUrl: options.mediaUrl } : {}),
+                    ...(options.inputType !== 'text' ? { mediaType: options.inputType } : {}),
+                    ...(options.fileName ? { fileName: options.fileName } : {}),
+                } as any,
             });
 
             // 4.1. Check if conversation is PAUSED (handoff para humano) or Bot is PAUSED

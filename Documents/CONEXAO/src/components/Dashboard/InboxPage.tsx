@@ -28,6 +28,9 @@ interface Message {
     role: string;
     createdAt: string;
     tool_calls?: any;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+    fileName?: string | null;
 }
 
 interface Contact {
@@ -379,14 +382,37 @@ export function InboxPage({ clientId }: { clientId?: string }) {
                                 messages.map(msg => {
                                     const isAssistant = msg.role === 'assistant';
                                     const isSystem = msg.role === 'system' || msg.role === 'tool';
+                                    const bubbleClass = `max-w-xs lg:max-w-sm xl:max-w-md rounded-2xl text-sm shadow-sm overflow-hidden ${isAssistant ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-tl-sm border border-gray-100 dark:border-gray-600'}`;
+                                    const timeClass = `text-xs mt-1 text-right px-3 pb-2 ${isAssistant ? 'text-blue-200' : 'text-gray-400'}`;
                                     return (
                                         <div key={msg.id} className={`flex ${isAssistant ? 'justify-end' : isSystem ? 'justify-center' : 'justify-start'}`}>
                                             {isSystem ? (
                                                 <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full max-w-xs text-center">{msg.content.substring(0, 120)}</span>
                                             ) : (
-                                                <div className={`max-w-xs lg:max-w-sm xl:max-w-md px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words shadow-sm ${isAssistant ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-tl-sm border border-gray-100 dark:border-gray-600'}`}>
-                                                    {msg.content}
-                                                    <div className={`text-xs mt-1 text-right ${isAssistant ? 'text-blue-200' : 'text-gray-400'}`}>
+                                                <div className={bubbleClass}>
+                                                    {msg.mediaUrl && msg.mediaType === 'image' && (
+                                                        <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
+                                                            <img src={msg.mediaUrl} alt="imagem" className="max-w-full rounded-t-2xl object-cover" style={{ maxHeight: 260 }} />
+                                                        </a>
+                                                    )}
+                                                    {msg.mediaUrl && msg.mediaType === 'audio' && (
+                                                        <div className="px-3 pt-2">
+                                                            <audio controls src={msg.mediaUrl} className="w-full" style={{ minWidth: 220 }} />
+                                                        </div>
+                                                    )}
+                                                    {msg.mediaUrl && msg.mediaType === 'video' && (
+                                                        <video controls src={msg.mediaUrl} className="max-w-full rounded-t-2xl" style={{ maxHeight: 260 }} />
+                                                    )}
+                                                    {msg.mediaUrl && msg.mediaType === 'document' && (
+                                                        <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 pt-2 pb-1 hover:underline">
+                                                            <span className="text-lg">📎</span>
+                                                            <span className="truncate text-xs">{msg.fileName || 'Documento'}</span>
+                                                        </a>
+                                                    )}
+                                                    {(msg.content && !(msg.mediaType === 'audio' && msg.mediaUrl)) && (
+                                                        <div className="px-3 pt-2 whitespace-pre-wrap break-words">{msg.content}</div>
+                                                    )}
+                                                    <div className={timeClass}>
                                                         {format(parseISO(msg.createdAt), 'HH:mm')}
                                                     </div>
                                                 </div>

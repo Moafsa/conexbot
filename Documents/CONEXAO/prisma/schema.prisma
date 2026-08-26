@@ -710,6 +710,9 @@ model Message {
   inputTokens    Int?
   outputTokens   Int?
   aiProvider     String?
+  mediaUrl       String?
+  mediaType      String?
+  fileName       String?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 

@@ -2,11 +2,24 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { MessageProcessor } from '@/services/engine/processor';
+import { StorageService } from '@/lib/storage';
 import https from 'https';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+
+async function uploadMediaToMinio(buffer: Buffer, mediaId: string, mimeType: string, fileName?: string): Promise<string | null> {
+    try {
+        const ext = mimeType.split('/')[1]?.split(';')[0] || 'bin';
+        const key = `whatsapp-media/${mediaId}.${ext}`;
+        const url = await StorageService.uploadFile(buffer, key, mimeType);
+        return url;
+    } catch (e: any) {
+        console.error('[Meta Webhook] MinIO upload failed:', e.message);
+        return null;
+    }
+}
 
 function downloadBuffer(url: string, headers: Record<string, string> = {}): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -181,10 +194,12 @@ async function handleWhatsApp(body: any) {
 
                                 console.log(`[Meta Webhook] Downloaded Meta Audio file to ${tempAudioPath} (${buffer.length} bytes)`);
 
+                                const minioUrl = await uploadMediaToMinio(buffer, mediaId, 'audio/ogg');
+
                                 const { VoiceService } = await import('@/services/engine/voice');
                                 const transcribedText = await VoiceService.transcribe(
-                                    tempAudioPath, 
-                                    (bot as any).openaiToken, 
+                                    tempAudioPath,
+                                    (bot as any).openaiToken,
                                     (bot as any).geminiToken
                                 );
 
@@ -196,7 +211,7 @@ async function handleWhatsApp(body: any) {
                                     transcribedText || '(áudio sem fala detectada)',
                                     'meta_whatsapp',
                                     'id',
-                                    { inputType: 'audio', mediaPath: tempAudioPath }
+                                    { inputType: 'audio', mediaPath: tempAudioPath, mediaUrl: minioUrl || undefined, mimeType: 'audio/ogg' }
                                 );
                             } catch (err: any) {
                                 console.error('[Meta Webhook] Error processing audio message:', err);
@@ -232,8 +247,11 @@ async function handleWhatsApp(body: any) {
                                 if (!mediaJson.url) return;
 
                                 const buffer = await downloadBuffer(mediaJson.url, { 'Authorization': `Bearer ${metaToken}` });
+                                const mimeType = mediaJson.mime_type || 'image/jpeg';
                                 const tempImgPath = path.join(os.tmpdir(), `meta_img_${mediaId}.jpg`);
                                 fs.writeFileSync(tempImgPath, buffer);
+
+                                const minioUrl = await uploadMediaToMinio(buffer, mediaId, mimeType);
 
                                 await MessageProcessor.process(
                                     channel.botId,
@@ -241,11 +259,60 @@ async function handleWhatsApp(body: any) {
                                     caption,
                                     'meta_whatsapp',
                                     'id',
-                                    { inputType: 'image', mediaPath: tempImgPath }
+                                    { inputType: 'image', mediaPath: tempImgPath, mediaUrl: minioUrl || undefined, mimeType }
                                 );
                             } catch (err: any) {
                                 console.error('[Meta Webhook] Error processing image message:', err);
                             }
+                        })();
+                    } else if (msgType === 'video') {
+                        const videoData = msg.video;
+                        const mediaId = videoData?.id;
+                        const caption = videoData?.caption || '';
+                        if (!mediaId) continue;
+                        (async () => {
+                            try {
+                                const bot = await prisma.bot.findUnique({ where: { id: channel.botId } });
+                                if (!bot) return;
+                                const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                                const channelCreds = (channel.credentials as any) || {};
+                                const metaToken = channelCreds.accessToken || channelCreds.token || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+                                if (!metaToken) return;
+                                const mediaRes = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${metaToken}` } });
+                                if (!mediaRes.ok) return;
+                                const mediaJson = await mediaRes.json();
+                                if (!mediaJson.url) return;
+                                const mimeType = mediaJson.mime_type || 'video/mp4';
+                                const buffer = await downloadBuffer(mediaJson.url, { 'Authorization': `Bearer ${metaToken}` });
+                                const minioUrl = await uploadMediaToMinio(buffer, mediaId, mimeType);
+                                console.log(`[Meta Webhook] WA Video from ${from}, minioUrl: ${minioUrl}`);
+                                await MessageProcessor.process(channel.botId, from, caption || '[Vídeo]', 'meta_whatsapp', 'id', { inputType: 'video', mediaUrl: minioUrl || undefined, mimeType });
+                            } catch (err: any) { console.error('[Meta Webhook] Error processing video:', err); }
+                        })();
+                    } else if (msgType === 'document') {
+                        const docData = msg.document;
+                        const mediaId = docData?.id;
+                        const fileName = docData?.filename || 'documento';
+                        const caption = docData?.caption || '';
+                        if (!mediaId) continue;
+                        (async () => {
+                            try {
+                                const bot = await prisma.bot.findUnique({ where: { id: channel.botId } });
+                                if (!bot) return;
+                                const globalConfig = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+                                const channelCreds = (channel.credentials as any) || {};
+                                const metaToken = channelCreds.accessToken || channelCreds.token || globalConfig?.metaAccessToken || process.env.META_ACCESS_TOKEN;
+                                if (!metaToken) return;
+                                const mediaRes = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, { headers: { 'Authorization': `Bearer ${metaToken}` } });
+                                if (!mediaRes.ok) return;
+                                const mediaJson = await mediaRes.json();
+                                if (!mediaJson.url) return;
+                                const mimeType = mediaJson.mime_type || 'application/octet-stream';
+                                const buffer = await downloadBuffer(mediaJson.url, { 'Authorization': `Bearer ${metaToken}` });
+                                const minioUrl = await uploadMediaToMinio(buffer, mediaId, mimeType, fileName);
+                                console.log(`[Meta Webhook] WA Document from ${from}, file: ${fileName}, minioUrl: ${minioUrl}`);
+                                await MessageProcessor.process(channel.botId, from, caption || `[Documento: ${fileName}]`, 'meta_whatsapp', 'id', { inputType: 'document', mediaUrl: minioUrl || undefined, mimeType, fileName });
+                            } catch (err: any) { console.error('[Meta Webhook] Error processing document:', err); }
                         })();
                     } else {
                         console.log(`[Meta Webhook] Unsupported message type: ${msgType}`);
