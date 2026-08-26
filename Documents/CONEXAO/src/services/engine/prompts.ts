@@ -60,6 +60,7 @@ export interface BotContext {
         specialistSkill?: string | null;
     };
     coupons?: CouponInfo[];
+    couponInstruction?: string;
     isMercadoLivre?: boolean;
     deliveryFeeType?: string | null;
     deliveryFeeRules?: any;
@@ -378,7 +379,8 @@ ${couponLines.join('\n')}
    - O cliente hesitar ou desistir da compra (ex: "está caro", "não posso agora", "vou pensar").
    - O cliente perguntar explicitamente se existe algum desconto ou cupom.
 3. Use o cupom como um "empurrão final" para fechar a venda agora.
-4. NUNCA ofereça ou aplique um cupom em um produto fora da lista de "válido APENAS para" dele. Se o cliente pedir um cupom para um produto que não está na lista, diga que esse cupom não é válido para aquele item.`);
+4. NUNCA ofereça ou aplique um cupom em um produto fora da lista de "válido APENAS para" dele. Se o cliente pedir um cupom para um produto que não está na lista, diga que esse cupom não é válido para aquele item.
+5. O cliente pode informar apenas parte do nome do cupom (ex: "tacchini" em vez do código completo). Passe o termo exatamente como o cliente digitou na ferramenta — o sistema faz a busca automaticamente e retornará o resultado correto ou pedirá esclarecimento se houver ambiguidade.${bot.couponInstruction ?? ''}`);
     }
 
     // Fallback to human

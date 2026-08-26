@@ -67,6 +67,33 @@ import { VectorService } from './vector';
 import { FunnelStage } from '@prisma/client';
 import { ChatwootService } from './chatwoot';
 import { getAiClient, safeChatCompletion } from '@/lib/ai-provider';
+
+/**
+ * Find a coupon by code with fuzzy fallback.
+ * 1. Try exact match (case-insensitive).
+ * 2. If not found, search codes that CONTAIN the input.
+ * Returns { coupon, ambiguous } where ambiguous lists alternatives when multiple match.
+ */
+async function findCoupon(botId: string, inputCode: string, includeProducts = false) {
+    const upper = inputCode.trim().toUpperCase();
+    const include = includeProducts ? { products: { select: { productId: true } } } : undefined;
+
+    // 1. Exact match
+    const exact = await prisma.coupon.findUnique({
+        where: { botId_code: { botId, code: upper } },
+        ...(include ? { include } : {}),
+    });
+    if (exact) return { coupon: exact, ambiguous: [] };
+
+    // 2. Fuzzy: codes that contain the typed term
+    const fuzzy = await prisma.coupon.findMany({
+        where: { botId, active: true, code: { contains: upper, mode: 'insensitive' } },
+        ...(include ? { include } : {}),
+    });
+    if (fuzzy.length === 1) return { coupon: fuzzy[0], ambiguous: [] };
+    if (fuzzy.length > 1) return { coupon: null, ambiguous: fuzzy };
+    return { coupon: null, ambiguous: [] };
+}
 import { format, addMinutes } from 'date-fns';
 import { mercadoLivreTools } from './mcp/mercadolivre';
 
@@ -656,6 +683,10 @@ export const MessageProcessor = {
                 type: c.type,
                 productNames: c.products.map(p => p.product.name)
             }));
+            // Instruction appended to coupon context so the LLM handles partial codes gracefully
+            const couponInstruction = activeCoupons.length > 0
+                ? '\nIMPORTANTE: O cliente pode informar apenas parte do código do cupom (ex: "tacchini" em vez de "DESCONTO TACCHINI AVISTA"). Passe exatamente o que o cliente digitou na ferramenta — o sistema fará a busca fuzzy e retornará o resultado ou pedirá para o cliente especificar se houver ambiguidade.'
+                : '';
 
             // 9. Prompt Building
             const mediaList = bot.media.map((m: any) => ({ id: m.id, type: m.type, description: m.description }));
@@ -714,7 +745,8 @@ export const MessageProcessor = {
                     assignedRole: activeBot.name,
                     specialistSkill: specialistSkill
                 },
-                coupons: couponsForPrompt as any
+                coupons: couponsForPrompt as any,
+                couponInstruction
             });
 
             const supervisorInstruction = `\n⚠️ INSTRUÇÃO DO SUPERVISOR:\nESTÁGIO ATUAL: ${analysis.nextStage}\nESTRATÉGIA: ${analysis.strategy}\n${SupervisorService.getStagePrompt(analysis.nextStage as FunnelStage)}`;
@@ -1444,47 +1476,49 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                                         // Apply Coupon if provided
                                         if (args.cupom_desconto) {
-                                            const coupon = await prisma.coupon.findUnique({
-                                                where: { botId_code: { botId: bot.id, code: args.cupom_desconto.toUpperCase() } },
-                                                include: { products: { select: { productId: true } } }
-                                            });
+                                            const { coupon, ambiguous } = await findCoupon(bot.id, args.cupom_desconto, true);
 
-                                            const couponRestrictedToOtherProduct = !!coupon
-                                                && coupon.products.length > 0
-                                                && !coupon.products.some(p => p.productId === (matchedProduct as any).id);
-
-                                            if (coupon && coupon.active) {
-                                                if (!matchedProduct.allowCoupons) {
-                                                    discountDetail = " (Este produto não permite uso de cupons)";
-                                                } else if (couponRestrictedToOtherProduct) {
-                                                    discountDetail = " (Cupom não é válido para este produto)";
-                                                } else {
-                                                    // Check expiration
-                                                    const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
-                                                    const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
-
-                                                    if (!isExpired && !isLimitReached) {
-                                                        appliedCouponId = coupon.id;
-                                                        const originalValue = finalPrice;
-                                                        if (coupon.type === 'PERCENTAGE') {
-                                                            finalPrice = finalPrice * (1 - coupon.value / 100);
-                                                            discountDetail = ` (Cupom ${coupon.code}: -${coupon.value}%)`;
-                                                        } else {
-                                                            finalPrice = Math.max(0, finalPrice - coupon.value);
-                                                            discountDetail = ` (Cupom ${coupon.code}: -R$ ${coupon.value.toFixed(2)})`;
-                                                        }
-                                                        
-                                                        // Increment usage count
-                                                        await prisma.coupon.update({
-                                                            where: { id: coupon.id },
-                                                            data: { usedCount: { increment: 1 } }
-                                                        });
-                                                    } else {
-                                                        discountDetail = " (Cupom inválido ou expirado)";
-                                                    }
-                                                }
+                                            if (ambiguous.length > 1) {
+                                                // Multiple partial matches — ask customer to specify
+                                                const options = ambiguous.map((c: any) => {
+                                                    const val = c.type === 'PERCENTAGE' ? `-${c.value}%` : `-R$ ${c.value.toFixed(2)}`;
+                                                    return `${c.code} (${val})`;
+                                                }).join(' ou ');
+                                                discountDetail = ` (Código ambíguo. Diga ao cliente: "Encontrei mais de um cupom com esse nome: ${options}. Qual você quer usar? Por favor, informe o código completo.")`;
                                             } else {
-                                                discountDetail = " (Cupom não encontrado)";
+                                                const couponRestrictedToOtherProduct = !!coupon
+                                                    && (coupon as any).products?.length > 0
+                                                    && !(coupon as any).products.some((p: any) => p.productId === (matchedProduct as any).id);
+
+                                                if (coupon && coupon.active) {
+                                                    if (!matchedProduct.allowCoupons) {
+                                                        discountDetail = " (Este produto não permite uso de cupons)";
+                                                    } else if (couponRestrictedToOtherProduct) {
+                                                        discountDetail = " (Cupom não é válido para este produto)";
+                                                    } else {
+                                                        const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
+                                                        const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
+
+                                                        if (!isExpired && !isLimitReached) {
+                                                            appliedCouponId = coupon.id;
+                                                            if (coupon.type === 'PERCENTAGE') {
+                                                                finalPrice = finalPrice * (1 - coupon.value / 100);
+                                                                discountDetail = ` (Cupom ${coupon.code}: -${coupon.value}%)`;
+                                                            } else {
+                                                                finalPrice = Math.max(0, finalPrice - coupon.value);
+                                                                discountDetail = ` (Cupom ${coupon.code}: -R$ ${coupon.value.toFixed(2)})`;
+                                                            }
+                                                            await prisma.coupon.update({
+                                                                where: { id: coupon.id },
+                                                                data: { usedCount: { increment: 1 } }
+                                                            });
+                                                        } else {
+                                                            discountDetail = " (Cupom inválido ou expirado)";
+                                                        }
+                                                    }
+                                                } else {
+                                                    discountDetail = " (Cupom não encontrado)";
+                                                }
                                             }
                                         }
 
@@ -1616,14 +1650,18 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
 
                                     // Aplica Cupom (Promoção/Desconto)
                                     if (args.cupom) {
-                                        const coupon = await prisma.coupon.findUnique({
-                                            where: { botId_code: { botId: bot.id, code: args.cupom.toUpperCase() } }
-                                        });
+                                        const { coupon, ambiguous } = await findCoupon(bot.id, args.cupom);
 
-                                        if (coupon && coupon.active) {
+                                        if (ambiguous.length > 1) {
+                                            const options = ambiguous.map((c: any) => {
+                                                const val = c.type === 'PERCENTAGE' ? `-${c.value}%` : `-R$ ${c.value.toFixed(2)}`;
+                                                return `${c.code} (${val})`;
+                                            }).join(' ou ');
+                                            discountMsg = `\n[Atenção] Código ambíguo. Informe ao cliente: "Encontrei mais de um cupom com esse nome: ${options}. Qual você quer usar?"`;
+                                        } else if (coupon && coupon.active) {
                                             const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
                                             const isLimitReached = coupon.usageLimit && coupon.usedCount >= coupon.usageLimit;
-                                            
+
                                             if (!isExpired && !isLimitReached) {
                                                 if (coupon.type === 'PERCENTAGE') {
                                                     discountValue = summary.total * (coupon.value / 100);
