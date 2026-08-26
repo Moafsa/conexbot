@@ -10,6 +10,22 @@ import { resolveMessageFromMe, resolveWhatsAppCustomerKeys, isNoiseChat } from '
 
 const TEMP_DIR = os.tmpdir();
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+        const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+        const token = (config as any)?.mapboxToken;
+        if (!token) return `lat ${lat}, lng ${lng}`;
+        const res = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=pt&limit=1`
+        );
+        if (!res.ok) return `lat ${lat}, lng ${lng}`;
+        const data = await res.json();
+        return data.features?.[0]?.place_name || `lat ${lat}, lng ${lng}`;
+    } catch {
+        return `lat ${lat}, lng ${lng}`;
+    }
+}
+
 function logToFile(msg: string) {
     const timestamp = new Date().toISOString();
     const line = `[${timestamp}] ${msg}\n`;
@@ -164,6 +180,36 @@ export async function POST(req: Request) {
                 logToFile(`[AdAttribution] Click-to-WhatsApp referral detected: adId=${adAttribution.adId}, ad="${adAttribution.adName}"`);
             }
             // ─────────────────────────────────────────────────────────────────────────
+
+            // ── Location message handling ──────────────────────────────────────────
+            const locationMsg = message.locationMessage || message.LocationMessage;
+            if (locationMsg && !messageBody) {
+                const lat: number = locationMsg.degreesLatitude ?? locationMsg.DegreesLatitude ?? 0;
+                const lng: number = locationMsg.degreesLongitude ?? locationMsg.DegreesLongitude ?? 0;
+                const placeName: string = locationMsg.name || locationMsg.Name || '';
+                const placeAddr: string = locationMsg.address || locationMsg.Address || '';
+
+                if (lat !== 0 || lng !== 0) {
+                    (async () => {
+                        try {
+                            const geocoded = await reverseGeocode(lat, lng);
+                            const parts = [
+                                placeName && `Local: ${placeName}`,
+                                placeAddr && `Endereço informado: ${placeAddr}`,
+                                `Endereço pelo mapa: ${geocoded}`,
+                                `Coordenadas: ${lat}, ${lng}`,
+                            ].filter(Boolean);
+                            const locationText = `📍 [LOCALIZAÇÃO COMPARTILHADA PELO CLIENTE]\n${parts.join('\n')}`;
+                            logToFile(`Location received from ${cleanPhone}: ${locationText}`);
+                            const { BufferingService } = await import('@/services/engine/buffering');
+                            BufferingService.add(sessionName, cleanPhone, locationText, 'whatsapp', 'text', chatJid, adAttribution);
+                        } catch (err: any) {
+                            logToFile(`Location processing error: ${err.message}`);
+                        }
+                    })();
+                    return NextResponse.json({ status: 'location_received' });
+                }
+            }
 
             if (!messageBody) {
                 logToFile(`Skipping: empty body.`);

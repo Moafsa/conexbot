@@ -9,6 +9,22 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+        const config = await prisma.globalConfig.findUnique({ where: { id: 'system' } });
+        const token = (config as any)?.mapboxToken;
+        if (!token) return `lat ${lat}, lng ${lng}`;
+        const res = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=pt&limit=1`
+        );
+        if (!res.ok) return `lat ${lat}, lng ${lng}`;
+        const data = await res.json();
+        return data.features?.[0]?.place_name || `lat ${lat}, lng ${lng}`;
+    } catch {
+        return `lat ${lat}, lng ${lng}`;
+    }
+}
+
 async function uploadMediaToMinio(buffer: Buffer, mediaId: string, mimeType: string, fileName?: string): Promise<string | null> {
     try {
         const ext = mimeType.split('/')[1]?.split(';')[0] || 'bin';
@@ -314,6 +330,32 @@ async function handleWhatsApp(body: any) {
                                 await MessageProcessor.process(channel.botId, from, caption || `[Documento: ${fileName}]`, 'meta_whatsapp', 'id', { inputType: 'document', mediaUrl: minioUrl || undefined, mimeType, fileName });
                             } catch (err: any) { console.error('[Meta Webhook] Error processing document:', err); }
                         })();
+                    } else if (msgType === 'location') {
+                        const loc = msg.location || {};
+                        const lat: number = loc.latitude ?? 0;
+                        const lng: number = loc.longitude ?? 0;
+                        const placeName: string = loc.name || '';
+                        const placeAddr: string = loc.address || '';
+
+                        if (lat !== 0 || lng !== 0) {
+                            (async () => {
+                                try {
+                                    const geocoded = await reverseGeocode(lat, lng);
+                                    const parts = [
+                                        placeName && `Local: ${placeName}`,
+                                        placeAddr && `Endereço informado: ${placeAddr}`,
+                                        `Endereço pelo mapa: ${geocoded}`,
+                                        `Coordenadas: ${lat}, ${lng}`,
+                                    ].filter(Boolean);
+                                    const locationText = `📍 [LOCALIZAÇÃO COMPARTILHADA PELO CLIENTE]\n${parts.join('\n')}`;
+                                    console.log(`[Meta Webhook] Location from ${from}: ${locationText}`);
+                                    MessageProcessor.process(channel.botId, from, locationText, 'meta_whatsapp', 'id', { inputType: 'text' })
+                                        .catch(err => console.error('[Meta Webhook] Location processor error:', err));
+                                } catch (err: any) {
+                                    console.error('[Meta Webhook] Location processing error:', err.message);
+                                }
+                            })();
+                        }
                     } else {
                         console.log(`[Meta Webhook] Unsupported message type: ${msgType}`);
                     }
