@@ -207,13 +207,20 @@ async function runImport(jobId: string, botId: string, tenantId: string) {
 
             // Process each result (DB writes serial per batch to avoid contention)
             for (const { phone, name, jid, history } of results) {
+                const cleanPhone = phone.replace(/\D/g, '');
+
+                // Always ensure a conversation exists for this contact, even with no history
+                await prisma.conversation.upsert({
+                    where: { botId_remoteId: { botId, remoteId: cleanPhone } },
+                    update: {},
+                    create: { botId, remoteId: cleanPhone, channel: 'whatsapp' },
+                }).catch(() => null);
+
                 if (history.length === 0) {
                     job.imported++;
                     emit(jobId, 'progress', job);
                     continue;
                 }
-
-                const cleanPhone = phone.replace(/\D/g, '');
 
                 // Update contact lastActive
                 await prisma.contact.update({
