@@ -93,9 +93,10 @@ export async function GET(req: Request) {
         orderBy: { updatedAt: 'desc' },
         take: PAGE,
         include: {
+            // Fetch last 30 messages to compute unread count and preview in one shot
             messages: {
                 orderBy: { createdAt: 'desc' },
-                take: 1,
+                take: 30,
                 select: { content: true, role: true, createdAt: true },
             },
             bot: { select: { id: true, name: true } },
@@ -122,27 +123,14 @@ export async function GET(req: Request) {
         select: { id: true, name: true },
     });
 
-    // Count unanswered user messages (messages from 'user' since last 'assistant' reply)
-    // One efficient raw query for all conversations at once
-    const convIds = conversations.map(c => c.id);
-    const unreadRows = convIds.length > 0
-        ? await prisma.$queryRaw<{ conversationId: string; unread: bigint }[]>`
-            SELECT m."conversationId", COUNT(*) AS unread
-            FROM "Message" m
-            WHERE m."conversationId" = ANY(${convIds}::uuid[])
-              AND m.role = 'user'
-              AND m."createdAt" > COALESCE(
-                (SELECT MAX(m2."createdAt") FROM "Message" m2
-                 WHERE m2."conversationId" = m."conversationId" AND m2.role = 'assistant'),
-                '1900-01-01'::timestamptz
-              )
-            GROUP BY m."conversationId"
-          `
-        : [];
-    const unreadMap = new Map(unreadRows.map(r => [r.conversationId, Number(r.unread)]));
-
     const result = conversations.map(conv => {
         const contact = contactMap.get(`${conv.botId}:${conv.remoteId}`);
+        // messages are ordered desc — count consecutive user messages from the top
+        let unreadCount = 0;
+        for (const m of conv.messages) {
+            if (m.role === 'user') unreadCount++;
+            else break;
+        }
         const lastMsg = conv.messages[0];
         return {
             id: conv.id,
@@ -152,7 +140,7 @@ export async function GET(req: Request) {
             botName: conv.bot.name,
             updatedAt: conv.updatedAt,
             contactName: contact?.name || null,
-            unreadCount: unreadMap.get(conv.id) || 0,
+            unreadCount,
             lastMessage: lastMsg ? { content: lastMsg.content.substring(0, 100), role: lastMsg.role, createdAt: lastMsg.createdAt } : null,
         };
     });
