@@ -199,8 +199,8 @@ export const MessageProcessor = {
             if (conversation) {
                 await prisma.conversation.update({
                     where: { id: conversation.id },
-                    data: { updatedAt: new Date(), remoteId: senderPhone }
-                }).catch(() => {});
+                    data: { updatedAt: new Date() }
+                }).catch((err: any) => { logToFile(`[Processor] Failed to update conversation updatedAt: ${err?.message}`); });
             } else {
                 try {
                     conversation = await prisma.conversation.create({
