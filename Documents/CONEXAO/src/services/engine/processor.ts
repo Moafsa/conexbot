@@ -761,7 +761,7 @@ export const MessageProcessor = {
                                         }
                                     }
 
-                                    const fullResolved = feature.place_name || searchAddr;
+                                    const fullResolved = feature.place_name || rawAddr;
 
                                     // Check if geocoded city is in the allowed cities list
                                     const feeRulesRaw = activeBot?.deliveryFeeRules;

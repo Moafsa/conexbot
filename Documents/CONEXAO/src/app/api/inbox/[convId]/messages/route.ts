@@ -26,14 +26,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ convId: 
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const messages = await prisma.message.findMany({
-        where: {
-            conversationId: convId,
-            ...(cursor ? { id: { lt: cursor } } : {}),
-        },
-        orderBy: { createdAt: 'asc' },
-        take: PAGE,
-    });
+    const messages = cursor
+        ? await prisma.message.findMany({
+            where: { conversationId: convId, id: { lt: cursor } },
+            orderBy: { createdAt: 'desc' },
+            take: PAGE,
+          }).then(rows => rows.reverse())
+        : await prisma.message.findMany({
+            where: { conversationId: convId },
+            orderBy: { createdAt: 'desc' },
+            take: PAGE,
+          }).then(rows => rows.reverse());
 
     const contact = await prisma.contact.findFirst({
         where: { phone: conv.remoteId, botId: conv.botId },

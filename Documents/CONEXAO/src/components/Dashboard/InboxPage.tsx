@@ -132,7 +132,6 @@ export function InboxPage({ clientId }: { clientId?: string }) {
             const data = await res.json();
             const incoming: Message[] = data.messages || [];
             setMessages(prev => {
-                if (incoming.length <= prev.length) return prev;
                 const existingIds = new Set(prev.map(m => m.id));
                 const added = incoming.filter(m => !existingIds.has(m.id));
                 return added.length > 0 ? [...prev, ...added] : prev;
