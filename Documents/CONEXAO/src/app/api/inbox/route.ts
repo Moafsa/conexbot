@@ -6,6 +6,17 @@ import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import prisma from '@/lib/prisma';
 import { getPhoneVariations } from '@/lib/phone-utils';
 
+// Returns all phone variants including versions with/without Brazil country code (55)
+// so that contacts stored in different formats are always found.
+function allPhoneFormats(phone: string): string[] {
+    const base = getPhoneVariations(phone);
+    const result = new Set(base);
+    for (const v of base) {
+        if (v.startsWith('55') && v.length > 4) result.add(v.slice(2));
+    }
+    return Array.from(result);
+}
+
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -45,9 +56,9 @@ export async function GET(req: Request) {
             select: { phone: true, botId: true }
         });
 
-        // Generate all phone variations so format mismatch doesn't break lookups
+        // Generate all phone formats (with/without country code, with/without 9th digit)
         const contactConditions = matchingContacts.flatMap(c =>
-            getPhoneVariations(c.phone).map(v => ({ botId: c.botId!, remoteId: v }))
+            allPhoneFormats(c.phone).map(v => ({ botId: c.botId!, remoteId: v }))
         );
 
         // 2. Find conversations whose messages contain the search term
@@ -91,16 +102,16 @@ export async function GET(req: Request) {
         },
     });
 
-    // Enrich with contact info — try both the stored remoteId and all its variations
-    const allPhoneVariants = [...new Set(conversations.flatMap(c => getPhoneVariations(c.remoteId)))];
+    // Enrich with contact info — use all phone formats to bridge mismatches
+    const allPhoneVariants = [...new Set(conversations.flatMap(c => allPhoneFormats(c.remoteId)))];
     const contacts = await prisma.contact.findMany({
         where: { phone: { in: allPhoneVariants }, botId: { in: activeBotIds } },
         select: { phone: true, name: true, botId: true },
     });
-    // Index by every variant so lookup always finds the right contact
+    // Index by every format variant so lookup always finds the right contact
     const contactMap = new Map<string, { name: string }>();
     for (const ct of contacts) {
-        for (const v of getPhoneVariations(ct.phone)) {
+        for (const v of allPhoneFormats(ct.phone)) {
             const key = `${ct.botId}:${v}`;
             if (!contactMap.has(key)) contactMap.set(key, ct);
         }
