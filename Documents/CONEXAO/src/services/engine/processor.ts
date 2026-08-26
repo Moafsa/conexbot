@@ -243,12 +243,32 @@ export const MessageProcessor = {
             if (options.inputType === 'image' && options.mediaPath) {
                 const { VisionService } = await import('./vision');
                 try {
-                    const description = await VisionService.analyze(options.mediaPath, messageText, bot);
-                    contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\nLegenda: "${messageText}"\nDescrição da IA: ${description}`;
+                    // Fetch recent messages to give the vision model conversation context
+                    const recentMsgs = await prisma.message.findMany({
+                        where: { conversationId: conversation.id },
+                        orderBy: { createdAt: 'desc' },
+                        take: 6,
+                        select: { role: true, content: true },
+                    });
+                    const conversationContext = recentMsgs
+                        .reverse()
+                        .map(m => `${m.role === 'user' ? 'Cliente' : 'Assistente'}: ${m.content.substring(0, 300)}`)
+                        .join('\n');
+
+                    const analysis = await VisionService.analyze(options.mediaPath, messageText, bot, conversationContext);
+                    const captionLine = messageText?.trim() ? `Legenda do cliente: "${messageText}"\n` : '';
+                    contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\n${captionLine}Análise contextual da imagem:\n${analysis}`;
                 } catch (e: any) {
                     logger.error({ err: e }, 'Vision analysis failed');
-                    contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\n(Erro ao analisar imagem)`;
+                    contentToSave = `[IMAGEM ENVIADA PELO USUÁRIO]\nLegenda: "${messageText}"\n(Não foi possível analisar a imagem)`;
                 }
+            } else if (options.inputType === 'document') {
+                const docName = options.fileName || 'documento';
+                const captionLine = messageText?.trim() ? ` com a mensagem: "${messageText}"` : '';
+                contentToSave = `[DOCUMENTO ENVIADO PELO USUÁRIO]\nArquivo: "${docName}"${captionLine}\nVerifique o documento enviado e responda conforme o contexto da conversa.`;
+            } else if (options.inputType === 'video') {
+                const captionLine = messageText?.trim() ? ` com legenda: "${messageText}"` : '';
+                contentToSave = `[VÍDEO ENVIADO PELO USUÁRIO]${captionLine}\nO cliente enviou um vídeo. Considere o contexto da conversa para responder adequadamente.`;
             } else if (options.inputType === 'audio') {
                 contentToSave = `[ÁUDIO TRANSCRITO]: "${messageText}"`;
             }

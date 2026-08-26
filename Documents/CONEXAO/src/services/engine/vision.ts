@@ -13,6 +13,28 @@ function detectImageMimeType(buffer: Buffer): string {
     return 'image/jpeg';
 }
 
+function buildPrompt(caption: string | undefined, conversationContext: string | undefined): string {
+    const contextBlock = conversationContext
+        ? `\n\n=== CONTEXTO DA CONVERSA (últimas mensagens) ===\n${conversationContext}\n=== FIM DO CONTEXTO ===`
+        : '';
+
+    const captionBlock = caption && caption.trim()
+        ? `O cliente enviou esta imagem com a legenda: "${caption}".`
+        : 'O cliente enviou esta imagem sem legenda.';
+
+    return `Você é um assistente de análise de imagens para atendimento ao cliente via WhatsApp.
+
+${captionBlock}${contextBlock}
+
+Analise a imagem considerando o contexto da conversa e responda de forma objetiva:
+
+1. **O que é a imagem**: descreva o conteúdo principal (ex: comprovante de pagamento, foto de produto, documento, logo, reclamação visual, etc.)
+2. **Relevância para o atendimento**: o que o cliente provavelmente está comunicando ou pedindo com esta imagem? Conecte ao contexto da conversa.
+3. **Detalhes importantes**: extraia informações específicas relevantes (valores, datas, nomes, endereços, códigos, etc.) se presentes.
+
+Seja direto e útil. Não descreva o que é óbvio — foque no que o agente de atendimento precisa saber para responder adequadamente ao cliente.`;
+}
+
 /** Call Gemini generateContent directly - more robust for WhatsApp images */
 async function analyzeWithGeminiDirect(apiKey: string, base64Data: string, mimeType: string, prompt: string): Promise<string> {
     const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
@@ -27,7 +49,7 @@ async function analyzeWithGeminiDirect(apiKey: string, base64Data: string, mimeT
                         { text: prompt }
                     ]
                 }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+                generationConfig: { temperature: 0.2, maxOutputTokens: 600 }
             })
         });
         if (res.ok) {
@@ -46,48 +68,42 @@ async function analyzeWithGeminiDirect(apiKey: string, base64Data: string, mimeT
 
 export const VisionService = {
     /**
-     * Analyze an image and return a description.
-     * Prefers Gemini for vision (handles WhatsApp images better). Falls back to OpenAI if Gemini unavailable.
+     * Analyze an image in the context of the conversation.
+     * Prefers Gemini for vision. Falls back to OpenAI.
+     * @param conversationContext - recent messages formatted as "Cliente: ...\nAssistente: ..."
      */
-    async analyze(imagePath: string, caption?: string, bot?: any): Promise<string> {
-        const runAnalysis = async (provider: 'gemini' | 'openai'): Promise<string> => {
+    async analyze(imagePath: string, caption?: string, bot?: any, conversationContext?: string): Promise<string> {
+        const prompt = buildPrompt(caption, conversationContext);
+
+        const runWithOpenAI = async (): Promise<string> => {
             const imageBuffer = fs.readFileSync(imagePath);
             const mimeType = detectImageMimeType(imageBuffer);
             const base64Image = imageBuffer.toString('base64');
             const dataUri = `data:${mimeType};base64,${base64Image}`;
-            const textPrompt = caption
-                ? `O usuário enviou esta imagem com a legenda: "${caption}". Descreva a imagem em detalhes para que eu possa ajudá-lo.`
-                : "Descreva esta imagem em detalhes para que eu possa atender o cliente.";
-
-            const messages: any[] = [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: textPrompt },
-                        { type: "image_url", image_url: { url: dataUri, detail: "low" } },
-                    ],
-                },
-            ];
 
             const { client, model: modelToUse } = await getAiClient({
-                provider,
-                model: provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash',
+                provider: 'openai',
+                model: 'gpt-4o-mini',
                 tenant: bot?.tenant || {}
             });
 
-            console.log(`[VisionService] Using ${provider} with ${modelToUse}`);
-
             const response = await client.chat.completions.create({
                 model: modelToUse,
-                messages,
-                max_tokens: 500,
+                messages: [{
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: prompt },
+                        { type: 'image_url', image_url: { url: dataUri, detail: 'high' } },
+                    ],
+                }],
+                max_tokens: 600,
             });
 
             return response.choices[0]?.message?.content || "Não consegui analisar a imagem.";
         };
 
         try {
-            console.log(`[VisionService] Analyzing ${imagePath}...`);
+            console.log(`[VisionService] Analyzing ${imagePath} with context (${conversationContext?.length ?? 0} chars)...`);
             const tenant = bot?.tenant || {};
             const geminiKey = tenant.geminiApiKey || process.env.GEMINI_API_KEY;
             const hasOpenAI = !!(tenant.openaiApiKey || process.env.OPENAI_API_KEY);
@@ -95,11 +111,8 @@ export const VisionService = {
             const imageBuffer = fs.readFileSync(imagePath);
             const mimeType = detectImageMimeType(imageBuffer);
             const base64Image = imageBuffer.toString('base64');
-            const prompt = caption
-                ? `O usuário enviou esta imagem com a legenda: "${caption}". Descreva a imagem em detalhes.`
-                : "Descreva esta imagem em detalhes para que eu possa atender o cliente.";
 
-            // 1. Try Gemini direct API first (best for WhatsApp/WuzAPI images)
+            // 1. Try Gemini direct API first (best for WhatsApp images)
             if (geminiKey) {
                 for (const mime of [mimeType, 'image/jpeg', 'image/png']) {
                     try {
@@ -117,7 +130,7 @@ export const VisionService = {
             if (hasOpenAI) {
                 try {
                     console.log('[VisionService] Using OpenAI');
-                    return await runAnalysis('openai');
+                    return await runWithOpenAI();
                 } catch (err: any) {
                     console.error('[VisionService] OpenAI failed:', err?.message);
                 }
