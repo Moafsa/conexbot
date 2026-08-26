@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList, Truck, Code2, Inbox, BookUser } from "lucide-react";
+import { CreditCard, Settings, ChevronLeft, ChevronRight, LogOut, Users, LayoutDashboard, MessageSquare, Shield, Download, PenTool, TrendingUp, ShoppingBag, Tag, Briefcase, Building2, Phone, Mail, Bot, RefreshCw, ClipboardList, Truck, Code2, Inbox, BookUser, ShoppingCart } from "lucide-react";
 
 export default function Sidebar({ branding, userPlans, isImpersonating, isAgencyClient, agencyInfo, botBusinessType, isOpenOnMobile, onCloseMobile }: {
     branding?: any;
@@ -134,6 +134,7 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
         ];
         if (isDelivery) {
             strategyItems.push({ icon: Truck, label: "Frota & Entregadores", href: "/dashboard/drivers" });
+            strategyItems.push({ icon: ShoppingCart, label: "Pedidos", href: "/dashboard/orders" });
         }
         const marketingItems = [];
         if (userPlans?.hasWriter) {
@@ -170,7 +171,8 @@ export default function Sidebar({ branding, userPlans, isImpersonating, isAgency
             primaryItems.push({ icon: Inbox,         label: "Caixa de Entrada",  href: "/dashboard/inbox" });
             primaryItems.push({ icon: BookUser,      label: "Contatos",          href: "/dashboard/contacts" });
             if (isDelivery) {
-                primaryItems.push({ icon: Truck, label: "Frota & Entregadores", href: "/dashboard/drivers" });
+                primaryItems.push({ icon: Truck,        label: "Frota & Entregadores", href: "/dashboard/drivers" });
+                primaryItems.push({ icon: ShoppingCart, label: "Pedidos",               href: "/dashboard/orders" });
             }
         }
         const writerItems = [];

@@ -164,6 +164,20 @@ const ORDER_AGENT_TOOLS = [
     {
         type: 'function' as const,
         function: {
+            name: 'definir_observacao',
+            description: 'Salva observações do pedido: horário de entrega solicitado, ponto de referência, complemento de endereço ou qualquer instrução especial do cliente. Use sempre que o cliente informar um horário ("às 11:30h"), ponto de referência ("atrás da escola") ou instrução especial.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    observacao: { type: 'string', description: 'Texto completo da observação. Ex: "Entregar às 11:30h. Ponto de referência: atrás da escola Kaik."' }
+                },
+                required: ['observacao']
+            }
+        }
+    },
+    {
+        type: 'function' as const,
+        function: {
             name: 'cancelar_carrinho',
             description: 'Cancela e limpa o carrinho atual. Use se o cliente quiser recomeçar ou cancelar o pedido.',
             parameters: { type: 'object', properties: {} }
@@ -192,6 +206,7 @@ export interface OrderAgentContext {
         changeAmount: number | null;
         totalAmount: number;
         items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+        notes?: string | null;
     }) => Promise<{ orderId: string; orderNumber?: string }>;
     history?: Array<{ role: string; content: string; tool_calls?: any; tool_call_id?: string }>;
 }
@@ -690,7 +705,8 @@ REGRAS DE NEGÓCIO:
 5. FECHAMENTO: Só chame fechar_pedido quando o cliente confirmar explicitamente com "sim", "pode", "confirmo" ou similar.
 6. MULTI-ENTREGA: Se houver um PLANO DE MULTI-ENTREGA ATIVO acima, use os dados do plano. Quando fechar, chame fechar_pedido — o sistema cria pedidos separados automaticamente para cada endereço.
 7. STATUS: Se o cliente perguntar sobre o status do pedido, informe com base no ÚLTIMO PEDIDO.
-8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas. Responda APENAS ao que foi solicitado no estado atual.`;
+8. Seja natural, cordial e objetivo. Evite respostas longas ou robóticas. Responda APENAS ao que foi solicitado no estado atual.
+9. OBSERVAÇÕES: Se o cliente informar um horário de entrega ("às 11:30h", "depois das 14h"), ponto de referência ("atrás da escola", "portão azul"), ou qualquer instrução especial, chame imediatamente definir_observacao com um texto claro resumindo essas informações.`;
     };
 
     const initialPrompt = await buildSystemPrompt();
@@ -1015,6 +1031,12 @@ REGRAS DE NEGÓCIO:
                     }
                 }
 
+            // ── Tool: definir_observacao ────────────────────────────────────
+            } else if (name === 'definir_observacao') {
+                const obs = args.observacao as string;
+                await CartService.setNotes(ctx.botId, ctx.contactPhone, obs);
+                result = `📝 Observação salva: "${obs}"`;
+
             // ── Tool: cancelar_carrinho ─────────────────────────────────────
             } else if (name === 'cancelar_carrinho') {
                 await CartService.clearCart(ctx.botId, ctx.contactPhone);
@@ -1066,7 +1088,7 @@ export async function createOrderFromCartData(
     contactId: string,
     orderData: Awaited<ReturnType<typeof CartService.convertToOrderData>>
 ): Promise<{ orderId: string }> {
-    console.log(`[OrderCreate] Creating order botId=${botId} contactId=${contactId} address="${orderData.address}" total=${orderData.totalAmount} items=${JSON.stringify(orderData.items)}`);
+    console.log(`[OrderCreate] Creating order botId=${botId} contactId=${contactId} address="${orderData.address}" total=${orderData.totalAmount} notes="${orderData.notes}" items=${JSON.stringify(orderData.items)}`);
     try {
         const order = await prisma.order.create({
             data: {
@@ -1077,6 +1099,7 @@ export async function createOrderFromCartData(
                 longitude: orderData.longitude,
                 totalAmount: orderData.totalAmount,
                 status: 'PENDING',
+                ...(orderData.notes ? { notes: orderData.notes } : {}),
                 items: {
                     create: orderData.items.map(item => ({
                         productId: item.productId,
@@ -1085,7 +1108,7 @@ export async function createOrderFromCartData(
                     }))
                 }
             }
-        });
+        } as any);
         console.log(`[OrderCreate] SUCCESS orderId=${order.id}`);
         return { orderId: order.id };
     } catch (err: any) {

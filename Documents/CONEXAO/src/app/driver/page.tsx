@@ -444,9 +444,20 @@ function DriverDashboardContent() {
                                         )}
                                     </div>
 
+                                    {/* Notes / Observações */}
+                                    {(order as any).notes && (
+                                        <div className="flex items-start gap-2.5 bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20">
+                                            <span className="text-amber-400 shrink-0 text-sm">📝</span>
+                                            <div className="space-y-0.5">
+                                                <span className="text-[10px] text-amber-400 uppercase font-semibold">Observações</span>
+                                                <p className="text-xs text-amber-200 leading-normal">{(order as any).notes}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Actions */}
                                     <div className="grid grid-cols-2 gap-3 pt-2">
-                                        <a 
+                                        <a
                                             href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`}
                                             target="_blank" 
                                             rel="noopener noreferrer"

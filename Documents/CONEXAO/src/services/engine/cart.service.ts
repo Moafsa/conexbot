@@ -184,6 +184,8 @@ export class CartService {
             `- ${item.quantity}x ${item.product.name} (R$ ${Number(item.unitPrice).toFixed(2)} cada) = R$ ${(item.quantity * Number(item.unitPrice)).toFixed(2)}`
         ).join('\n');
 
+        const notesSuffix = cart.notes ? `\n📝 Observação: ${cart.notes}` : '';
+
         return {
             cartId: cart.id,
             hasItems: cart.items.length > 0,
@@ -200,11 +202,12 @@ export class CartService {
             deliveryLng: cart.deliveryLng,
             paymentMethod: cart.paymentMethod,
             changeAmount: cart.changeAmount,
+            notes: cart.notes ?? null,
             total,
             totalAmount: total,
             summary: cart.items.length === 0
                 ? '🛒 Carrinho vazio.'
-                : `🛒 Carrinho:\n${itemsText}\n📍 Endereço: ${cart.deliveryAddress || 'Não definido'}\n💳 Pagamento: ${cart.paymentMethod || 'Não definido'}\n💰 Total: R$ ${total.toFixed(2)}`
+                : `🛒 Carrinho:\n${itemsText}\n📍 Endereço: ${cart.deliveryAddress || 'Não definido'}\n💳 Pagamento: ${cart.paymentMethod || 'Não definido'}\n💰 Total: R$ ${total.toFixed(2)}${notesSuffix}`
         };
     }
 
@@ -224,6 +227,12 @@ export class CartService {
      * Fecha o carrinho e retorna os dados para criação do Order.
      * NÃO cria o Order — apenas prepara os dados e muda status para COMPLETED.
      */
+    static async setNotes(botId: string, contactPhone: string, notes: string) {
+        const cart = await this.getOrCreateCart(botId, contactPhone);
+        await prisma.cart.update({ where: { id: cart.id }, data: { notes } });
+        return { success: true };
+    }
+
     static async convertToOrderData(botId: string, contactPhone: string) {
         const cart = await this.getOrCreateCart(botId, contactPhone);
         const readiness = await this.isReadyForCheckout(botId, contactPhone);
@@ -251,7 +260,8 @@ export class CartService {
             paymentMethod: cart.paymentMethod!,
             changeAmount: cart.changeAmount,
             totalAmount: total,
-            items: orderItems
+            items: orderItems,
+            notes: cart.notes ?? null
         };
     }
 

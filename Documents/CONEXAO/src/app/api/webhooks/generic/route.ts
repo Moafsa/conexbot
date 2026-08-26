@@ -200,10 +200,11 @@ export async function POST(req: Request) {
 
                     // Save human agent's message to database conversation history
                     try {
+                        const pausedUntil = new Date(Date.now() + 30 * 60 * 1000);
                         const conversation = await prisma.conversation.upsert({
                             where: { botId_remoteId: { botId: bot.id, remoteId: cleanPhone } },
-                            update: { updatedAt: new Date() },
-                            create: { botId: bot.id, remoteId: cleanPhone, channel: 'whatsapp' }
+                            update: { updatedAt: new Date(), pausedUntil } as any,
+                            create: { botId: bot.id, remoteId: cleanPhone, channel: 'whatsapp', pausedUntil } as any
                         });
                         await prisma.message.create({
                             data: {
@@ -212,6 +213,7 @@ export async function POST(req: Request) {
                                 content: `[HUMANO]: ${messageText}`
                             }
                         });
+                        logToFile(`[Generic Webhook] Bot paused for 30min after human agent reply for ${cleanPhone}`);
                     } catch (dbErr: any) {
                         logToFile(`[Generic Webhook] Failed to save human agent reply to DB: ${dbErr.message}`);
                     }

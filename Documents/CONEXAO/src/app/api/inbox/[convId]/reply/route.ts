@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getEffectiveTenantId } from '@/lib/get-effective-tenant';
 import prisma from '@/lib/prisma';
+import { sendOutboundMessageToPhone } from '@/services/engine/outbound-notifier';
 
 export async function POST(req: Request, { params }: { params: Promise<{ convId: string }> }) {
     const session = await getServerSession(authOptions);
@@ -21,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ convId:
 
     const conv = await prisma.conversation.findUnique({
         where: { id: convId },
-        include: { bot: { select: { tenantId: true, id: true } } },
+        include: { bot: true },
     });
     if (!conv || conv.bot.tenantId !== tenantId) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -36,24 +37,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ convId:
         },
     });
 
-    // Send via UZAPI if bot has a session
-    const UZAPI_URL = process.env.UZAPI_URL || 'http://localhost:21465';
-    const sessionToken = `bot-${conv.botId.split('-')[0]}`;
-    const phone = conv.remoteId.replace(/\D/g, '');
-    const toJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
-
-    try {
-        await fetch(`${UZAPI_URL}/chat/send/text`, {
-            method: 'POST',
-            headers: { 'Token': sessionToken, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Phone: toJid, Body: text.trim() }),
-        });
-    } catch (e: any) {
-        console.error('[InboxReply] UZAPI send failed:', e.message);
+    // Send via the best available channel (Meta Cloud API or UZAPI)
+    const result = await sendOutboundMessageToPhone(conv.bot, conv.remoteId, text.trim());
+    if (!result.success) {
+        console.error('[InboxReply] Send failed:', result.error);
     }
 
-    // Update conversation updatedAt
-    await prisma.conversation.update({ where: { id: convId }, data: { updatedAt: new Date() } });
+    // Pause bot for 30 minutes so AI does not interrupt human agent
+    const pausedUntil = new Date(Date.now() + 30 * 60 * 1000);
+    await prisma.conversation.update({ where: { id: convId }, data: { updatedAt: new Date(), pausedUntil } as any });
 
-    return NextResponse.json({ message: msg });
+    return NextResponse.json({ message: msg, sent: result.success, error: result.error || null });
 }

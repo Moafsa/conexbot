@@ -588,6 +588,7 @@ model Order {
   driver           Contact?    @relation("DriverOrders", fields: [driverId], references: [id])
   followUpSent     Boolean     @default(false)
   followUpResponse String?
+  notes            String?
 
   @@index([couponId])
 }

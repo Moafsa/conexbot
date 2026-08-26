@@ -733,12 +733,38 @@ export const MessageProcessor = {
 
                 if (addrCandidates.length > 0) {
                     const mapboxResults: string[] = [];
+
+                    // Pre-load delivery fee rules once
+                    const feeRulesRaw = activeBot?.deliveryFeeRules;
+                    const feeRules = Array.isArray(feeRulesRaw) ? feeRulesRaw : (typeof feeRulesRaw === 'string' ? JSON.parse(feeRulesRaw || '[]') : []);
+                    const allowedCities: string[] = [...new Set(feeRules.map((r: any) => r.city).filter(Boolean))] as string[];
+                    const allowedNeighborhoods: string[] = [...new Set(feeRules.map((r: any) => r.neighborhood).filter(Boolean))] as string[];
+
                     for (const rawAddr of addrCandidates) {
                         try {
-                            // For city verification, geocode WITHOUT city context so Mapbox finds the real location.
-                            // Adding the bot's city as context would bias results and defeat the purpose of checking.
+                            // Step 1: Check if the address text mentions a registered neighborhood name.
+                            // If it does, we already know it's in the delivery area — no need for Mapbox city check.
+                            const rawLower = rawAddr.toLowerCase();
+                            const matchedNeighborhood = allowedNeighborhoods.find(n =>
+                                rawLower.includes(n.toLowerCase())
+                            );
+
+                            if (matchedNeighborhood) {
+                                // Address contains a known neighborhood — confirm to AI it's valid, then use Mapbox only to resolve the full address
+                                const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(rawAddr)}.json?access_token=${mapboxToken}&country=BR&limit=1`;
+                                const geocodeRes = await fetch(geocodeUrl);
+                                let fullResolved = rawAddr;
+                                if (geocodeRes.ok) {
+                                    const geocodeData = await geocodeRes.json();
+                                    fullResolved = geocodeData.features?.[0]?.place_name || rawAddr;
+                                }
+                                mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO CADASTRADO E ATENDIDO: **${matchedNeighborhood}** (Endereço Completo no Mapa: "${fullResolved}"). ✅ Este bairro está na lista de entrega.`);
+                                continue;
+                            }
+
+                            // Step 2: No registered neighborhood found — use Mapbox to determine city and check coverage
                             const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(rawAddr)}.json?access_token=${mapboxToken}&country=BR&limit=1`;
-                            
+
                             const geocodeRes = await fetch(geocodeUrl);
                             if (geocodeRes.ok) {
                                 const geocodeData = await geocodeRes.json();
@@ -766,15 +792,16 @@ export const MessageProcessor = {
 
                                     const fullResolved = feature.place_name || rawAddr;
 
-                                    // Check if geocoded city is in the allowed cities list
-                                    const feeRulesRaw = activeBot?.deliveryFeeRules;
-                                    const feeRules = Array.isArray(feeRulesRaw) ? feeRulesRaw : (typeof feeRulesRaw === 'string' ? JSON.parse(feeRulesRaw || '[]') : []);
-                                    const allowedCities: string[] = [...new Set(feeRules.map((r: any) => r.city).filter(Boolean))] as string[];
+                                    // Also accept if Mapbox resolves a neighborhood name that matches a registered one
+                                    const mapboxNeighborhoodMatches = allowedNeighborhoods.some(n =>
+                                        neighborhood.toLowerCase().includes(n.toLowerCase()) || n.toLowerCase().includes(neighborhood.toLowerCase())
+                                    );
                                     const cityOutsideCoverage = allowedCities.length > 0 && geocodedCity &&
-                                        !allowedCities.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase()));
+                                        !allowedCities.some(c => geocodedCity.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(geocodedCity.toLowerCase())) &&
+                                        !mapboxNeighborhoodMatches;
 
                                     if (cityOutsideCoverage) {
-                                        mapboxResults.push(`- ⛔ ENDEREÇO FORA DA ÁREA DE ATENDIMENTO: "${rawAddr}" → O Mapbox identificou que este endereço pertence à cidade de **${geocodedCity}**, que NÃO está na lista de cidades atendidas (${allowedCities.join(', ')}). VOCÊ DEVE RECUSAR A ENTREGA e informar ao cliente que não realizamos entregas em ${geocodedCity}.`);
+                                        mapboxResults.push(`- ⚠️ ENDEREÇO NÃO LOCALIZADO NA ÁREA DE ATENDIMENTO: "${rawAddr}" → O Mapbox identificou a cidade como **${geocodedCity}**, que não está na lista de cidades atendidas (${allowedCities.join(', ')}). AÇÃO OBRIGATÓRIA: Responda ao cliente com uma mensagem amigável dizendo que não conseguiu localizar o endereço e que vai verificar e já retorna, por exemplo: "Não consegui localizar seu endereço em nosso sistema. Vou verificar e já te retorno, tá bem? 😊". Em seguida, chame IMEDIATAMENTE a função chamar_humano com motivo "Endereço não localizado: ${rawAddr} (cidade identificada: ${geocodedCity})" para que um atendente humano assuma e resolva.`);
                                     } else {
                                         mapboxResults.push(`- Endereço Digitado/Salvo: "${rawAddr}" ➔ BAIRRO OFICIAL NO MAPA (MAPBOX): **${neighborhood || geocodedCity || 'Bento Gonçalves'}** (Endereço Completo no Mapa: "${fullResolved}").`);
                                     }
@@ -1106,7 +1133,7 @@ Sempre use esta referência para resolver datas como "amanhã", "próxima semana
                                 return `${i.quantity}x ${prod?.name || i.productId}`;
                             }).join(', ');
 
-                            const notifMsg = `📦 *Novo Pedido Confirmado*\n\n*Cliente:* ${existingContact.name || senderPhone}\n*Tel:* ${senderPhone}\n*Endereço:* ${orderData.address}\n*Itens:* ${itemsText}\n*Total:* R$ ${orderData.totalAmount.toFixed(2)}\n*Pagamento:* ${orderData.paymentMethod}${orderData.changeAmount ? `\n*Troco para:* R$ ${orderData.changeAmount}` : ''}`;
+                            const notifMsg = `📦 *Novo Pedido Confirmado*\n\n*Cliente:* ${existingContact.name || senderPhone}\n*Tel:* ${senderPhone}\n*Endereço:* ${orderData.address}\n*Itens:* ${itemsText}\n*Total:* R$ ${orderData.totalAmount.toFixed(2)}\n*Pagamento:* ${orderData.paymentMethod}${orderData.changeAmount ? `\n*Troco para:* R$ ${orderData.changeAmount}` : ''}${(orderData as any).notes ? `\n*Observação:* ${(orderData as any).notes}` : ''}`;
 
                             try {
                                 await prisma.message.create({

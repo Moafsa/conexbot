@@ -51,6 +51,89 @@ const STATUS_COLORS: Record<string, string> = {
     PAUSED:   'bg-gray-500/15 text-gray-400',
 };
 
+interface PresetTemplate {
+    label: string;
+    name: string;
+    category: 'MARKETING' | 'UTILITY';
+    language: string;
+    header: string;
+    body: string;
+    footer: string;
+    emoji: string;
+    description: string;
+}
+
+const PRESET_TEMPLATES: PresetTemplate[] = [
+    // ── Templates usados pelo sistema (slugs obrigatórios) ──
+    {
+        label: 'Nova Entrega Atribuida',
+        emoji: '🚚',
+        description: 'Enviado ao entregador quando um pedido é despachado. Usado pela rota e pelo bot.',
+        name: 'nova_entrega_atribuida',
+        category: 'UTILITY',
+        language: 'pt_BR',
+        header: 'Novo Pedido para Voce',
+        body: 'Ola! Voce tem um novo pedido para entregar.\n\nCliente: {{1}}\nTelefone: {{2}}\nEndereco: {{3}}\nItens: {{4}}\n\nRota no Maps: {{5}}\nApp do entregador: {{6}}',
+        footer: 'Acesse o app para confirmar a entrega',
+    },
+    {
+        label: 'Envio Link Entregador',
+        emoji: '📱',
+        description: 'Envia o link do app (PWA) para o entregador pelo WhatsApp. Usado na página Frota.',
+        name: 'envio_link_entregador',
+        category: 'UTILITY',
+        language: 'pt_BR',
+        header: 'Seu App de Entregas',
+        body: 'Ola, {{1}}! Aqui esta o seu link de acesso exclusivo ao aplicativo do entregador.\n\nLink de acesso: {{2}}\n\nAbra no navegador do celular, ative a geolocalizacao e adicione o app a sua tela inicial para receber corridas.',
+        footer: '',
+    },
+    {
+        label: 'Transbordo Humano',
+        emoji: '🙋',
+        description: 'Notifica o atendente humano quando o bot aciona escalonamento. Usado pelo agente de IA.',
+        name: 'transbordo_humano',
+        category: 'UTILITY',
+        language: 'pt_BR',
+        header: 'Atendimento Humano Solicitado',
+        body: 'Atencao! O cliente {{1}} ({{2}}) solicitou atendimento humano.\n\nMotivo: {{3}}\n\nResumo da conversa: {{4}}\n\nAcesse o CRM para atender: {{5}}\n\nO bot foi pausado e aguarda sua atencao.',
+        footer: '',
+    },
+    // ── Templates adicionais úteis ──
+    {
+        label: 'Pedido Confirmado',
+        emoji: '✅',
+        description: 'Confirma o pedido para o cliente com valor total.',
+        name: 'pedido_confirmado',
+        category: 'UTILITY',
+        language: 'pt_BR',
+        header: 'Pedido Confirmado',
+        body: 'Ola, {{1}}! Seu pedido foi confirmado. Total: R$ {{2}}. Em breve nosso entregador estara a caminho. Obrigado pela preferencia!',
+        footer: 'Responda para falar com atendimento',
+    },
+    {
+        label: 'Reengajamento Cliente',
+        emoji: '👋',
+        description: 'Retoma contato com clientes inativos para gerar novos pedidos.',
+        name: 'reengajamento_cliente',
+        category: 'MARKETING',
+        language: 'pt_BR',
+        header: 'Sentimos sua falta',
+        body: 'Ola, {{1}}! Faz um tempo que nao conversamos. Estamos aqui quando precisar. Que tal fazer um novo pedido hoje? E so responder esta mensagem!',
+        footer: '',
+    },
+    {
+        label: 'Oferta Especial',
+        emoji: '🎁',
+        description: 'Envia promoção ou condição especial para o cliente.',
+        name: 'oferta_especial',
+        category: 'MARKETING',
+        language: 'pt_BR',
+        header: 'Oferta Especial para Voce',
+        body: 'Ola, {{1}}! Temos uma oferta especial: {{2}}. Aproveite enquanto durar. Responda esta mensagem para garantir o seu agora mesmo!',
+        footer: '',
+    },
+];
+
 export default function DeveloperPage() {
     const [numbers, setNumbers] = useState<WaNumber[]>([]);
     const [allBots, setAllBots] = useState<AllBot[]>([]);
@@ -72,6 +155,18 @@ export default function DeveloperPage() {
     const [tplFooter, setTplFooter] = useState('');
     const [tplMsg, setTplMsg] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({});
     const [creatingTpl, setCreatingTpl] = useState<string | null>(null);
+
+    const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+
+    function applyPreset(preset: PresetTemplate) {
+        setTplName(preset.name);
+        setTplCategory(preset.category);
+        setTplLanguage(preset.language);
+        setTplHeader(preset.header);
+        setTplBody(preset.body);
+        setTplFooter(preset.footer);
+        setSelectedPreset(preset.name);
+    }
 
     // New key form state
     const [showKeyForm, setShowKeyForm] = useState<string | null>(null);
@@ -148,9 +243,25 @@ export default function DeveloperPage() {
         setCreatingTpl(botId);
         setTplMsg(p => ({ ...p, [botId]: { type: 'ok', text: '' } }));
         try {
+            // Extract variable count from text ({{1}}, {{2}}, ...)
+            const countVars = (text: string) => {
+                const matches = text.match(/\{\{\d+\}\}/g) || [];
+                return new Set(matches).size;
+            };
+            const genExamples = (count: number, prefix: string) =>
+                Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+
             const components: any[] = [];
-            if (tplHeader.trim()) components.push({ type: 'HEADER', format: 'TEXT', text: tplHeader.trim() });
-            components.push({ type: 'BODY', text: tplBody.trim() });
+            if (tplHeader.trim()) {
+                const headerVars = countVars(tplHeader.trim());
+                const headerComp: any = { type: 'HEADER', format: 'TEXT', text: tplHeader.trim() };
+                if (headerVars > 0) headerComp.example = { header_text: genExamples(headerVars, 'Exemplo') };
+                components.push(headerComp);
+            }
+            const bodyVars = countVars(tplBody.trim());
+            const bodyComp: any = { type: 'BODY', text: tplBody.trim() };
+            if (bodyVars > 0) bodyComp.example = { body_text: [genExamples(bodyVars, 'Exemplo')] };
+            components.push(bodyComp);
             if (tplFooter.trim()) components.push({ type: 'FOOTER', text: tplFooter.trim() });
 
             const res = await fetch(`/api/v1/templates?botId=${botId}`, {
@@ -168,6 +279,7 @@ export default function DeveloperPage() {
                 setTplMsg(p => ({ ...p, [botId]: { type: 'ok', text: `Template enviado para aprovação da Meta (24-72h). ID: ${data.id}` } }));
                 setTplName(''); setTplBody(''); setTplHeader(''); setTplFooter('');
                 setShowTplForm(null);
+                setSelectedPreset(null);
                 fetchTemplates(botId);
             } else {
                 const msg = data.details?.error?.error_user_msg || data.details?.error?.message || data.error || 'Erro ao criar';
@@ -465,30 +577,85 @@ Authorization: Bearer cxk_sua_api_key
                                                 </div>
 
                                                 {showTplForm === bot.id && (
-                                                    <div className="bg-black/30 border border-white/8 rounded-xl p-4 space-y-2.5">
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            <div className="col-span-3">
-                                                                <input value={tplName} onChange={e => setTplName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="nome_do_template (snake_case)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono" />
+                                                    <div className="space-y-3">
+                                                        {/* Preset cards */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">Templates prontos — clique para preencher e enviar</p>
+
+                                                            <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500/80 mb-1.5 flex items-center gap-1">
+                                                                <span className="inline-block w-3 h-px bg-amber-500/40" />
+                                                                Usados pelo sistema — slug obrigatório
+                                                                <span className="inline-block flex-1 h-px bg-amber-500/20" />
+                                                            </p>
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                                                                {PRESET_TEMPLATES.slice(0, 3).map(preset => (
+                                                                    <button
+                                                                        key={preset.name}
+                                                                        onClick={() => applyPreset(preset)}
+                                                                        className={`text-left p-3 rounded-xl border transition ${selectedPreset === preset.name ? 'bg-amber-500/15 border-amber-500/50' : 'bg-black/20 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <span className="text-base leading-none">{preset.emoji}</span>
+                                                                            <span className={`text-xs font-bold truncate ${selectedPreset === preset.name ? 'text-amber-300' : 'text-white'}`}>{preset.label}</span>
+                                                                        </div>
+                                                                        <p className="text-[10px] text-gray-500 leading-snug">{preset.description}</p>
+                                                                        <code className={`text-[9px] mt-1.5 block font-mono ${selectedPreset === preset.name ? 'text-amber-400' : 'text-gray-600'}`}>{preset.name}</code>
+                                                                    </button>
+                                                                ))}
                                                             </div>
-                                                            <select value={tplCategory} onChange={e => setTplCategory(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                                                                <option value="MARKETING">Marketing</option>
-                                                                <option value="UTILITY">Utilitário</option>
-                                                                <option value="AUTHENTICATION">Autenticação</option>
-                                                            </select>
-                                                            <select value={tplLanguage} onChange={e => setTplLanguage(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                                                                <option value="pt_BR">pt_BR</option>
-                                                                <option value="en_US">en_US</option>
-                                                                <option value="es">es</option>
-                                                            </select>
+
+                                                            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-600 mb-1.5 flex items-center gap-1">
+                                                                <span className="inline-block w-3 h-px bg-gray-600" />
+                                                                Outros templates úteis
+                                                                <span className="inline-block flex-1 h-px bg-gray-600/40" />
+                                                            </p>
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                                {PRESET_TEMPLATES.slice(3).map(preset => (
+                                                                    <button
+                                                                        key={preset.name}
+                                                                        onClick={() => applyPreset(preset)}
+                                                                        className={`text-left p-3 rounded-xl border transition ${selectedPreset === preset.name ? 'bg-blue-500/15 border-blue-500/50' : 'bg-black/20 border-white/8 hover:border-white/20 hover:bg-white/5'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <span className="text-base leading-none">{preset.emoji}</span>
+                                                                            <span className={`text-xs font-bold truncate ${selectedPreset === preset.name ? 'text-blue-300' : 'text-white'}`}>{preset.label}</span>
+                                                                        </div>
+                                                                        <p className="text-[10px] text-gray-500 leading-snug">{preset.description}</p>
+                                                                        <div className="flex items-center gap-1.5 mt-1.5">
+                                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${preset.category === 'UTILITY' ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400'}`}>{preset.category}</span>
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
                                                         </div>
-                                                        <input value={tplHeader} onChange={e => setTplHeader(e.target.value)} placeholder="Cabeçalho (opcional)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
-                                                        <textarea value={tplBody} onChange={e => setTplBody(e.target.value)} rows={3} placeholder="Corpo da mensagem. Use {{1}}, {{2}} para variáveis." className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none" />
-                                                        <input value={tplFooter} onChange={e => setTplFooter(e.target.value)} placeholder="Rodapé (opcional)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
-                                                        <div className="flex gap-2 pt-1">
-                                                            <button onClick={() => createTemplate(bot.id)} disabled={!tplName.trim() || !tplBody.trim() || creatingTpl === bot.id} className="px-4 py-2 bg-blue-500 text-white text-sm font-black rounded-lg hover:bg-blue-400 disabled:opacity-40 transition">
-                                                                {creatingTpl === bot.id ? 'Enviando...' : 'Enviar para Meta'}
-                                                            </button>
-                                                            <button onClick={() => setShowTplForm(null)} className="px-4 py-2 bg-white/5 text-gray-400 text-sm rounded-lg hover:bg-white/10">Cancelar</button>
+
+                                                        {/* Form */}
+                                                        <div className="bg-black/30 border border-white/8 rounded-xl p-4 space-y-2.5">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Detalhes do template {selectedPreset && <span className="text-blue-400 normal-case font-normal">— editável antes de enviar</span>}</p>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div className="col-span-3">
+                                                                    <input value={tplName} onChange={e => { setTplName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setSelectedPreset(null); }} placeholder="nome_do_template (snake_case)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 font-mono" />
+                                                                </div>
+                                                                <select value={tplCategory} onChange={e => setTplCategory(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                                                                    <option value="MARKETING">Marketing</option>
+                                                                    <option value="UTILITY">Utilitário</option>
+                                                                    <option value="AUTHENTICATION">Autenticação</option>
+                                                                </select>
+                                                                <select value={tplLanguage} onChange={e => setTplLanguage(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                                                                    <option value="pt_BR">pt_BR</option>
+                                                                    <option value="en_US">en_US</option>
+                                                                    <option value="es">es</option>
+                                                                </select>
+                                                            </div>
+                                                            <input value={tplHeader} onChange={e => setTplHeader(e.target.value)} placeholder="Cabeçalho (opcional, sem emojis)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+                                                            <textarea value={tplBody} onChange={e => setTplBody(e.target.value)} rows={3} placeholder="Corpo da mensagem. Use {{1}}, {{2}} para variáveis." className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none" />
+                                                            <input value={tplFooter} onChange={e => setTplFooter(e.target.value)} placeholder="Rodapé (opcional)" className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500" />
+                                                            <div className="flex gap-2 pt-1">
+                                                                <button onClick={() => createTemplate(bot.id)} disabled={!tplName.trim() || !tplBody.trim() || creatingTpl === bot.id} className="px-4 py-2 bg-blue-500 text-white text-sm font-black rounded-lg hover:bg-blue-400 disabled:opacity-40 transition">
+                                                                    {creatingTpl === bot.id ? 'Enviando...' : 'Enviar para Meta'}
+                                                                </button>
+                                                                <button onClick={() => { setShowTplForm(null); setSelectedPreset(null); }} className="px-4 py-2 bg-white/5 text-gray-400 text-sm rounded-lg hover:bg-white/10">Cancelar</button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}

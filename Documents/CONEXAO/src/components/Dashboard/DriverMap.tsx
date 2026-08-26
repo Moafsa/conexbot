@@ -71,6 +71,56 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
     const [driverKeywords, setDriverKeywords] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
+    // Edit Order Modal State
+    const [editOrderModalOpen, setEditOrderModalOpen] = useState(false);
+    const [editingOrder, setEditingOrder] = useState<any>(null);
+    const [editAddress, setEditAddress] = useState('');
+    const [editNotes, setEditNotes] = useState('');
+    const [editPayment, setEditPayment] = useState('');
+    const [editItems, setEditItems] = useState<Array<{ productId: string; productName: string; quantity: number; unitPrice: number }>>([]);
+    const [savingOrder, setSavingOrder] = useState(false);
+
+    function openEditOrder(order: any) {
+        setEditingOrder(order);
+        setEditAddress(order.address || '');
+        setEditNotes((order as any).notes || '');
+        setEditPayment((order as any).paymentMethod || '');
+        setEditItems((order.items || []).map((i: any) => ({
+            productId: i.productId,
+            productName: i.product?.name || i.productId,
+            quantity: i.quantity,
+            unitPrice: Number(i.unitPrice),
+        })));
+        setEditOrderModalOpen(true);
+    }
+
+    async function saveEditOrder() {
+        if (!editingOrder) return;
+        setSavingOrder(true);
+        try {
+            const res = await fetch(`/api/orders/${editingOrder.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    address: editAddress,
+                    notes: editNotes || null,
+                    paymentMethod: editPayment || undefined,
+                    items: editItems.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
+                }),
+            });
+            if (res.ok) {
+                toast.success('Pedido atualizado!');
+                setEditOrderModalOpen(false);
+                fetchPendingOrders();
+            } else {
+                const d = await res.json();
+                toast.error(d.error || 'Erro ao salvar');
+            }
+        } finally {
+            setSavingOrder(false);
+        }
+    }
+
     // Delivery Fees Modal State
     const [feesModalOpen, setFeesModalOpen] = useState(false);
     const [deliveryFeeType, setDeliveryFeeType] = useState('FIXED');
@@ -331,6 +381,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                 <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
                                 <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${cleanAddress(customer.notes || customer.needs)}</p>
                                 <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items && order.items.length > 0 ? order.items.map((i: any) => `${i.product?.name || 'Gás'} x${i.quantity}`).join(', ') : 'Gás 13kg'}</p>
+                                ${(order as any).notes ? `<p class="text-[11px] text-amber-700 mt-1 bg-amber-50 px-1.5 py-0.5 rounded font-medium">📝 ${(order as any).notes}</p>` : ''}
                             </div>
                         `);
 
@@ -413,6 +464,7 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                             <h4 class="font-bold text-sm mt-1 text-slate-800">${customer.name || 'Cliente'}</h4>
                             <p class="text-[11px] text-slate-500 mt-1"><b>Endereço:</b> ${cleanAddress(customer.notes || customer.needs)}</p>
                             <p class="text-xs text-slate-700 mt-1 font-semibold">Itens: ${order.items && order.items.length > 0 ? order.items.map((i: any) => `${i.product?.name || 'Gás'} x${i.quantity}`).join(', ') : 'Gás 13kg'}</p>
+                            ${(order as any).notes ? `<p class="text-[11px] text-amber-700 mt-1 bg-amber-50 px-1.5 py-0.5 rounded font-medium">📝 ${(order as any).notes}</p>` : ''}
                         </div>
                     `);
 
@@ -860,10 +912,23 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                                                     <span className="shrink-0">🛒</span>
                                                     <span className="truncate"><b>Pedido:</b> {itemsSummary}</span>
                                                 </p>
+                                                {(order as any).notes && (
+                                                    <p className="text-[10px] text-amber-300 flex items-start gap-1 border-t border-white/5 pt-1.5">
+                                                        <span className="shrink-0">📝</span>
+                                                        <span className="leading-relaxed">{(order as any).notes}</span>
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[9px]">
                                                 <span className="text-amber-400 font-extrabold">R$ {Number(order.totalAmount || 0).toFixed(2)}</span>
                                                 <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); openEditOrder(order); }}
+                                                        className="text-blue-400 hover:text-blue-300 font-bold px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 cursor-pointer"
+                                                        title="Editar Pedido"
+                                                    >
+                                                        ✏️ Editar
+                                                    </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleOrderAction(order.id, 'PAY'); }}
                                                         className="text-emerald-400 hover:text-emerald-300 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 cursor-pointer"
@@ -1580,6 +1645,97 @@ export default function DriverMap({ mapboxToken }: DriverMapProps) {
                     </div>
                 </div>
             )}
+
+        {/* Modal de Edição de Pedido */}
+        {editOrderModalOpen && editingOrder && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+                <div className="w-full max-w-lg bg-[#07041a] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4 animate-fade-in text-white max-h-[90vh] flex flex-col">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3 shrink-0">
+                        <div>
+                            <h3 className="text-base font-bold text-white">Editar Pedido</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">#{editingOrder.id.substring(0, 8)} — {editingOrder.contact?.name || editingOrder.contact?.phone || 'Cliente'}</p>
+                        </div>
+                        <button onClick={() => setEditOrderModalOpen(false)} className="p-1.5 rounded-xl hover:bg-white/10 text-gray-400 hover:text-white transition">
+                            <XCircle size={18} />
+                        </button>
+                    </div>
+
+                    <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+                        {/* Endereço */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">Endereço de Entrega</label>
+                            <input
+                                value={editAddress}
+                                onChange={e => setEditAddress(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6366f1]"
+                                placeholder="Rua, número, bairro..."
+                            />
+                        </div>
+
+                        {/* Observações */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">Observações / Horário</label>
+                            <textarea
+                                value={editNotes}
+                                onChange={e => setEditNotes(e.target.value)}
+                                rows={2}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6366f1] resize-none"
+                                placeholder="Horário de entrega, ponto de referência, instrução especial..."
+                            />
+                        </div>
+
+                        {/* Pagamento */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">Forma de Pagamento</label>
+                            <select
+                                value={editPayment}
+                                onChange={e => setEditPayment(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#6366f1]"
+                            >
+                                <option value="">— não alterar —</option>
+                                <option value="PIX">PIX</option>
+                                <option value="DINHEIRO">Dinheiro</option>
+                                <option value="CARTAO">Cartão</option>
+                            </select>
+                        </div>
+
+                        {/* Itens */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1.5">Itens do Pedido</label>
+                            <div className="space-y-2">
+                                {editItems.map((item, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 bg-white/5 border border-white/8 rounded-xl px-3 py-2">
+                                        <span className="text-xs text-gray-300 flex-1 truncate">{item.productName}</span>
+                                        <span className="text-[10px] text-gray-500">R$ {item.unitPrice.toFixed(2)}</span>
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => setEditItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: Math.max(1, p.quantity - 1) } : p))} className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center">−</button>
+                                            <span className="text-sm font-bold text-white w-6 text-center">{item.quantity}</span>
+                                            <button onClick={() => setEditItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: p.quantity + 1 } : p))} className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center">+</button>
+                                            <button onClick={() => setEditItems(prev => prev.filter((_, i) => i !== idx))} className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold flex items-center justify-center ml-1">✕</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {editItems.length === 0 && <p className="text-xs text-gray-600 text-center py-2">Nenhum item. O total será zerado.</p>}
+                            </div>
+                            {editItems.length > 0 && (
+                                <p className="text-xs text-amber-400 font-bold mt-2 text-right">
+                                    Total: R$ {editItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0).toFixed(2)}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-3 border-t border-white/5 shrink-0">
+                        <button onClick={() => setEditOrderModalOpen(false)} className="flex-1 p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 font-semibold rounded-2xl transition border border-white/5">
+                            Cancelar
+                        </button>
+                        <button onClick={saveEditOrder} disabled={savingOrder} className="flex-1 p-2.5 bg-gradient-to-r from-[#6366f1] to-[#a855f7] hover:opacity-90 text-white font-bold rounded-2xl transition disabled:opacity-50">
+                            {savingOrder ? 'Salvando...' : 'Salvar Alterações'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         </div>
     );
